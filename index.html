@@ -7,6 +7,10 @@
       content="width=device-width, initial-scale=1" />
 
     <title>HTBAH App</title>
+    <link
+      rel="icon"
+      type="image/png"
+      href="assets/img/htbah-begleit-app-logo.png" />
 
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
@@ -17,33 +21,86 @@
     <link
       href="https://unpkg.com/rpg-awesome/css/rpg-awesome.min.css"
       rel="stylesheet" />
+    <link
+      href="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.css"
+      rel="stylesheet" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css"
+      rel="stylesheet" />
 
-    <script src="https://unpkg.com/vue@3"></script>
-    <script src="https://unpkg.com/vue-router@4"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"></script>
 
     <style>
+      :root,
+      [data-theme='dark'] {
+        --bg-color: #0f172a;
+        --text-color: #e5e7eb;
+        --heading-color: #f9fafb;
+        --paragraph-color: #cbd5f5;
+        --list-color: #e2e8f0;
+        --card-bg: #1e293b;
+        --card-color: #f1f5f9;
+        --border-color: #334155;
+        --input-bg: #0f172a;
+        --input-color: #f1f5f9;
+        --placeholder-color: #64748b;
+        --navbar-bg: #1e293b;
+        --navbar-link: #cbd5f5;
+        --primary-color: #3b82f6;
+        --success-color: #22c55e;
+        --danger-color: #ef4444;
+        --warning-color: #f59e0b;
+        --secondary-color: #64748b;
+        --modal-backdrop: rgba(2, 6, 23, 0.75);
+        --modal-bg: #1e293b;
+      }
+
+      [data-theme='light'] {
+        --bg-color: #f8fafc;
+        --text-color: #0f172a;
+        --heading-color: #0f172a;
+        --paragraph-color: #334155;
+        --list-color: #1e293b;
+        --card-bg: #ffffff;
+        --card-color: #0f172a;
+        --border-color: #cbd5e1;
+        --input-bg: #ffffff;
+        --input-color: #0f172a;
+        --placeholder-color: #64748b;
+        --navbar-bg: #ffffff;
+        --navbar-link: #334155;
+        --primary-color: #2563eb;
+        --success-color: #16a34a;
+        --danger-color: #dc2626;
+        --warning-color: #d97706;
+        --secondary-color: #64748b;
+        --modal-backdrop: rgba(15, 23, 42, 0.4);
+        --modal-bg: #ffffff;
+      }
+
       body {
-        background: #0f172a; /* dunkles Blau statt schwarz */
-        color: #e5e7eb; /* weiches Weiß */
+        background: var(--bg-color);
+        color: var(--text-color);
         font-size: 16px;
       }
 
       .card {
-        background: #1e293b;
-        color: #f1f5f9;
+        background: var(--card-bg);
+        color: var(--card-color);
         border-radius: 16px;
         padding: 12px;
+        border: 1px solid var(--border-color);
       }
 
       h2,
       h4,
       h5 {
-        color: #f9fafb;
+        color: var(--heading-color);
       }
 
       p {
-        color: #cbd5f5;
+        color: var(--paragraph-color);
         margin-bottom: 6px;
       }
 
@@ -52,44 +109,44 @@
       }
 
       li {
-        color: #e2e8f0;
+        color: var(--list-color);
         margin-bottom: 4px;
       }
 
-      input,
+      input:not([type='checkbox']):not([type='radio']),
       select {
-        background: #0f172a !important;
-        color: #f1f5f9 !important;
-        border: 1px solid #334155 !important;
+        background: var(--input-bg) !important;
+        color: var(--input-color) !important;
+        border: 1px solid var(--border-color) !important;
       }
 
       input::placeholder {
-        color: #64748b;
+        color: var(--placeholder-color);
       }
 
       .btn-primary {
-        background: #3b82f6;
+        background: var(--primary-color);
         border: none;
       }
 
       .btn-success {
-        background: #22c55e;
+        background: var(--success-color);
         border: none;
       }
 
       .btn-danger {
-        background: #ef4444;
+        background: var(--danger-color);
         border: none;
       }
 
       .btn-warning {
-        background: #f59e0b;
+        background: var(--warning-color);
         border: none;
-        color: black;
+        color: #111827;
       }
 
       .btn-secondary {
-        background: #64748b;
+        background: var(--secondary-color);
         border: none;
       }
 
@@ -97,18 +154,31 @@
         position: fixed;
         bottom: 0;
         width: 100%;
-        background: #1e293b;
-        border-top: 1px solid #334155;
+        background: var(--navbar-bg);
+        border-top: 1px solid var(--border-color);
       }
 
       .navbar-fixed a {
-        color: #cbd5f5;
+        color: var(--navbar-link);
         text-decoration: none;
         font-size: 20px;
       }
 
+      .navbar-fixed button {
+        color: var(--navbar-link);
+        text-decoration: none;
+        font-size: 20px;
+        background: transparent;
+        border: none;
+        padding: 0;
+      }
+
       .navbar-fixed a.router-link-active {
-        color: #3b82f6;
+        color: var(--primary-color);
+      }
+
+      .navbar-fixed button:hover {
+        color: var(--primary-color);
       }
 
       .content {
@@ -116,7 +186,177 @@
       }
 
       .navbar-fixed {
-        height: 70px;
+        height: 50px;
+      }
+
+      .regelwerk-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: var(--modal-backdrop);
+        z-index: 2000;
+      }
+
+      .regelwerk-modal-window {
+        position: absolute;
+        top: 5vh;
+        left: 5vw;
+        width: 90vw;
+        height: 85vh;
+        min-width: 320px;
+        min-height: 280px;
+        resize: both;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border-color);
+        background: var(--modal-bg);
+      }
+
+      .regelwerk-modal-content {
+        flex: 1;
+        border: none;
+      }
+
+      .modal-content {
+        background: var(--modal-bg);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+      }
+
+      .modal-header,
+      .modal-footer {
+        border-color: var(--border-color);
+      }
+
+      .form-check-input {
+        border-color: var(--border-color);
+      }
+
+      .theme-toggle-input {
+        width: 2.8em;
+        height: 1.4em;
+        cursor: pointer;
+      }
+
+      .action-card {
+        display: block;
+        transition: transform 0.15s ease, border-color 0.15s ease;
+      }
+
+      .action-card:hover {
+        transform: translateY(-1px);
+        border-color: var(--primary-color);
+      }
+
+      .action-card-arrow {
+        color: var(--primary-color);
+        font-size: 28px;
+      }
+
+      .charakterbild-vorschau {
+        width: 100%;
+        aspect-ratio: 3 / 4;
+        object-fit: cover;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: var(--input-bg);
+      }
+
+      .charakterbild-vorschau-klein {
+        max-height: 180px;
+        width: auto;
+        max-width: 100%;
+        aspect-ratio: 3 / 4;
+        object-fit: cover;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: var(--input-bg);
+      }
+
+      .charakterbild-platzhalter {
+        width: 100%;
+        aspect-ratio: 3 / 4;
+        border-radius: 10px;
+        border: 1px dashed var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--paragraph-color);
+        background: var(--input-bg);
+      }
+
+      .charakterbild-platzhalter-klein {
+        max-height: 180px;
+        width: 100%;
+        border-radius: 10px;
+        border: 1px dashed var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--paragraph-color);
+        background: var(--input-bg);
+        aspect-ratio: 3 / 4;
+      }
+
+      .cropper-image {
+        max-width: 100%;
+        max-height: 60vh;
+        display: block;
+      }
+
+      .quill-editor-host {
+        min-height: 60vh;
+      }
+
+      .quill-editor-host .ql-toolbar.ql-snow,
+      .quill-editor-host .ql-container.ql-snow {
+        border-color: var(--border-color);
+      }
+
+      .quill-editor-host .ql-toolbar.ql-snow {
+        background: var(--card-bg);
+      }
+
+      .quill-editor-host .ql-container.ql-snow {
+        background: var(--input-bg);
+      }
+
+      .quill-editor-host .ql-editor {
+        color: var(--text-color);
+      }
+
+      .quill-editor-host .ql-editor.ql-blank::before {
+        color: var(--placeholder-color);
+      }
+
+      .wuerfel-ergebnis-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .wuerfel-ergebnis-chip-w10 {
+        background: rgba(59, 130, 246, 0.2);
+        color: var(--text-color);
+        border: 1px solid rgba(59, 130, 246, 0.5);
+      }
+
+      .wuerfel-ergebnis-chip-w100 {
+        background: rgba(34, 197, 94, 0.2);
+        color: var(--text-color);
+        border: 1px solid rgba(34, 197, 94, 0.5);
+      }
+
+      .form-check-input:checked {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+      }
+
+      [data-theme='dark'] .btn-close {
+        filter: invert(1) grayscale(100%) brightness(200%);
       }
     </style>
   </head>
@@ -124,754 +364,17 @@
   <body>
     <div id="app"></div>
 
-    <script>
-      const STORAGE_KEY = 'htbah_character';
-      const PRESET_KEY = 'htbah_presets';
-
-      /* ===================== Utils ===================== */
-      function loadChar() {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY));
-      }
-      function saveChar(c) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(c));
-      }
-
-      function loadPresets() {
-        return JSON.parse(localStorage.getItem(PRESET_KEY)) || [];
-      }
-
-      function savePresets(presets) {
-        localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
-      }
-
-      function d10() {
-        return Math.floor(Math.random() * 10) + 1;
-      }
-      function d100() {
-        return Math.floor(Math.random() * 100) + 1;
-      }
-
-      /* ===================== Home ===================== */
-      const Home = {
-        template: `
-                                                <div class="container content py-3 text-center">
-                                                    <h2>HTBAH</h2>
-                                                    <p class="text-secondary">Simple. Schnell. Dein Abenteuer.</p>
-
-                                                    <router-link class="btn btn-primary w-100 mb-2" to="/create">
-                                                        🧙 Neuer Charakter
-                                                    </router-link>
-
-                                                    <router-link class="btn btn-success w-100 mb-2" to="/play">
-                                                        ⚔️ Abenteuer starten
-                                                    </router-link>
-
-                                                    <router-link class="btn btn-danger w-100" to="/settings">
-                                                        🗑️ Daten zurücksetzen
-                                                    </router-link>
-                                                </div>`,
-      };
-
-      /* ===================== Create ===================== */
-      const Create = {
-        data() {
-          return {
-            presets: loadPresets(),
-            selectedPreset: '',
-            char: loadChar() || {
-              name: '',
-              handeln: [],
-              wissen: [],
-              soziales: [],
-            },
-            activeInfo: null,
-            skill: { name: '', value: 0, type: 'handeln' },
-          };
-        },
-        computed: {
-          sums() {
-            return {
-              handeln: this.char.handeln.reduce((s, x) => s + x.value, 0),
-              wissen: this.char.wissen.reduce((s, x) => s + x.value, 0),
-              soziales: this.char.soziales.reduce((s, x) => s + x.value, 0),
-            };
-          },
-          abilities() {
-            return {
-              handeln: Math.round(this.sums.handeln / 10),
-              wissen: Math.round(this.sums.wissen / 10),
-              soziales: Math.round(this.sums.soziales / 10),
-            };
-          },
-          geist() {
-            return {
-              handeln: Math.round(this.abilities.handeln / 10),
-              wissen: Math.round(this.abilities.wissen / 10),
-              soziales: Math.round(this.abilities.soziales / 10),
-            };
-          },
-          points() {
-            return this.sums.handeln + this.sums.wissen + this.sums.soziales;
-          },
-        },
-        watch: {
-          char: {
-            deep: true,
-            handler() {
-              saveChar(this.char);
-            },
-          },
-        },
-        methods: {
-          applyPreset() {
-            const p = this.presets.find((x) => x.name === this.selectedPreset);
-            if (!p) return;
-
-            if (!confirm('Aktuellen Charakter überschreiben?')) return;
-
-            this.char.handeln = JSON.parse(JSON.stringify(p.handeln));
-            this.char.wissen = JSON.parse(JSON.stringify(p.wissen));
-            this.char.soziales = JSON.parse(JSON.stringify(p.soziales));
-          },
-          toggleInfo(type) {
-            this.activeInfo = this.activeInfo === type ? null : type;
-          },
-          sortedSkills(type) {
-            return [...this.char[type]].sort((a, b) => {
-              return a.name.localeCompare(b.name, 'de');
-            });
-          },
-          editSkill(skill) {
-            skill.editing = true;
-            skill._backup = { ...skill };
-          },
-
-          saveSkill(skill) {
-            if (skill.value > 100) {
-              alert('Max 100');
-              return;
-            }
-            skill.editing = false;
-          },
-
-          cancelEdit(skill) {
-            Object.assign(skill, skill._backup);
-            skill.editing = false;
-          },
-
-          removeSkill(type, skill) {
-            if (!confirm(`Fähigkeit "${skill.name}" wirklich löschen?`)) {
-              return;
-            }
-
-            const index = this.char[type].indexOf(skill);
-            this.char[type].splice(index, 1);
-          },
-          add() {
-            if (!this.skill.name) {
-              alert('Gib einen Namen an.');
-              return;
-            }
-
-            let val = Number(this.skill.value);
-
-            if (val <= 0) {
-              alert('Wert muss größer als 0 sein');
-              return;
-            }
-
-            if (val > 100) {
-              alert('Maximalwert ist 100');
-              return;
-            }
-
-            if (this.points + val > 400) {
-              alert('Du hast nicht genug Punkte übrig');
-              return;
-            }
-
-            this.char[this.skill.type].push({
-              name: this.skill.name,
-              value: val,
-            });
-
-            this.skill.name = '';
-            this.skill.value = 0;
-          },
-        },
-        template: `
-                                                <div class="container content py-3">
-
-                                                <h4>Charakter</h4>
-
-                                                <div class="card p-3 mb-3">
-                                                <h5>Preset laden</h5>
-
-                                                <select class="form-select mb-2" v-model="selectedPreset">
-                                                <option value="">-- auswählen --</option>
-                                                <option v-for="p in presets" :value="p.name">
-                                                {{p.name}}
-                                                </option>
-                                                </select>
-
-                                                <button class="btn btn-primary w-100" @click="applyPreset">
-                                                Preset anwenden
-                                                </button>
-                                                </div>
-
-                                                <div class="mb-3">
-                                                    <button class="btn btn-outline-light w-100" data-bs-toggle="collapse" data-bs-target="#infoBox">
-                                                        ℹ️ Wie funktioniert das?
-                                                    </button>
-
-                                                    <div id="infoBox" class="collapse mt-2">
-                                                        <div class="card p-3">
-                                                            <p><strong>Du hast 400 Punkte.</strong> Diese verteilst du auf Fähigkeiten.</p>
-                                                            <p><strong>Fähigkeiten</strong> sind konkrete Dinge (z.B. Klettern, Lügen).</p>
-                                                            <p><strong>Kategorien:</strong></p>
-                                                            <ul>
-                                                                <li><strong>Handeln</strong> → körperlich / aktiv</li>
-                                                                <li><strong>Wissen</strong> → logisch / gelernt</li>
-                                                                <li><strong>Soziales</strong> → Interaktion</li>
-                                                            </ul>
-                                                            <p><strong>Begabung</strong> entsteht automatisch aus deinen Punkten und verbessert alle Fähigkeiten.</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <input class="form-control mb-2" v-model="char.name" placeholder="Name">
-
-                                                <div class="card p-2 mb-2">
-                                                <div class="mb-2">
-                                                    <p>
-                                                        Punkte: <strong>{{points}}</strong> / 400
-                                                        <span class="text-warning">({{400 - points}} übrig)</span>
-                                                    </p>
-
-                                                    <div class="progress" style="height:10px;">
-                                                        <div class="progress-bar"
-                                                             :style="{width: (points/400*100) + '%'}">
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                </div>
-
-                                                <div v-for="type in ['handeln','wissen','soziales']" class="card p-2 mb-2">
-                                                <h5 class="text-uppercase fw-bold">{{type}}</h5>
-                                                <p>Summe: {{sums[type]}}</p>
-                                                <p>
-                                                Begabung: <strong>{{abilities[type]}}</strong>
-                                                <span
-                                                    class="material-symbols-outlined"
-                                                    @click="toggleInfo(type)"
-                                                    style="cursor:pointer;">
-                                                info
-                                                </span>
-                                                <div v-if="activeInfo === type" class="mt-2 p-2 rounded" style="background:#0f172a;">
-                                                    <small>
-                                                        Begabung = Summe der Fähigkeiten / 10.<br>
-                                                        Verbessert alle Fähigkeiten dieser Kategorie.
-                                                    </small>
-                                                </div>
-                                                </p>
-                                                <p>Geistesblitz: {{geist[type]}}</p>
-
-                                                <ul>
-                                                <li v-for="(s, i) in sortedSkills(type)" class="mb-2 p-2 rounded" style="background:#0f172a;">
-
-                                                    <div v-if="!s.editing">
-                                                        <strong>{{s.name}}</strong><br>
-                                                        <small>{{s.value}} + {{abilities[type]}} = {{s.value + abilities[type]}}</small>
-
-                                                        <div class="mt-1">
-                                                            <button class="btn btn-sm btn-secondary me-1"
-                                                                    @click="editSkill(s)">
-                                                                ✏️
-                                                            </button>
-
-                                                            <button class="btn btn-sm btn-danger"
-                                                                    @click="removeSkill(type, s)">
-                                                                🗑️
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    <div v-else>
-                                                        <input class="form-control mb-1" v-model="s.name">
-                                                        <div class="mb-2 d-flex align-items-center gap-2">
-
-              <input type="range"
-                     class="form-range flex-grow-1"
-                     v-model.number="skill.value"
-                     min="0"
-                     max="100"
-                     step="1">
-
-              <input type="number"
-                     class="form-control"
-                     style="width:70px"
-                     v-model.number="skill.value"
-                     min="0"
-                     max="100">
-
-            </div>
-                                                        <button class="btn btn-sm btn-success me-1"
-                                                                @click="saveSkill(s)">
-                                                            ✔️
-                                                        </button>
-
-                                                        <button class="btn btn-sm btn-secondary"
-                                                                @click="cancelEdit(s)">
-                                                            ✖️
-                                                        </button>
-                                                    </div>
-
-                                                </li>
-                                                </ul>
-                                                </div>
-
-                                                <div class="card p-2">
-                                                <h5>Neue Fähigkeit</h5>
-                                                <input class="form-control mb-2" v-model="skill.name">
-                                                <input type="number" class="form-control mb-2"
-                                                       v-model="skill.value"
-                                                       min="0"
-                                                       max="100">
-                                                <select class="form-select mb-2" v-model="skill.type">
-                                                <option value="handeln">Handeln</option>
-                                                <option value="wissen">Wissen</option>
-                                                <option value="soziales">Soziales</option>
-                                                </select>
-
-                                                <button class="btn btn-primary w-100" @click="add">Hinzufügen</button>
-                                                </div>
-                                                <div style="height: 80px;"></div>
-
-                                                </div>`,
-      };
-
-      /* ===================== Play ===================== */
-      const Play = {
-        data() {
-          return {
-            char: loadChar(),
-            log: [],
-            enemyHP: 100,
-            initiative: null,
-          };
-        },
-        created() {
-          if (!this.char) this.$router.push('/create');
-        },
-        methods: {
-          rollInitiative() {
-            this.initiative =
-              d10() +
-              Math.round(
-                this.char.handeln.reduce((s, x) => s + x.value, 0) / 10,
-              );
-            this.log.unshift('Initiative: ' + this.initiative);
-          },
-          attack() {
-            let roll = d100();
-            let skill = this.char.handeln[0];
-
-            if (!skill) return;
-
-            let value =
-              skill.value +
-              Math.round(
-                this.char.handeln.reduce((s, x) => s + x.value, 0) / 10,
-              );
-
-            if (roll <= value) {
-              let dmg = d10() * 5;
-              this.enemyHP -= dmg;
-              this.log.unshift('Treffer! Schaden: ' + dmg);
-            } else {
-              this.log.unshift('Verfehlt (' + roll + ')');
-            }
-          },
-          reroll() {
-            this.log.unshift('Geistesblitz genutzt!');
-          },
-          resetFight() {
-            this.enemyHP = 100;
-            this.log = [];
-          },
-        },
-        template: `
-                                                <div class="container content py-3" v-if="char">
-
-                                                <h4>{{char.name}}</h4>
-
-                                                <div class="card p-2 mb-2">
-                                                <p>Enemy HP: {{enemyHP}}</p>
-                                                </div>
-
-                                                <button class="btn btn-warning w-100 mb-2" @click="rollInitiative">
-                                                Initiative würfeln
-                                                </button>
-
-                                                <button class="btn btn-danger w-100 mb-2" @click="attack">
-                                                Angriff
-                                                </button>
-
-                                                <button class="btn btn-secondary w-100 mb-2" @click="reroll">
-                                                Geistesblitz
-                                                </button>
-
-                                                <button class="btn btn-outline-light w-100 mb-2" @click="resetFight">
-                                                Reset Kampf
-                                                </button>
-
-                                                <div class="card p-2">
-                                                <h5>Log</h5>
-                                                <div v-for="l in log">{{l}}</div>
-                                                </div>
-
-                                                </div>`,
-      };
-
-      /* ===================== Settings ===================== */
-      const Settings = {
-        methods: {
-          clear() {
-            localStorage.clear();
-            location.reload();
-          },
-        },
-        template: `
-                                                <div class="container content py-3 text-center">
-                                                <h4>Reset</h4>
-                                                <button class="btn btn-danger" @click="clear">
-                                                Alles löschen
-                                                </button>
-                                                </div>`,
-      };
-
-      /* ===================== Presets ===================== */
-      const Presets = {
-        data() {
-          return {
-            presets: loadPresets(),
-          };
-        },
-        methods: {
-          remove(p) {
-            if (!confirm(`Preset "${p.name}" löschen?`)) return;
-            this.presets = this.presets.filter((x) => x !== p);
-            savePresets(this.presets);
-          },
-          exportPreset(p) {
-            const blob = new Blob([JSON.stringify(p, null, 2)], {
-              type: 'application/json',
-            });
-            const url = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-            a.href = url;
-            const safeName = p.name
-              .toLowerCase()
-              .replace(/\s+/g, '-') // Leerzeichen → Bindestrich
-              .replace(/[^a-z0-9\-]/g, ''); // Sonderzeichen raus
-
-            a.download = 'charakter-preset-' + safeName + '.json';
-            a.click();
-          },
-          importFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = () => {
-              try {
-                const json = JSON.parse(reader.result);
-                this.presets.push(json);
-                savePresets(this.presets);
-              } catch {
-                alert('Ungültige Datei');
-              }
-            };
-            reader.readAsText(file);
-          },
-        },
-        template: `
-                                                <div class="container content py-3">
-
-                                                <h4>Presets</h4>
-
-                                                <div class="card p-3 mb-3">
-                                                    <router-link class="btn btn-success w-100 mb-2" to="/presets/form">
-                  ➕ Neues Preset
-                  </router-link>
-
-                                                    <input type="file" class="form-control" @change="importFile">
-                                                </div>
-
-                                                <div class="card p-3 mb-3" v-for="(p, index) in presets">
-                                                    <h5 class="fw-bold">{{p.name}}</h5>
-
-                                                    <button class="btn btn-sm btn-secondary me-1 mb-2"
-                                @click="$router.push('/presets/form/' + index)">
-                        ✏️ Bearbeiten
-                        </button>
-
-                                                    <button class="btn btn-sm btn-primary me-1 mb-2" @click="exportPreset(p)">
-                                                        ⬇️ Export
-                                                    </button>
-
-                                                    <button class="btn btn-sm btn-danger mb-2" @click="remove(p)">
-                                                        🗑️ Löschen
-                                                    </button>
-                                                </div>
-
-                                                <div style="height:80px;"></div>
-
-                                                </div>
-                                                `,
-      };
-
-      /* ===================== Preseteditor ===================== */
-      const PresetEditor = {
-        data() {
-          return {
-            preset: {
-              name: '',
-              handeln: [],
-              wissen: [],
-              soziales: [],
-            },
-            skill: { name: '', value: '', type: 'handeln' },
-            isEdit: false,
-            presetIndex: null,
-          };
-        },
-        created() {
-          const id = this.$route.params.id;
-
-          if (id !== undefined) {
-            const presets = loadPresets();
-            const p = presets[id];
-
-            if (p) {
-              this.preset = JSON.parse(JSON.stringify(p));
-              this.isEdit = true;
-              this.presetIndex = id;
-            }
-          }
-        },
-
-        methods: {
-          add() {
-            if (!this.skill.name) return;
-
-            let val =
-              this.skill.value === '' || this.skill.value === null
-                ? null
-                : Number(this.skill.value);
-
-            if (val !== null && (val < 1 || val > 100)) {
-              alert('Wert muss zwischen 1 und 100 liegen');
-              return;
-            }
-
-            this.preset[this.skill.type].push({
-              name: this.skill.name,
-              value: val,
-            });
-
-            this.skill.name = '';
-            this.skill.value = '';
-          },
-          remove(type, skill) {
-            if (!confirm(`"${skill.name}" löschen?`)) return;
-            const i = this.preset[type].indexOf(skill);
-            this.preset[type].splice(i, 1);
-          },
-          save() {
-            if (!this.preset.name) {
-              alert('Name fehlt');
-              return;
-            }
-
-            const presets = loadPresets();
-
-            if (this.isEdit) {
-              presets[this.presetIndex] = this.preset;
-            } else {
-              presets.push(this.preset);
-            }
-
-            savePresets(presets);
-            this.$router.push('/presets');
-          },
-        },
-        computed: {
-          sliderValue: {
-            get() {
-              return this.skill.value ?? 0;
-            },
-            set(val) {
-              this.skill.value = val === 0 ? null : val;
-            },
-          },
-          sortedSkills() {
-            return (type) =>
-              [...this.preset[type]].sort((a, b) =>
-                a.name.localeCompare(b.name, 'de'),
-              );
-          },
-        },
-        template: `
-                                                <div class="container content py-3">
-
-                                                <h4>{{ isEdit ? 'Preset bearbeiten' : 'Preset erstellen' }}</h4>
-
-                                                <input class="form-control mb-3" v-model="preset.name" placeholder="Preset Name">
-
-                                                <div v-for="type in ['handeln','wissen','soziales']" class="card p-3 mb-3">
-
-                                                <h5 class="text-uppercase fw-bold">{{type}}</h5>
-
-                                                <ul>
-                                                <li v-for="s in sortedSkills(type)" class="mb-2">
-                                                <strong>{{s.name}}</strong><br>
-                                                <small v-if="s.value !== null">{{s.value}}</small>
-                                                <small v-else class="text-secondary">kein Wert</small>
-
-                                                <div>
-                                                <button class="btn btn-sm btn-danger mt-1"
-                                                        @click="remove(type, s)">
-                                                🗑️
-                                                </button>
-                                                </div>
-                                                </li>
-                                                </ul>
-
-                                                </div>
-
-                                                <div class="card p-3 mb-3">
-                                                <h5>Fähigkeit hinzufügen</h5>
-
-                                                <div class="mb-2">
-                                                    <label class="form-label">Fähigkeit</label>
-                                                    <input class="form-control" v-model="skill.name" placeholder="z.B. Klettern">
-                                                </div>
-
-                                                <div class="mb-2">
-                                                    <label class="form-label">Wert (optional)</label>
-                                                    <div class="mb-2 d-flex align-items-center gap-2">
-
-        <input type="range"
-               class="form-range flex-grow-1"
-               v-model.number="sliderValue"
-               min="0"
-               max="100"
-               step="1">
-
-        <input type="number"
-               class="form-control"
-               style="width:70px"
-               v-model.number="skill.value"
-               min="0"
-               max="100"
-               placeholder="-">
-
-      </div>
-                                                </div>
-
-                                                <select class="form-select mb-2" v-model="skill.type">
-                                                <option value="handeln">Handeln</option>
-                                                <option value="wissen">Wissen</option>
-                                                <option value="soziales">Soziales</option>
-                                                </select>
-
-                                                <button class="btn btn-primary w-100" @click="add">
-                                                Hinzufügen
-                                                </button>
-                                                </div>
-
-                                                <button class="btn btn-success w-100" @click="save">
-                                                Preset speichern
-                                                </button>
-
-                                                <div style="height:80px;"></div>
-
-                                                </div>
-                                                `,
-      };
-
-      /* ===================== Regelwerk ===================== */
-      const Regelwerk = {
-        data() {
-          return {
-            sourceUrl:
-              '/assets/pdf/how-to-be-a-hero-Regelwerk.pdf',
-          };
-        },
-        template: `
-    <div class="d-flex flex-column" style="height:calc(100vh - 70px);">
-
-      <!-- Header -->
-      <div class="d-flex justify-content-between align-items-center p-3">
-        <h4 class="mb-0">📜 Regelwerk</h4>
-        <a href="https://howtobeahero.de" target="_blank" class="btn btn-sm btn-secondary">
-          Wiki ↗
-        </a>
-      </div>
-
-      <!-- PDF Viewer -->
-      <iframe 
-  :src="'https://mozilla.github.io/pdf.js/web/viewer.html?file=' + sourceUrl"
-  style="flex:1; border:none;">
-</iframe>
-
-    </div>
-  `,
-      };
-
-      /* ===================== Router ===================== */
-      const routes = [
-        { path: '/', component: Home },
-        { path: '/create', component: Create },
-        { path: '/play', component: Play },
-        { path: '/presets', component: Presets },
-        { path: '/presets/form', component: PresetEditor },
-        { path: '/presets/form/:id', component: PresetEditor },
-        { path: '/regelwerk', component: Regelwerk },
-        { path: '/settings', component: Settings },
-      ];
-
-      const router = VueRouter.createRouter({
-        history: VueRouter.createWebHashHistory(),
-        routes,
-      });
-
-      /* ===================== App ===================== */
-      const app = Vue.createApp({
-        template: `
-                                                    <router-view></router-view>
-                                                    <bottom-nav></bottom-nav>
-                                                `,
-      });
-
-      app.use(router);
-
-      app.component('bottom-nav', {
-        template: `
-                                                <div class="navbar-fixed d-flex justify-content-around p-2">
-                                                <router-link to="/">🏠</router-link>
-                                                <router-link to="/create">🧙</router-link>
-                                                <router-link to="/play">⚔️</router-link>
-                                                <router-link to="/presets">📦</router-link>
-                                                <router-link to="/regelwerk">📜</router-link>
-                                                <router-link to="/settings">⚙️</router-link>
-                                                </div>`,
-      });
-
-      app.mount('#app');
-    </script>
+    <script src="pages/Startseite.js"></script>
+    <script src="pages/CharakterErstellung.js"></script>
+    <script src="pages/Abenteuer.js"></script>
+    <script src="pages/Einstellungen.js"></script>
+    <script src="pages/PresetVerwaltung.js"></script>
+    <script src="pages/PresetEditor.js"></script>
+    <script src="components/RegelwerkModal.js"></script>
+    <script src="components/BottomNav.js"></script>
+    <script src="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+    <script src="main.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>

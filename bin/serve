@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PORT="${PORT:-8080}"
+HOST="${HOST:-127.0.0.1}"
+
+cd "$ROOT_DIR"
+
+echo "Projekt: $ROOT_DIR"
+echo "Host:    $HOST"
+echo "Port:    $PORT"
+echo
+
+if command -v npx >/dev/null 2>&1; then
+  echo "Starte Live-Reload mit browser-sync ..."
+  echo "URL: http://$HOST:$PORT"
+  exec npx --yes browser-sync@latest start \
+    --server "$ROOT_DIR" \
+    --host "$HOST" \
+    --port "$PORT" \
+    --files "index.html,assets/**/*.{html,css,js,json,pdf,png,jpg,jpeg,webp,gif,svg}" \
+    --no-open \
+    --no-ui
+fi
+
+echo "npx nicht gefunden. Starte Fallback ohne Live-Reload via python3 -m http.server ..."
+echo "URL: http://$HOST:$PORT"
+exec python3 -m http.server "$PORT" --bind "$HOST" --directory "$ROOT_DIR"
