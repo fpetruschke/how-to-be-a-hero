@@ -65,9 +65,9 @@ window.HTBAH_SEITEN.CharakterErstellung = {
       zeigePresetAktionen: false,
       neueFaehigkeit: { name: '', value: 0, type: 'handeln' },
       cropper: null,
-      cropperModal: null,
+      cropperScaleX: 1,
+      cropperScaleY: 1,
       bildVerwaltungModal: null,
-      bildGrossModal: null,
       inventarModal: null,
       journalModal: null,
       inventarQuill: null,
@@ -205,16 +205,7 @@ window.HTBAH_SEITEN.CharakterErstellung = {
       const reader = new FileReader();
       reader.onload = () => {
         this.tempBildQuelle = String(reader.result || '');
-        this.$nextTick(() => {
-          const modalElement = this.$refs.cropperModalElement;
-          if (!modalElement) {
-            return;
-          }
-
-          this.cropperModal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
-          this.cropperModal.show();
-          this.$nextTick(() => this.cropperInitialisieren());
-        });
+        this.$nextTick(() => this.cropperInitialisieren());
       };
 
       reader.readAsDataURL(datei);
@@ -237,6 +228,40 @@ window.HTBAH_SEITEN.CharakterErstellung = {
         background: false,
         responsive: true,
       });
+      this.cropperScaleX = 1;
+      this.cropperScaleY = 1;
+    },
+    bildDrehen(winkel) {
+      if (!this.cropper) {
+        return;
+      }
+
+      this.cropper.rotate(winkel);
+    },
+    bildHorizontalSpiegeln() {
+      if (!this.cropper) {
+        return;
+      }
+
+      this.cropperScaleX = this.cropperScaleX * -1;
+      this.cropper.scaleX(this.cropperScaleX);
+    },
+    bildVertikalSpiegeln() {
+      if (!this.cropper) {
+        return;
+      }
+
+      this.cropperScaleY = this.cropperScaleY * -1;
+      this.cropper.scaleY(this.cropperScaleY);
+    },
+    bildBearbeitungZuruecksetzen() {
+      if (!this.cropper) {
+        return;
+      }
+
+      this.cropper.reset();
+      this.cropperScaleX = 1;
+      this.cropperScaleY = 1;
     },
     zugeschnittenesBildSpeichern() {
       if (!this.cropper) {
@@ -258,10 +283,17 @@ window.HTBAH_SEITEN.CharakterErstellung = {
       this.charakterBild = dataUrl;
       window.HTBAH.speichereCharakterBild(dataUrl);
       this.cropperAufraeumen();
-
-      if (this.cropperModal) {
-        this.cropperModal.hide();
+    },
+    zuschnittMitAktuellemBildStarten() {
+      if (!this.charakterBild) {
+        return;
       }
+
+      this.tempBildQuelle = this.charakterBild;
+      this.$nextTick(() => this.cropperInitialisieren());
+    },
+    zuschnittAbbrechen() {
+      this.cropperAufraeumen();
     },
     charakterBildEntfernen() {
       if (!this.charakterBild) {
@@ -284,24 +316,13 @@ window.HTBAH_SEITEN.CharakterErstellung = {
       this.bildVerwaltungModal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
       this.bildVerwaltungModal.show();
     },
-    charakterBildGrossAnzeigen() {
-      if (!this.charakterBild) {
-        return;
-      }
-
-      const modalElement = this.$refs.bildGrossModalElement;
-      if (!modalElement) {
-        return;
-      }
-
-      this.bildGrossModal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
-      this.bildGrossModal.show();
-    },
     cropperAufraeumen() {
       if (this.cropper) {
         this.cropper.destroy();
         this.cropper = null;
       }
+      this.cropperScaleX = 1;
+      this.cropperScaleY = 1;
 
       this.tempBildQuelle = '';
 
@@ -309,7 +330,7 @@ window.HTBAH_SEITEN.CharakterErstellung = {
         this.$refs.bildInputElement.value = '';
       }
     },
-    cropperModalGeschlossen() {
+    bildVerwaltungModalGeschlossen() {
       this.cropperAufraeumen();
     },
     inventarEditorInitialisieren() {
@@ -398,15 +419,18 @@ window.HTBAH_SEITEN.CharakterErstellung = {
     },
   },
   mounted() {
-    const modalElement = this.$refs.cropperModalElement;
+    const modalElement = this.$refs.bildVerwaltungModalElement;
     if (modalElement) {
-      modalElement.addEventListener('hidden.bs.modal', this.cropperModalGeschlossen);
+      modalElement.addEventListener('hidden.bs.modal', this.bildVerwaltungModalGeschlossen);
     }
   },
   beforeUnmount() {
-    const modalElement = this.$refs.cropperModalElement;
+    const modalElement = this.$refs.bildVerwaltungModalElement;
     if (modalElement) {
-      modalElement.removeEventListener('hidden.bs.modal', this.cropperModalGeschlossen);
+      modalElement.removeEventListener(
+        'hidden.bs.modal',
+        this.bildVerwaltungModalGeschlossen,
+      );
     }
     this.cropperAufraeumen();
 
@@ -697,51 +721,6 @@ window.HTBAH_SEITEN.CharakterErstellung = {
 
       <div
         class="modal fade"
-        id="charakterBildCropperModal"
-        ref="cropperModalElement"
-        tabindex="-1"
-        aria-labelledby="charakterBildCropperLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="charakterBildCropperLabel">
-                Charakterbild zuschneiden
-              </h5>
-              <button
-                type="button"
-                class="btn-close"
-                data-bs-dismiss="modal"
-                aria-label="Schließen"></button>
-            </div>
-            <div class="modal-body text-center">
-              <img
-                v-if="tempBildQuelle"
-                ref="cropperBildElement"
-                :src="tempBildQuelle"
-                alt="Bild zuschneiden"
-                class="cropper-image" />
-            </div>
-            <div class="modal-footer">
-              <button
-                type="button"
-                class="btn btn-secondary"
-                data-bs-dismiss="modal">
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                class="btn btn-primary"
-                @click="zugeschnittenesBildSpeichern">
-                Bild übernehmen
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div
-        class="modal fade"
         id="charakterBildVerwaltungModal"
         ref="bildVerwaltungModalElement"
         tabindex="-1"
@@ -762,13 +741,37 @@ window.HTBAH_SEITEN.CharakterErstellung = {
             <div class="modal-body">
               <div class="text-center mb-3">
                 <img
-                  v-if="charakterBild"
+                  v-if="tempBildQuelle"
+                  ref="cropperBildElement"
+                  :src="tempBildQuelle"
+                  alt="Bild zuschneiden"
+                  class="cropper-image" />
+                <img
+                  v-else-if="charakterBild"
                   :src="charakterBild"
                   alt="Charakterbild Vorschau"
                   class="charakterbild-vorschau" />
                 <div v-else class="charakterbild-platzhalter">
                   <span class="material-symbols-outlined" aria-hidden="true">person</span>
                 </div>
+              </div>
+
+              <div v-if="tempBildQuelle" class="d-flex flex-wrap gap-2 justify-content-center mb-3">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bildDrehen(-90)">
+                  90° links
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bildDrehen(90)">
+                  90° rechts
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bildHorizontalSpiegeln">
+                  Horizontal spiegeln
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bildVertikalSpiegeln">
+                  Vertikal spiegeln
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bildBearbeitungZuruecksetzen">
+                  Zuruecksetzen
+                </button>
               </div>
 
               <input
@@ -782,13 +785,29 @@ window.HTBAH_SEITEN.CharakterErstellung = {
               <button
                 type="button"
                 class="btn btn-outline-primary"
+                v-if="!tempBildQuelle"
                 :disabled="!charakterBild"
-                @click="charakterBildGrossAnzeigen">
-                Groß anzeigen
+                @click="zuschnittMitAktuellemBildStarten">
+                Aktuelles Bild zuschneiden
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                v-if="tempBildQuelle"
+                @click="zuschnittAbbrechen">
+                Zuschnitt abbrechen
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                v-if="tempBildQuelle"
+                @click="zugeschnittenesBildSpeichern">
+                Zuschnitt speichern
               </button>
               <button
                 type="button"
                 class="btn btn-outline-danger"
+                v-if="!tempBildQuelle"
                 :disabled="!charakterBild"
                 @click="charakterBildEntfernen">
                 Bild entfernen
@@ -799,36 +818,6 @@ window.HTBAH_SEITEN.CharakterErstellung = {
                 data-bs-dismiss="modal">
                 Schließen
               </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div
-        class="modal fade"
-        id="charakterBildGrossModal"
-        ref="bildGrossModalElement"
-        tabindex="-1"
-        aria-labelledby="charakterBildGrossLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-fullscreen">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="charakterBildGrossLabel">
-                Charakterbild
-              </h5>
-              <button
-                type="button"
-                class="btn-close"
-                data-bs-dismiss="modal"
-                aria-label="Schließen"></button>
-            </div>
-            <div class="modal-body d-flex align-items-center justify-content-center">
-              <img
-                v-if="charakterBild"
-                :src="charakterBild"
-                alt="Charakterbild groß"
-                class="img-fluid rounded" />
             </div>
           </div>
         </div>

@@ -5,7 +5,13 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
   data() {
     return {
       regelwerkUrl: window.HTBAH.ermittleRegelwerkQuelleUrl(),
+      viewerBasisUrl: window.HTBAH.ermittleAssetUrl('assets/pdfjs/web/viewer.html'),
     };
+  },
+  computed: {
+    viewerUrl() {
+      return `${this.viewerBasisUrl}?file=${encodeURIComponent(this.regelwerkUrl)}#zoom=page-width&pagemode=thumbs`;
+    },
   },
   methods: {
     schliessen() {
@@ -21,10 +27,13 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
             <a href="https://howtobeahero.de" target="_blank" class="btn btn-sm btn-secondary">
               Wiki ↗
             </a>
+            <a :href="regelwerkUrl" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary">
+              PDF öffnen ↗
+            </a>
             <button class="btn btn-sm btn-danger" @click="schliessen">Schließen</button>
           </div>
         </div>
-        <iframe :src="regelwerkUrl" class="regelwerk-modal-content"></iframe>
+        <iframe :src="viewerUrl" class="regelwerk-modal-content"></iframe>
       </div>
     </div>
   `,

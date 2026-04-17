@@ -27,16 +27,16 @@ function wuerfelW100() {
   return Math.floor(Math.random() * 100) + 1;
 }
 
-function ermittleRegelwerkQuelleUrl() {
+function ermittleAssetUrl(relativerPfad) {
   const basisPfad = window.location.pathname.endsWith('/')
     ? window.location.pathname
     : window.location.pathname.replace(/\/[^/]*$/, '/');
 
-  return (
-    window.location.origin +
-    basisPfad +
-    'assets/pdf/how-to-be-a-hero-Regelwerk.pdf'
-  );
+  return window.location.origin + basisPfad + relativerPfad.replace(/^\/+/, '');
+}
+
+function ermittleRegelwerkQuelleUrl() {
+  return ermittleAssetUrl('assets/pdf/how-to-be-a-hero-Regelwerk.pdf');
 }
 
 function ladeTheme() {
@@ -72,6 +72,7 @@ window.HTBAH = {
   speicherePresets,
   wuerfelW10,
   wuerfelW100,
+  ermittleAssetUrl,
   ermittleRegelwerkQuelleUrl,
   ladeTheme,
   setzeTheme,
