@@ -435,3 +435,9 @@ app.component('bestaetigen-modal', window.HTBAH_KOMPONENTEN.BestaetigenModal);
 app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner);
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);
 app.mount('#app');
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}

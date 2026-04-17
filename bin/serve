@@ -17,7 +17,7 @@ if command -v npx >/dev/null 2>&1; then
   echo "URL: http://$HOST:$PORT"
 
   # index.html + App-Einstieg (main.*), Vue-Seiten und Komponenten, statische Assets
-  BS_FILES="index.html,main.css,main.js,shared/**/*.js,lib/**/*.mjs,vendor/**/*.js,pages/**/*.{js,css},components/**/*.{js,css},assets/**/*.{html,css,js,json,pdf,png,jpg,jpeg,webp,gif,svg}"
+  BS_FILES="index.html,main.css,main.js,manifest.webmanifest,sw.js,shared/**/*.js,lib/**/*.mjs,vendor/**/*.js,pages/**/*.{js,css},components/**/*.{js,css},assets/**/*.{html,css,js,json,pdf,png,jpg,jpeg,webp,gif,svg}"
 
   exec npx --yes browser-sync@latest start \
     --server "$ROOT_DIR" \

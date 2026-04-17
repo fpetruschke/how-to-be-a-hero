@@ -1,0 +1,25 @@
+{
+  "name": "HTBAH Begleit-App",
+  "short_name": "HTBAH",
+  "description": "Begleit-App für How to be a Hero",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#336a2b",
+  "theme_color": "#509b4a",
+  "icons": [
+    {
+      "src": "assets/img/htbah-begleit-app-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/img/htbah-begleit-app-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
