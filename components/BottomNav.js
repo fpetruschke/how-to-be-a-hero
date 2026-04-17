@@ -39,21 +39,23 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.ergebnisse = [window.HTBAH.wuerfelW100()];
         return;
       }
-
       const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
       this.anzahlW10 = anzahl10;
       this.ergebnisse = Array.from({ length: anzahl10 }, () => window.HTBAH.wuerfelW10());
     },
   },
   template: `
-    <div class="navbar-fixed d-flex justify-content-around p-2">
-      <router-link to="/">🏠</router-link>
-      <router-link to="/charakter-erstellung">🧙</router-link>
-      <router-link to="/abenteuer">⚔️</router-link>
-      <button type="button" @click="wuerfelModalOeffnen">🎲</button>
-      <button type="button" @click="regelwerkOeffnen">📜</button>
-      <router-link to="/einstellungen">⚙️</router-link>
-    </div>
+    <teleport to="body">
+      <div class="navbar-fixed d-flex justify-content-around p-2">
+        <router-link to="/">🏠</router-link>
+        <router-link to="/charakter">🧙</router-link>
+        <router-link to="/spielleiter" title="Spielleiter · Gruppen">👥</router-link>
+        <router-link to="/zufallstabellen" title="Zufallstabellen">📚</router-link>
+        <button type="button" @click="wuerfelModalOeffnen">🎲</button>
+        <button type="button" @click="regelwerkOeffnen">📜</button>
+        <router-link to="/einstellungen">⚙️</router-link>
+      </div>
+    </teleport>
 
     <teleport to="body">
       <div
@@ -63,8 +65,8 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         tabindex="-1"
         aria-labelledby="wuerfelModalLabel"
         aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-          <div class="modal-content">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content shadow">
             <div class="modal-header">
               <h5 class="modal-title d-flex align-items-center gap-2" id="wuerfelModalLabel">
                 <span aria-hidden="true">🎲</span>
@@ -97,21 +99,29 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
                 <div class="row g-2 align-items-end">
                   <div class="col-12" v-if="wuerfelModus === 'w10'">
-                    <label class="form-label mb-1">Anzahl W10</label>
-                    <input
-                      type="number"
-                      class="form-control"
-                      min="1"
-                      max="50"
-                      v-model.number="anzahlW10" />
+                    <div class="form-floating">
+                      <input
+                        id="nav-anzahl-w10"
+                        type="number"
+                        class="form-control"
+                        min="1"
+                        max="50"
+                        v-model.number="anzahlW10"
+                        placeholder=" " />
+                      <label for="nav-anzahl-w10">Anzahl W10</label>
+                    </div>
                   </div>
                   <div class="col-12" v-else>
                     <small>W100 wird immer genau einmal gewürfelt.</small>
                   </div>
                   <div class="col-12">
-                    <button type="button" class="btn btn-primary w-100" @click="wuerfeln">
+                    <icon-text-button
+                      type="button"
+                      class="btn btn-primary w-100"
+                      icon="casino"
+                      @click="wuerfeln">
                       Würfeln
-                    </button>
+                    </icon-text-button>
                   </div>
                 </div>
               </div>

@@ -5,9 +5,10 @@ const SPEICHER_BEREICHE = {
     key: 'htbah_character',
     titel: 'Charakterdaten löschen?',
     beschreibung:
-      'Dein erstellter Charakter mit allen Werten sowie Inventar und Abenteuerjournal wird entfernt. Das Charakterbild bleibt erhalten.',
+      'Dein erstellter Charakter mit allen Werten sowie Inventar und Notizen wird entfernt. Das Charakterbild bleibt erhalten.',
     erfolg: 'Charakterdaten wurden gelöscht.',
-    buttonText: '🧙 Charakterdaten löschen',
+    buttonSymbol: '🧙',
+    buttonLabel: 'Charakterdaten löschen',
   },
   charakterbild: {
     key: 'htbah_character_image',
@@ -15,7 +16,8 @@ const SPEICHER_BEREICHE = {
     beschreibung:
       'Dein ausgewähltes Charakterbild wird entfernt. Deine übrigen Charakterdaten bleiben erhalten.',
     erfolg: 'Charakterbild wurde gelöscht.',
-    buttonText: '🖼️ Charakterbild löschen',
+    buttonSymbol: '🖼️',
+    buttonLabel: 'Charakterbild löschen',
   },
   presets: {
     key: 'htbah_presets',
@@ -23,7 +25,8 @@ const SPEICHER_BEREICHE = {
     beschreibung:
       'Alle gespeicherten Presets für schnelle Charakter-Erstellung werden entfernt.',
     erfolg: 'Presets wurden gelöscht.',
-    buttonText: '📦 Presets löschen',
+    buttonSymbol: '📦',
+    buttonLabel: 'Presets löschen',
   },
   theme: {
     key: 'htbah_theme',
@@ -31,7 +34,33 @@ const SPEICHER_BEREICHE = {
     beschreibung:
       'Deine gespeicherte Theme-Auswahl wird entfernt und die App nutzt wieder das dunkle Standard-Theme.',
     erfolg: 'Darstellung wurde auf das Standard-Theme zurückgesetzt.',
-    buttonText: '🎨 Theme-Einstellung löschen',
+    buttonSymbol: '🎨',
+    buttonLabel: 'Theme-Einstellung löschen',
+  },
+  zufallstabellen: {
+    key: 'htbah_zufallstabellen',
+    titel: 'Zufallstabellen löschen?',
+    beschreibung:
+      'Alle gespeicherten Einträge in den Zufallstabellen (NPCs, Orte, Gegenstände) werden entfernt.',
+    erfolg: 'Zufallstabellen wurden gelöscht.',
+    buttonSymbol: '📚',
+    buttonLabel: 'Zufallstabellen löschen',
+  },
+  alles: {
+    keys: [
+      'htbah_character',
+      'htbah_character_image',
+      'htbah_presets',
+      'htbah_theme',
+      'htbah_spielleiter_gruppen',
+      'htbah_zufallstabellen',
+    ],
+    titel: 'Alle lokalen Daten löschen?',
+    beschreibung:
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Presets, Spielleiter-Gruppen, Zufallstabellen und deine Theme-Auswahl entfernt. Die App entspricht danach einem frischen Start.',
+    erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
+    buttonSymbol: '🗑️',
+    buttonLabel: 'Alles löschen',
   },
 };
 
@@ -45,9 +74,6 @@ window.HTBAH_SEITEN.Einstellungen = {
     };
   },
   computed: {
-    aktiverSpeicherBereich() {
-      return SPEICHER_BEREICHE[this.zuLoeschenderBereich] || SPEICHER_BEREICHE.charakter;
-    },
     themeTitel() {
       return this.istHellesTheme ? 'Helles Theme' : 'Dunkles Theme';
     },
@@ -61,12 +87,19 @@ window.HTBAH_SEITEN.Einstellungen = {
       window.HTBAH.setzeTheme(neuesTheme);
     },
     oeffneLoeschDialog(bereich) {
-      if (!SPEICHER_BEREICHE[bereich]) {
+      const eintrag = SPEICHER_BEREICHE[bereich];
+      if (!eintrag) {
         return;
       }
 
       this.zuLoeschenderBereich = bereich;
       this.statusMeldung = '';
+
+      this.$refs.bestaetigenModal.oeffnen({
+        titel: eintrag.titel,
+        beschreibung: eintrag.beschreibung,
+        onBestaetigen: () => this.speicherBereichLoeschen(),
+      });
     },
     speicherBereichLoeschen() {
       const bereich = SPEICHER_BEREICHE[this.zuLoeschenderBereich];
@@ -75,9 +108,13 @@ window.HTBAH_SEITEN.Einstellungen = {
         return;
       }
 
-      localStorage.removeItem(bereich.key);
+      if (Array.isArray(bereich.keys)) {
+        bereich.keys.forEach((k) => localStorage.removeItem(k));
+      } else {
+        localStorage.removeItem(bereich.key);
+      }
 
-      if (this.zuLoeschenderBereich === 'theme') {
+      if (this.zuLoeschenderBereich === 'theme' || this.zuLoeschenderBereich === 'alles') {
         this.istHellesTheme = false;
         document.documentElement.setAttribute('data-theme', 'dark');
       }
@@ -91,9 +128,9 @@ window.HTBAH_SEITEN.Einstellungen = {
 
       <h5 class="text-start mb-2">Presets</h5>
       <div class="card p-3 mb-3">
-        <router-link class="btn btn-primary w-100" to="/preset-verwaltung">
-          📦 Preset-Management
-        </router-link>
+        <icon-text-button tag="router-link" to="/preset-verwaltung" class="btn btn-primary w-100" icon="inventory_2">
+          Preset-Management
+        </icon-text-button>
       </div>
 
       <h5 class="text-start mb-2">Theme</h5>
@@ -118,83 +155,66 @@ window.HTBAH_SEITEN.Einstellungen = {
       </div>
 
       <h5 class="text-start mb-2">Daten löschen</h5>
-      <div class="card p-3 mb-3">
-        <button
+      <div class="card p-3" style="margin-bottom: 4rem;">
+        <icon-text-button
           class="btn btn-outline-danger w-100 mb-2"
-          data-bs-toggle="modal"
-          data-bs-target="#resetDataConfirmModal"
+          type="button"
+          :symbol="speicherBereiche.charakter.buttonSymbol"
           @click="oeffneLoeschDialog('charakter')">
-          {{ speicherBereiche.charakter.buttonText }}
-        </button>
-        <button
+          {{ speicherBereiche.charakter.buttonLabel }}
+        </icon-text-button>
+        <icon-text-button
           class="btn btn-outline-danger w-100 mb-2"
-          data-bs-toggle="modal"
-          data-bs-target="#resetDataConfirmModal"
+          type="button"
+          :symbol="speicherBereiche.charakterbild.buttonSymbol"
           @click="oeffneLoeschDialog('charakterbild')">
-          {{ speicherBereiche.charakterbild.buttonText }}
-        </button>
-        <button
+          {{ speicherBereiche.charakterbild.buttonLabel }}
+        </icon-text-button>
+        <icon-text-button
           class="btn btn-outline-danger w-100 mb-2"
-          data-bs-toggle="modal"
-          data-bs-target="#resetDataConfirmModal"
+          type="button"
+          :symbol="speicherBereiche.presets.buttonSymbol"
           @click="oeffneLoeschDialog('presets')">
-          {{ speicherBereiche.presets.buttonText }}
-        </button>
-        <button
-          class="btn btn-outline-danger w-100"
-          data-bs-toggle="modal"
-          data-bs-target="#resetDataConfirmModal"
+          {{ speicherBereiche.presets.buttonLabel }}
+        </icon-text-button>
+        <icon-text-button
+          class="btn btn-outline-danger w-100 mb-2"
+          type="button"
+          :symbol="speicherBereiche.theme.buttonSymbol"
           @click="oeffneLoeschDialog('theme')">
-          {{ speicherBereiche.theme.buttonText }}
-        </button>
+          {{ speicherBereiche.theme.buttonLabel }}
+        </icon-text-button>
+        <icon-text-button
+          class="btn btn-outline-danger w-100 mb-2"
+          type="button"
+          :symbol="speicherBereiche.zufallstabellen.buttonSymbol"
+          @click="oeffneLoeschDialog('zufallstabellen')">
+          {{ speicherBereiche.zufallstabellen.buttonLabel }}
+        </icon-text-button>
+        <icon-text-button
+          class="btn btn-danger w-100"
+          type="button"
+          :symbol="speicherBereiche.alles.buttonSymbol"
+          @click="oeffneLoeschDialog('alles')">
+          {{ speicherBereiche.alles.buttonLabel }}
+        </icon-text-button>
       </div>
 
-      <div v-if="statusMeldung" class="alert alert-success py-2 mb-3 text-start">
-        {{ statusMeldung }}
-      </div>
-
-      <div
-        class="modal fade"
-        id="resetDataConfirmModal"
-        tabindex="-1"
-        aria-labelledby="resetDataConfirmLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="resetDataConfirmLabel">
-                {{ aktiverSpeicherBereich.titel }}
-              </h5>
-              <button
-                type="button"
-                class="btn-close"
-                data-bs-dismiss="modal"
-                aria-label="Schließen"></button>
-            </div>
-            <div class="modal-body">
-              {{ aktiverSpeicherBereich.beschreibung }}
-              <br />
-              <br />
-              Dieser Schritt kann nicht rückgängig gemacht werden.
-            </div>
-            <div class="modal-footer">
-              <button
-                type="button"
-                class="btn btn-secondary"
-                data-bs-dismiss="modal">
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                class="btn btn-danger"
-                data-bs-dismiss="modal"
-                @click="speicherBereichLoeschen">
-                Ja, löschen
-              </button>
-            </div>
-          </div>
+      <teleport to="body">
+        <div
+          v-if="statusMeldung"
+          class="htbah-erfolgs-toast alert alert-success alert-dismissible py-2 mb-0 text-center shadow"
+          role="status">
+          {{ statusMeldung }}
+          <button
+            type="button"
+            class="btn-close"
+            aria-label="Meldung schließen"
+            @click="statusMeldung = ''"></button>
         </div>
-      </div>
+      </teleport>
+
+      <bestaetigen-modal ref="bestaetigenModal" />
     </div>
   `,
 };

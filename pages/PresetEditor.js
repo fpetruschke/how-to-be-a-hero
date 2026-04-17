@@ -91,7 +91,10 @@ window.HTBAH_SEITEN.PresetEditor = {
     <div class="container content py-3">
       <h4>{{ istBearbeitung ? 'Preset bearbeiten' : 'Preset erstellen' }}</h4>
 
-      <input class="form-control mb-3" v-model="preset.name" placeholder="Preset Name">
+      <div class="form-floating mb-3">
+        <input id="pe-preset-name" class="form-control" v-model="preset.name" placeholder=" ">
+        <label for="pe-preset-name">Preset-Name</label>
+      </div>
 
       <div v-for="kategorie in ['handeln','wissen','soziales']" class="card p-3 mb-3">
         <h5 class="text-uppercase fw-bold">{{kategorie}}</h5>
@@ -114,36 +117,40 @@ window.HTBAH_SEITEN.PresetEditor = {
       <div class="card p-3 mb-3">
         <h5>Fähigkeit hinzufügen</h5>
 
-        <div class="mb-2">
-          <label class="form-label">Fähigkeit</label>
-          <input class="form-control" v-model="neueFaehigkeit.name" placeholder="z.B. Klettern">
+        <div class="form-floating mb-2">
+          <input id="pe-neue-faeh-name" class="form-control" v-model="neueFaehigkeit.name" placeholder=" ">
+          <label for="pe-neue-faeh-name">Fähigkeit</label>
         </div>
 
-        <div class="mb-2">
-          <label class="form-label">Wert (optional)</label>
-          <div class="mb-2 d-flex align-items-center gap-2">
-            <input type="range"
-                   class="form-range flex-grow-1"
-                   v-model.number="sliderWert"
-                   min="0"
-                   max="100"
-                   step="1">
+        <div class="mb-2 d-flex align-items-center gap-2">
+          <input type="range"
+                 class="form-range flex-grow-1"
+                 v-model.number="sliderWert"
+                 min="0"
+                 max="100"
+                 step="1">
 
-            <input type="number"
-                   class="form-control"
-                   style="width:70px"
-                   v-model.number="neueFaehigkeit.value"
-                   min="0"
-                   max="100"
-                   placeholder="-">
+          <div class="form-floating" style="width: 5.5rem; flex-shrink: 0">
+            <input
+              type="number"
+              id="pe-neue-faeh-wert"
+              class="form-control"
+              v-model.number="neueFaehigkeit.value"
+              min="0"
+              max="100"
+              placeholder=" ">
+            <label for="pe-neue-faeh-wert">Wert (optional)</label>
           </div>
         </div>
 
-        <select class="form-select mb-2" v-model="neueFaehigkeit.type">
-          <option value="handeln">Handeln</option>
-          <option value="wissen">Wissen</option>
-          <option value="soziales">Soziales</option>
-        </select>
+        <div class="form-floating mb-2">
+          <select id="pe-neue-faeh-kat" class="form-select" v-model="neueFaehigkeit.type">
+            <option value="handeln">Handeln</option>
+            <option value="wissen">Wissen</option>
+            <option value="soziales">Soziales</option>
+          </select>
+          <label for="pe-neue-faeh-kat">Kategorie</label>
+        </div>
 
         <button class="btn btn-primary w-100" @click="faehigkeitHinzufuegen">
           Hinzufügen

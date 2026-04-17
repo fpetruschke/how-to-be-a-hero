@@ -41,7 +41,7 @@ HOST=0.0.0.0 PORT=5173 ./bin/serve
 
 ## Android / Termux
 
-Ja, das Skript kann auch unter Termux laufen, wenn die Tools installiert sind:
+Das Skript kann auch unter Termux laufen, wenn folgende Tools installiert sind:
 
 - Live-Reload: `pkg install nodejs` (stellt `npx` bereit)
 - Fallback: `pkg install python`

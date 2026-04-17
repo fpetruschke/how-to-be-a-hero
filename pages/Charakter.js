@@ -1,0 +1,1048 @@
+window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
+
+const KATEGORIE_INFOS = {
+  handeln: {
+    erklaerung:
+      'Handeln umfasst körperliche, praktische und unmittelbare Aktionen in der Spielwelt.',
+    beispiele: ['Klettern', 'Schleichen', 'Kampf', 'Schlösser knacken', 'Fahren'],
+  },
+  wissen: {
+    erklaerung:
+      'Wissen umfasst gelerntes, logisches und analytisches Können rund um Fakten und Zusammenhänge.',
+    beispiele: ['Heilkunde', 'Geschichte', 'Magiekunde', 'Sprachen', 'Technik'],
+  },
+  soziales: {
+    erklaerung:
+      'Soziales umfasst alle Fähigkeiten im Umgang mit anderen Personen, Gruppen und Beziehungen.',
+    beispiele: ['Überreden', 'Lügen', 'Menschenkenntnis', 'Verhandeln', 'Auftreten'],
+  },
+};
+
+/** Kurzinfo zu Regelwerk 2.3 (Anzeige in der Oberfläche) */
+const GEISTESBLITZ_INFO_ZEILEN = [
+  'Maximalwert pro Begabung: Begabungswert geteilt durch 10, kaufmännisch runden (wie im Regelwerk).',
+  'Nur für dieselbe Begabung: Ein Punkt aus „Wissen“ gilt nicht für eine Handeln-Probe (und umgekehrt).',
+  'Einsatz am Tisch: noch einmal würfeln, wenn die erste Probe misslungen ist — nicht bei kritischem Misserfolg.',
+  'Verbrauchte Punkte bleiben weg, bis du die Konten wieder auffüllst (z. B. nach Abenteuerende).',
+  'Gültigkeit: ein Abend bzw. ein Abenteuer; ungenutzte Punkte sind nicht übertragbar; neues Abenteuer startet mit vollem Konto. Wird ein Abenteuer auf mehrere Abende verteilt, regenerieren die Punkte bis zum nächsten Abend.',
+];
+
+const M = window.HTBAH_CHARAKTER_MODEL;
+
+/** Preset-JSON (Export aus Preset-Verwaltung / Editor) für Fähigkeiten übernehmen */
+function normalisiereFaehigkeitenPreset(roh) {
+  if (!roh || typeof roh !== 'object') return null;
+  const kategorien = ['handeln', 'wissen', 'soziales'];
+  const out = { name: typeof roh.name === 'string' ? roh.name.trim() : '' };
+  for (const k of kategorien) {
+    if (!Array.isArray(roh[k])) return null;
+    const arr = [];
+    for (const eintrag of roh[k]) {
+      if (!eintrag || typeof eintrag !== 'object') continue;
+      const name = typeof eintrag.name === 'string' ? eintrag.name.trim() : '';
+      const value = Number(eintrag.value);
+      if (!name || Number.isNaN(value) || value < 1 || value > 100) continue;
+      arr.push({ name, value });
+    }
+    out[k] = arr;
+  }
+  return out;
+}
+
+window.HTBAH_SEITEN.Charakter = {
+  components: {
+    CharakterBildModal: window.HTBAH_KOMPONENTEN.CharakterBildModal,
+    InventarModal: window.HTBAH_KOMPONENTEN.InventarModal,
+    VorNachteileModal: window.HTBAH_KOMPONENTEN.VorNachteileModal,
+    NotizenModal: window.HTBAH_KOMPONENTEN.NotizenModal,
+    FaehigkeitFormular: window.HTBAH_KOMPONENTEN.FaehigkeitFormular,
+    InitiativeModal: window.HTBAH_KOMPONENTEN.InitiativeModal,
+    ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
+  },
+  props: {
+    spielleiterMitglied: { type: Object, default: null },
+    onSpielleiterPersist: { type: Function, default: null },
+  },
+  data() {
+    return {
+      presets: window.HTBAH.ladePresets(),
+      ausgewaehltesPreset: '',
+      charakterLokal: M.charakterMitDefaults(window.HTBAH.ladeCharakter()),
+      charakterBildLokal: window.HTBAH.ladeCharakterBild(),
+      aktiveInfo: null,
+      aktiveKategorieInfo: null,
+      zeigePresetAktionen: false,
+      neueFaehigkeit: { name: '', value: 0, type: 'handeln' },
+      bearbeitungEntwurf: { name: '', value: 0, type: 'handeln' },
+      bearbeitungReferenz: null,
+      bearbeitungKategorie: '',
+      geistesblitzAusgebenModus: false,
+      aktiveGeistesblitzInfo: null,
+      _prevLpSnapshot: null,
+    };
+  },
+  computed: {
+    summen() {
+      return {
+        handeln: this.charakter.handeln.reduce((summe, eintrag) => summe + eintrag.value, 0),
+        wissen: this.charakter.wissen.reduce((summe, eintrag) => summe + eintrag.value, 0),
+        soziales: this.charakter.soziales.reduce((summe, eintrag) => summe + eintrag.value, 0),
+      };
+    },
+    begabungen() {
+      return {
+        handeln: Math.round(this.summen.handeln / 10),
+        wissen: Math.round(this.summen.wissen / 10),
+        soziales: Math.round(this.summen.soziales / 10),
+      };
+    },
+    /** Maximal pro Begabung: Begabungswert / 10, kaufmännisch (Regelwerk 2.3 / 3.x) */
+    geistesblitzWerte() {
+      return {
+        handeln: Math.round(this.begabungen.handeln / 10),
+        wissen: Math.round(this.begabungen.wissen / 10),
+        soziales: Math.round(this.begabungen.soziales / 10),
+      };
+    },
+    punkte() {
+      return this.summen.handeln + this.summen.wissen + this.summen.soziales;
+    },
+    kategorieInfos() {
+      return KATEGORIE_INFOS;
+    },
+    geistesblitzInfoZeilen() {
+      return GEISTESBLITZ_INFO_ZEILEN;
+    },
+    charakter() {
+      return this.spielleiterMitglied ? this.spielleiterMitglied.charakter : this.charakterLokal;
+    },
+    charakterBild() {
+      return this.spielleiterMitglied
+        ? this.spielleiterMitglied.charakterBild
+        : this.charakterBildLokal;
+    },
+  },
+  created() {
+    this.initialisiereGeistesblitzVerbleibend();
+    this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
+    this._prevLpSnapshot = this.normalisiereLp(this.charakter.lebenspunkte);
+    if (this._prevLpSnapshot === 0) {
+      this.charakter.lpStatusTot = true;
+    }
+    window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
+  },
+  mounted() {
+    window.HTBAH._aktiverCharakter = this.charakter;
+  },
+  beforeUnmount() {
+    if (window.HTBAH._aktiverCharakter === this.charakter) {
+      window.HTBAH._aktiverCharakter = null;
+    }
+  },
+  watch: {
+    charakter: {
+      deep: true,
+      handler() {
+        const lp = this.normalisiereLp(this.charakter.lebenspunkte);
+        if (lp !== this._prevLpSnapshot) {
+          this.verarbeiteLebenspunkteAenderung(this._prevLpSnapshot, lp);
+          this._prevLpSnapshot = this.normalisiereLp(this.charakter.lebenspunkte);
+        }
+        if (this.spielleiterMitglied) {
+          this.onSpielleiterPersist?.();
+        } else {
+          window.HTBAH.speichereCharakter(this.charakter);
+        }
+        window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
+      },
+    },
+    geistesblitzWerte: {
+      deep: true,
+      handler(neu) {
+        const alt = this._prevGeistesblitzMax;
+        const v = this.charakter.geistesblitzVerbleibend;
+        if (!alt || !v) {
+          this._prevGeistesblitzMax = { ...neu };
+          return;
+        }
+        for (const k of ['handeln', 'wissen', 'soziales']) {
+          const delta = neu[k] - alt[k];
+          if (delta !== 0) {
+            const r = v[k] + delta;
+            v[k] = Math.max(0, Math.min(r, neu[k]));
+          }
+        }
+        this._prevGeistesblitzMax = { ...neu };
+      },
+    },
+  },
+  methods: {
+    normalisiereLp(roh) {
+      const n = Math.round(Number(roh));
+      if (Number.isNaN(n) || n < 0) {
+        return 0;
+      }
+      return n;
+    },
+    verarbeiteLebenspunkteAenderung(vorher, nach) {
+      let n = this.normalisiereLp(nach);
+      const v = this.normalisiereLp(vorher);
+
+      if (n !== this.charakter.lebenspunkte) {
+        this.charakter.lebenspunkte = n;
+      }
+
+      if (this.charakter.lpStatusTot) {
+        return;
+      }
+
+      if (n === 0) {
+        this.charakter.lpStatusTot = true;
+        return;
+      }
+
+      const verlust = v - n;
+      if (verlust > 60) {
+        this.charakter.lpMassenschadenBewusstlos = true;
+      }
+
+      if (v > 10 && n >= 1 && n <= 10) {
+        this.charakter.lpBewusstlosAusgeblendet = false;
+      }
+      if (verlust > 60) {
+        this.charakter.lpBewusstlosAusgeblendet = false;
+      }
+      if (n < v && n >= 1 && n <= 10 && v >= 1 && v <= 10) {
+        this.charakter.lpBewusstlosAusgeblendet = false;
+      }
+    },
+    initialisiereGeistesblitzVerbleibend() {
+      const m = this.geistesblitzWerte;
+      let v = this.charakter.geistesblitzVerbleibend;
+      if (!v) {
+        this.charakter.geistesblitzVerbleibend = {
+          handeln: m.handeln,
+          wissen: m.wissen,
+          soziales: m.soziales,
+        };
+        return;
+      }
+      for (const k of ['handeln', 'wissen', 'soziales']) {
+        v[k] = Math.max(0, Math.min(v[k], m[k]));
+      }
+    },
+    geistesblitzInfoUmschalten(kategorie) {
+      this.aktiveGeistesblitzInfo =
+        this.aktiveGeistesblitzInfo === kategorie ? null : kategorie;
+    },
+    geistesblitzAusgebenModusUmschalten() {
+      this.geistesblitzAusgebenModus = !this.geistesblitzAusgebenModus;
+    },
+    geistesblitzPunktAusgeben(kategorie) {
+      if (!this.geistesblitzAusgebenModus) return;
+      const v = this.charakter.geistesblitzVerbleibend;
+      const max = this.geistesblitzWerte[kategorie];
+      if (!v || v[kategorie] <= 0) return;
+      v[kategorie] = Math.max(0, Math.min(v[kategorie] - 1, max));
+    },
+    geistesblitzKontenAuffuellen() {
+      if (
+        !confirm(
+          'Alle Geistesblitzkonten auf den aktuellen Maximalwert setzen? (Typisch nach Abenteuerende / neuem Abenteuer.)',
+        )
+      ) {
+        return;
+      }
+      const m = this.geistesblitzWerte;
+      this.charakter.geistesblitzVerbleibend = {
+        handeln: m.handeln,
+        wissen: m.wissen,
+        soziales: m.soziales,
+      };
+      this._prevGeistesblitzMax = { ...m };
+    },
+    faehigkeitenPresetAufCharakterAnwenden(preset) {
+      this.charakter.handeln = JSON.parse(JSON.stringify(preset.handeln));
+      this.charakter.wissen = JSON.parse(JSON.stringify(preset.wissen));
+      this.charakter.soziales = JSON.parse(JSON.stringify(preset.soziales));
+    },
+    presetAnwenden() {
+      const preset = this.presets.find((eintrag) => eintrag.name === this.ausgewaehltesPreset);
+      if (!preset) return;
+
+      if (!confirm('Aktuellen Charakter überschreiben?')) return;
+
+      this.faehigkeitenPresetAufCharakterAnwenden(preset);
+    },
+    presetAusDateiAnwenden(event) {
+      const input = event.target;
+      const datei = input.files && input.files[0];
+      if (!datei) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const json = JSON.parse(reader.result);
+          const preset = normalisiereFaehigkeitenPreset(json);
+          if (!preset) {
+            alert('Ungültige Preset-Datei (erwartet: handeln, wissen, soziales als Listen).');
+            return;
+          }
+          const titel = preset.name ? `„${preset.name}“` : 'dieses Preset';
+          if (!confirm(`Aktuellen Charakter mit ${titel} aus der Datei überschreiben?`)) {
+            return;
+          }
+          this.faehigkeitenPresetAufCharakterAnwenden(preset);
+        } catch {
+          alert('Datei konnte nicht gelesen werden (kein gültiges JSON).');
+        } finally {
+          input.value = '';
+        }
+      };
+      reader.onerror = () => {
+        alert('Datei konnte nicht gelesen werden.');
+        input.value = '';
+      };
+      reader.readAsText(datei);
+    },
+    infoUmschalten(kategorie) {
+      this.aktiveInfo = this.aktiveInfo === kategorie ? null : kategorie;
+    },
+    kategorieInfoUmschalten(kategorie) {
+      this.aktiveKategorieInfo = this.aktiveKategorieInfo === kategorie ? null : kategorie;
+    },
+    presetAktionenUmschalten() {
+      this.zeigePresetAktionen = !this.zeigePresetAktionen;
+    },
+    sortierteFaehigkeiten(kategorie) {
+      return [...this.charakter[kategorie]].sort((a, b) =>
+        a.name.localeCompare(b.name, 'de'),
+      );
+    },
+    bearbeitungModalOeffnen(kategorie, faehigkeit) {
+      this.bearbeitungReferenz = faehigkeit;
+      this.bearbeitungKategorie = kategorie;
+      this.bearbeitungEntwurf = {
+        name: faehigkeit.name,
+        value: faehigkeit.value,
+        type: kategorie,
+      };
+
+      this.$nextTick(() => {
+        const el = this.$refs.faehigkeitBearbeitenModalElement;
+        if (!el || !window.bootstrap) {
+          return;
+        }
+
+        window.bootstrap.Modal.getOrCreateInstance(el).show();
+      });
+    },
+    bearbeitungModalGeschlossen() {
+      this.bearbeitungReferenz = null;
+      this.bearbeitungKategorie = '';
+    },
+    bearbeitungModalSchliessen() {
+      const el = this.$refs.faehigkeitBearbeitenModalElement;
+      if (el && window.bootstrap) {
+        const instanz = window.bootstrap.Modal.getInstance(el);
+        if (instanz) {
+          instanz.hide();
+        }
+      }
+    },
+    bearbeitungSpeichern() {
+      const { name, value, type } = this.bearbeitungEntwurf;
+      const ref = this.bearbeitungReferenz;
+      const altKat = this.bearbeitungKategorie;
+
+      if (!ref || !altKat) {
+        return;
+      }
+
+      const nameTrim = typeof name === 'string' ? name.trim() : '';
+      if (!nameTrim) {
+        alert('Gib einen Namen an.');
+        return;
+      }
+
+      const wert = Number(value);
+
+      if (wert <= 0) {
+        alert('Wert muss größer als 0 sein');
+        return;
+      }
+
+      if (wert > 100) {
+        alert('Maximalwert ist 100');
+        return;
+      }
+
+      const punkteOhne = this.punkte - ref.value;
+      if (punkteOhne + wert > 400) {
+        alert('Du hast nicht genug Punkte übrig');
+        return;
+      }
+
+      if (type !== altKat) {
+        const idx = this.charakter[altKat].indexOf(ref);
+        if (idx !== -1) {
+          this.charakter[altKat].splice(idx, 1);
+        }
+
+        ref.name = nameTrim;
+        ref.value = wert;
+        this.charakter[type].push(ref);
+      } else {
+        ref.name = nameTrim;
+        ref.value = wert;
+      }
+
+      this.bearbeitungModalSchliessen();
+    },
+    faehigkeitLoeschenAnfragen(kategorie, faehigkeit) {
+      this.$refs.faehigkeitLoeschenModal.oeffnen({
+        titel: 'Fähigkeit löschen?',
+        beschreibung: `Die Fähigkeit „${faehigkeit.name}“ wird entfernt.`,
+        onBestaetigen: () => {
+          const index = this.charakter[kategorie].indexOf(faehigkeit);
+          if (index !== -1) {
+            this.charakter[kategorie].splice(index, 1);
+          }
+        },
+      });
+    },
+    faehigkeitHinzufuegen() {
+      const nameTrim = String(this.neueFaehigkeit.name || '').trim();
+      if (!nameTrim) {
+        alert('Gib einen Namen an.');
+        return;
+      }
+
+      const wert = Number(this.neueFaehigkeit.value);
+
+      if (wert <= 0) {
+        alert('Wert muss größer als 0 sein');
+        return;
+      }
+
+      if (wert > 100) {
+        alert('Maximalwert ist 100');
+        return;
+      }
+
+      if (this.punkte + wert > 400) {
+        alert('Du hast nicht genug Punkte übrig');
+        return;
+      }
+
+      this.charakter[this.neueFaehigkeit.type].push({
+        name: nameTrim,
+        value: wert,
+      });
+
+      this.neueFaehigkeit.name = '';
+      this.neueFaehigkeit.value = 0;
+    },
+    bildVerwaltungOeffnen() {
+      this.$refs.charakterBildModal.oeffnen();
+    },
+    setzeCharakterBild(url) {
+      const dataUrl = typeof url === 'string' ? url : '';
+      if (this.spielleiterMitglied) {
+        this.spielleiterMitglied.charakterBild = dataUrl;
+      } else {
+        this.charakterBildLokal = dataUrl;
+        window.HTBAH.speichereCharakterBild(dataUrl);
+      }
+      this.onSpielleiterPersist?.();
+    },
+    charakterJsonExportieren() {
+      const paket = window.HTBAH.erstelleCharakterExportPaket(this.charakter, this.charakterBild);
+      const rohName = typeof this.charakter.name === 'string' ? this.charakter.name : '';
+      const sicher =
+        rohName.replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 64) || 'charakter';
+      window.HTBAH.dateiHerunterladenJson(paket, `htbah-charakter-${sicher}.json`);
+    },
+    inventarDialogOeffnen() {
+      this.$refs.inventarModal.oeffnen();
+    },
+    vorNachteileDialogOeffnen() {
+      this.$refs.vorNachteileModal.oeffnen();
+    },
+    initiativeModalOeffnen() {
+      this.$refs.initiativeModal.oeffnen();
+    },
+    kategorieAnzeige(kategorie) {
+      const namen = { handeln: 'Handeln', wissen: 'Wissen', soziales: 'Soziales' };
+      return namen[kategorie] || kategorie;
+    },
+    effektiverFaehigkeitswertProbe(kategorie, faehigkeit) {
+      return Math.min(100, faehigkeit.value + this.begabungen[kategorie]);
+    },
+    probeModalOeffnenBegabung(kategorie) {
+      this.$refs.probeWurfModal.oeffnen({
+        modus: 'begabung',
+        zielwert: this.begabungen[kategorie],
+        titel: 'Probe: Begabung ' + this.kategorieAnzeige(kategorie),
+        untertitel:
+          'Nur der Begabungswert — ohne einzelne Fähigkeit. Keine kritischen Erfolge (Regelwerk).',
+      });
+    },
+    probeModalOeffnenFaehigkeit(kategorie, faehigkeit) {
+      const b = this.begabungen[kategorie];
+      const roh = faehigkeit.value + b;
+      const z = this.effektiverFaehigkeitswertProbe(kategorie, faehigkeit);
+      let untertitel =
+        'Effektivwert ' +
+        z +
+        ' (' +
+        faehigkeit.value +
+        ' + ' +
+        b +
+        ' Begabung, ' +
+        this.kategorieAnzeige(kategorie) +
+        ')';
+      if (roh > 100) {
+        untertitel += '. Überzählige Punkte zählen für die Probe nicht (Regelwerk 3.4, Ziel 100).';
+      }
+      this.$refs.probeWurfModal.oeffnen({
+        modus: 'faehigkeit',
+        zielwert: z,
+        titel: 'Probe: ' + faehigkeit.name,
+        untertitel,
+      });
+    },
+    notizenDialogOeffnen() {
+      this.$refs.notizenModal.oeffnen();
+    },
+  },
+  template: `
+    <div class="container content py-3">
+      <h4 v-if="!spielleiterMitglied">Charakter</h4>
+      <h5 v-else class="mb-3 text-body-secondary">Charakterblatt (Spielleiter)</h5>
+
+      <div class="card p-3 mb-2">
+        <div class="row g-3">
+          <div class="col-12 col-lg-8">
+            <div class="mb-3">
+              <label for="ce-char-name" class="form-label text-body-secondary small mb-1">Name</label>
+              <input
+                id="ce-char-name"
+                type="text"
+                class="form-control htbah-charakter-name-input"
+                v-model="charakter.name"
+                placeholder="Name deines Helden"
+                autocomplete="name" />
+            </div>
+
+            <div class="row g-2 mb-2">
+              <div class="col-12 col-md-4">
+                <div class="form-floating">
+                  <input id="ce-char-geschlecht" class="form-control" v-model="charakter.geschlecht" placeholder=" ">
+                  <label for="ce-char-geschlecht">Geschlecht</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-4">
+                <div class="form-floating">
+                  <input id="ce-char-alter" type="number" class="form-control" v-model.number="charakter.alter" min="0" placeholder=" ">
+                  <label for="ce-char-alter">Alter</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-4">
+                <div class="form-floating">
+                  <input id="ce-char-lp" type="number" class="form-control" v-model.number="charakter.lebenspunkte" min="0" placeholder=" ">
+                  <label for="ce-char-lp">Lebenspunkte</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-2">
+              <div class="col-12 col-md-6">
+                <div class="form-floating">
+                  <input id="ce-char-statur" class="form-control" v-model="charakter.statur" placeholder=" ">
+                  <label for="ce-char-statur">Statur</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="form-floating">
+                  <input id="ce-char-religion" class="form-control" v-model="charakter.religion" placeholder=" ">
+                  <label for="ce-char-religion">Religion</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-2">
+              <div class="col-12 col-md-6">
+                <div class="form-floating">
+                  <input id="ce-char-beruf" class="form-control" v-model="charakter.beruf" placeholder=" ">
+                  <label for="ce-char-beruf">Beruf</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="form-floating">
+                  <input id="ce-char-famstand" class="form-control" v-model="charakter.familienstand" placeholder=" ">
+                  <label for="ce-char-famstand">Familienstand</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-4">
+            <h6 class="mb-2">Charakterbild</h6>
+            <div class="text-center mb-2">
+              <img
+                v-if="charakterBild"
+                :src="charakterBild"
+                alt="Charakterbild"
+                class="charakterbild-vorschau-klein" />
+              <div v-else class="charakterbild-platzhalter-klein">
+                <span class="material-symbols-outlined" aria-hidden="true">person</span>
+              </div>
+            </div>
+
+            <button
+              class="btn btn-outline-primary w-100"
+              @click="bildVerwaltungOeffnen">
+              Bild verwalten
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-3 mb-2">
+        <h5 class="mb-2">Vor- &amp; Nachteile</h5>
+        <p class="small text-body-secondary mb-3 mb-md-2">
+          Jedes Paar besteht aus einem Vorteil (kostet Fähigkeitspunkte) und einem Nachteil
+          (gewährt Fähigkeitspunkte); die Punkte eines Paares müssen sich ausgleichen.
+          Du kannst beliebig viele Paare anlegen — derzeit nur als Freitext mit Formatierung.
+        </p>
+        <icon-text-button
+          type="button"
+          class="btn btn-outline-primary w-100"
+          symbol="⚖️"
+          @click="vorNachteileDialogOeffnen">
+          Vor- &amp; Nachteile bearbeiten
+        </icon-text-button>
+
+        <div
+          v-if="charakter.vorNachteilePaare.length"
+          class="table-responsive rounded border border-secondary border-opacity-25 mt-3 vor-nachteile-karte-wrap">
+          <table class="table table-sm mb-0 inventar-tabelle vor-nachteile-tabelle vor-nachteile-karte-tabelle">
+            <thead>
+              <tr>
+                <th scope="col" class="vn-col-nr text-end">#</th>
+                <th scope="col" class="vn-col-vorteil">Vorteil</th>
+                <th scope="col" class="vn-col-nachteil">Nachteil</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(paar, vnIndex) in charakter.vorNachteilePaare" :key="paar.id">
+                <td class="vn-col-nr text-end text-muted small align-top">{{ vnIndex + 1 }}</td>
+                <td class="vn-col-vorteil">
+                  <div
+                    class="inventar-beschreibung-vorschau small vor-nachteile-karte-vorschau"
+                    v-html="paar.vorteilHtml"></div>
+                </td>
+                <td class="vn-col-nachteil">
+                  <div
+                    class="inventar-beschreibung-vorschau small vor-nachteile-karte-vorschau"
+                    v-html="paar.nachteilHtml"></div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="small text-body-secondary mb-0 mt-3">
+          Noch keine Paare — über den Button bearbeiten.
+        </p>
+      </div>
+
+      <div class="card p-2 mb-2">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h5 class="mb-0">Fähigkeiten</h5>
+          <div class="d-flex align-items-center gap-2">
+            <button
+              v-if="!spielleiterMitglied"
+              type="button"
+              class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center"
+              @click="presetAktionenUmschalten"
+              aria-label="Preset-Aktionen">
+              <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center"
+              data-bs-toggle="modal"
+              data-bs-target="#faehigkeitenHilfeModal"
+              aria-label="Hilfe zu Fähigkeiten">
+              <span class="material-symbols-outlined" aria-hidden="true">help</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="zeigePresetAktionen && !spielleiterMitglied" class="card p-2 mb-2">
+          <h6 class="mb-2">Presets</h6>
+          <div class="form-floating mb-2">
+            <select id="ce-preset-wahl" class="form-select" v-model="ausgewaehltesPreset">
+              <option value="">Preset wählen …</option>
+              <option v-for="preset in presets" :value="preset.name">
+                {{preset.name}}
+              </option>
+            </select>
+            <label for="ce-preset-wahl">Preset (lokal gespeichert)</label>
+          </div>
+          <button class="btn btn-primary w-100 mb-2" @click="presetAnwenden">
+            Preset anwenden
+          </button>
+          <p class="small text-body-secondary mb-2">
+            Von der Spielleitung erhaltene Datei (.json) kannst du direkt laden — ohne vorheriges Importieren in die App.
+          </p>
+          <div class="form-floating mb-0">
+            <input
+              id="ce-preset-import"
+              type="file"
+              accept="application/json,.json"
+              class="form-control"
+              @change="presetAusDateiAnwenden" />
+            <label for="ce-preset-import">Preset aus Datei laden</label>
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <p>
+            Punkte: <strong>{{punkte}}</strong> / 400
+            <span class="text-warning">({{400 - punkte}} übrig)</span>
+          </p>
+
+          <div class="progress" style="height:10px;">
+            <div class="progress-bar" :style="{width: (punkte/400*100) + '%'}"></div>
+          </div>
+
+          <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+            <button
+              type="button"
+              class="btn btn-sm"
+              :class="geistesblitzAusgebenModus ? 'btn-warning' : 'btn-outline-secondary'"
+              @click="geistesblitzAusgebenModusUmschalten">
+              {{ geistesblitzAusgebenModus ? 'Geistesblitzpunkte ausgeben: an' : 'Geistesblitzpunkte ausgeben' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary"
+              @click="geistesblitzKontenAuffuellen">
+              Geistesblitz-Konto auffüllen
+            </button>
+          </div>
+          <p v-if="geistesblitzAusgebenModus" class="small text-warning mb-0 mt-1">
+            Pro Kategorie einen Punkt abziehen, wenn du ihn am Tisch verbraucht hast.
+          </p>
+        </div>
+
+        <div class="row g-2 mb-2">
+          <div
+            v-for="kategorie in ['handeln','wissen','soziales']"
+            class="col-12 col-md-4">
+            <div class="card p-2 h-100">
+              <h5 class="text-uppercase fw-bold d-flex align-items-center gap-1">
+                <span>{{kategorie}}</span>
+                <span
+                  class="material-symbols-outlined"
+                  @click="kategorieInfoUmschalten(kategorie)"
+                  style="cursor:pointer;"
+                  aria-label="Kategorie-Info">
+                  info
+                </span>
+              </h5>
+              <div
+                v-if="aktiveKategorieInfo === kategorie"
+                class="faehigkeiten-stat-info-panel mb-2 mt-0">
+                <small class="d-block">
+                  {{ kategorieInfos[kategorie].erklaerung }}
+                </small>
+                <ul class="mt-2 mb-0 small">
+                  <li v-for="beispiel in kategorieInfos[kategorie].beispiele">
+                    {{ beispiel }}
+                  </li>
+                </ul>
+              </div>
+
+              <div class="mb-2">
+                <div class="faehigkeiten-stat-badges-row" role="group" :aria-label="'Werte ' + kategorie">
+                  <div class="faehigkeiten-stat-gruppe">
+                    <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-summe">
+                      Summe {{ summen[kategorie] }}
+                    </span>
+                  </div>
+                  <div class="faehigkeiten-stat-gruppe">
+                    <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-begabung">
+                      Begabung {{ begabungen[kategorie] }}
+                    </span>
+                    <button
+                      type="button"
+                      class="faehigkeiten-stat-info-btn faehigkeiten-probe-wuerfel-btn"
+                      :aria-label="'W100-Probe auf Begabung ' + kategorieAnzeige(kategorie)"
+                      @click="probeModalOeffnenBegabung(kategorie)">
+                      <span class="faehigkeiten-wuerfel-emoji" aria-hidden="true">🎲</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="faehigkeiten-stat-info-btn"
+                      :aria-label="'Info Begabung (' + kategorie + ')'"
+                      :aria-expanded="aktiveInfo === kategorie"
+                      @click="infoUmschalten(kategorie)">
+                      <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                    </button>
+                  </div>
+                  <div class="faehigkeiten-stat-gruppe">
+                    <span
+                      class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-geistesblitz">
+                      Geistesblitz {{ charakter.geistesblitzVerbleibend[kategorie] }} / {{ geistesblitzWerte[kategorie] }}
+                    </span>
+                    <button
+                      type="button"
+                      class="faehigkeiten-stat-info-btn"
+                      :aria-label="'Info Geistesblitzpunkte (' + kategorie + ')'"
+                      :aria-expanded="aktiveGeistesblitzInfo === kategorie"
+                      @click="geistesblitzInfoUmschalten(kategorie)">
+                      <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                    </button>
+                    <button
+                      v-if="geistesblitzAusgebenModus"
+                      type="button"
+                      class="btn btn-sm btn-outline-warning py-0 px-2"
+                      :disabled="!charakter.geistesblitzVerbleibend[kategorie]"
+                      @click="geistesblitzPunktAusgeben(kategorie)">
+                      −1
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  v-if="aktiveInfo === kategorie"
+                  class="faehigkeiten-stat-info-panel faehigkeiten-stat-info-panel--begabung">
+                  <small>
+                    Begabung = Summe der Fähigkeiten / 10 (kaufmännisch runden).<br>
+                    Sie wird auf alle Fähigkeiten dieser Kategorie addiert.
+                  </small>
+                </div>
+                <div
+                  v-if="aktiveGeistesblitzInfo === kategorie"
+                  class="faehigkeiten-stat-info-panel faehigkeiten-stat-info-panel--geistesblitz">
+                  <ul class="mb-0 ps-3 small">
+                    <li v-for="(zeile, ix) in geistesblitzInfoZeilen" :key="ix">
+                      {{ zeile }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="table-responsive rounded border border-secondary border-opacity-25">
+                <table class="table table-sm mb-0 faehigkeiten-tabelle">
+                  <thead>
+                    <tr>
+                      <th scope="col">Name</th>
+                      <th scope="col" class="text-end">Wert</th>
+                      <th scope="col" class="text-end">Effektiv</th>
+                      <th scope="col" class="text-end text-nowrap ps-2">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="!sortierteFaehigkeiten(kategorie).length">
+                      <td colspan="4" class="text-muted small py-2">Keine Fähigkeiten</td>
+                    </tr>
+                    <tr
+                      v-for="faehigkeit in sortierteFaehigkeiten(kategorie)"
+                      :key="faehigkeit">
+                      <td class="align-middle">{{ faehigkeit.name }}</td>
+                      <td class="align-middle text-end">{{ faehigkeit.value }}</td>
+                      <td class="align-middle text-end">
+                        {{ faehigkeit.value + begabungen[kategorie] }}
+                      </td>
+                      <td class="align-middle text-end ps-2">
+                        <div class="btn-group btn-group-sm" role="group" :aria-label="'Aktionen für ' + faehigkeit.name">
+                          <button
+                            type="button"
+                            class="btn btn-outline-primary d-flex align-items-center justify-content-center"
+                            :aria-label="'W100-Probe: ' + faehigkeit.name"
+                            @click="probeModalOeffnenFaehigkeit(kategorie, faehigkeit)">
+                            <span class="faehigkeiten-wuerfel-emoji" aria-hidden="true">🎲</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-outline-secondary d-flex align-items-center justify-content-center"
+                            :aria-label="'Bearbeiten: ' + faehigkeit.name"
+                            @click="bearbeitungModalOeffnen(kategorie, faehigkeit)">
+                            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-outline-danger d-flex align-items-center justify-content-center"
+                            :aria-label="'Löschen: ' + faehigkeit.name"
+                            @click="faehigkeitLoeschenAnfragen(kategorie, faehigkeit)">
+                            <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-2">
+          <h5>Neue Fähigkeit</h5>
+          <faehigkeit-formular v-model="neueFaehigkeit" id-prefix="ce-neu" />
+          <button class="btn btn-primary w-100 mt-2" @click="faehigkeitHinzufuegen">Hinzufügen</button>
+        </div>
+      </div>
+
+      <div class="card p-3 mb-2">
+        <div class="row g-2">
+          <div class="col-12">
+            <icon-text-button
+              type="button"
+              class="btn btn-outline-primary w-100"
+              symbol="🎲"
+              @click="initiativeModalOeffnen">
+              Initiative würfeln
+            </icon-text-button>
+          </div>
+          <div class="col-12 col-md-6">
+            <icon-text-button
+              class="btn btn-outline-primary w-100"
+              type="button"
+              symbol="🎒"
+              @click="inventarDialogOeffnen">
+              Inventar
+            </icon-text-button>
+          </div>
+          <div class="col-12 col-md-6">
+            <icon-text-button
+              class="btn btn-outline-primary w-100"
+              type="button"
+              symbol="📝"
+              @click="notizenDialogOeffnen">
+              Notizen
+            </icon-text-button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!spielleiterMitglied" class="card p-3 mb-2">
+        <h5 class="mb-2">Verwaltung</h5>
+        <p class="small text-body-secondary mb-3 mb-md-2">
+          Der Export enthält alle Charakterdaten (Stammdaten, Lebenspunkte- und Bewusstseinsstatus,
+          Geistesblitzkonten), das Profilbild, die drei Fähigkeitslisten, Vor- und Nachteile,
+          das Inventar und die Notizen. Beim Import (z. B. in der Spielleiter-Ansicht) werden
+          dieselben Felder wieder übernommen.
+        </p>
+        <icon-text-button
+          type="button"
+          class="btn btn-outline-secondary w-100"
+          icon="download"
+          @click="charakterJsonExportieren">
+          JSON exportieren
+        </icon-text-button>
+      </div>
+
+      <div
+        class="modal fade"
+        id="faehigkeitenHilfeModal"
+        tabindex="-1"
+        aria-labelledby="faehigkeitenHilfeLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content shadow">
+            <div class="modal-header">
+              <h5 class="modal-title" id="faehigkeitenHilfeLabel">
+                Hilfe zu Fähigkeiten
+              </h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+              <p><strong>Du hast 400 Punkte.</strong> Diese verteilst du auf Fähigkeiten.</p>
+              <p><strong>Fähigkeiten</strong> sind konkrete Dinge (z.B. Klettern, Lügen).</p>
+              <p><strong>Kategorien:</strong></p>
+              <ul>
+                <li><strong>Handeln</strong> → körperlich / aktiv</li>
+                <li><strong>Wissen</strong> → logisch / gelernt</li>
+                <li><strong>Soziales</strong> → Interaktion</li>
+              </ul>
+              <p><strong>Begabung</strong> entsteht automatisch aus deinen Punkten und verbessert alle Fähigkeiten.</p>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-bs-dismiss="modal">
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="modal fade"
+        id="faehigkeitBearbeitenModal"
+        ref="faehigkeitBearbeitenModalElement"
+        tabindex="-1"
+        aria-labelledby="faehigkeitBearbeitenLabel"
+        aria-hidden="true"
+        v-on="{ 'hidden.bs.modal': bearbeitungModalGeschlossen }">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content shadow">
+            <div class="modal-header">
+              <h5 class="modal-title" id="faehigkeitBearbeitenLabel">
+                Fähigkeit bearbeiten
+              </h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+              <faehigkeit-formular
+                v-model="bearbeitungEntwurf"
+                id-prefix="ce-bearb"
+              />
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                Abbrechen
+              </button>
+              <button type="button" class="btn btn-primary" @click="bearbeitungSpeichern">
+                Speichern
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <bestaetigen-modal ref="faehigkeitLoeschenModal" />
+
+      <charakter-bild-modal
+        ref="charakterBildModal"
+        :charakter-bild="charakterBild"
+        @update:charakter-bild="setzeCharakterBild($event)"
+      />
+      <vor-nachteile-modal ref="vorNachteileModal" :charakter="charakter" />
+      <initiative-modal ref="initiativeModal" :charakter="charakter" />
+      <probe-wurf-modal ref="probeWurfModal" />
+      <inventar-modal ref="inventarModal" :charakter="charakter" />
+      <notizen-modal
+        ref="notizenModal"
+        :journal-html="charakter.journalHtml"
+        @update:journal-html="charakter.journalHtml = $event"
+      />
+      <div style="height: 80px;"></div>
+    </div>
+  `,
+};

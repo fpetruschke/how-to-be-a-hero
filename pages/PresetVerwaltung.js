@@ -50,27 +50,34 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
       <h4>Presets</h4>
 
       <div class="card p-3 mb-3">
-        <router-link class="btn btn-success w-100 mb-2" to="/preset-bearbeiten">
-          ➕ Neues Preset
-        </router-link>
+        <icon-text-button tag="router-link" to="/preset-bearbeiten" class="btn btn-success w-100 mb-2" icon="add">
+          Neues Preset
+        </icon-text-button>
 
-        <input type="file" class="form-control" @change="presetImportieren">
+        <div class="form-floating">
+          <input
+            id="pv-preset-import"
+            type="file"
+            class="form-control"
+            @change="presetImportieren" />
+          <label for="pv-preset-import">Preset-Datei importieren</label>
+        </div>
       </div>
 
       <div class="card p-3 mb-3" v-for="(preset, index) in presets">
         <h5 class="fw-bold">{{preset.name}}</h5>
 
-        <button class="btn btn-sm btn-secondary me-1 mb-2" @click="$router.push('/preset-bearbeiten/' + index)">
-          ✏️ Bearbeiten
-        </button>
+        <icon-text-button class="btn btn-sm btn-secondary me-1 mb-2" icon="edit" @click="$router.push('/preset-bearbeiten/' + index)">
+          Bearbeiten
+        </icon-text-button>
 
-        <button class="btn btn-sm btn-primary me-1 mb-2" @click="presetExportieren(preset)">
-          ⬇️ Export
-        </button>
+        <icon-text-button class="btn btn-sm btn-primary me-1 mb-2" icon="download" @click="presetExportieren(preset)">
+          Export
+        </icon-text-button>
 
-        <button class="btn btn-sm btn-danger mb-2" @click="presetEntfernen(preset)">
-          🗑️ Löschen
-        </button>
+        <icon-text-button class="btn btn-sm btn-danger mb-2" icon="delete" @click="presetEntfernen(preset)">
+          Löschen
+        </icon-text-button>
       </div>
 
       <div style="height:80px;"></div>
