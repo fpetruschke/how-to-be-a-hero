@@ -4,6 +4,7 @@ const SPEICHER_KEY_THEME = 'htbah_theme';
 const SPEICHER_KEY_CHARAKTER_BILD = 'htbah_character_image';
 const SPEICHER_KEY_SPIELLEITER = 'htbah_spielleiter_gruppen';
 const SPEICHER_KEY_ZUFALLSTABELLEN = 'htbah_zufallstabellen';
+const SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH = 'htbah_spielleitung_abenteuerbuch';
 
 function neueEntropieId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -138,6 +139,23 @@ function ladeZufallstabellenZustand() {
 
 function speichereZufallstabellenZustand(zustand) {
   localStorage.setItem(SPEICHER_KEY_ZUFALLSTABELLEN, JSON.stringify(zustand));
+}
+
+function ladeSpielleitungAbenteuerbuchHtml() {
+  try {
+    return localStorage.getItem(SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH) || '';
+  } catch {
+    return '';
+  }
+}
+
+function speichereSpielleitungAbenteuerbuchHtml(html) {
+  const s = typeof html === 'string' ? html : '';
+  localStorage.setItem(SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH, s);
+}
+
+function loescheSpielleitungAbenteuerbuch() {
+  localStorage.removeItem(SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH);
 }
 
 function erstelleCharakterExportPaket(charakter, charakterBild) {
@@ -352,6 +370,9 @@ window.HTBAH = {
   dateiHerunterladenJson,
   ladeZufallstabellenZustand,
   speichereZufallstabellenZustand,
+  ladeSpielleitungAbenteuerbuchHtml,
+  speichereSpielleitungAbenteuerbuchHtml,
+  loescheSpielleitungAbenteuerbuch,
 };
 
 const routes = [
@@ -380,6 +401,7 @@ const router = VueRouter.createRouter({
 
 const uiZustand = Vue.reactive({
   regelwerkOffen: false,
+  abenteuerbuchOffen: false,
 });
 
 const lebenspunkteStatus = Vue.reactive({
@@ -394,12 +416,14 @@ function syncLebenspunkteStatusFromCharakter(charakter) {
     return;
   }
   const lp = Math.max(0, Math.round(Number(charakter.lebenspunkte) || 0));
-  const tot = Boolean(charakter.lpStatusTot);
+  const tot = lp === 0;
   const ausgeblendet = Boolean(charakter.lpBewusstlosAusgeblendet);
   const massenschaden = Boolean(charakter.lpMassenschadenBewusstlos);
   lebenspunkteStatus.tot = tot;
+  const bewusstlosTypisch = lp >= 1 && lp <= 10;
+  const bewusstlosMassenschaden = massenschaden && lp > 10;
   lebenspunkteStatus.bewusstlos =
-    !tot && !ausgeblendet && ((lp >= 1 && lp <= 10) || massenschaden);
+    !tot && !ausgeblendet && (bewusstlosTypisch || bewusstlosMassenschaden);
 }
 
 window.HTBAH.lebenspunkteStatus = lebenspunkteStatus;
@@ -417,7 +441,9 @@ const app = Vue.createApp({
   template: `
     <lebenspunkte-status-banner />
     <router-view></router-view>
+    <lokaler-speicher-hinweis-modal />
     <regelwerk-modal :ui-zustand="uiZustand"></regelwerk-modal>
+    <abenteuerbuch-modal :ui-zustand="uiZustand"></abenteuerbuch-modal>
     <bottom-nav :ui-zustand="uiZustand"></bottom-nav>
   `,
 });
@@ -430,6 +456,11 @@ router.afterEach((to) => {
   syncLebenspunkteStatusFromCharakter(window.HTBAH.ladeCharakter());
 });
 app.component('regelwerk-modal', window.HTBAH_KOMPONENTEN.RegelwerkModal);
+app.component('abenteuerbuch-modal', window.HTBAH_KOMPONENTEN.AbenteuerbuchModal);
+app.component(
+  'lokaler-speicher-hinweis-modal',
+  window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal,
+);
 app.component('bottom-nav', window.HTBAH_KOMPONENTEN.BottomNav);
 app.component('bestaetigen-modal', window.HTBAH_KOMPONENTEN.BestaetigenModal);
 app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner);

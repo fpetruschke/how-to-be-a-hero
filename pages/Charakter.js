@@ -58,6 +58,7 @@ window.HTBAH_SEITEN.Charakter = {
     FaehigkeitFormular: window.HTBAH_KOMPONENTEN.FaehigkeitFormular,
     InitiativeModal: window.HTBAH_KOMPONENTEN.InitiativeModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
+    CharakterPdfModal: window.HTBAH_KOMPONENTEN.CharakterPdfModal,
   },
   props: {
     spielleiterMitglied: { type: Object, default: null },
@@ -79,6 +80,10 @@ window.HTBAH_SEITEN.Charakter = {
       geistesblitzAusgebenModus: false,
       aktiveGeistesblitzInfo: null,
       _prevLpSnapshot: null,
+      pdfExportLaedt: false,
+      charakterPdfModalOffen: false,
+      charakterPdfBlobUrl: null,
+      charakterPdfDateiname: '',
     };
   },
   computed: {
@@ -126,9 +131,7 @@ window.HTBAH_SEITEN.Charakter = {
     this.initialisiereGeistesblitzVerbleibend();
     this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
     this._prevLpSnapshot = this.normalisiereLp(this.charakter.lebenspunkte);
-    if (this._prevLpSnapshot === 0) {
-      this.charakter.lpStatusTot = true;
-    }
+    this.charakter.lpStatusTot = this._prevLpSnapshot === 0;
     window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
   },
   mounted() {
@@ -137,6 +140,9 @@ window.HTBAH_SEITEN.Charakter = {
   beforeUnmount() {
     if (window.HTBAH._aktiverCharakter === this.charakter) {
       window.HTBAH._aktiverCharakter = null;
+    }
+    if (this.charakterPdfBlobUrl) {
+      URL.revokeObjectURL(this.charakterPdfBlobUrl);
     }
   },
   watch: {
@@ -192,24 +198,22 @@ window.HTBAH_SEITEN.Charakter = {
         this.charakter.lebenspunkte = n;
       }
 
-      if (this.charakter.lpStatusTot) {
-        return;
-      }
-
       if (n === 0) {
         this.charakter.lpStatusTot = true;
         return;
       }
 
+      this.charakter.lpStatusTot = false;
+
       const verlust = v - n;
-      if (verlust > 60) {
+      if (verlust >= 60) {
         this.charakter.lpMassenschadenBewusstlos = true;
       }
 
       if (v > 10 && n >= 1 && n <= 10) {
         this.charakter.lpBewusstlosAusgeblendet = false;
       }
-      if (verlust > 60) {
+      if (verlust >= 60) {
         this.charakter.lpBewusstlosAusgeblendet = false;
       }
       if (n < v && n >= 1 && n <= 10 && v >= 1 && v <= 10) {
@@ -463,6 +467,43 @@ window.HTBAH_SEITEN.Charakter = {
         rohName.replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 64) || 'charakter';
       window.HTBAH.dateiHerunterladenJson(paket, `htbah-charakter-${sicher}.json`);
     },
+    charakterPdfModalSchliessen() {
+      this.charakterPdfModalOffen = false;
+      if (this.charakterPdfBlobUrl) {
+        URL.revokeObjectURL(this.charakterPdfBlobUrl);
+        this.charakterPdfBlobUrl = null;
+      }
+      this.charakterPdfDateiname = '';
+    },
+    async charakterPdfExportieren() {
+      if (this.pdfExportLaedt) {
+        return;
+      }
+      const fn =
+        window.HTBAH && typeof window.HTBAH.erzeugeCharakterPdfBlob === 'function'
+          ? window.HTBAH.erzeugeCharakterPdfBlob
+          : null;
+      if (!fn) {
+        alert('PDF-Funktion nicht geladen. Seite neu laden und erneut versuchen.');
+        return;
+      }
+      this.pdfExportLaedt = true;
+      try {
+        if (this.charakterPdfBlobUrl) {
+          URL.revokeObjectURL(this.charakterPdfBlobUrl);
+          this.charakterPdfBlobUrl = null;
+        }
+        const { blob, dateiname } = await fn(this.charakter, this.charakterBild);
+        this.charakterPdfBlobUrl = URL.createObjectURL(blob);
+        this.charakterPdfDateiname = dateiname;
+        this.charakterPdfModalOffen = true;
+      } catch (e) {
+        console.error(e);
+        alert(e && e.message ? e.message : 'PDF konnte nicht erzeugt werden.');
+      } finally {
+        this.pdfExportLaedt = false;
+      }
+    },
     inventarDialogOeffnen() {
       this.$refs.inventarModal.oeffnen();
     },
@@ -708,37 +749,40 @@ window.HTBAH_SEITEN.Charakter = {
           </div>
         </div>
 
-        <div class="mb-2">
-          <p>
-            Punkte: <strong>{{punkte}}</strong> / 400
-            <span class="text-warning">({{400 - punkte}} übrig)</span>
-          </p>
+        <div class="htbah-faehigkeiten-sticky-scope">
+          <div class="htbah-faehigkeiten-punkte-sticky">
+            <p class="mb-2">
+              Punkte: <strong>{{punkte}}</strong> / 400
+              <span class="text-warning">({{400 - punkte}} übrig)</span>
+            </p>
 
-          <div class="progress" style="height:10px;">
-            <div class="progress-bar" :style="{width: (punkte/400*100) + '%'}"></div>
+            <div class="progress" style="height:10px;">
+              <div class="progress-bar" :style="{width: (punkte/400*100) + '%'}"></div>
+            </div>
           </div>
 
-          <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-            <button
-              type="button"
-              class="btn btn-sm"
-              :class="geistesblitzAusgebenModus ? 'btn-warning' : 'btn-outline-secondary'"
-              @click="geistesblitzAusgebenModusUmschalten">
-              {{ geistesblitzAusgebenModus ? 'Geistesblitzpunkte ausgeben: an' : 'Geistesblitzpunkte ausgeben' }}
-            </button>
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-primary"
-              @click="geistesblitzKontenAuffuellen">
-              Geistesblitz-Konto auffüllen
-            </button>
+          <div class="mb-2">
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+              <button
+                type="button"
+                class="btn btn-sm"
+                :class="geistesblitzAusgebenModus ? 'btn-warning' : 'btn-outline-secondary'"
+                @click="geistesblitzAusgebenModusUmschalten">
+                {{ geistesblitzAusgebenModus ? 'Geistesblitzpunkte ausgeben: an' : 'Geistesblitzpunkte ausgeben' }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-primary"
+                @click="geistesblitzKontenAuffuellen">
+                Geistesblitz-Konto auffüllen
+              </button>
+            </div>
+            <p v-if="geistesblitzAusgebenModus" class="small text-warning mb-0 mt-1">
+              Pro Kategorie einen Punkt abziehen, wenn du ihn am Tisch verbraucht hast.
+            </p>
           </div>
-          <p v-if="geistesblitzAusgebenModus" class="small text-warning mb-0 mt-1">
-            Pro Kategorie einen Punkt abziehen, wenn du ihn am Tisch verbraucht hast.
-          </p>
-        </div>
 
-        <div class="row g-2 mb-2">
+          <div class="row g-2 mb-2">
           <div
             v-for="kategorie in ['handeln','wissen','soziales']"
             class="col-12 col-md-4">
@@ -889,6 +933,7 @@ window.HTBAH_SEITEN.Charakter = {
               </div>
             </div>
           </div>
+          </div>
         </div>
 
         <div class="card p-2">
@@ -930,15 +975,30 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div v-if="!spielleiterMitglied" class="card p-3 mb-2">
+      <div class="card p-3 mb-2">
         <h5 class="mb-2">Verwaltung</h5>
-        <p class="small text-body-secondary mb-3 mb-md-2">
-          Der Export enthält alle Charakterdaten (Stammdaten, Lebenspunkte- und Bewusstseinsstatus,
+        <p v-if="!spielleiterMitglied" class="small text-body-secondary mb-3 mb-md-2">
+          Der JSON-Export enthält alle Charakterdaten (Stammdaten, Lebenspunkte- und Bewusstseinsstatus,
           Geistesblitzkonten), das Profilbild, die drei Fähigkeitslisten, Vor- und Nachteile,
           das Inventar und die Notizen. Beim Import (z. B. in der Spielleiter-Ansicht) werden
           dieselben Felder wieder übernommen.
+          „PDF generieren“ erstellt den Charakterbogen als eine DIN-A4-Seite; bei sehr viel Text
+          wird versucht, den Inhalt zum Ausdrucken zu verkleinern.
+        </p>
+        <p v-else class="small text-body-secondary mb-3 mb-md-2">
+          PDF: kompletter Charakterbogen auf einer DIN-A4-Seite (bei viel Text wird der Inhalt
+          zum Ausdrucken verkleinert).
         </p>
         <icon-text-button
+          type="button"
+          class="btn btn-outline-primary w-100 mb-2"
+          icon="picture_as_pdf"
+          :disabled="pdfExportLaedt"
+          @click="charakterPdfExportieren">
+          {{ pdfExportLaedt ? 'PDF wird erzeugt …' : 'PDF generieren' }}
+        </icon-text-button>
+        <icon-text-button
+          v-if="!spielleiterMitglied"
           type="button"
           class="btn btn-outline-secondary w-100"
           icon="download"
@@ -1041,6 +1101,12 @@ window.HTBAH_SEITEN.Charakter = {
         ref="notizenModal"
         :journal-html="charakter.journalHtml"
         @update:journal-html="charakter.journalHtml = $event"
+      />
+      <charakter-pdf-modal
+        :offen="charakterPdfModalOffen"
+        :pdf-url="charakterPdfBlobUrl || ''"
+        :dateiname="charakterPdfDateiname"
+        @schliessen="charakterPdfModalSchliessen"
       />
       <div style="height: 80px;"></div>
     </div>

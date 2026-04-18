@@ -46,6 +46,15 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '📚',
     buttonLabel: 'Zufallstabellen löschen',
   },
+  abenteuerbuch: {
+    key: 'htbah_spielleitung_abenteuerbuch',
+    titel: 'Abenteuerbuch löschen?',
+    beschreibung:
+      'Alle formatierten Einträge im Spielleiter-Abenteuerbuch (Text und Formatierung) werden aus dem lokalen Speicher entfernt.',
+    erfolg: 'Abenteuerbuch wurde gelöscht.',
+    buttonSymbol: '📔',
+    buttonLabel: 'Abenteuerbuch löschen',
+  },
   alles: {
     keys: [
       'htbah_character',
@@ -54,10 +63,11 @@ const SPEICHER_BEREICHE = {
       'htbah_theme',
       'htbah_spielleiter_gruppen',
       'htbah_zufallstabellen',
+      'htbah_spielleitung_abenteuerbuch',
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Presets, Spielleiter-Gruppen, Zufallstabellen und deine Theme-Auswahl entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Presets, Spielleiter-Gruppen, Zufallstabellen, das Abenteuerbuch der Spielleitung und deine Theme-Auswahl entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
@@ -190,6 +200,13 @@ window.HTBAH_SEITEN.Einstellungen = {
           :symbol="speicherBereiche.zufallstabellen.buttonSymbol"
           @click="oeffneLoeschDialog('zufallstabellen')">
           {{ speicherBereiche.zufallstabellen.buttonLabel }}
+        </icon-text-button>
+        <icon-text-button
+          class="btn btn-outline-danger w-100 mb-2"
+          type="button"
+          :symbol="speicherBereiche.abenteuerbuch.buttonSymbol"
+          @click="oeffneLoeschDialog('abenteuerbuch')">
+          {{ speicherBereiche.abenteuerbuch.buttonLabel }}
         </icon-text-button>
         <icon-text-button
           class="btn btn-danger w-100"

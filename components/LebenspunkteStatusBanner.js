@@ -77,7 +77,7 @@ window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner = {
           <template v-else>
             <span class="htbah-lp-status-banner-text">
               <strong>Bewusstlos</strong>
-              — Lebenspunkte 1–10, mehr als 60 LP auf einmal verloren, oder 0 LP (tot).
+              — Lebenspunkte 1–10, oder über 10 LP, falls auf einen Schlag mindestens 60 LP verloren gingen.
             </span>
             <button
               type="button"

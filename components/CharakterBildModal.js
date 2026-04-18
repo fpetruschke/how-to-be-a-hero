@@ -196,7 +196,7 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
               aria-label="Schließen"></button>
           </div>
           <div class="modal-body">
-            <div class="text-center mb-3">
+            <div class="text-center mb-3 charakterbild-modal-bildbereich">
               <img
                 v-if="tempBildQuelle"
                 ref="cropperBildElement"

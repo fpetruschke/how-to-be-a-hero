@@ -412,6 +412,77 @@ input::placeholder {
   border: none;
 }
 
+/* Spielleiter: Abenteuerbuch (FAB + Quill im schwebenden Fenster) */
+.htbah-abenteuerbuch-fab {
+  position: fixed;
+  z-index: 1990;
+  right: max(0.75rem, env(safe-area-inset-right, 0px));
+  bottom: calc(50px + env(safe-area-inset-bottom, 0px) + 0.65rem);
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-color);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.htbah-abenteuerbuch-fab:hover,
+.htbah-abenteuerbuch-fab:focus-visible {
+  filter: brightness(1.08);
+}
+
+.htbah-abenteuerbuch-fab:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.htbah-abenteuerbuch-fab-emoji {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.abenteuerbuch-modal-window {
+  max-height: 90vh;
+}
+
+.abenteuerbuch-modal-editor-wrap {
+  flex: 1 1 auto;
+  min-height: 12rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.abenteuerbuch-quill-host.quill-editor-host {
+  min-height: 0 !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.abenteuerbuch-quill-host .ql-container.ql-snow {
+  flex: 1 1 auto;
+  min-height: 8rem;
+  overflow-y: auto;
+}
+
+.regelwerk-modal-window .ql-snow .ql-picker-options {
+  z-index: 2100;
+}
+
+.abenteuerbuch-modal-footer {
+  border-color: var(--border-color) !important;
+  background: var(--card-bg);
+}
+
 .modal-content {
   background: var(--modal-bg);
   color: var(--text-color);
@@ -499,6 +570,21 @@ input::placeholder {
   display: block;
 }
 
+@media (min-width: 992px) {
+  .charakterbild-modal-bildbereich .cropper-image {
+    max-height: 50vh;
+  }
+
+  .charakterbild-modal-bildbereich .charakterbild-vorschau,
+  .charakterbild-modal-bildbereich .charakterbild-platzhalter {
+    width: auto;
+    max-width: 100%;
+    max-height: 50vh;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
 .quill-editor-host {
   min-height: 60vh;
 }
@@ -526,6 +612,27 @@ input::placeholder {
 
 .htbah-bestaetigen-beschreibung {
   white-space: pre-line;
+}
+
+/* Charakter (schmale Viewports): Punkte + Fähigkeiten-Progressbar bleiben beim Scrollen sichtbar */
+@media (max-width: 767.98px) {
+  .htbah-faehigkeiten-punkte-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: var(--card-bg);
+    box-shadow: 0 6px 12px -10px rgba(15, 23, 42, 0.65);
+  }
+
+  body.htbah-mit-lp-banner .htbah-faehigkeiten-punkte-sticky {
+    top: 3rem;
+  }
+
+  [data-theme='light'] .htbah-faehigkeiten-punkte-sticky {
+    box-shadow: 0 6px 12px -10px rgba(15, 23, 42, 0.18);
+  }
 }
 
 .faehigkeiten-tabelle {
@@ -889,6 +996,31 @@ input::placeholder {
   letter-spacing: -0.02em;
   line-height: 1.25;
   color: var(--heading-color);
+}
+
+.htbah-start-card-avatar {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.htbah-start-card-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.htbah-start-card-avatar-emoji {
+  font-size: 1.85rem;
+  line-height: 1;
 }
 
 /* Charakter-Seite: prominenter Name */

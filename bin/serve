@@ -2,32 +2,46 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PORT="${PORT:-8080}"
+PORT="${PORT:-5173}"
 HOST="${HOST:-127.0.0.1}"
+
+# MEZ/MESZ (CET/CEST) — für konsistente Logs unabhängig von der System-TZ
+TZ_LOG="${TZ_LOG:-Europe/Berlin}"
+
+log() {
+  printf '%s %s\n' "$(TZ="$TZ_LOG" date '+%d.%m.%Y - %H:%M:%S')" "$*"
+}
+
+stream_with_ts() {
+  while IFS= read -r line || [[ -n "${line:-}" ]]; do
+    log "$line"
+  done
+}
 
 cd "$ROOT_DIR"
 
-echo "Projekt: $ROOT_DIR"
-echo "Host:    $HOST"
-echo "Port:    $PORT"
+log "Projekt: $ROOT_DIR"
+log "Host:    $HOST"
+log "Port:    $PORT"
 echo
 
 if command -v npx >/dev/null 2>&1; then
-  echo "Starte Live-Reload mit browser-sync ..."
-  echo "URL: http://$HOST:$PORT"
+  log "Starte Live-Reload mit browser-sync ..."
+  log "URL: http://$HOST:$PORT"
 
   # index.html + App-Einstieg (main.*), Vue-Seiten und Komponenten, statische Assets
-  BS_FILES="index.html,main.css,main.js,manifest.webmanifest,sw.js,shared/**/*.js,lib/**/*.mjs,vendor/**/*.js,pages/**/*.{js,css},components/**/*.{js,css},assets/**/*.{html,css,js,json,pdf,png,jpg,jpeg,webp,gif,svg}"
+  # Hinweis: browser-sync trennt --files an JEDEM Komma (keine Brace-Groups mit Kommas).
+  BS_FILES="index.html,main.css,main.js,manifest.webmanifest,sw.js,shared/**/*.js,lib/**/*.mjs,vendor/**/*.js,pages/**/*.js,pages/**/*.css,components/**/*.js,components/**/*.css,assets/**/*.html,assets/**/*.css,assets/**/*.js,assets/**/*.json,assets/**/*.pdf,assets/**/*.png,assets/**/*.jpg,assets/**/*.jpeg,assets/**/*.webp,assets/**/*.gif,assets/**/*.svg"
 
-  exec npx --yes browser-sync@latest start \
+  npx --yes browser-sync@latest start \
     --server "$ROOT_DIR" \
     --host "$HOST" \
     --port "$PORT" \
     --files "$BS_FILES" \
     --no-open \
-    --no-ui
+    --no-ui 2>&1 | stream_with_ts
+else
+  log "npx nicht gefunden. Starte Fallback ohne Live-Reload via python3 -m http.server ..."
+  log "URL: http://$HOST:$PORT"
+  python3 -m http.server "$PORT" --bind "$HOST" --directory "$ROOT_DIR" 2>&1 | stream_with_ts
 fi
-
-echo "npx nicht gefunden. Starte Fallback ohne Live-Reload via python3 -m http.server ..."
-echo "URL: http://$HOST:$PORT"
-exec python3 -m http.server "$PORT" --bind "$HOST" --directory "$ROOT_DIR"
