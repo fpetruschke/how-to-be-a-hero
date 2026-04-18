@@ -29,7 +29,7 @@ const GEISTESBLITZ_INFO_ZEILEN = [
 
 const M = window.HTBAH_CHARAKTER_MODEL;
 
-/** Preset-JSON (Export aus Preset-Verwaltung / Editor) für Fähigkeiten übernehmen */
+/** Fähigkeiten-Preset-JSON (Export aus Fähigkeiten-Presets / Editor) für Fähigkeiten übernehmen */
 function normalisiereFaehigkeitenPreset(roh) {
   if (!roh || typeof roh !== 'object') return null;
   const kategorien = ['handeln', 'wissen', 'soziales'];
@@ -40,8 +40,14 @@ function normalisiereFaehigkeitenPreset(roh) {
     for (const eintrag of roh[k]) {
       if (!eintrag || typeof eintrag !== 'object') continue;
       const name = typeof eintrag.name === 'string' ? eintrag.name.trim() : '';
-      const value = Number(eintrag.value);
-      if (!name || Number.isNaN(value) || value < 1 || value > 100) continue;
+      if (!name) continue;
+      const rohWert = eintrag.value;
+      if (rohWert === null || rohWert === undefined || rohWert === '') {
+        arr.push({ name, value: null });
+        continue;
+      }
+      const value = Number(rohWert);
+      if (Number.isNaN(value) || value < 1 || value > 100) continue;
       arr.push({ name, value });
     }
     out[k] = arr;
@@ -88,10 +94,12 @@ window.HTBAH_SEITEN.Charakter = {
   },
   computed: {
     summen() {
+      const sum = (liste) =>
+        liste.reduce((summe, eintrag) => summe + (Number(eintrag.value) || 0), 0);
       return {
-        handeln: this.charakter.handeln.reduce((summe, eintrag) => summe + eintrag.value, 0),
-        wissen: this.charakter.wissen.reduce((summe, eintrag) => summe + eintrag.value, 0),
-        soziales: this.charakter.soziales.reduce((summe, eintrag) => summe + eintrag.value, 0),
+        handeln: sum(this.charakter.handeln),
+        wissen: sum(this.charakter.wissen),
+        soziales: sum(this.charakter.soziales),
       };
     },
     begabungen() {
@@ -289,10 +297,10 @@ window.HTBAH_SEITEN.Charakter = {
           const json = JSON.parse(reader.result);
           const preset = normalisiereFaehigkeitenPreset(json);
           if (!preset) {
-            alert('Ungültige Preset-Datei (erwartet: handeln, wissen, soziales als Listen).');
+            alert('Ungültige Fähigkeiten-Preset-Datei (erwartet: handeln, wissen, soziales als Listen).');
             return;
           }
-          const titel = preset.name ? `„${preset.name}“` : 'dieses Preset';
+          const titel = preset.name ? `„${preset.name}“` : 'dieses Fähigkeiten-Preset';
           if (!confirm(`Aktuellen Charakter mit ${titel} aus der Datei überschreiben?`)) {
             return;
           }
@@ -518,7 +526,8 @@ window.HTBAH_SEITEN.Charakter = {
       return namen[kategorie] || kategorie;
     },
     effektiverFaehigkeitswertProbe(kategorie, faehigkeit) {
-      return Math.min(100, faehigkeit.value + this.begabungen[kategorie]);
+      const basis = Number(faehigkeit.value) || 0;
+      return Math.min(100, basis + this.begabungen[kategorie]);
     },
     probeModalOeffnenBegabung(kategorie) {
       this.$refs.probeWurfModal.oeffnen({
@@ -531,13 +540,14 @@ window.HTBAH_SEITEN.Charakter = {
     },
     probeModalOeffnenFaehigkeit(kategorie, faehigkeit) {
       const b = this.begabungen[kategorie];
-      const roh = faehigkeit.value + b;
+      const fWert = Number(faehigkeit.value) || 0;
+      const roh = fWert + b;
       const z = this.effektiverFaehigkeitswertProbe(kategorie, faehigkeit);
       let untertitel =
         'Effektivwert ' +
         z +
         ' (' +
-        faehigkeit.value +
+        fWert +
         ' + ' +
         b +
         ' Begabung, ' +
@@ -628,9 +638,9 @@ window.HTBAH_SEITEN.Charakter = {
             </div>
           </div>
 
-          <div class="col-12 col-lg-4">
-            <h6 class="mb-2">Charakterbild</h6>
-            <div class="text-center mb-2">
+          <div class="col-12 col-lg-4 d-flex flex-column">
+            <h6 class="mb-2 flex-shrink-0">Charakterbild</h6>
+            <div class="text-center mb-2 flex-shrink-0">
               <img
                 v-if="charakterBild"
                 :src="charakterBild"
@@ -642,7 +652,7 @@ window.HTBAH_SEITEN.Charakter = {
             </div>
 
             <button
-              class="btn btn-outline-primary w-100"
+              class="btn btn-outline-primary w-100 mt-lg-auto"
               @click="bildVerwaltungOeffnen">
               Bild verwalten
             </button>
@@ -707,7 +717,7 @@ window.HTBAH_SEITEN.Charakter = {
               type="button"
               class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center"
               @click="presetAktionenUmschalten"
-              aria-label="Preset-Aktionen">
+              aria-label="Fähigkeiten-Preset-Aktionen">
               <span class="material-symbols-outlined" aria-hidden="true">settings</span>
             </button>
             <button
@@ -722,18 +732,18 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
 
         <div v-if="zeigePresetAktionen && !spielleiterMitglied" class="card p-2 mb-2">
-          <h6 class="mb-2">Presets</h6>
+          <h6 class="mb-2">Fähigkeiten-Presets</h6>
           <div class="form-floating mb-2">
             <select id="ce-preset-wahl" class="form-select" v-model="ausgewaehltesPreset">
-              <option value="">Preset wählen …</option>
+              <option value="">Fähigkeiten-Preset wählen …</option>
               <option v-for="preset in presets" :value="preset.name">
                 {{preset.name}}
               </option>
             </select>
-            <label for="ce-preset-wahl">Preset (lokal gespeichert)</label>
+            <label for="ce-preset-wahl">Fähigkeiten-Preset (lokal gespeichert)</label>
           </div>
           <button class="btn btn-primary w-100 mb-2" @click="presetAnwenden">
-            Preset anwenden
+            Fähigkeiten-Preset anwenden
           </button>
           <p class="small text-body-secondary mb-2">
             Von der Spielleitung erhaltene Datei (.json) kannst du direkt laden — ohne vorheriges Importieren in die App.
@@ -745,7 +755,7 @@ window.HTBAH_SEITEN.Charakter = {
               accept="application/json,.json"
               class="form-control"
               @change="presetAusDateiAnwenden" />
-            <label for="ce-preset-import">Preset aus Datei laden</label>
+            <label for="ce-preset-import">Fähigkeiten-Preset aus Datei laden</label>
           </div>
         </div>
 
@@ -898,9 +908,11 @@ window.HTBAH_SEITEN.Charakter = {
                       v-for="faehigkeit in sortierteFaehigkeiten(kategorie)"
                       :key="faehigkeit">
                       <td class="align-middle">{{ faehigkeit.name }}</td>
-                      <td class="align-middle text-end">{{ faehigkeit.value }}</td>
+                      <td class="align-middle text-end text-muted">
+                        {{ faehigkeit.value == null ? '—' : faehigkeit.value }}
+                      </td>
                       <td class="align-middle text-end">
-                        {{ faehigkeit.value + begabungen[kategorie] }}
+                        {{ (Number(faehigkeit.value) || 0) + begabungen[kategorie] }}
                       </td>
                       <td class="align-middle text-end ps-2">
                         <div class="btn-group btn-group-sm" role="group" :aria-label="'Aktionen für ' + faehigkeit.name">

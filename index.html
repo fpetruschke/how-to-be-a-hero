@@ -8,7 +8,7 @@
 
     <title>HTBAH Begleit-App</title>
     <meta name="theme-color" content="#509b4a" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="HTBAH" />
     <link rel="manifest" href="manifest.webmanifest" />
@@ -42,6 +42,15 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"></script>
     <script src="shared/charakterModel.js"></script>
+    <script src="shared/faehigkeitenPresetsStandard.js"></script>
+    <script src="shared/zufallsgenerator/util.js"></script>
+    <script src="shared/zufallsgenerator/npcWortlisten.js"></script>
+    <script src="shared/zufallsgenerator/npcModul.js"></script>
+    <script src="shared/zufallsgenerator/ortWortlisten.js"></script>
+    <script src="shared/zufallsgenerator/ortModul.js"></script>
+    <script src="shared/zufallsgenerator/gegenstandWortlisten.js"></script>
+    <script src="shared/zufallsgenerator/gegenstandModul.js"></script>
+    <script src="shared/zufallsgenerator.js"></script>
   </head>
 
   <body>
@@ -49,6 +58,7 @@
 
     <script src="pages/Startseite.js"></script>
     <script src="components/CharakterBildModal.js"></script>
+    <script src="components/WeltenbauBildImportModal.js"></script>
     <script src="components/InventarModal.js"></script>
     <script src="components/VorNachteileModal.js"></script>
     <script src="components/NotizenModal.js"></script>
@@ -65,11 +75,13 @@
     <script src="pages/SpielleiterGruppenUebersicht.js"></script>
     <script src="pages/SpielleiterGruppe.js"></script>
     <script src="pages/Zufallstabellen.js"></script>
+    <script src="pages/Weltenbau.js"></script>
     <script src="components/RegelwerkModal.js"></script>
     <script src="components/AbenteuerbuchModal.js"></script>
     <script src="components/LebenspunkteStatusBanner.js"></script>
     <script src="components/BottomNav.js"></script>
     <script src="components/LokalerSpeicherHinweisModal.js"></script>
+    <script src="components/BildbetrachterHost.js"></script>
     <script src="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
     <script src="main.js"></script>

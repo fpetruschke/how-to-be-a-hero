@@ -1,3 +1,4 @@
+const SPEICHER_KEY_APP_ROLLE = 'htbah_app_rolle';
 const SPEICHER_KEY_CHARAKTER = 'htbah_character';
 const SPEICHER_KEY_PRESETS = 'htbah_presets';
 const SPEICHER_KEY_THEME = 'htbah_theme';
@@ -5,6 +6,7 @@ const SPEICHER_KEY_CHARAKTER_BILD = 'htbah_character_image';
 const SPEICHER_KEY_SPIELLEITER = 'htbah_spielleiter_gruppen';
 const SPEICHER_KEY_ZUFALLSTABELLEN = 'htbah_zufallstabellen';
 const SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH = 'htbah_spielleitung_abenteuerbuch';
+const SPEICHER_KEY_WELTENBAU = 'htbah_weltenbau';
 
 function neueEntropieId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -158,6 +160,43 @@ function loescheSpielleitungAbenteuerbuch() {
   localStorage.removeItem(SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH);
 }
 
+function normalisiereWeltenbauEintrag(e) {
+  if (!e || typeof e !== 'object') {
+    return null;
+  }
+  const dataUrl = typeof e.dataUrl === 'string' ? e.dataUrl : '';
+  if (!dataUrl.startsWith('data:image/')) {
+    return null;
+  }
+  return {
+    id: typeof e.id === 'string' && e.id ? e.id : neueEntropieId(),
+    name: typeof e.name === 'string' ? e.name : '',
+    dataUrl,
+    hinzugefuegtAm:
+      typeof e.hinzugefuegtAm === 'string' && e.hinzugefuegtAm ? e.hinzugefuegtAm : new Date().toISOString(),
+  };
+}
+
+function ladeWeltenbauZustand() {
+  let roh = null;
+  try {
+    roh = JSON.parse(localStorage.getItem(SPEICHER_KEY_WELTENBAU) || 'null');
+  } catch {
+    roh = null;
+  }
+  if (!roh || typeof roh !== 'object') {
+    return { version: 1, eintraege: [] };
+  }
+  const eintraege = Array.isArray(roh.eintraege)
+    ? roh.eintraege.map(normalisiereWeltenbauEintrag).filter(Boolean)
+    : [];
+  return { version: 1, eintraege };
+}
+
+function speichereWeltenbauZustand(zustand) {
+  localStorage.setItem(SPEICHER_KEY_WELTENBAU, JSON.stringify(zustand));
+}
+
 function erstelleCharakterExportPaket(charakter, charakterBild) {
   const roh =
     charakter && typeof charakter === 'object' ? charakter : {};
@@ -227,16 +266,54 @@ function speichereCharakter(charakter) {
   localStorage.setItem(SPEICHER_KEY_CHARAKTER, JSON.stringify(charakter));
 }
 
+function istSystemFaehigkeitenPreset(preset) {
+  return Boolean(preset && typeof preset === 'object' && preset.htbahPresetId);
+}
+
+/**
+ * Liest rohe Preset-Liste aus dem Speicher und ergänzt vorgegebene Fähigkeiten-Presets.
+ * Nutzer-Presets (ohne htbahPresetId) bleiben erhalten und folgen danach.
+ */
+function mergeFaehigkeitenPresetsAusSpeicher(roh) {
+  const standard = window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS;
+  let arr = [];
+  if (Array.isArray(roh)) {
+    arr = roh;
+  }
+  if (!Array.isArray(standard) || standard.length === 0) {
+    return arr;
+  }
+  const systemMerged = standard.map((def) => {
+    const user = arr.find((s) => s && s.htbahPresetId === def.htbahPresetId);
+    if (!user) {
+      return JSON.parse(JSON.stringify(def));
+    }
+    const name =
+      typeof user.name === 'string' && user.name.trim() ? user.name.trim() : def.name;
+    return {
+      ...def,
+      ...user,
+      htbahPresetId: def.htbahPresetId,
+      name,
+      handeln: Array.isArray(user.handeln) ? user.handeln : def.handeln,
+      wissen: Array.isArray(user.wissen) ? user.wissen : def.wissen,
+      soziales: Array.isArray(user.soziales) ? user.soziales : def.soziales,
+    };
+  });
+  const ohneSystem = arr.filter((s) => s && typeof s === 'object' && !s.htbahPresetId);
+  return [...systemMerged, ...ohneSystem];
+}
+
 function ladePresets() {
   const roh = localStorage.getItem(SPEICHER_KEY_PRESETS);
   if (roh == null || roh === '') {
-    return [];
+    return mergeFaehigkeitenPresetsAusSpeicher([]);
   }
   try {
     const w = JSON.parse(roh);
-    return Array.isArray(w) ? w : [];
+    return mergeFaehigkeitenPresetsAusSpeicher(Array.isArray(w) ? w : []);
   } catch {
-    return [];
+    return mergeFaehigkeitenPresetsAusSpeicher([]);
   }
 }
 
@@ -347,11 +424,96 @@ function loescheCharakterBild() {
 
 setzeTheme(ladeTheme());
 
+/**
+ * @returns {'charakter' | 'spielleitung' | null}
+ */
+function ladeAppRolle() {
+  try {
+    const r = localStorage.getItem(SPEICHER_KEY_APP_ROLLE);
+    if (r === 'charakter' || r === 'spielleitung') {
+      return r;
+    }
+  } catch {
+    /* ignorieren */
+  }
+  return null;
+}
+
+/**
+ * @param {'charakter' | 'spielleitung' | null} rolle
+ */
+function speichereAppRolle(rolle) {
+  if (rolle === 'charakter' || rolle === 'spielleitung') {
+    localStorage.setItem(SPEICHER_KEY_APP_ROLLE, rolle);
+    return;
+  }
+  localStorage.removeItem(SPEICHER_KEY_APP_ROLLE);
+}
+
+const bildbetrachterZustand = Vue.reactive({
+  naechsteZ: 4100,
+  fenster: [],
+});
+
+/**
+ * @param {{ dataUrl: string, titel?: string, weltenbauEintragId?: string }} opts
+ */
+function bildbetrachterOeffnen(opts) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const dataUrl = typeof o.dataUrl === 'string' ? o.dataUrl : '';
+  if (!dataUrl.startsWith('data:image/')) {
+    return null;
+  }
+  const id = neueEntropieId();
+  const n = bildbetrachterZustand.fenster.length;
+  const offset = 28 * n;
+  const w = Math.min(560, Math.max(280, window.innerWidth - 48));
+  const h = Math.min(440, Math.max(220, window.innerHeight - 100));
+  bildbetrachterZustand.fenster.push({
+    id,
+    weltenbauEintragId: typeof o.weltenbauEintragId === 'string' ? o.weltenbauEintragId : '',
+    titel: typeof o.titel === 'string' && o.titel.trim() ? o.titel.trim() : 'Bild',
+    dataUrl,
+    x: Math.min(24 + offset, Math.max(8, window.innerWidth - w - 8)),
+    y: Math.min(24 + offset, Math.max(8, window.innerHeight - h - 8)),
+    w,
+    h,
+    zoom: 1,
+    naturalW: 0,
+    naturalH: 0,
+    fullscreen: false,
+    zIndex: bildbetrachterZustand.naechsteZ++,
+  });
+  return id;
+}
+
+function bildbetrachterSchliessen(fensterId) {
+  bildbetrachterZustand.fenster = bildbetrachterZustand.fenster.filter((f) => f.id !== fensterId);
+}
+
+function bildbetrachterSchliesseFuerWeltenbauEintrag(eintragId) {
+  if (!eintragId) {
+    return;
+  }
+  bildbetrachterZustand.fenster = bildbetrachterZustand.fenster.filter(
+    (f) => f.weltenbauEintragId !== eintragId,
+  );
+}
+
+function bildbetrachterNachVorne(fensterId) {
+  const f = bildbetrachterZustand.fenster.find((x) => x.id === fensterId);
+  if (f) {
+    f.zIndex = bildbetrachterZustand.naechsteZ++;
+  }
+}
+
 window.HTBAH = {
+  ...(window.HTBAH || {}),
   ladeCharakter,
   speichereCharakter,
   ladePresets,
   speicherePresets,
+  istSystemFaehigkeitenPreset,
   wuerfelW10,
   wuerfelW100,
   berechneProbeAuswertung,
@@ -373,23 +535,37 @@ window.HTBAH = {
   ladeSpielleitungAbenteuerbuchHtml,
   speichereSpielleitungAbenteuerbuchHtml,
   loescheSpielleitungAbenteuerbuch,
+  ladeWeltenbauZustand,
+  speichereWeltenbauZustand,
+  bildbetrachter: bildbetrachterZustand,
+  bildbetrachterOeffnen,
+  bildbetrachterSchliessen,
+  bildbetrachterSchliesseFuerWeltenbauEintrag,
+  bildbetrachterNachVorne,
+  ladeAppRolle,
+  speichereAppRolle,
 };
 
 const routes = [
   { path: '/', component: window.HTBAH_SEITEN.Startseite },
+  { path: '/spieler', redirect: '/charakter' },
   { path: '/charakter', component: window.HTBAH_SEITEN.Charakter },
   { path: '/charakter-erstellung', redirect: '/charakter' },
-  { path: '/preset-verwaltung', component: window.HTBAH_SEITEN.PresetVerwaltung },
-  { path: '/preset-bearbeiten', component: window.HTBAH_SEITEN.PresetEditor },
-  { path: '/preset-bearbeiten/:id', component: window.HTBAH_SEITEN.PresetEditor },
+  { path: '/faehigkeiten-presets', component: window.HTBAH_SEITEN.PresetVerwaltung },
+  { path: '/faehigkeiten-preset-bearbeiten', component: window.HTBAH_SEITEN.PresetEditor },
+  { path: '/faehigkeiten-preset-bearbeiten/:id', component: window.HTBAH_SEITEN.PresetEditor },
   { path: '/einstellungen', component: window.HTBAH_SEITEN.Einstellungen },
   { path: '/spielleiter', component: window.HTBAH_SEITEN.SpielleiterGruppenUebersicht },
   { path: '/spielleiter/gruppe/:gruppeId', component: window.HTBAH_SEITEN.SpielleiterGruppe },
   { path: '/zufallstabellen', component: window.HTBAH_SEITEN.Zufallstabellen },
+  { path: '/weltenbau', component: window.HTBAH_SEITEN.Weltenbau },
   { path: '/create', redirect: '/charakter' },
-  { path: '/presets', redirect: '/preset-verwaltung' },
-  { path: '/presets/form', redirect: '/preset-bearbeiten' },
-  { path: '/presets/form/:id', redirect: '/preset-bearbeiten/:id' },
+  { path: '/presets', redirect: '/faehigkeiten-presets' },
+  { path: '/presets/form', redirect: '/faehigkeiten-preset-bearbeiten' },
+  { path: '/presets/form/:id', redirect: '/faehigkeiten-preset-bearbeiten/:id' },
+  { path: '/preset-verwaltung', redirect: '/faehigkeiten-presets' },
+  { path: '/preset-bearbeiten', redirect: '/faehigkeiten-preset-bearbeiten' },
+  { path: '/preset-bearbeiten/:id', redirect: '/faehigkeiten-preset-bearbeiten/:id' },
   { path: '/settings', redirect: '/einstellungen' },
   { path: '/gm', redirect: '/spielleiter' },
 ];
@@ -397,6 +573,49 @@ const routes = [
 const router = VueRouter.createRouter({
   history: VueRouter.createWebHashHistory(),
   routes,
+});
+
+function istNurCharakterRoute(pfad) {
+  return pfad === '/charakter';
+}
+
+function istNurSpielleitungRoute(pfad) {
+  if (pfad === '/spielleiter' || pfad === '/zufallstabellen' || pfad === '/weltenbau') {
+    return true;
+  }
+  if (pfad.startsWith('/spielleiter/gruppe/')) {
+    return true;
+  }
+  if (pfad === '/faehigkeiten-presets' || pfad === '/faehigkeiten-preset-bearbeiten') {
+    return true;
+  }
+  if (/^\/faehigkeiten-preset-bearbeiten\/[^/]+$/.test(pfad)) {
+    return true;
+  }
+  return false;
+}
+
+router.beforeEach((to) => {
+  const rolle = window.HTBAH.ladeAppRolle();
+  const ziel = to.path || '/';
+
+  if (ziel === '/') {
+    return true;
+  }
+
+  if (!rolle) {
+    return { path: '/' };
+  }
+
+  if (rolle === 'charakter' && istNurSpielleitungRoute(ziel)) {
+    return { path: '/charakter' };
+  }
+
+  if (rolle === 'spielleitung' && istNurCharakterRoute(ziel)) {
+    return { path: '/spielleiter' };
+  }
+
+  return true;
 });
 
 const uiZustand = Vue.reactive({
@@ -444,6 +663,7 @@ const app = Vue.createApp({
     <lokaler-speicher-hinweis-modal />
     <regelwerk-modal :ui-zustand="uiZustand"></regelwerk-modal>
     <abenteuerbuch-modal :ui-zustand="uiZustand"></abenteuerbuch-modal>
+    <bildbetrachter-host />
     <bottom-nav :ui-zustand="uiZustand"></bottom-nav>
   `,
 });
@@ -465,6 +685,7 @@ app.component('bottom-nav', window.HTBAH_KOMPONENTEN.BottomNav);
 app.component('bestaetigen-modal', window.HTBAH_KOMPONENTEN.BestaetigenModal);
 app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner);
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);
+app.component('bildbetrachter-host', window.HTBAH_KOMPONENTEN.BildbetrachterHost);
 app.mount('#app');
 
 if ('serviceWorker' in navigator) {

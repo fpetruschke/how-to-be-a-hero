@@ -209,18 +209,6 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
     },
   },
   template: `
-    <teleport to="body">
-      <button
-        v-show="!uiZustand.abenteuerbuchOffen"
-        type="button"
-        class="htbah-abenteuerbuch-fab"
-        title="Abenteuerbuch (Spielleitung)"
-        aria-label="Abenteuerbuch öffnen"
-        @click="oeffnen">
-        <span class="htbah-abenteuerbuch-fab-emoji" aria-hidden="true">📝</span>
-      </button>
-    </teleport>
-
     <div v-if="uiZustand.abenteuerbuchOffen" class="regelwerk-modal-layer">
       <div
         ref="fensterElement"

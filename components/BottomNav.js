@@ -16,10 +16,41 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     ergebnisTitel() {
       return this.wuerfelModus === 'w10' ? 'W10 Ergebnisse' : 'W100 Ergebnis';
     },
+    rolle() {
+      void this.$route.fullPath;
+      return window.HTBAH.ladeAppRolle();
+    },
+    zeigeNav() {
+      const p = this.$route.path || '/';
+      return p !== '/';
+    },
+    startseiteLandingAktiv() {
+      const p = this.$route.path || '';
+      return p === '/';
+    },
+    spielleiterGruppenAktiv() {
+      const p = this.$route.path || '';
+      return p === '/spielleiter' || p.startsWith('/spielleiter/gruppe/');
+    },
+    presetVerwaltungAktiv() {
+      const p = this.$route.path || '';
+      return (
+        p === '/faehigkeiten-presets' ||
+        p === '/faehigkeiten-preset-bearbeiten' ||
+        /^\/faehigkeiten-preset-bearbeiten\//.test(p)
+      );
+    },
+    weltenbauAktiv() {
+      const p = this.$route.path || '';
+      return p === '/weltenbau';
+    },
   },
   methods: {
     regelwerkOeffnen() {
       this.uiZustand.regelwerkOffen = true;
+    },
+    abenteuerbuchOeffnen() {
+      this.uiZustand.abenteuerbuchOffen = true;
     },
     wuerfelModalOeffnen() {
       const modalElement = this.$refs.wuerfelModalElement;
@@ -46,14 +77,51 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
   },
   template: `
     <teleport to="body">
-      <div class="navbar-fixed d-flex justify-content-around p-2">
-        <router-link to="/">🏠</router-link>
-        <router-link to="/charakter">🧙</router-link>
-        <router-link to="/spielleiter" title="Spielleiter · Gruppen">👥</router-link>
-        <router-link to="/zufallstabellen" title="Zufallstabellen">📚</router-link>
-        <button type="button" @click="wuerfelModalOeffnen">🎲</button>
-        <button type="button" @click="regelwerkOeffnen">📜</button>
-        <router-link to="/einstellungen">⚙️</router-link>
+      <div
+        v-if="zeigeNav"
+        class="navbar-fixed d-flex flex-nowrap align-items-stretch w-100 px-2 py-2 htbah-bottom-nav-inner">
+        <template v-if="rolle === 'charakter'">
+          <router-link
+            to="/"
+            title="App-Startseite (Rollenwahl)"
+            :class="{ 'router-link-active': startseiteLandingAktiv }">
+            🏠
+          </router-link>
+          <router-link to="/charakter" title="Charakter">🧙</router-link>
+        </template>
+        <template v-else-if="rolle === 'spielleitung'">
+          <router-link
+            to="/"
+            title="App-Startseite (Rollenwahl)"
+            :class="{ 'router-link-active': startseiteLandingAktiv }">
+            🏠
+          </router-link>
+          <router-link
+            to="/spielleiter"
+            title="Gruppen"
+            :class="{ 'router-link-active': spielleiterGruppenAktiv }">
+            👥
+          </router-link>
+          <router-link
+            to="/faehigkeiten-presets"
+            title="Fähigkeiten-Presets"
+            :class="{ 'router-link-active': presetVerwaltungAktiv }">
+            📦
+          </router-link>
+          <router-link to="/zufallstabellen" title="Zufallstabellen">📚</router-link>
+          <router-link
+            to="/weltenbau"
+            title="Weltenbau"
+            :class="{ 'router-link-active': weltenbauAktiv }">
+            🗺️
+          </router-link>
+          <button type="button" title="Spielleitungsnotizen (Abenteuerbuch)" @click="abenteuerbuchOeffnen">
+            📝
+          </button>
+        </template>
+        <button type="button" title="Regelwerk" @click="regelwerkOeffnen">📜</button>
+        <button type="button" title="Würfel" @click="wuerfelModalOeffnen">🎲</button>
+        <router-link to="/einstellungen" title="Einstellungen">⚙️</router-link>
       </div>
     </teleport>
 

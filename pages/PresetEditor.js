@@ -1,6 +1,27 @@
 window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
 
+const PE_KATEGORIE_INFOS = {
+  handeln: {
+    erklaerung:
+      'Handeln umfasst körperliche, praktische und unmittelbare Aktionen in der Spielwelt.',
+    beispiele: ['Klettern', 'Schleichen', 'Kampf', 'Schlösser knacken', 'Fahren'],
+  },
+  wissen: {
+    erklaerung:
+      'Wissen umfasst gelerntes, logisches und analytisches Können rund um Fakten und Zusammenhänge.',
+    beispiele: ['Heilkunde', 'Geschichte', 'Magiekunde', 'Sprachen', 'Technik'],
+  },
+  soziales: {
+    erklaerung:
+      'Soziales umfasst alle Fähigkeiten im Umgang mit anderen Personen, Gruppen und Beziehungen.',
+    beispiele: ['Überreden', 'Lügen', 'Menschenkenntnis', 'Verhandeln', 'Auftreten'],
+  },
+};
+
 window.HTBAH_SEITEN.PresetEditor = {
+  components: {
+    FaehigkeitFormular: window.HTBAH_KOMPONENTEN.FaehigkeitFormular,
+  },
   data() {
     return {
       preset: {
@@ -9,9 +30,13 @@ window.HTBAH_SEITEN.PresetEditor = {
         wissen: [],
         soziales: [],
       },
-      neueFaehigkeit: { name: '', value: '', type: 'handeln' },
+      neueFaehigkeit: { name: '', value: null, type: 'handeln' },
       istBearbeitung: false,
       presetIndex: null,
+      aktiveKategorieInfo: null,
+      bearbeitungEntwurf: { name: '', value: null, type: 'handeln' },
+      bearbeitungReferenz: null,
+      bearbeitungKategorie: '',
     };
   },
   created() {
@@ -28,32 +53,136 @@ window.HTBAH_SEITEN.PresetEditor = {
       }
     }
   },
+  computed: {
+    kategorieInfos() {
+      return PE_KATEGORIE_INFOS;
+    },
+    sortierteFaehigkeiten() {
+      return (kategorie) =>
+        [...this.preset[kategorie]].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    },
+  },
   methods: {
+    kategorieInfoUmschalten(kategorie) {
+      this.aktiveKategorieInfo = this.aktiveKategorieInfo === kategorie ? null : kategorie;
+    },
+    wertAnzeige(faehigkeit) {
+      const v = faehigkeit.value;
+      if (v === null || v === undefined) {
+        return '—';
+      }
+      return v;
+    },
     faehigkeitHinzufuegen() {
-      if (!this.neueFaehigkeit.name) return;
-
-      const wert =
-        this.neueFaehigkeit.value === '' || this.neueFaehigkeit.value === null
-          ? null
-          : Number(this.neueFaehigkeit.value);
-
-      if (wert !== null && (wert < 1 || wert > 100)) {
-        alert('Wert muss zwischen 1 und 100 liegen');
+      const nameTrim = String(this.neueFaehigkeit.name || '').trim();
+      if (!nameTrim) {
+        alert('Gib einen Namen an.');
         return;
       }
 
+      let wert = null;
+      const v = this.neueFaehigkeit.value;
+      if (v !== null && v !== undefined && v !== '') {
+        const n = Number(v);
+        if (!Number.isFinite(n) || n < 1 || n > 100) {
+          alert('Wert muss zwischen 1 und 100 liegen oder leer bleiben.');
+          return;
+        }
+        wert = n;
+      }
+
       this.preset[this.neueFaehigkeit.type].push({
-        name: this.neueFaehigkeit.name,
+        name: nameTrim,
         value: wert,
       });
 
-      this.neueFaehigkeit.name = '';
-      this.neueFaehigkeit.value = '';
+      this.neueFaehigkeit = {
+        name: '',
+        value: null,
+        type: this.neueFaehigkeit.type,
+      };
     },
-    faehigkeitEntfernen(kategorie, faehigkeit) {
-      if (!confirm(`"${faehigkeit.name}" löschen?`)) return;
-      const index = this.preset[kategorie].indexOf(faehigkeit);
-      this.preset[kategorie].splice(index, 1);
+    bearbeitungModalOeffnen(kategorie, faehigkeit) {
+      this.bearbeitungReferenz = faehigkeit;
+      this.bearbeitungKategorie = kategorie;
+      this.bearbeitungEntwurf = {
+        name: faehigkeit.name,
+        value: faehigkeit.value,
+        type: kategorie,
+      };
+
+      this.$nextTick(() => {
+        const el = this.$refs.faehigkeitBearbeitenModalElement;
+        if (!el || !window.bootstrap) {
+          return;
+        }
+        window.bootstrap.Modal.getOrCreateInstance(el).show();
+      });
+    },
+    bearbeitungModalGeschlossen() {
+      this.bearbeitungReferenz = null;
+      this.bearbeitungKategorie = '';
+    },
+    bearbeitungModalSchliessen() {
+      const el = this.$refs.faehigkeitBearbeitenModalElement;
+      if (el && window.bootstrap) {
+        const instanz = window.bootstrap.Modal.getInstance(el);
+        if (instanz) {
+          instanz.hide();
+        }
+      }
+    },
+    bearbeitungSpeichern() {
+      const { name, value, type } = this.bearbeitungEntwurf;
+      const ref = this.bearbeitungReferenz;
+      const altKat = this.bearbeitungKategorie;
+
+      if (!ref || !altKat) {
+        return;
+      }
+
+      const nameTrim = typeof name === 'string' ? name.trim() : '';
+      if (!nameTrim) {
+        alert('Gib einen Namen an.');
+        return;
+      }
+
+      let wert = null;
+      if (value !== null && value !== undefined && value !== '') {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 1 || n > 100) {
+          alert('Wert muss zwischen 1 und 100 liegen oder leer bleiben.');
+          return;
+        }
+        wert = n;
+      }
+
+      if (type !== altKat) {
+        const idx = this.preset[altKat].indexOf(ref);
+        if (idx !== -1) {
+          this.preset[altKat].splice(idx, 1);
+        }
+        ref.name = nameTrim;
+        ref.value = wert;
+        this.preset[type].push(ref);
+      } else {
+        ref.name = nameTrim;
+        ref.value = wert;
+      }
+
+      this.bearbeitungModalSchliessen();
+    },
+    faehigkeitLoeschenAnfragen(kategorie, faehigkeit) {
+      this.$refs.faehigkeitLoeschenModal.oeffnen({
+        titel: 'Fähigkeit löschen?',
+        beschreibung: `Die Fähigkeit „${faehigkeit.name}“ wird aus dem Preset entfernt.`,
+        onBestaetigen: () => {
+          const index = this.preset[kategorie].indexOf(faehigkeit);
+          if (index !== -1) {
+            this.preset[kategorie].splice(index, 1);
+          }
+        },
+      });
     },
     presetSpeichern() {
       if (!this.preset.name) {
@@ -62,106 +191,174 @@ window.HTBAH_SEITEN.PresetEditor = {
       }
 
       const presets = window.HTBAH.ladePresets();
+      const zuSpeichern = JSON.parse(JSON.stringify(this.preset));
+      if (!this.istBearbeitung && zuSpeichern.htbahPresetId) {
+        delete zuSpeichern.htbahPresetId;
+      }
 
       if (this.istBearbeitung) {
-        presets[this.presetIndex] = this.preset;
+        presets[this.presetIndex] = zuSpeichern;
       } else {
-        presets.push(this.preset);
+        presets.push(zuSpeichern);
       }
 
       window.HTBAH.speicherePresets(presets);
-      this.$router.push('/preset-verwaltung');
-    },
-  },
-  computed: {
-    sliderWert: {
-      get() {
-        return this.neueFaehigkeit.value ?? 0;
-      },
-      set(wert) {
-        this.neueFaehigkeit.value = wert === 0 ? null : wert;
-      },
-    },
-    sortierteFaehigkeiten() {
-      return (kategorie) =>
-        [...this.preset[kategorie]].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+      this.$router.push('/faehigkeiten-presets');
     },
   },
   template: `
     <div class="container content py-3">
-      <h4>{{ istBearbeitung ? 'Preset bearbeiten' : 'Preset erstellen' }}</h4>
+      <h4>{{ istBearbeitung ? 'Fähigkeiten-Preset bearbeiten' : 'Fähigkeiten-Preset erstellen' }}</h4>
+      <p v-if="preset.htbahPresetId" class="small text-body-secondary mb-3">
+        Vorgegebenes Preset: Name und Fähigkeiten sind anpassbar; in der Übersicht kann es nicht gelöscht werden.
+      </p>
 
-      <div class="form-floating mb-3">
-        <input id="pe-preset-name" class="form-control" v-model="preset.name" placeholder=" ">
-        <label for="pe-preset-name">Preset-Name</label>
-      </div>
-
-      <div v-for="kategorie in ['handeln','wissen','soziales']" class="card p-3 mb-3">
-        <h5 class="text-uppercase fw-bold">{{kategorie}}</h5>
-
-        <ul>
-          <li v-for="faehigkeit in sortierteFaehigkeiten(kategorie)" class="mb-2">
-            <strong>{{faehigkeit.name}}</strong><br>
-            <small v-if="faehigkeit.value !== null">{{faehigkeit.value}}</small>
-            <small v-else class="text-secondary">kein Wert</small>
-
-            <div>
-              <button class="btn btn-sm btn-danger mt-1" @click="faehigkeitEntfernen(kategorie, faehigkeit)">
-                🗑️
-              </button>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <div class="card p-3 mb-3">
-        <h5>Fähigkeit hinzufügen</h5>
-
-        <div class="form-floating mb-2">
-          <input id="pe-neue-faeh-name" class="form-control" v-model="neueFaehigkeit.name" placeholder=" ">
-          <label for="pe-neue-faeh-name">Fähigkeit</label>
+      <div class="card p-3 mb-2">
+        <div class="form-floating mb-0">
+          <input id="pe-preset-name" class="form-control" v-model="preset.name" placeholder=" " autocomplete="off" />
+          <label for="pe-preset-name">Name des Fähigkeiten-Presets</label>
         </div>
+      </div>
 
-        <div class="mb-2 d-flex align-items-center gap-2">
-          <input type="range"
-                 class="form-range flex-grow-1"
-                 v-model.number="sliderWert"
-                 min="0"
-                 max="100"
-                 step="1">
+      <div class="card p-2 mb-2">
+        <h5 class="mb-2">Fähigkeiten</h5>
+        <p class="small text-body-secondary mb-3 mb-md-2">
+          Im Preset legst du nur Fähigkeitsnamen fest. Punkte (Werte) trägst du am Charakter ein —
+          dort erscheint wie gewohnt die Spalte „Effektiv“ (Wert + Begabung).
+        </p>
 
-          <div class="form-floating" style="width: 5.5rem; flex-shrink: 0">
-            <input
-              type="number"
-              id="pe-neue-faeh-wert"
-              class="form-control"
-              v-model.number="neueFaehigkeit.value"
-              min="0"
-              max="100"
-              placeholder=" ">
-            <label for="pe-neue-faeh-wert">Wert (optional)</label>
+        <div class="row g-2 mb-2">
+          <div
+            v-for="kategorie in ['handeln','wissen','soziales']"
+            :key="kategorie"
+            class="col-12 col-md-4">
+            <div class="card p-2 h-100">
+              <h5 class="text-uppercase fw-bold d-flex align-items-center gap-1">
+                <span>{{ kategorie }}</span>
+                <span
+                  class="material-symbols-outlined"
+                  style="cursor:pointer;"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Kategorie-Info"
+                  @click="kategorieInfoUmschalten(kategorie)"
+                  @keydown.enter.prevent="kategorieInfoUmschalten(kategorie)"
+                  @keydown.space.prevent="kategorieInfoUmschalten(kategorie)">
+                  info
+                </span>
+              </h5>
+              <div
+                v-if="aktiveKategorieInfo === kategorie"
+                class="faehigkeiten-stat-info-panel mb-2 mt-0">
+                <small class="d-block">
+                  {{ kategorieInfos[kategorie].erklaerung }}
+                </small>
+                <ul class="mt-2 mb-0 small">
+                  <li v-for="beispiel in kategorieInfos[kategorie].beispiele" :key="beispiel">
+                    {{ beispiel }}
+                  </li>
+                </ul>
+              </div>
+
+              <div class="table-responsive rounded border border-secondary border-opacity-25">
+                <table class="table table-sm mb-0 faehigkeiten-tabelle">
+                  <thead>
+                    <tr>
+                      <th scope="col">Name</th>
+                      <th scope="col" class="text-end">Wert</th>
+                      <th scope="col" class="text-end">Effektiv</th>
+                      <th scope="col" class="text-end text-nowrap ps-2">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="!sortierteFaehigkeiten(kategorie).length">
+                      <td colspan="4" class="text-muted small py-2">Keine Fähigkeiten</td>
+                    </tr>
+                    <tr
+                      v-for="faehigkeit in sortierteFaehigkeiten(kategorie)"
+                      :key="kategorie + '-' + faehigkeit.name">
+                      <td class="align-middle">{{ faehigkeit.name }}</td>
+                      <td class="align-middle text-end">{{ wertAnzeige(faehigkeit) }}</td>
+                      <td class="align-middle text-end text-muted small">—</td>
+                      <td class="align-middle text-end ps-2">
+                        <div class="btn-group btn-group-sm" role="group" :aria-label="'Aktionen für ' + faehigkeit.name">
+                          <button
+                            type="button"
+                            class="btn btn-outline-secondary d-flex align-items-center justify-content-center"
+                            :aria-label="'Bearbeiten: ' + faehigkeit.name"
+                            @click="bearbeitungModalOeffnen(kategorie, faehigkeit)">
+                            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-outline-danger d-flex align-items-center justify-content-center"
+                            :aria-label="'Löschen: ' + faehigkeit.name"
+                            @click="faehigkeitLoeschenAnfragen(kategorie, faehigkeit)">
+                            <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="form-floating mb-2">
-          <select id="pe-neue-faeh-kat" class="form-select" v-model="neueFaehigkeit.type">
-            <option value="handeln">Handeln</option>
-            <option value="wissen">Wissen</option>
-            <option value="soziales">Soziales</option>
-          </select>
-          <label for="pe-neue-faeh-kat">Kategorie</label>
+        <div class="card p-2">
+          <h5>Neue Fähigkeit</h5>
+          <faehigkeit-formular
+            v-model="neueFaehigkeit"
+            id-prefix="pe-neu"
+            :nullable-wert="true"
+          />
+          <button type="button" class="btn btn-primary w-100 mt-2" @click="faehigkeitHinzufuegen">
+            Hinzufügen
+          </button>
         </div>
-
-        <button class="btn btn-primary w-100" @click="faehigkeitHinzufuegen">
-          Hinzufügen
-        </button>
       </div>
 
-      <button class="btn btn-success w-100" @click="presetSpeichern">
-        Preset speichern
+      <button type="button" class="btn btn-success w-100" @click="presetSpeichern">
+        Fähigkeiten-Preset speichern
       </button>
 
       <div style="height:80px;"></div>
+
+      <div
+        class="modal fade"
+        id="peFaehigkeitBearbeitenModal"
+        ref="faehigkeitBearbeitenModalElement"
+        tabindex="-1"
+        aria-labelledby="peFaehigkeitBearbeitenLabel"
+        aria-hidden="true"
+        v-on="{ 'hidden.bs.modal': bearbeitungModalGeschlossen }">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content shadow">
+            <div class="modal-header">
+              <h5 class="modal-title" id="peFaehigkeitBearbeitenLabel">Fähigkeit bearbeiten</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+              <faehigkeit-formular
+                v-model="bearbeitungEntwurf"
+                id-prefix="pe-bearb"
+                :nullable-wert="true"
+              />
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+              <button type="button" class="btn btn-primary" @click="bearbeitungSpeichern">Speichern</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <bestaetigen-modal ref="faehigkeitLoeschenModal" />
     </div>
   `,
 };

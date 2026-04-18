@@ -18,9 +18,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       bearbeitung: null,
       bearbeitungIndex: -1,
       zeileQuillInstanz: null,
+      /** DOM-Knoten des Quill-Hosts (Funktions-Ref feuert bei jedem Re-Render erneut) */
+      zeileQuillHostElement: null,
       zeileQuillSession: 0,
       zeileModalInstanz: null,
       zuLoeschendeZeile: null,
+      zufallGegenstandEpoche: 'mittelalter',
+      zufallGegenstandKleidung: true,
+      /** Stabile Funktion für :ref (wie InventarModal), kein String-ref im Modal */
+      zeileQuillHostRefFn: null,
+    };
+  },
+  created() {
+    this.zeileQuillHostRefFn = (el) => {
+      this.zeileQuillHostRef(el);
     };
   },
   computed: {
@@ -36,6 +47,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return `${neu}Ort`;
       }
       return `${neu}Gegenstand`;
+    },
+    zufallsgeneratorBereit() {
+      return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
     },
   },
   methods: {
@@ -77,8 +91,23 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         beschreibungHtml: '',
       };
     },
+    zeileQuillOrphanToolbarsInModalBodyEntfernen() {
+      const modal = this.$refs.zeileModalElement;
+      if (!modal) {
+        return;
+      }
+      const body = modal.querySelector('.modal-body');
+      if (!body) {
+        return;
+      }
+      /* Quill hängt .ql-toolbar als Geschwister vor den Host — ohne Wrapper bleiben sie bei v-if/key von Vue liegen */
+      body.querySelectorAll(':scope > .ql-toolbar.ql-snow').forEach((node) => {
+        node.remove();
+      });
+    },
     zeileModalOeffnen(typ, zeile, index) {
       this.zeileQuillInstanz = null;
+      this.zeileQuillHostElement = null;
       this.zeileQuillSession += 1;
       this.bearbeitung = {
         typ,
@@ -86,6 +115,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       };
       this.bearbeitungIndex = index;
       this.$nextTick(() => {
+        this.zeileQuillOrphanToolbarsInModalBodyEntfernen();
         const el = this.$refs.zeileModalElement;
         if (!el || !window.bootstrap) {
           return;
@@ -121,19 +151,54 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       return this.bearbeitung.zeile.notizenHtml || '';
     },
-    zeileQuillInitialisieren(retryCount) {
-      const n = typeof retryCount === 'number' ? retryCount : 0;
-      if (!window.Quill || !this.bearbeitung) {
+    zeileQuillHostRef(el) {
+      if (!el) {
+        this.zeileQuillInstanz = null;
+        this.zeileQuillHostElement = null;
         return;
       }
-      const host = this.$refs.zeileQuillHost;
-      if (!host) {
-        if (n < 10) {
-          this.$nextTick(() => this.zeileQuillInitialisieren(n + 1));
+      if (!this.bearbeitung) {
+        return;
+      }
+      this.$nextTick(() => {
+        if (!this.bearbeitung) {
+          return;
+        }
+        this.zeileQuillAufHostEinrichten(el);
+      });
+    },
+    zeileQuillHostDomLeeren(el) {
+      if (!el) {
+        return;
+      }
+      el.querySelectorAll('.ql-toolbar.ql-snow').forEach((node) => {
+        node.remove();
+      });
+      el.innerHTML = '';
+    },
+    zeileQuillAufHostEinrichten(el, quillRetry) {
+      const r = typeof quillRetry === 'number' ? quillRetry : 0;
+      if (!el || !this.bearbeitung) {
+        return;
+      }
+      if (!window.Quill) {
+        if (r < 40) {
+          setTimeout(() => this.zeileQuillAufHostEinrichten(el, r + 1), 25);
         }
         return;
       }
-      this.zeileQuillInstanz = new window.Quill(host, {
+      /* Funktions-:ref wird bei jedem Re-Render erneut aufgerufen — keine zweite Quill-Instanz */
+      if (
+        this.zeileQuillInstanz &&
+        this.zeileQuillHostElement === el &&
+        el.contains(this.zeileQuillInstanz.root)
+      ) {
+        return;
+      }
+      this.zeileQuillHostDomLeeren(el);
+      this.zeileQuillInstanz = null;
+      this.zeileQuillHostElement = el;
+      this.zeileQuillInstanz = new window.Quill(el, {
         theme: 'snow',
         placeholder: 'Text formatieren…',
         modules: {
@@ -149,15 +214,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       });
       this.zeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitung();
     },
-    onZeileModalShown() {
-      this.$nextTick(() => {
-        this.$nextTick(() => this.zeileQuillInitialisieren());
-      });
-    },
     onZeileModalHidden() {
       this.zeileQuillInstanz = null;
+      this.zeileQuillHostElement = null;
       this.bearbeitung = null;
       this.bearbeitungIndex = -1;
+      this.$nextTick(() => this.zeileQuillOrphanToolbarsInModalBodyEntfernen());
     },
     quillHtmlInBearbeitungSchreiben() {
       if (!this.bearbeitung || !this.zeileQuillInstanz) {
@@ -169,6 +231,36 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       } else {
         this.bearbeitung.zeile.notizenHtml = html;
       }
+    },
+    quillAusBearbeitungSetzen() {
+      if (!this.zeileQuillInstanz) {
+        return;
+      }
+      this.zeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitung();
+    },
+    zufallsvorschlagUebernehmen() {
+      if (!this.bearbeitung || this.bearbeitungIndex >= 0) {
+        return;
+      }
+      const G = window.HTBAH && window.HTBAH.Zufallsgenerator;
+      if (!G) {
+        return;
+      }
+      const z = this.bearbeitung.zeile;
+      const typ = this.bearbeitung.typ;
+      let felder;
+      if (typ === 'npc') {
+        felder = G.npc();
+      } else if (typ === 'ort') {
+        felder = G.ort();
+      } else {
+        felder = G.gegenstand({
+          epoche: this.zufallGegenstandEpoche,
+          mitKleidung: this.zufallGegenstandKleidung,
+        });
+      }
+      Object.assign(z, felder);
+      this.$nextTick(() => this.quillAusBearbeitungSetzen());
     },
     zeileSpeichern() {
       if (!this.bearbeitung) {
@@ -248,6 +340,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
   },
   beforeUnmount() {
     this.zeileQuillInstanz = null;
+    this.zeileQuillHostElement = null;
   },
   template: `
     <div class="container content py-3">
@@ -347,7 +440,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <th>Größe</th>
                   <th>Lage</th>
                   <th>Zustand</th>
-                  <th>Notizen</th>
+                  <th>Beschreibung</th>
                   <th class="text-end text-nowrap">Aktionen</th>
                 </tr>
               </thead>
@@ -432,12 +525,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         tabindex="-1"
         aria-labelledby="htbahZufallstabellenZeileModalLabel"
         aria-hidden="true"
-        @shown.bs.modal="onZeileModalShown"
         @hidden.bs.modal="onZeileModalHidden">
         <div class="modal-dialog modal-dialog-scrollable modal-lg">
           <div class="modal-content shadow">
             <div class="modal-header">
-              <h5 class="modal-title" id="htbahZufallstabellenZeileModalLabel">{{ zeileModalTitel }}</h5>
+              <h5 class="modal-title me-auto" id="htbahZufallstabellenZeileModalLabel">{{ zeileModalTitel }}</h5>
+              <button
+                v-if="bearbeitung && bearbeitungIndex < 0"
+                type="button"
+                class="btn btn-sm btn-outline-secondary me-2"
+                :disabled="!zufallsgeneratorBereit"
+                :title="zufallsgeneratorBereit ? '' : 'Zufallsgenerator nicht geladen'"
+                @click="zufallsvorschlagUebernehmen">
+                Zufallsvorschlag
+              </button>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body text-start" v-if="bearbeitung">
@@ -530,18 +631,37 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </template>
 
               <template v-else-if="bearbeitung.typ === 'gegenstand'">
+                <div class="row g-2 mb-2 align-items-end" v-if="bearbeitungIndex < 0">
+                  <div class="col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zfg-epoche">Epoche für Zufallsvorschlag</label>
+                    <select id="zfg-epoche" class="form-select form-select-sm" v-model="zufallGegenstandEpoche">
+                      <option value="mittelalter">Mittelalter</option>
+                      <option value="gegenwart">Gegenwart</option>
+                      <option value="zukunft">Zukunft</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-check mt-3">
+                      <input id="zfg-kleidung" class="form-check-input" type="checkbox" v-model="zufallGegenstandKleidung" />
+                      <label class="form-check-label small" for="zfg-kleidung">Kleidung als Kategorie zulassen</label>
+                    </div>
+                  </div>
+                </div>
                 <div class="form-floating mb-3">
                   <input id="zfg-name" class="form-control" v-model="bearbeitung.zeile.name" placeholder=" " />
                   <label for="zfg-name">Name</label>
                 </div>
               </template>
 
-              <label class="form-label mt-3 mb-1" v-if="bearbeitung.typ === 'gegenstand'">Beschreibung</label>
-              <label class="form-label mt-3 mb-1" v-else>Notizen</label>
+              <label class="form-label mt-3 mb-1" v-if="bearbeitung.typ === 'npc'">Notizen</label>
+              <label class="form-label mt-3 mb-1" v-else>Beschreibung</label>
               <div
-                :key="'zeile-q-' + zeileQuillSession"
-                ref="zeileQuillHost"
-                class="quill-editor-host zufallstabellen-quill-host"></div>
+                class="zufallstabellen-quill-wrap"
+                :key="'zeile-q-' + zeileQuillSession">
+                <div
+                  :ref="zeileQuillHostRefFn"
+                  class="quill-editor-host zufallstabellen-quill-host"></div>
+              </div>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>

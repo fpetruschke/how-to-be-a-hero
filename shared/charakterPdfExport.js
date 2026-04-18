@@ -152,7 +152,7 @@
         const eff = effektivwert(kategorie, f, begabungen);
         rows += `<tr>
           <td style="padding:2px 3px;border:1px solid #ccc;vertical-align:top;">${escapeHtml(f.name)}</td>
-          <td style="padding:2px 3px;border:1px solid #ccc;text-align:right;white-space:nowrap;">${escapeHtml(String(f.value))}</td>
+          <td style="padding:2px 3px;border:1px solid #ccc;text-align:right;white-space:nowrap;">${escapeHtml(f.value == null ? '—' : String(f.value))}</td>
           <td style="padding:2px 3px;border:1px solid #ccc;text-align:right;white-space:nowrap;">${escapeHtml(String(eff))}</td>
         </tr>`;
       }

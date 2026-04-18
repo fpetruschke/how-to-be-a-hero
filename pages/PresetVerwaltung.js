@@ -8,7 +8,11 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
   },
   methods: {
     presetEntfernen(preset) {
-      if (!confirm(`Preset "${preset.name}" löschen?`)) return;
+      if (window.HTBAH.istSystemFaehigkeitenPreset(preset)) {
+        alert('Vorgegebene Fähigkeiten-Presets können nicht gelöscht werden.');
+        return;
+      }
+      if (!confirm(`Fähigkeiten-Preset „${preset.name}“ löschen?`)) return;
       this.presets = this.presets.filter((eintrag) => eintrag !== preset);
       window.HTBAH.speicherePresets(this.presets);
     },
@@ -25,7 +29,7 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9\-]/g, '');
 
-      downloadLink.download = 'charakter-preset-' + dateiNameSicher + '.json';
+      downloadLink.download = 'faehigkeiten-preset-' + dateiNameSicher + '.json';
       downloadLink.click();
     },
     presetImportieren(event) {
@@ -36,6 +40,9 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
       reader.onload = () => {
         try {
           const json = JSON.parse(reader.result);
+          if (json && typeof json === 'object' && json.htbahPresetId) {
+            delete json.htbahPresetId;
+          }
           this.presets.push(json);
           window.HTBAH.speicherePresets(this.presets);
         } catch {
@@ -47,11 +54,11 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
   },
   template: `
     <div class="container content py-3">
-      <h4>Presets</h4>
+      <h4>Fähigkeiten-Presets</h4>
 
       <div class="card p-3 mb-3">
-        <icon-text-button tag="router-link" to="/preset-bearbeiten" class="btn btn-success w-100 mb-2" icon="add">
-          Neues Preset
+        <icon-text-button tag="router-link" to="/faehigkeiten-preset-bearbeiten" class="btn btn-success w-100 mb-2" icon="add">
+          Neues Fähigkeiten-Preset
         </icon-text-button>
 
         <div class="form-floating">
@@ -60,14 +67,17 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
             type="file"
             class="form-control"
             @change="presetImportieren" />
-          <label for="pv-preset-import">Preset-Datei importieren</label>
+          <label for="pv-preset-import">Fähigkeiten-Preset-Datei importieren</label>
         </div>
       </div>
 
       <div class="card p-3 mb-3" v-for="(preset, index) in presets">
-        <h5 class="fw-bold">{{preset.name}}</h5>
+        <h5 class="fw-bold d-flex flex-wrap align-items-center gap-2">
+          <span>{{preset.name}}</span>
+          <span v-if="preset.htbahPresetId" class="badge text-bg-secondary">Vorgegeben</span>
+        </h5>
 
-        <icon-text-button class="btn btn-sm btn-secondary me-1 mb-2" icon="edit" @click="$router.push('/preset-bearbeiten/' + index)">
+        <icon-text-button class="btn btn-sm btn-secondary me-1 mb-2" icon="edit" @click="$router.push('/faehigkeiten-preset-bearbeiten/' + index)">
           Bearbeiten
         </icon-text-button>
 
@@ -75,7 +85,11 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
           Export
         </icon-text-button>
 
-        <icon-text-button class="btn btn-sm btn-danger mb-2" icon="delete" @click="presetEntfernen(preset)">
+        <icon-text-button
+          v-if="!preset.htbahPresetId"
+          class="btn btn-sm btn-danger mb-2"
+          icon="delete"
+          @click="presetEntfernen(preset)">
           Löschen
         </icon-text-button>
       </div>

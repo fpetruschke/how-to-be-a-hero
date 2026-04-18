@@ -1,5 +1,17 @@
 window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
 
+function htbahFormatBytes(bytes) {
+  const n = typeof bytes === 'number' && Number.isFinite(bytes) ? Math.max(0, bytes) : 0;
+  if (n === 0) {
+    return '0 Bytes';
+  }
+  const k = 1024;
+  const stufen = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(n) / Math.log(k)), stufen.length - 1);
+  const wert = n / k ** i;
+  return `${wert.toLocaleString('de-DE', { maximumFractionDigits: i === 0 ? 0 : 2 })} ${stufen[i]}`;
+}
+
 const SPEICHER_BEREICHE = {
   charakter: {
     key: 'htbah_character',
@@ -21,12 +33,12 @@ const SPEICHER_BEREICHE = {
   },
   presets: {
     key: 'htbah_presets',
-    titel: 'Presets löschen?',
+    titel: 'Fähigkeiten-Presets löschen?',
     beschreibung:
-      'Alle gespeicherten Presets für schnelle Charakter-Erstellung werden entfernt.',
-    erfolg: 'Presets wurden gelöscht.',
+      'Alle gespeicherten Fähigkeiten-Presets für schnelle Charakter-Erstellung werden entfernt.',
+    erfolg: 'Fähigkeiten-Presets wurden gelöscht.',
     buttonSymbol: '📦',
-    buttonLabel: 'Presets löschen',
+    buttonLabel: 'Fähigkeiten-Presets löschen',
   },
   theme: {
     key: 'htbah_theme',
@@ -55,6 +67,24 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '📔',
     buttonLabel: 'Abenteuerbuch löschen',
   },
+  weltenbau: {
+    key: 'htbah_weltenbau',
+    titel: 'Weltenbau-Bilder löschen?',
+    beschreibung:
+      'Alle unter „Weltenbau“ importierten Karten- und Generator-Bilder werden aus dem lokalen Speicher entfernt.',
+    erfolg: 'Weltenbau-Bilder wurden gelöscht.',
+    buttonSymbol: '🗺️',
+    buttonLabel: 'Weltenbau-Bilder löschen',
+  },
+  spielleiter: {
+    key: 'htbah_spielleiter_gruppen',
+    titel: 'Spielleiter-Gruppen löschen?',
+    beschreibung:
+      'Alle gespeicherten Gruppen und Charaktere in der Spielleiter-Ansicht werden entfernt.',
+    erfolg: 'Spielleiter-Gruppen wurden gelöscht.',
+    buttonSymbol: '👥',
+    buttonLabel: 'Spielleiter-Gruppen löschen',
+  },
   alles: {
     keys: [
       'htbah_character',
@@ -64,10 +94,12 @@ const SPEICHER_BEREICHE = {
       'htbah_spielleiter_gruppen',
       'htbah_zufallstabellen',
       'htbah_spielleitung_abenteuerbuch',
+      'htbah_weltenbau',
+      'htbah_app_rolle',
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Presets, Spielleiter-Gruppen, Zufallstabellen, das Abenteuerbuch der Spielleitung und deine Theme-Auswahl entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Gruppen, Zufallstabellen, das Abenteuerbuch der Spielleitung, unter „Weltenbau“ gespeicherte Bilder, die gewählte Rolle (Charakter/Spielleitung) und deine Theme-Auswahl entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
@@ -81,6 +113,9 @@ window.HTBAH_SEITEN.Einstellungen = {
       zuLoeschenderBereich: 'charakter',
       statusMeldung: '',
       speicherBereiche: SPEICHER_BEREICHE,
+      browserSpeicher: null,
+      browserSpeicherFehler: '',
+      browserSpeicherLaden: true,
     };
   },
   computed: {
@@ -90,11 +125,84 @@ window.HTBAH_SEITEN.Einstellungen = {
     themeSymbol() {
       return this.istHellesTheme ? 'light_mode' : 'dark_mode';
     },
+    appRolle() {
+      void this.$route.fullPath;
+      return window.HTBAH.ladeAppRolle();
+    },
+    browserSpeicherQuotaEndlich() {
+      const b = this.browserSpeicher;
+      if (!b || typeof b.quota !== 'number') {
+        return false;
+      }
+      return Number.isFinite(b.quota) && b.quota > 0;
+    },
+    browserSpeicherProzent() {
+      const b = this.browserSpeicher;
+      if (!b || !this.browserSpeicherQuotaEndlich) {
+        return 0;
+      }
+      const u = typeof b.usage === 'number' && Number.isFinite(b.usage) ? b.usage : 0;
+      const q = b.quota;
+      if (q <= 0) {
+        return 0;
+      }
+      return Math.min(100, Math.round((100 * u) / q));
+    },
+    browserSpeicherNutzungText() {
+      if (!this.browserSpeicher) {
+        return '';
+      }
+      const u = this.browserSpeicher.usage;
+      return htbahFormatBytes(typeof u === 'number' && Number.isFinite(u) ? u : 0);
+    },
+    browserSpeicherQuotaText() {
+      const b = this.browserSpeicher;
+      if (!b || !this.browserSpeicherQuotaEndlich) {
+        return '';
+      }
+      return htbahFormatBytes(b.quota);
+    },
+    browserSpeicherProgressBarKlasse() {
+      const p = this.browserSpeicherProzent;
+      if (p >= 95) {
+        return 'bg-danger';
+      }
+      if (p >= 80) {
+        return 'bg-warning text-dark';
+      }
+      return 'bg-success';
+    },
   },
   methods: {
+    zurRollenauswahl() {
+      window.HTBAH.speichereAppRolle(null);
+      this.$router.push('/');
+    },
     themeUmschalten() {
       const neuesTheme = this.istHellesTheme ? 'light' : 'dark';
       window.HTBAH.setzeTheme(neuesTheme);
+    },
+    async speicherSchaetzungLaden() {
+      this.browserSpeicherFehler = '';
+      this.browserSpeicherLaden = true;
+      if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
+        this.browserSpeicher = null;
+        this.browserSpeicherFehler =
+          'Speicher-Schätzung ist nicht verfügbar (z. B. unsichere Verbindung oder älterer Browser).';
+        this.browserSpeicherLaden = false;
+        return;
+      }
+      try {
+        const est = await navigator.storage.estimate();
+        const usage = typeof est.usage === 'number' && Number.isFinite(est.usage) ? est.usage : 0;
+        const quotaRaw = typeof est.quota === 'number' ? est.quota : 0;
+        const quota = Number.isFinite(quotaRaw) && quotaRaw > 0 ? quotaRaw : 0;
+        this.browserSpeicher = { usage, quota };
+      } catch {
+        this.browserSpeicher = null;
+        this.browserSpeicherFehler = 'Die Speicherwerte konnten nicht gelesen werden.';
+      }
+      this.browserSpeicherLaden = false;
     },
     oeffneLoeschDialog(bereich) {
       const eintrag = SPEICHER_BEREICHE[bereich];
@@ -130,16 +238,29 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
 
       this.statusMeldung = bereich.erfolg;
+
+      if (this.zuLoeschenderBereich === 'alles') {
+        this.$router.push('/');
+      }
+
+      this.speicherSchaetzungLaden();
     },
+  },
+  mounted() {
+    this.speicherSchaetzungLaden();
   },
   template: `
     <div class="container content py-3 text-center">
       <h4>Einstellungen</h4>
 
-      <h5 class="text-start mb-2">Presets</h5>
+      <h5 class="text-start mb-2">App</h5>
       <div class="card p-3 mb-3">
-        <icon-text-button tag="router-link" to="/preset-verwaltung" class="btn btn-primary w-100" icon="inventory_2">
-          Preset-Management
+        <icon-text-button
+          class="btn btn-outline-secondary w-100"
+          type="button"
+          icon="swap_horiz"
+          @click="zurRollenauswahl">
+          Zur Rollenauswahl (Startseite)
         </icon-text-button>
       </div>
 
@@ -164,57 +285,135 @@ window.HTBAH_SEITEN.Einstellungen = {
         </div>
       </div>
 
+      <h5 class="text-start mb-2">Speicherstatus</h5>
+      <div class="card p-3 mb-3 text-start">
+        <p class="small text-body-secondary mb-2">
+          Geschätztes Kontingent für diese Website (localStorage, IndexedDB, Service-Worker-Caches u. a.).
+          Die Werte sind ungefähr; unter HTTPS ist die Anzeige meist am zuverlässigsten.
+        </p>
+        <div v-if="browserSpeicherLaden" class="small text-body-secondary">Wird geladen …</div>
+        <div v-else-if="browserSpeicherFehler" class="alert alert-warning py-2 mb-0 small">
+          {{ browserSpeicherFehler }}
+        </div>
+        <template v-else-if="browserSpeicher">
+          <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2 mb-2">
+            <span class="small"><strong>{{ browserSpeicherNutzungText }}</strong> belegt</span>
+            <span class="small text-body-secondary" v-if="browserSpeicherQuotaEndlich">
+              von {{ browserSpeicherQuotaText }}
+            </span>
+            <span class="small text-body-secondary" v-else>ohne gemeldetes Obergrenzen-Limit</span>
+          </div>
+          <div
+            v-if="browserSpeicherQuotaEndlich"
+            class="progress"
+            style="height: 1.1rem"
+            role="progressbar"
+            :aria-valuenow="browserSpeicherProzent"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-label="'Speicher: ' + browserSpeicherProzent + ' Prozent'">
+            <div
+              class="progress-bar"
+              :class="browserSpeicherProgressBarKlasse"
+              :style="{ width: browserSpeicherProzent + '%' }"></div>
+          </div>
+          <div v-if="browserSpeicherQuotaEndlich" class="small text-body-secondary mt-1 text-end">
+            {{ browserSpeicherProzent }} %
+          </div>
+        </template>
+        <icon-text-button
+          type="button"
+          class="btn btn-outline-secondary btn-sm mt-2"
+          icon="refresh"
+          :disabled="browserSpeicherLaden"
+          @click="speicherSchaetzungLaden">
+          Aktualisieren
+        </icon-text-button>
+      </div>
+
       <h5 class="text-start mb-2">Daten löschen</h5>
       <div class="card p-3" style="margin-bottom: 4rem;">
-        <icon-text-button
-          class="btn btn-outline-danger w-100 mb-2"
-          type="button"
-          :symbol="speicherBereiche.charakter.buttonSymbol"
-          @click="oeffneLoeschDialog('charakter')">
-          {{ speicherBereiche.charakter.buttonLabel }}
-        </icon-text-button>
-        <icon-text-button
-          class="btn btn-outline-danger w-100 mb-2"
-          type="button"
-          :symbol="speicherBereiche.charakterbild.buttonSymbol"
-          @click="oeffneLoeschDialog('charakterbild')">
-          {{ speicherBereiche.charakterbild.buttonLabel }}
-        </icon-text-button>
-        <icon-text-button
-          class="btn btn-outline-danger w-100 mb-2"
-          type="button"
-          :symbol="speicherBereiche.presets.buttonSymbol"
-          @click="oeffneLoeschDialog('presets')">
-          {{ speicherBereiche.presets.buttonLabel }}
-        </icon-text-button>
-        <icon-text-button
-          class="btn btn-outline-danger w-100 mb-2"
-          type="button"
-          :symbol="speicherBereiche.theme.buttonSymbol"
-          @click="oeffneLoeschDialog('theme')">
-          {{ speicherBereiche.theme.buttonLabel }}
-        </icon-text-button>
-        <icon-text-button
-          class="btn btn-outline-danger w-100 mb-2"
-          type="button"
-          :symbol="speicherBereiche.zufallstabellen.buttonSymbol"
-          @click="oeffneLoeschDialog('zufallstabellen')">
-          {{ speicherBereiche.zufallstabellen.buttonLabel }}
-        </icon-text-button>
-        <icon-text-button
-          class="btn btn-outline-danger w-100 mb-2"
-          type="button"
-          :symbol="speicherBereiche.abenteuerbuch.buttonSymbol"
-          @click="oeffneLoeschDialog('abenteuerbuch')">
-          {{ speicherBereiche.abenteuerbuch.buttonLabel }}
-        </icon-text-button>
-        <icon-text-button
-          class="btn btn-danger w-100"
-          type="button"
-          :symbol="speicherBereiche.alles.buttonSymbol"
-          @click="oeffneLoeschDialog('alles')">
-          {{ speicherBereiche.alles.buttonLabel }}
-        </icon-text-button>
+        <template v-if="appRolle === 'charakter'">
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.charakter.buttonSymbol"
+            @click="oeffneLoeschDialog('charakter')">
+            {{ speicherBereiche.charakter.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.charakterbild.buttonSymbol"
+            @click="oeffneLoeschDialog('charakterbild')">
+            {{ speicherBereiche.charakterbild.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.theme.buttonSymbol"
+            @click="oeffneLoeschDialog('theme')">
+            {{ speicherBereiche.theme.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-danger w-100"
+            type="button"
+            :symbol="speicherBereiche.alles.buttonSymbol"
+            @click="oeffneLoeschDialog('alles')">
+            {{ speicherBereiche.alles.buttonLabel }}
+          </icon-text-button>
+        </template>
+        <template v-else-if="appRolle === 'spielleitung'">
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.presets.buttonSymbol"
+            @click="oeffneLoeschDialog('presets')">
+            {{ speicherBereiche.presets.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.spielleiter.buttonSymbol"
+            @click="oeffneLoeschDialog('spielleiter')">
+            {{ speicherBereiche.spielleiter.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.zufallstabellen.buttonSymbol"
+            @click="oeffneLoeschDialog('zufallstabellen')">
+            {{ speicherBereiche.zufallstabellen.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.abenteuerbuch.buttonSymbol"
+            @click="oeffneLoeschDialog('abenteuerbuch')">
+            {{ speicherBereiche.abenteuerbuch.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.weltenbau.buttonSymbol"
+            @click="oeffneLoeschDialog('weltenbau')">
+            {{ speicherBereiche.weltenbau.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.theme.buttonSymbol"
+            @click="oeffneLoeschDialog('theme')">
+            {{ speicherBereiche.theme.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-danger w-100"
+            type="button"
+            :symbol="speicherBereiche.alles.buttonSymbol"
+            @click="oeffneLoeschDialog('alles')">
+            {{ speicherBereiche.alles.buttonLabel }}
+          </icon-text-button>
+        </template>
       </div>
 
       <teleport to="body">
