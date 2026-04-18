@@ -115,6 +115,39 @@ function normalisiereZufallstabellenGegenstandZeile(z) {
   };
 }
 
+function normalisiereZufallstabellenFraktionZeile(z) {
+  if (!z || typeof z !== 'object') {
+    return null;
+  }
+  return {
+    id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
+    art: typeof z.art === 'string' ? z.art : '',
+    name: typeof z.name === 'string' ? z.name : '',
+    ziel: typeof z.ziel === 'string' ? z.ziel : '',
+    gesinnungVerhalten: typeof z.gesinnungVerhalten === 'string' ? z.gesinnungVerhalten : '',
+    beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
+  };
+}
+
+function normalisiereZufallstabellenPantheonZeile(z) {
+  if (!z || typeof z !== 'object') {
+    return null;
+  }
+  return {
+    id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
+    name: typeof z.name === 'string' ? z.name : '',
+    geschlecht: typeof z.geschlecht === 'string' ? z.geschlecht : '',
+    domaene: typeof z.domaene === 'string' ? z.domaene : '',
+    charakter: typeof z.charakter === 'string' ? z.charakter : '',
+    staerke: typeof z.staerke === 'string' ? z.staerke : '',
+    schwaeche: typeof z.schwaeche === 'string' ? z.schwaeche : '',
+    schutzpatronat: typeof z.schutzpatronat === 'string' ? z.schutzpatronat : '',
+    verlangen: typeof z.verlangen === 'string' ? z.verlangen : '',
+    mythosGaben: typeof z.mythosGaben === 'string' ? z.mythosGaben : '',
+    notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
+  };
+}
+
 function ladeZufallstabellenZustand() {
   let roh = null;
   try {
@@ -123,7 +156,7 @@ function ladeZufallstabellenZustand() {
     roh = null;
   }
   if (!roh || typeof roh !== 'object') {
-    return { version: 1, npcs: [], orte: [], gegenstaende: [] };
+    return { version: 1, npcs: [], orte: [], gegenstaende: [], fraktionen: [], pantheon: [] };
   }
   return {
     version: 1,
@@ -135,6 +168,12 @@ function ladeZufallstabellenZustand() {
       : [],
     gegenstaende: Array.isArray(roh.gegenstaende)
       ? roh.gegenstaende.map(normalisiereZufallstabellenGegenstandZeile).filter(Boolean)
+      : [],
+    fraktionen: Array.isArray(roh.fraktionen)
+      ? roh.fraktionen.map(normalisiereZufallstabellenFraktionZeile).filter(Boolean)
+      : [],
+    pantheon: Array.isArray(roh.pantheon)
+      ? roh.pantheon.map(normalisiereZufallstabellenPantheonZeile).filter(Boolean)
       : [],
   };
 }

@@ -25,6 +25,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       zuLoeschendeZeile: null,
       zufallGegenstandEpoche: 'mittelalter',
       zufallGegenstandKleidung: true,
+      zufallFraktionEpoche: 'mittelalter',
       /** Stabile Funktion für :ref (wie InventarModal), kein String-ref im Modal */
       zeileQuillHostRefFn: null,
     };
@@ -45,6 +46,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       if (this.bearbeitung.typ === 'ort') {
         return `${neu}Ort`;
+      }
+      if (this.bearbeitung.typ === 'fraktion') {
+        return `${neu}Fraktion`;
+      }
+      if (this.bearbeitung.typ === 'pantheon') {
+        return `${neu}Gottheit`;
       }
       return `${neu}Gegenstand`;
     },
@@ -89,6 +96,31 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         id: window.HTBAH.neueEntropieId(),
         name: '',
         beschreibungHtml: '',
+      };
+    },
+    fraktionLeer() {
+      return {
+        id: window.HTBAH.neueEntropieId(),
+        art: '',
+        name: '',
+        ziel: '',
+        gesinnungVerhalten: '',
+        beschreibungHtml: '',
+      };
+    },
+    pantheonLeer() {
+      return {
+        id: window.HTBAH.neueEntropieId(),
+        name: '',
+        geschlecht: '',
+        domaene: '',
+        charakter: '',
+        staerke: '',
+        schwaeche: '',
+        schutzpatronat: '',
+        verlangen: '',
+        mythosGaben: '',
+        notizenHtml: '',
       };
     },
     zeileQuillOrphanToolbarsInModalBodyEntfernen() {
@@ -142,11 +174,26 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     gegenstandBearbeiten(row, index) {
       this.zeileModalOeffnen('gegenstand', row, index);
     },
+    fraktionHinzufuegen() {
+      this.zeileModalOeffnen('fraktion', this.fraktionLeer(), -1);
+    },
+    fraktionBearbeiten(row, index) {
+      this.zeileModalOeffnen('fraktion', row, index);
+    },
+    pantheonHinzufuegen() {
+      this.zeileModalOeffnen('pantheon', this.pantheonLeer(), -1);
+    },
+    pantheonBearbeiten(row, index) {
+      this.zeileModalOeffnen('pantheon', row, index);
+    },
     htmlFuerQuillAusBearbeitung() {
       if (!this.bearbeitung) {
         return '';
       }
       if (this.bearbeitung.typ === 'gegenstand') {
+        return this.bearbeitung.zeile.beschreibungHtml || '';
+      }
+      if (this.bearbeitung.typ === 'fraktion') {
         return this.bearbeitung.zeile.beschreibungHtml || '';
       }
       return this.bearbeitung.zeile.notizenHtml || '';
@@ -226,7 +273,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return;
       }
       const html = this.zeileQuillInstanz.root.innerHTML;
-      if (this.bearbeitung.typ === 'gegenstand') {
+      if (this.bearbeitung.typ === 'gegenstand' || this.bearbeitung.typ === 'fraktion') {
         this.bearbeitung.zeile.beschreibungHtml = html;
       } else {
         this.bearbeitung.zeile.notizenHtml = html;
@@ -253,6 +300,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         felder = G.npc();
       } else if (typ === 'ort') {
         felder = G.ort();
+      } else if (typ === 'fraktion') {
+        felder = G.fraktion({ epoche: this.zufallFraktionEpoche });
+      } else if (typ === 'pantheon') {
+        felder = G.pantheon();
       } else {
         felder = G.gegenstand({
           epoche: this.zufallGegenstandEpoche,
@@ -274,6 +325,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         liste = this.zustand.npcs;
       } else if (typ === 'ort') {
         liste = this.zustand.orte;
+      } else if (typ === 'fraktion') {
+        liste = this.zustand.fraktionen;
+      } else if (typ === 'pantheon') {
+        liste = this.zustand.pantheon;
       } else {
         liste = this.zustand.gegenstaende;
       }
@@ -307,6 +362,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         liste = this.zustand.npcs;
       } else if (typ === 'ort') {
         liste = this.zustand.orte;
+      } else if (typ === 'fraktion') {
+        liste = this.zustand.fraktionen;
+      } else if (typ === 'pantheon') {
+        liste = this.zustand.pantheon;
       } else {
         liste = this.zustand.gegenstaende;
       }
@@ -321,6 +380,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         npcs: 'NPCs',
         orte: 'Orte',
         gegenstaende: 'Gegenstände',
+        fraktionen: 'Fraktionen',
+        pantheon: 'Pantheon',
       };
       this.$refs.zufallstabellenBestaetigen.oeffnen({
         titel: `${labels[typ] || 'Tabelle'} leeren?`,
@@ -332,6 +393,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             this.zustand.orte = [];
           } else if (typ === 'gegenstaende') {
             this.zustand.gegenstaende = [];
+          } else if (typ === 'fraktionen') {
+            this.zustand.fraktionen = [];
+          } else if (typ === 'pantheon') {
+            this.zustand.pantheon = [];
           }
           this.persist();
         },
@@ -416,6 +481,55 @@ window.HTBAH_SEITEN.Zufallstabellen = {
 
       <div class="card mb-3 text-start">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold">Gegenstände</span>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('gegenstaende')">
+              Leeren
+            </button>
+            <icon-text-button
+              type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0"
+              icon="add"
+              @click="gegenstandHinzufuegen"
+              aria-label="Eintrag hinzufügen">
+              Hinzufügen
+            </icon-text-button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Beschreibung</th>
+                  <th class="text-end text-nowrap">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!zustand.gegenstaende.length">
+                  <td colspan="3" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                </tr>
+                <tr v-for="(row, index) in zustand.gegenstaende" :key="row.id">
+                  <td>{{ row.name || '—' }}</td>
+                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
+                  <td class="text-end text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="gegenstandBearbeiten(row, index)">
+                      Bearbeiten
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">
+                      Löschen
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3 text-start">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
           <span class="fw-semibold">Orte</span>
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('orte')">
@@ -471,16 +585,71 @@ window.HTBAH_SEITEN.Zufallstabellen = {
 
       <div class="card mb-3 text-start">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">Gegenstände</span>
+          <span class="fw-semibold">Fraktionen</span>
           <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('gegenstaende')">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('fraktionen')">
               Leeren
             </button>
             <icon-text-button
               type="button"
               class="btn btn-sm btn-outline-primary flex-shrink-0"
               icon="add"
-              @click="gegenstandHinzufuegen"
+              @click="fraktionHinzufuegen"
+              aria-label="Eintrag hinzufügen">
+              Hinzufügen
+            </icon-text-button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Art</th>
+                  <th>Name</th>
+                  <th>Ziel</th>
+                  <th>Gesinnung / Verhalten</th>
+                  <th>Beschreibung</th>
+                  <th class="text-end text-nowrap">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!zustand.fraktionen.length">
+                  <td colspan="6" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                </tr>
+                <tr v-for="(row, index) in zustand.fraktionen" :key="row.id">
+                  <td>{{ row.art || '—' }}</td>
+                  <td>{{ row.name || '—' }}</td>
+                  <td class="small">{{ row.ziel || '—' }}</td>
+                  <td class="small">{{ row.gesinnungVerhalten || '—' }}</td>
+                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
+                  <td class="text-end text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="fraktionBearbeiten(row, index)">
+                      Bearbeiten
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('fraktion', row.id)">
+                      Löschen
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3 text-start">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold">Pantheon</span>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('pantheon')">
+              Leeren
+            </button>
+            <icon-text-button
+              type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0"
+              icon="add"
+              @click="pantheonHinzufuegen"
               aria-label="Eintrag hinzufügen">
               Hinzufügen
             </icon-text-button>
@@ -492,22 +661,28 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th>Beschreibung</th>
+                  <th>Domäne</th>
+                  <th>Charakter</th>
+                  <th>Schutzpatronat</th>
+                  <th>Notizen</th>
                   <th class="text-end text-nowrap">Aktionen</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!zustand.gegenstaende.length">
-                  <td colspan="3" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                <tr v-if="!zustand.pantheon.length">
+                  <td colspan="6" class="text-secondary text-center py-3">Noch keine Einträge.</td>
                 </tr>
-                <tr v-for="(row, index) in zustand.gegenstaende" :key="row.id">
+                <tr v-for="(row, index) in zustand.pantheon" :key="row.id">
                   <td>{{ row.name || '—' }}</td>
-                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
+                  <td class="small">{{ row.domaene || '—' }}</td>
+                  <td class="small">{{ row.charakter || '—' }}</td>
+                  <td class="small">{{ row.schutzpatronat || '—' }}</td>
+                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
                   <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="gegenstandBearbeiten(row, index)">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="pantheonBearbeiten(row, index)">
                       Bearbeiten
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('pantheon', row.id)">
                       Löschen
                     </button>
                   </td>
@@ -630,6 +805,104 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </div>
               </template>
 
+              <template v-else-if="bearbeitung.typ === 'fraktion'">
+                <div class="row g-2 mb-2 align-items-end" v-if="bearbeitungIndex < 0">
+                  <div class="col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zff-epoche">Epoche für Namensvorschlag</label>
+                    <select id="zff-epoche" class="form-select form-select-sm" v-model="zufallFraktionEpoche">
+                      <option value="mittelalter">Mittelalter</option>
+                      <option value="gegenwart">Gegenwart</option>
+                      <option value="zukunft">Zukunft</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zff-art" class="form-control" v-model="bearbeitung.zeile.art" placeholder=" " />
+                      <label for="zff-art">Art (z. B. Gilde, Partei, Bande)</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zff-name" class="form-control" v-model="bearbeitung.zeile.name" placeholder=" " />
+                      <label for="zff-name">Name</label>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-floating">
+                      <input id="zff-ziel" class="form-control" v-model="bearbeitung.zeile.ziel" placeholder=" " />
+                      <label for="zff-ziel">Ziel</label>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-floating">
+                      <textarea id="zff-ges" class="form-control" v-model="bearbeitung.zeile.gesinnungVerhalten" placeholder=" " style="height: 5rem"></textarea>
+                      <label for="zff-ges">Gesinnung / Verhalten</label>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <template v-else-if="bearbeitung.typ === 'pantheon'">
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zfp-name" class="form-control" v-model="bearbeitung.zeile.name" placeholder=" " />
+                      <label for="zfp-name">Name</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zfp-geschlecht" class="form-control" v-model="bearbeitung.zeile.geschlecht" placeholder=" " />
+                      <label for="zfp-geschlecht">Geschlecht / Darstellung</label>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-floating">
+                      <input id="zfp-dom" class="form-control" v-model="bearbeitung.zeile.domaene" placeholder=" " />
+                      <label for="zfp-dom">Wofür steht die Gottheit (Domäne)</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <textarea id="zfp-ch" class="form-control" v-model="bearbeitung.zeile.charakter" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfp-ch">Charakter (z. B. rachsüchtig, gütig)</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <textarea id="zfp-st" class="form-control" v-model="bearbeitung.zeile.staerke" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfp-st">Stärken</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <textarea id="zfp-sw" class="form-control" v-model="bearbeitung.zeile.schwaeche" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfp-sw">Schwächen</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <textarea id="zfp-pat" class="form-control" v-model="bearbeitung.zeile.schutzpatronat" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfp-pat">Schutzpatronat (wer / was)</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <textarea id="zfp-ver" class="form-control" v-model="bearbeitung.zeile.verlangen" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfp-ver">Was verlangt sie (Opfer, Gebote)</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <textarea id="zfp-myth" class="form-control" v-model="bearbeitung.zeile.mythosGaben" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfp-myth">Mythos: Was wird erzählt, dass sie geben würde</label>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
               <template v-else-if="bearbeitung.typ === 'gegenstand'">
                 <div class="row g-2 mb-2 align-items-end" v-if="bearbeitungIndex < 0">
                   <div class="col-md-6">
@@ -654,6 +927,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </template>
 
               <label class="form-label mt-3 mb-1" v-if="bearbeitung.typ === 'npc'">Notizen</label>
+              <label class="form-label mt-3 mb-1" v-else-if="bearbeitung.typ === 'pantheon'">Notizen & Mythos</label>
               <label class="form-label mt-3 mb-1" v-else>Beschreibung</label>
               <div
                 class="zufallstabellen-quill-wrap"

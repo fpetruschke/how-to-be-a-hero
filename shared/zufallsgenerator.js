@@ -10,8 +10,10 @@ window.HTBAH = window.HTBAH || {};
   const npc = window.HTBAH.ZufallsgeneratorNpcModul;
   const ort = window.HTBAH.ZufallsgeneratorOrtModul;
   const gegenstand = window.HTBAH.ZufallsgeneratorGegenstandModul;
+  const fraktion = window.HTBAH.ZufallsgeneratorFraktionModul;
+  const pantheon = window.HTBAH.ZufallsgeneratorPantheonModul;
 
-  if (!U || !npc || !ort || !gegenstand) {
+  if (!U || !npc || !ort || !gegenstand || !fraktion || !pantheon) {
     return;
   }
 
@@ -20,5 +22,7 @@ window.HTBAH = window.HTBAH || {};
     npc: () => npc.generiere(),
     ort: () => ort.generiere(),
     gegenstand: (opts) => gegenstand.generiere(opts || {}),
+    fraktion: (opts) => fraktion.generiere(opts || {}),
+    pantheon: () => pantheon.generiere(),
   };
 })();
