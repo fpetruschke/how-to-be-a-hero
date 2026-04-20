@@ -9,6 +9,8 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
     name: 'Mittelalter-Fantasy-Preset',
     handeln: [
       { name: 'Schwertkampf', value: null },
+      { name: 'Nahkampf (bewaffnet)', value: null },
+      { name: 'Faustkampf', value: null },
       { name: 'Bogenschießen', value: null },
       { name: 'Reiten', value: null },
       { name: 'Schleichen', value: null },
@@ -21,9 +23,11 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Geschichte & Legenden', value: null },
       { name: 'Heilkunde', value: null },
       { name: 'Religion', value: null },
-      { name: 'Waffenkunde', value: null },
+      { name: 'Physik & Mechanik', value: null },
       { name: 'Alte Sprachen', value: null },
       { name: 'Tierkunde', value: null },
+      { name: 'Geografie', value: null },
+      { name: 'Überleben (Wildnis)', value: null },
     ],
     soziales: [
       { name: 'Überreden', value: null },
@@ -33,6 +37,8 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Lügen', value: null },
       { name: 'Menschenkenntnis', value: null },
       { name: 'Auftreten', value: null },
+      { name: 'Diplomatie', value: null },
+      { name: 'Verführen', value: null },
     ],
   },
   {

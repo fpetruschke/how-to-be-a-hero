@@ -19,7 +19,7 @@ window.HTBAH = window.HTBAH || {};
 
   window.HTBAH.Zufallsgenerator = {
     EPOCHE: U ? U.EPOCHE : {},
-    npc: () => npc.generiere(),
+    npc: (opts) => npc.generiere(opts || {}),
     ort: () => ort.generiere(),
     gegenstand: (opts) => gegenstand.generiere(opts || {}),
     fraktion: (opts) => fraktion.generiere(opts || {}),

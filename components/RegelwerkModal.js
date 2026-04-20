@@ -4,12 +4,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
   props: ['uiZustand'],
   data() {
     return {
-      istVollbild: false,
-      positionX: null,
-      positionY: null,
-      ziehenAktiv: false,
-      ziehOffsetX: 0,
-      ziehOffsetY: 0,
+      ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
     };
   },
   computed: {
@@ -19,14 +14,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
       return `${viewerBasisUrl}?file=${encodeURIComponent(regelwerkUrl)}#zoom=page-width&pagemode=thumbs`;
     },
     fensterStil() {
-      if (this.istVollbild || this.positionX === null || this.positionY === null) {
-        return {};
-      }
-
-      return {
-        left: `${this.positionX}px`,
-        top: `${this.positionY}px`,
-      };
+      return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this);
     },
     vollbildIcon() {
       return this.istVollbild ? 'close_fullscreen' : 'open_in_full';
@@ -43,6 +31,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
       }
 
       this.beendeZiehen();
+      this.beendeResize();
       this.istVollbild = false;
     },
   },
@@ -51,96 +40,14 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
   },
   beforeUnmount() {
     this.beendeZiehen();
+    this.beendeResize();
     window.removeEventListener('resize', this.beiFensterGroesseGeaendert);
   },
   methods: {
-    initialisierePosition() {
-      const fenster = this.$refs.fensterElement;
-      if (!fenster || this.positionX !== null || this.positionY !== null) {
-        this.stelleSichtbaresFensterSicher();
-        return;
-      }
-
-      const startX = window.innerWidth * 0.05;
-      const startY = window.innerHeight * 0.05;
-      const maxX = Math.max(0, window.innerWidth - fenster.offsetWidth);
-      const maxY = Math.max(0, window.innerHeight - fenster.offsetHeight);
-      this.positionX = Math.min(startX, maxX);
-      this.positionY = Math.min(startY, maxY);
-    },
-    starteZiehen(event) {
-      if (this.istVollbild || event.target.closest('button, a')) {
-        return;
-      }
-
-      if (event.pointerType === 'mouse' && event.button !== 0) {
-        return;
-      }
-
-      const fenster = this.$refs.fensterElement;
-      if (!fenster) {
-        return;
-      }
-
-      const rechteck = fenster.getBoundingClientRect();
-      this.ziehenAktiv = true;
-      this.ziehOffsetX = event.clientX - rechteck.left;
-      this.ziehOffsetY = event.clientY - rechteck.top;
-
-      window.addEventListener('pointermove', this.beimZiehen);
-      window.addEventListener('pointerup', this.beendeZiehen);
-      window.addEventListener('pointercancel', this.beendeZiehen);
-      event.preventDefault();
-    },
-    beimZiehen(event) {
-      if (!this.ziehenAktiv || this.istVollbild) {
-        return;
-      }
-
-      const fenster = this.$refs.fensterElement;
-      if (!fenster) {
-        return;
-      }
-
-      const maxX = Math.max(0, window.innerWidth - fenster.offsetWidth);
-      const maxY = Math.max(0, window.innerHeight - fenster.offsetHeight);
-      const neueXPosition = event.clientX - this.ziehOffsetX;
-      const neueYPosition = event.clientY - this.ziehOffsetY;
-      this.positionX = Math.min(Math.max(0, neueXPosition), maxX);
-      this.positionY = Math.min(Math.max(0, neueYPosition), maxY);
-    },
-    beendeZiehen() {
-      this.ziehenAktiv = false;
-      window.removeEventListener('pointermove', this.beimZiehen);
-      window.removeEventListener('pointerup', this.beendeZiehen);
-      window.removeEventListener('pointercancel', this.beendeZiehen);
-    },
-    vollbildUmschalten() {
-      this.istVollbild = !this.istVollbild;
-      if (!this.istVollbild) {
-        this.$nextTick(this.stelleSichtbaresFensterSicher);
-      }
-    },
-    stelleSichtbaresFensterSicher() {
-      if (this.istVollbild) {
-        return;
-      }
-
-      const fenster = this.$refs.fensterElement;
-      if (!fenster || this.positionX === null || this.positionY === null) {
-        return;
-      }
-
-      const maxX = Math.max(0, window.innerWidth - fenster.offsetWidth);
-      const maxY = Math.max(0, window.innerHeight - fenster.offsetHeight);
-      this.positionX = Math.min(Math.max(0, this.positionX), maxX);
-      this.positionY = Math.min(Math.max(0, this.positionY), maxY);
-    },
-    beiFensterGroesseGeaendert() {
-      this.$nextTick(this.stelleSichtbaresFensterSicher);
-    },
+    ...window.HTBAH_MODAL_FENSTER.methoden,
     schliessen() {
       this.beendeZiehen();
+      this.beendeResize();
       this.istVollbild = false;
       this.uiZustand.regelwerkOffen = false;
     },
@@ -179,6 +86,12 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
           </div>
         </div>
         <iframe :src="viewerUrl" class="regelwerk-modal-content"></iframe>
+        <div
+          v-if="!istVollbild"
+          class="regelwerk-modal-resize-handle"
+          role="presentation"
+          aria-hidden="true"
+          @pointerdown="starteResize"></div>
       </div>
     </div>
   `,

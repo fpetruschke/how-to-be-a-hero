@@ -106,6 +106,70 @@ const SPEICHER_BEREICHE = {
   },
 };
 
+const DATEN_EXPORT_BEREICHE = [
+  {
+    id: 'appRolle',
+    key: 'htbah_app_rolle',
+    label: 'App-Rolle (Spieler/Spielleitung)',
+  },
+  {
+    id: 'charakter',
+    key: 'htbah_character',
+    label: 'Charakterdaten',
+  },
+  {
+    id: 'charakterbild',
+    key: 'htbah_character_image',
+    label: 'Charakterbild',
+  },
+  {
+    id: 'presets',
+    key: 'htbah_presets',
+    label: 'Fähigkeiten-Presets',
+  },
+  {
+    id: 'spielleiter',
+    key: 'htbah_spielleiter_gruppen',
+    label: 'Spielleiter-Gruppen',
+  },
+  {
+    id: 'zufallstabellen',
+    key: 'htbah_zufallstabellen',
+    label: 'Zufallstabellen',
+  },
+  {
+    id: 'abenteuerbuch',
+    key: 'htbah_spielleitung_abenteuerbuch',
+    label: 'Abenteuerbuch',
+  },
+  {
+    id: 'weltenbau',
+    key: 'htbah_weltenbau',
+    label: 'Weltenbau',
+  },
+  {
+    id: 'theme',
+    key: 'htbah_theme',
+    label: 'Theme-Einstellung',
+  },
+];
+
+function neueBereichsAuswahl(alleBereiche) {
+  const auswahl = {};
+  alleBereiche.forEach((b) => {
+    auswahl[b.id] = true;
+  });
+  return auswahl;
+}
+
+function keineBereichsAuswahl(alleBereiche) {
+  const auswahl = {};
+  alleBereiche.forEach((b) => {
+    auswahl[b.id] = false;
+  });
+  return auswahl;
+}
+
 window.HTBAH_SEITEN.Einstellungen = {
   data() {
     return {
@@ -116,6 +180,14 @@ window.HTBAH_SEITEN.Einstellungen = {
       browserSpeicher: null,
       browserSpeicherFehler: '',
       browserSpeicherLaden: true,
+      statusTyp: 'success',
+      datenExportBereiche: DATEN_EXPORT_BEREICHE,
+      exportAuswahl: neueBereichsAuswahl(DATEN_EXPORT_BEREICHE),
+      importAuswahl: {},
+      importBereicheAusDatei: [],
+      importDateiname: '',
+      exportModalInstanz: null,
+      importModalInstanz: null,
     };
   },
   computed: {
@@ -172,12 +244,31 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
       return 'bg-success';
     },
+    statusAlertKlasse() {
+      return this.statusTyp === 'danger' ? 'alert-danger' : 'alert-success';
+    },
+    hatExportAuswahl() {
+      return this.datenExportBereiche.some((b) => this.exportAuswahl[b.id]);
+    },
+    hatImportAuswahl() {
+      return this.importBereicheAusDatei.some((b) => this.importAuswahl[b.id]);
+    },
+    exportAlleBereicheAusgewaehlt() {
+      const bereiche = this.datenExportBereiche;
+      if (!bereiche.length) {
+        return false;
+      }
+      return bereiche.every((b) => this.exportAuswahl[b.id]);
+    },
+    importAlleBereicheAusgewaehlt() {
+      const bereiche = this.importBereicheAusDatei;
+      if (!bereiche.length) {
+        return false;
+      }
+      return bereiche.every((b) => this.importAuswahl[b.id]);
+    },
   },
   methods: {
-    zurRollenauswahl() {
-      window.HTBAH.speichereAppRolle(null);
-      this.$router.push('/');
-    },
     themeUmschalten() {
       const neuesTheme = this.istHellesTheme ? 'light' : 'dark';
       window.HTBAH.setzeTheme(neuesTheme);
@@ -227,22 +318,193 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
 
       if (Array.isArray(bereich.keys)) {
-        bereich.keys.forEach((k) => localStorage.removeItem(k));
+        window.HTBAH.speicher.loescheKeys(bereich.keys);
       } else {
-        localStorage.removeItem(bereich.key);
+        window.HTBAH.speicher.loescheKey(bereich.key);
       }
 
       if (this.zuLoeschenderBereich === 'theme' || this.zuLoeschenderBereich === 'alles') {
         this.istHellesTheme = false;
         document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
       }
 
-      this.statusMeldung = bereich.erfolg;
+      this.statusAnzeigen(bereich.erfolg, 'success');
 
       if (this.zuLoeschenderBereich === 'alles') {
         this.$router.push('/');
       }
 
+      this.speicherSchaetzungLaden();
+    },
+    statusAnzeigen(text, typ = 'success') {
+      this.statusTyp = typ === 'danger' ? 'danger' : 'success';
+      this.statusMeldung = text;
+    },
+    modalAnzeigen(modalRefName, instanzName) {
+      this.$nextTick(() => {
+        const el = this.$refs[modalRefName];
+        if (!el || !window.bootstrap) {
+          return;
+        }
+        this[instanzName] = window.bootstrap.Modal.getOrCreateInstance(el);
+        this[instanzName].show();
+      });
+    },
+    exportModalOeffnen() {
+      this.exportAuswahl = neueBereichsAuswahl(this.datenExportBereiche);
+      this.modalAnzeigen('exportModalElement', 'exportModalInstanz');
+    },
+    exportStarten() {
+      const ausgewaehlteBereiche = this.datenExportBereiche.filter((b) => this.exportAuswahl[b.id]);
+      if (!ausgewaehlteBereiche.length) {
+        this.statusAnzeigen('Bitte wähle mindestens einen Speicherbereich für den Export aus.', 'danger');
+        return;
+      }
+
+      const daten = ausgewaehlteBereiche.map((bereich) => {
+        const wert = window.HTBAH.speicher.leseText(bereich.key, null);
+        const vorhanden = typeof wert === 'string';
+        return {
+          id: bereich.id,
+          key: bereich.key,
+          label: bereich.label,
+          vorhanden,
+          wert: vorhanden ? wert : null,
+        };
+      });
+
+      const paket = {
+        htbahExportVersion: 1,
+        typ: 'lokaler-speicher',
+        exportiertAm: new Date().toISOString(),
+        daten,
+      };
+
+      const datum = new Date();
+      const yyyy = String(datum.getFullYear());
+      const mm = String(datum.getMonth() + 1).padStart(2, '0');
+      const dd = String(datum.getDate()).padStart(2, '0');
+      window.HTBAH.dateiHerunterladenJson(paket, `htbah-backup-${yyyy}-${mm}-${dd}.json`);
+
+      if (this.exportModalInstanz) {
+        this.exportModalInstanz.hide();
+      }
+      this.statusAnzeigen('Export gestartet: Deine JSON-Datei wird heruntergeladen.');
+    },
+    importDateiWaehlen() {
+      this.importDateiname = '';
+      this.importBereicheAusDatei = [];
+      this.importAuswahl = {};
+      const input = this.$refs.importDateiInput;
+      if (!input) {
+        this.statusAnzeigen('Dateiauswahl ist derzeit nicht verfügbar.', 'danger');
+        return;
+      }
+      input.value = '';
+      input.click();
+    },
+    async importDateiAusgewaehlt(event) {
+      const input = event?.target;
+      const datei = input?.files?.[0];
+      if (!datei) {
+        return;
+      }
+
+      let text = '';
+      try {
+        text = await datei.text();
+      } catch {
+        this.statusAnzeigen('Die ausgewählte Datei konnte nicht gelesen werden.', 'danger');
+        return;
+      }
+
+      let roh;
+      try {
+        roh = JSON.parse(text);
+      } catch {
+        this.statusAnzeigen('Die ausgewählte Datei ist kein gültiges JSON.', 'danger');
+        return;
+      }
+
+      if (!roh || typeof roh !== 'object' || roh.typ !== 'lokaler-speicher' || !Array.isArray(roh.daten)) {
+        this.statusAnzeigen(
+          'Unbekanntes Importformat. Bitte wähle eine Datei aus dem Daten-Export der Einstellungen.',
+          'danger',
+        );
+        return;
+      }
+
+      const bekannteBereiche = new Map(this.datenExportBereiche.map((b) => [b.id, b]));
+      const importBereiche = roh.daten
+        .filter((eintrag) => eintrag && typeof eintrag === 'object' && typeof eintrag.key === 'string')
+        .map((eintrag, index) => {
+          const id =
+            typeof eintrag.id === 'string' && eintrag.id
+              ? eintrag.id
+              : `import_${index}_${eintrag.key}`;
+          const bekannterBereich = bekannteBereiche.get(id);
+          return {
+            id,
+            key: eintrag.key,
+            label:
+              typeof eintrag.label === 'string' && eintrag.label.trim()
+                ? eintrag.label.trim()
+                : bekannterBereich?.label || eintrag.key,
+            vorhanden: Boolean(eintrag.vorhanden),
+            wert: typeof eintrag.wert === 'string' ? eintrag.wert : null,
+          };
+        });
+
+      if (!importBereiche.length) {
+        this.statusAnzeigen('Die JSON-Datei enthält keine importierbaren Speicherbereiche.', 'danger');
+        return;
+      }
+
+      this.importDateiname = datei.name || 'Import-Datei';
+      this.importBereicheAusDatei = importBereiche;
+      this.importAuswahl = neueBereichsAuswahl(importBereiche);
+      this.modalAnzeigen('importModalElement', 'importModalInstanz');
+    },
+    bereicheAuswahlAlleToggle(ziel) {
+      if (ziel === 'export') {
+        const bereiche = this.datenExportBereiche;
+        this.exportAuswahl = this.exportAlleBereicheAusgewaehlt
+          ? keineBereichsAuswahl(bereiche)
+          : neueBereichsAuswahl(bereiche);
+        return;
+      }
+      if (ziel === 'import') {
+        const bereiche = this.importBereicheAusDatei;
+        this.importAuswahl = this.importAlleBereicheAusgewaehlt
+          ? keineBereichsAuswahl(bereiche)
+          : neueBereichsAuswahl(bereiche);
+      }
+    },
+    importStarten() {
+      const ausgewaehlteBereiche = this.importBereicheAusDatei.filter((b) => this.importAuswahl[b.id]);
+      if (!ausgewaehlteBereiche.length) {
+        this.statusAnzeigen('Bitte wähle mindestens einen Speicherbereich für den Import aus.', 'danger');
+        return;
+      }
+
+      ausgewaehlteBereiche.forEach((bereich) => {
+        if (bereich.vorhanden && typeof bereich.wert === 'string') {
+          window.HTBAH.speicher.schreibeText(bereich.key, bereich.wert);
+        } else {
+          window.HTBAH.speicher.loescheKey(bereich.key);
+        }
+      });
+
+      if (ausgewaehlteBereiche.some((b) => b.key === 'htbah_theme')) {
+        window.HTBAH.setzeTheme(window.HTBAH.ladeTheme());
+        this.istHellesTheme = window.HTBAH.ladeTheme() === 'light';
+      }
+
+      if (this.importModalInstanz) {
+        this.importModalInstanz.hide();
+      }
+      this.statusAnzeigen('Import abgeschlossen. Ausgewählte Speicherbereiche wurden übernommen.');
       this.speicherSchaetzungLaden();
     },
   },
@@ -252,17 +514,6 @@ window.HTBAH_SEITEN.Einstellungen = {
   template: `
     <div class="container content py-3 text-center">
       <h4>Einstellungen</h4>
-
-      <h5 class="text-start mb-2">App</h5>
-      <div class="card p-3 mb-3">
-        <icon-text-button
-          class="btn btn-outline-secondary w-100"
-          type="button"
-          icon="swap_horiz"
-          @click="zurRollenauswahl">
-          Zur Rollenauswahl (Startseite)
-        </icon-text-button>
-      </div>
 
       <h5 class="text-start mb-2">Theme</h5>
       <div class="card p-3 mb-3 text-start">
@@ -329,6 +580,36 @@ window.HTBAH_SEITEN.Einstellungen = {
           @click="speicherSchaetzungLaden">
           Aktualisieren
         </icon-text-button>
+      </div>
+
+      <h5 class="text-start mb-2">Daten</h5>
+      <div class="card p-3 mb-3 text-start">
+        <p class="small text-body-secondary mb-2">
+          Exportiere und importiere Deine lokalen Daten als JSON-Datei, um Backups zu erstellen
+          oder Daten über Deine eigene Cloud zwischen Geräten zu synchronisieren.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          <icon-text-button
+            class="btn btn-outline-primary flex-grow-1"
+            type="button"
+            icon="download"
+            @click="exportModalOeffnen">
+            Daten exportieren
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-primary flex-grow-1"
+            type="button"
+            icon="upload_file"
+            @click="importDateiWaehlen">
+            Daten importieren
+          </icon-text-button>
+        </div>
+        <input
+          ref="importDateiInput"
+          class="d-none"
+          type="file"
+          accept=".json,application/json"
+          @change="importDateiAusgewaehlt" />
       </div>
 
       <h5 class="text-start mb-2">Daten löschen</h5>
@@ -419,7 +700,8 @@ window.HTBAH_SEITEN.Einstellungen = {
       <teleport to="body">
         <div
           v-if="statusMeldung"
-          class="htbah-erfolgs-toast alert alert-success alert-dismissible py-2 mb-0 text-center shadow"
+          class="htbah-erfolgs-toast alert alert-dismissible py-2 mb-0 text-center shadow"
+          :class="statusAlertKlasse"
           role="status">
           {{ statusMeldung }}
           <button
@@ -429,6 +711,140 @@ window.HTBAH_SEITEN.Einstellungen = {
             @click="statusMeldung = ''"></button>
         </div>
       </teleport>
+
+      <div
+        ref="exportModalElement"
+        class="modal fade"
+        id="htbahExportModal"
+        tabindex="-1"
+        aria-labelledby="htbahExportModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content shadow">
+            <div class="modal-header">
+              <h5 class="modal-title" id="htbahExportModalLabel">Daten exportieren</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body text-start">
+              <p class="small text-body-secondary mb-2">
+                Wähle die Speicherbereiche für den Export aus.
+              </p>
+              <div class="d-flex justify-content-end mb-2">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-link"
+                  @click="bereicheAuswahlAlleToggle('export')">
+                  {{ exportAlleBereicheAusgewaehlt ? 'Alle abwählen' : 'Alle auswählen' }}
+                </button>
+              </div>
+              <div
+                v-for="bereich in datenExportBereiche"
+                :key="'export-' + bereich.id"
+                class="form-check form-switch mb-2">
+                <input
+                  :id="'export-switch-' + bereich.id"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  v-model="exportAuswahl[bereich.id]" />
+                <label class="form-check-label" :for="'export-switch-' + bereich.id">
+                  {{ bereich.label }}
+                </label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-bs-dismiss="modal">
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="!hatExportAuswahl"
+                @click="exportStarten">
+                Export starten
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        ref="importModalElement"
+        class="modal fade"
+        id="htbahImportModal"
+        tabindex="-1"
+        aria-labelledby="htbahImportModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content shadow">
+            <div class="modal-header">
+              <h5 class="modal-title" id="htbahImportModalLabel">Daten importieren</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body text-start">
+              <p class="small text-body-secondary mb-2">
+                Datei: <strong>{{ importDateiname || 'Unbekannt' }}</strong>
+              </p>
+              <p class="small text-body-secondary mb-2">
+                Wähle die Speicherbereiche aus, die importiert werden sollen.
+              </p>
+              <div class="d-flex justify-content-end mb-2">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-link"
+                  @click="bereicheAuswahlAlleToggle('import')">
+                  {{ importAlleBereicheAusgewaehlt ? 'Alle abwählen' : 'Alle auswählen' }}
+                </button>
+              </div>
+              <div
+                v-for="bereich in importBereicheAusDatei"
+                :key="'import-' + bereich.id"
+                class="form-check form-switch mb-2">
+                <input
+                  :id="'import-switch-' + bereich.id"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  v-model="importAuswahl[bereich.id]" />
+                <label class="form-check-label d-flex align-items-center gap-2" :for="'import-switch-' + bereich.id">
+                  <span>{{ bereich.label }}</span>
+                  <span
+                    v-if="!bereich.vorhanden"
+                    class="badge text-bg-secondary">
+                    Wird gelöscht
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-bs-dismiss="modal">
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="!hatImportAuswahl"
+                @click="importStarten">
+                Import starten
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <bestaetigen-modal ref="bestaetigenModal" />
     </div>

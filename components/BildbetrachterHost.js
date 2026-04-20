@@ -1,11 +1,14 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
-const BB_RESIZE_OBS = new Map();
+const BB_MIN_BREITE = 220;
+const BB_MIN_HOEHE = 160;
 
 window.HTBAH_KOMPONENTEN.BildbetrachterHost = {
   data() {
     return {
-      kopfZiehen: null,
+      ziehenStatus: null,
+      resizeStatus: null,
+      pinchNachFensterId: {},
     };
   },
   computed: {
@@ -13,12 +16,37 @@ window.HTBAH_KOMPONENTEN.BildbetrachterHost = {
       return window.HTBAH.bildbetrachter.fenster;
     },
   },
+  mounted() {
+    window.addEventListener('resize', this.beiFensterGroesseGeaendert);
+  },
   methods: {
     schliessen(id) {
       window.HTBAH.bildbetrachterSchliessen(id);
     },
     fokus(f) {
       window.HTBAH.bildbetrachterNachVorne(f.id);
+    },
+    findeFenster(fensterId) {
+      return window.HTBAH.bildbetrachter.fenster.find((x) => x.id === fensterId);
+    },
+    stelleFensterSichtbar(f) {
+      if (!f || f.fullscreen) {
+        return;
+      }
+      const groesse = window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(
+        f.w,
+        f.h,
+        BB_MIN_BREITE,
+        BB_MIN_HOEHE,
+      );
+      f.w = groesse.breite;
+      f.h = groesse.hoehe;
+      const position = window.HTBAH_MODAL_FENSTER.utils.begrenzePosition(f.x, f.y, f.w, f.h);
+      f.x = position.x;
+      f.y = position.y;
+    },
+    beiFensterGroesseGeaendert() {
+      this.fenster.forEach((f) => this.stelleFensterSichtbar(f));
     },
     fensterStyle(f) {
       if (f.fullscreen) {
@@ -42,34 +70,14 @@ window.HTBAH_KOMPONENTEN.BildbetrachterHost = {
         zIndex: f.zIndex,
         minWidth: '220px',
         minHeight: '160px',
-        resize: 'both',
         overflow: 'hidden',
       };
     },
-    fensterElRef(el, f) {
-      if (!el) {
-        const ro = BB_RESIZE_OBS.get(f.id);
-        if (ro) {
-          ro.disconnect();
-          BB_RESIZE_OBS.delete(f.id);
-        }
-        return;
-      }
-      if (BB_RESIZE_OBS.has(f.id)) {
-        return;
-      }
-      const ro = new ResizeObserver(() => {
-        if (f.fullscreen) {
-          return;
-        }
-        f.w = Math.round(el.offsetWidth);
-        f.h = Math.round(el.offsetHeight);
-      });
-      ro.observe(el);
-      BB_RESIZE_OBS.set(f.id, ro);
-    },
     vollbildToggle(f) {
       f.fullscreen = !f.fullscreen;
+      if (!f.fullscreen) {
+        this.stelleFensterSichtbar(f);
+      }
     },
     rad(f, ev) {
       const step = ev.deltaY > 0 ? -0.1 : 0.1;
@@ -77,6 +85,56 @@ window.HTBAH_KOMPONENTEN.BildbetrachterHost = {
     },
     zoomRelativ(f, delta) {
       f.zoom = Math.min(8, Math.max(0.15, Math.round((f.zoom + delta) * 100) / 100));
+    },
+    touchDistanz(a, b) {
+      const dx = a.clientX - b.clientX;
+      const dy = a.clientY - b.clientY;
+      return Math.hypot(dx, dy);
+    },
+    pinchStart(f, ev) {
+      if (!ev.touches || ev.touches.length !== 2) {
+        return;
+      }
+      const a = ev.touches[0];
+      const b = ev.touches[1];
+      const distanz = this.touchDistanz(a, b);
+      if (!distanz) {
+        return;
+      }
+      this.fokus(f);
+      this.pinchNachFensterId[f.id] = {
+        startDistanz: distanz,
+        startZoom: f.zoom,
+      };
+      ev.preventDefault();
+    },
+    pinchMove(f, ev) {
+      if (!ev.touches || ev.touches.length !== 2) {
+        return;
+      }
+      const zustand = this.pinchNachFensterId[f.id];
+      if (!zustand) {
+        this.pinchStart(f, ev);
+        return;
+      }
+      const a = ev.touches[0];
+      const b = ev.touches[1];
+      const distanz = this.touchDistanz(a, b);
+      if (!distanz || !zustand.startDistanz) {
+        return;
+      }
+      const faktor = distanz / zustand.startDistanz;
+      const neuerZoom = zustand.startZoom * faktor;
+      f.zoom = Math.min(8, Math.max(0.15, Math.round(neuerZoom * 100) / 100));
+      ev.preventDefault();
+    },
+    pinchEnd(f, ev) {
+      if (ev.touches && ev.touches.length >= 2) {
+        return;
+      }
+      if (this.pinchNachFensterId[f.id]) {
+        delete this.pinchNachFensterId[f.id];
+      }
     },
     zoomReset(f) {
       f.zoom = 1;
@@ -102,43 +160,133 @@ window.HTBAH_KOMPONENTEN.BildbetrachterHost = {
         display: 'block',
       };
     },
-    kopfMausRunter(f, ev) {
+    kopfPointerRunter(f, ev) {
       if (f.fullscreen) {
         return;
       }
+      if (ev.pointerType === 'mouse' && ev.button !== 0) {
+        return;
+      }
+      if (ev.target.closest('button, a, input, select, textarea, label')) {
+        return;
+      }
       this.fokus(f);
-      this.kopfZiehen = {
+      this.ziehenStatus = {
         id: f.id,
-        sx: ev.clientX,
-        sy: ev.clientY,
-        ox: f.x,
-        oy: f.y,
+        pointerId: ev.pointerId,
+        startX: ev.clientX,
+        startY: ev.clientY,
+        originX: f.x,
+        originY: f.y,
       };
-      document.addEventListener('mousemove', this.kopfMausBewegen);
-      document.addEventListener(
-        'mouseup',
-        () => {
-          document.removeEventListener('mousemove', this.kopfMausBewegen);
-          this.kopfZiehen = null;
-        },
-        { once: true },
-      );
+      window.addEventListener('pointermove', this.beimZiehenPointer);
+      window.addEventListener('pointerup', this.beendeZiehenPointer);
+      window.addEventListener('pointercancel', this.beendeZiehenPointer);
+      ev.preventDefault();
     },
-    kopfMausBewegen(ev) {
-      const z = this.kopfZiehen;
+    beimZiehenPointer(ev) {
+      const z = this.ziehenStatus;
       if (!z) {
         return;
       }
-      const f = window.HTBAH.bildbetrachter.fenster.find((x) => x.id === z.id);
+      if (z.pointerId !== undefined && ev.pointerId !== z.pointerId) {
+        return;
+      }
+      const f = this.findeFenster(z.id);
       if (!f || f.fullscreen) {
         return;
       }
-      f.x = z.ox + (ev.clientX - z.sx);
-      f.y = z.oy + (ev.clientY - z.sy);
+      const neueX = z.originX + (ev.clientX - z.startX);
+      const neueY = z.originY + (ev.clientY - z.startY);
+      const position = window.HTBAH_MODAL_FENSTER.utils.begrenzePosition(neueX, neueY, f.w, f.h);
+      f.x = position.x;
+      f.y = position.y;
+    },
+    beendeZiehenPointer(ev) {
+      if (!this.ziehenStatus) {
+        return;
+      }
+      if (
+        ev &&
+        this.ziehenStatus.pointerId !== undefined &&
+        ev.pointerId !== this.ziehenStatus.pointerId
+      ) {
+        return;
+      }
+      this.ziehenStatus = null;
+      window.removeEventListener('pointermove', this.beimZiehenPointer);
+      window.removeEventListener('pointerup', this.beendeZiehenPointer);
+      window.removeEventListener('pointercancel', this.beendeZiehenPointer);
+    },
+    resizePointerRunter(f, ev) {
+      if (f.fullscreen) {
+        return;
+      }
+      if (ev.pointerType === 'mouse' && ev.button !== 0) {
+        return;
+      }
+      this.fokus(f);
+      this.resizeStatus = {
+        id: f.id,
+        pointerId: ev.pointerId,
+        startX: ev.clientX,
+        startY: ev.clientY,
+        startBreite: f.w,
+        startHoehe: f.h,
+      };
+      window.addEventListener('pointermove', this.beimResizePointer);
+      window.addEventListener('pointerup', this.beendeResizePointer);
+      window.addEventListener('pointercancel', this.beendeResizePointer);
+      ev.preventDefault();
+      ev.stopPropagation();
+    },
+    beimResizePointer(ev) {
+      const r = this.resizeStatus;
+      if (!r) {
+        return;
+      }
+      if (r.pointerId !== undefined && ev.pointerId !== r.pointerId) {
+        return;
+      }
+      const f = this.findeFenster(r.id);
+      if (!f || f.fullscreen) {
+        return;
+      }
+      const neueBreite = r.startBreite + (ev.clientX - r.startX);
+      const neueHoehe = r.startHoehe + (ev.clientY - r.startY);
+      const groesse = window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(
+        neueBreite,
+        neueHoehe,
+        BB_MIN_BREITE,
+        BB_MIN_HOEHE,
+      );
+      f.w = groesse.breite;
+      f.h = groesse.hoehe;
+      const position = window.HTBAH_MODAL_FENSTER.utils.begrenzePosition(f.x, f.y, f.w, f.h);
+      f.x = position.x;
+      f.y = position.y;
+    },
+    beendeResizePointer(ev) {
+      if (!this.resizeStatus) {
+        return;
+      }
+      if (
+        ev &&
+        this.resizeStatus.pointerId !== undefined &&
+        ev.pointerId !== this.resizeStatus.pointerId
+      ) {
+        return;
+      }
+      this.resizeStatus = null;
+      window.removeEventListener('pointermove', this.beimResizePointer);
+      window.removeEventListener('pointerup', this.beendeResizePointer);
+      window.removeEventListener('pointercancel', this.beendeResizePointer);
     },
   },
   beforeUnmount() {
-    document.removeEventListener('mousemove', this.kopfMausBewegen);
+    this.beendeZiehenPointer();
+    this.beendeResizePointer();
+    window.removeEventListener('resize', this.beiFensterGroesseGeaendert);
   },
   template: `
     <teleport to="body">
@@ -148,12 +296,11 @@ window.HTBAH_KOMPONENTEN.BildbetrachterHost = {
           :key="f.id"
           class="htbah-bb-fenster card shadow d-flex flex-column"
           :class="{ 'htbah-bb-fenster-fs': f.fullscreen }"
-          :ref="(el) => fensterElRef(el, f)"
           :style="fensterStyle(f)"
-          @mousedown="fokus(f)">
+          @pointerdown="fokus(f)">
           <div
             class="htbah-bb-kopf card-header py-1 px-2 d-flex align-items-center gap-1 flex-wrap"
-            @mousedown.stop="kopfMausRunter(f, $event)">
+            @pointerdown.stop="kopfPointerRunter(f, $event)">
             <span class="material-symbols-outlined htbah-bb-griff" aria-hidden="true">drag_pan</span>
             <span class="text-truncate flex-grow-1 small mb-0" :title="f.titel">{{ f.titel }}</span>
             <div class="btn-group btn-group-sm" role="group" aria-label="Zoom">
@@ -210,9 +357,19 @@ window.HTBAH_KOMPONENTEN.BildbetrachterHost = {
                 :alt="f.titel"
                 draggable="false"
                 :style="imgStyle(f)"
+                @touchstart="pinchStart(f, $event)"
+                @touchmove="pinchMove(f, $event)"
+                @touchend="pinchEnd(f, $event)"
+                @touchcancel="pinchEnd(f, $event)"
                 @load="onImgLoad(f, $event)" />
             </div>
           </div>
+          <div
+            v-if="!f.fullscreen"
+            class="regelwerk-modal-resize-handle htbah-bb-resize-handle"
+            role="presentation"
+            aria-hidden="true"
+            @pointerdown="resizePointerRunter(f, $event)"></div>
         </div>
       </div>
     </teleport>

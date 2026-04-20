@@ -23,6 +23,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       zeileQuillSession: 0,
       zeileModalInstanz: null,
       zuLoeschendeZeile: null,
+      zufallNpcEpoche: 'mittelalter',
       zufallGegenstandEpoche: 'mittelalter',
       zufallGegenstandKleidung: true,
       zufallFraktionEpoche: 'mittelalter',
@@ -66,6 +67,30 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     textVorschau(html) {
       return htbahTextVorschau(html);
     },
+    npcWaffenWerteText(row) {
+      const schadenswert = String(row && row.schadenswert ? row.schadenswert : '').trim();
+      const kampfart = row && row.kampfart === 'fernkampf' ? 'Fernkampf' : 'Nahkampf';
+      if (!schadenswert) {
+        return '—';
+      }
+      return `Schaden ${schadenswert} · ${kampfart}`;
+    },
+    gegenstandWaffenWerteText(row) {
+      if (!row || !row.istWaffe) {
+        return '—';
+      }
+      const schadenswert = String(row.schadenswert || '').trim();
+      let kampfLabel = 'Nahkampf';
+      if (row.kampfart === 'fernkampf') {
+        kampfLabel = 'Fernkampf';
+      } else if (row.kampfart === 'sonstiges') {
+        kampfLabel = 'Sonstiges';
+      }
+      if (!schadenswert) {
+        return kampfLabel;
+      }
+      return `Schaden ${schadenswert} · ${kampfLabel}`;
+    },
     npcLeer() {
       return {
         id: window.HTBAH.neueEntropieId(),
@@ -78,6 +103,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         gesinnung: '',
         beruf: '',
         ziel: '',
+        stimme: '',
+        lebenspunkte: '',
+        waffe: '',
+        schadenswert: '',
+        kampfart: 'nahkampf',
+        aufenthaltsort: '',
         notizenHtml: '',
       };
     },
@@ -96,6 +127,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         id: window.HTBAH.neueEntropieId(),
         name: '',
         beschreibungHtml: '',
+        istWaffe: false,
+        schadenswert: '',
+        kampfart: 'nahkampf',
       };
     },
     fraktionLeer() {
@@ -297,7 +331,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const typ = this.bearbeitung.typ;
       let felder;
       if (typ === 'npc') {
-        felder = G.npc();
+        const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
+        felder = G.npc({ epoche: this.zufallNpcEpoche, orteNamen });
       } else if (typ === 'ort') {
         felder = G.ort();
       } else if (typ === 'fraktion') {
@@ -416,120 +451,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
 
       <div class="card mb-3 text-start">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">NPCs</span>
-          <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('npcs')">
-              Leeren
-            </button>
-            <icon-text-button
-              type="button"
-              class="btn btn-sm btn-outline-primary flex-shrink-0"
-              icon="add"
-              @click="npcHinzufuegen"
-              aria-label="Eintrag hinzufügen">
-              Hinzufügen
-            </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm table-striped mb-0 align-middle">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Spitzname</th>
-                  <th>Geschlecht</th>
-                  <th>Alter</th>
-                  <th>Familienstand</th>
-                  <th>Statur</th>
-                  <th>Gesinnung</th>
-                  <th>Beruf</th>
-                  <th>Ziel</th>
-                  <th>Notizen</th>
-                  <th class="text-end text-nowrap">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!zustand.npcs.length">
-                  <td colspan="11" class="text-secondary text-center py-3">Noch keine Einträge.</td>
-                </tr>
-                <tr v-for="(row, index) in zustand.npcs" :key="row.id">
-                  <td>{{ row.name || '—' }}</td>
-                  <td>{{ row.spitzname || '—' }}</td>
-                  <td>{{ row.geschlecht || '—' }}</td>
-                  <td>{{ row.alter || '—' }}</td>
-                  <td>{{ row.familienstand || '—' }}</td>
-                  <td>{{ row.statur || '—' }}</td>
-                  <td>{{ row.gesinnung || '—' }}</td>
-                  <td>{{ row.beruf || '—' }}</td>
-                  <td>{{ row.ziel || '—' }}</td>
-                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
-                  <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="npcBearbeiten(row, index)">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('npc', row.id)">
-                      Löschen
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">Gegenstände</span>
-          <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('gegenstaende')">
-              Leeren
-            </button>
-            <icon-text-button
-              type="button"
-              class="btn btn-sm btn-outline-primary flex-shrink-0"
-              icon="add"
-              @click="gegenstandHinzufuegen"
-              aria-label="Eintrag hinzufügen">
-              Hinzufügen
-            </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm table-striped mb-0 align-middle">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Beschreibung</th>
-                  <th class="text-end text-nowrap">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!zustand.gegenstaende.length">
-                  <td colspan="3" class="text-secondary text-center py-3">Noch keine Einträge.</td>
-                </tr>
-                <tr v-for="(row, index) in zustand.gegenstaende" :key="row.id">
-                  <td>{{ row.name || '—' }}</td>
-                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
-                  <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="gegenstandBearbeiten(row, index)">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">
-                      Löschen
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
           <span class="fw-semibold">Orte</span>
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('orte')">
@@ -573,6 +494,132 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                       Bearbeiten
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('ort', row.id)">
+                      Löschen
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3 text-start">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold">NPCs</span>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('npcs')">
+              Leeren
+            </button>
+            <icon-text-button
+              type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0"
+              icon="add"
+              @click="npcHinzufuegen"
+              aria-label="Eintrag hinzufügen">
+              Hinzufügen
+            </icon-text-button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Spitzname</th>
+                  <th>Geschlecht</th>
+                  <th>Alter</th>
+                  <th>Familienstand</th>
+                  <th>Statur</th>
+                  <th>LP</th>
+                  <th>Gesinnung</th>
+                  <th>Beruf</th>
+                  <th>Aufenthaltsort</th>
+                  <th>Ziel</th>
+                  <th>Stimme</th>
+                  <th>Waffe</th>
+                  <th>Werte</th>
+                  <th>Notizen</th>
+                  <th class="text-end text-nowrap">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!zustand.npcs.length">
+                  <td colspan="16" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                </tr>
+                <tr v-for="(row, index) in zustand.npcs" :key="row.id">
+                  <td>{{ row.name || '—' }}</td>
+                  <td>{{ row.spitzname || '—' }}</td>
+                  <td>{{ row.geschlecht || '—' }}</td>
+                  <td>{{ row.alter || '—' }}</td>
+                  <td>{{ row.familienstand || '—' }}</td>
+                  <td>{{ row.statur || '—' }}</td>
+                  <td>{{ row.lebenspunkte || '—' }}</td>
+                  <td>{{ row.gesinnung || '—' }}</td>
+                  <td>{{ row.beruf || '—' }}</td>
+                  <td>{{ row.aufenthaltsort || '—' }}</td>
+                  <td>{{ row.ziel || '—' }}</td>
+                  <td>{{ row.stimme || '—' }}</td>
+                  <td>{{ row.waffe || '—' }}</td>
+                  <td class="small">{{ npcWaffenWerteText(row) }}</td>
+                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
+                  <td class="text-end text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="npcBearbeiten(row, index)">
+                      Bearbeiten
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('npc', row.id)">
+                      Löschen
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3 text-start">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold">Gegenstände</span>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('gegenstaende')">
+              Leeren
+            </button>
+            <icon-text-button
+              type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0"
+              icon="add"
+              @click="gegenstandHinzufuegen"
+              aria-label="Eintrag hinzufügen">
+              Hinzufügen
+            </icon-text-button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Kampfwerte</th>
+                  <th>Beschreibung</th>
+                  <th class="text-end text-nowrap">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!zustand.gegenstaende.length">
+                  <td colspan="4" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                </tr>
+                <tr v-for="(row, index) in zustand.gegenstaende" :key="row.id">
+                  <td>{{ row.name || '—' }}</td>
+                  <td class="small text-nowrap">{{ gegenstandWaffenWerteText(row) }}</td>
+                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
+                  <td class="text-end text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="gegenstandBearbeiten(row, index)">
+                      Bearbeiten
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">
                       Löschen
                     </button>
                   </td>
@@ -718,6 +765,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             </div>
             <div class="modal-body text-start" v-if="bearbeitung">
               <template v-if="bearbeitung.typ === 'npc'">
+                <div class="row g-2 mb-2 align-items-end" v-if="bearbeitungIndex < 0">
+                  <div class="col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zfn-epoche">Epoche für Zufallsvorschlag</label>
+                    <select id="zfn-epoche" class="form-select form-select-sm" v-model="zufallNpcEpoche">
+                      <option value="mittelalter">Mittelalter</option>
+                      <option value="gegenwart">Gegenwart</option>
+                      <option value="zukunft">Zukunft</option>
+                    </select>
+                  </div>
+                </div>
                 <div class="row g-2">
                   <div class="col-md-6">
                     <div class="form-floating">
@@ -757,6 +814,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   </div>
                   <div class="col-md-6">
                     <div class="form-floating">
+                      <input
+                        id="zfn-lp"
+                        class="form-control"
+                        v-model="bearbeitung.zeile.lebenspunkte"
+                        placeholder=" "
+                        inputmode="numeric"
+                        autocomplete="off" />
+                      <label for="zfn-lp">Lebenspunkte</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
                       <input id="zfn-gesinnung" class="form-control" v-model="bearbeitung.zeile.gesinnung" placeholder=" " />
                       <label for="zfn-gesinnung">Gesinnung</label>
                     </div>
@@ -769,9 +838,47 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   </div>
                   <div class="col-12">
                     <div class="form-floating">
+                      <input
+                        id="zfn-aufenthaltsort"
+                        class="form-control"
+                        v-model="bearbeitung.zeile.aufenthaltsort"
+                        placeholder=" "
+                        autocomplete="off" />
+                      <label for="zfn-aufenthaltsort">Aufenthaltsort</label>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-floating">
                       <input id="zfn-ziel" class="form-control" v-model="bearbeitung.zeile.ziel" placeholder=" " />
                       <label for="zfn-ziel">Ziel (z. B. Wohlstand, Lebenswandel)</label>
                     </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zfn-stimme" class="form-control" v-model="bearbeitung.zeile.stimme" placeholder=" " />
+                      <label for="zfn-stimme">Stimme</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zfn-waffe" class="form-control" v-model="bearbeitung.zeile.waffe" placeholder=" " />
+                      <label for="zfn-waffe">Waffe</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zfn-schaden" class="form-control" v-model="bearbeitung.zeile.schadenswert" placeholder=" " />
+                      <label for="zfn-schaden">Schadenswert</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zfn-kampfart">Kampfart</label>
+                    <select id="zfn-kampfart" class="form-select" v-model="bearbeitung.zeile.kampfart">
+                      <option value="nahkampf">Nahkampf</option>
+                      <option value="fernkampf">Fernkampf</option>
+                    </select>
                   </div>
                 </div>
               </template>
@@ -923,6 +1030,31 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="form-floating mb-3">
                   <input id="zfg-name" class="form-control" v-model="bearbeitung.zeile.name" placeholder=" " />
                   <label for="zfg-name">Name</label>
+                </div>
+                <div class="form-check mb-3">
+                  <input id="zfg-waffe" class="form-check-input" type="checkbox" v-model="bearbeitung.zeile.istWaffe" />
+                  <label class="form-check-label" for="zfg-waffe">Waffe</label>
+                </div>
+                <div class="row g-2 mb-1 align-items-end" v-if="bearbeitung.zeile.istWaffe">
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input
+                        id="zfg-schaden"
+                        class="form-control"
+                        v-model="bearbeitung.zeile.schadenswert"
+                        placeholder=" "
+                        autocomplete="off" />
+                      <label for="zfg-schaden">Schadenswert (z. B. 2W10+1)</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zfg-kampfart">Kampfart</label>
+                    <select id="zfg-kampfart" class="form-select" v-model="bearbeitung.zeile.kampfart">
+                      <option value="nahkampf">Nahkampf</option>
+                      <option value="fernkampf">Fernkampf</option>
+                      <option value="sonstiges">Sonstiges / andere</option>
+                    </select>
+                  </div>
                 </div>
               </template>
 

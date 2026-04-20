@@ -77,26 +77,24 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         Gruppen anlegen und verwalten. In der Gruppenansicht importierst du Charakterblätter und bearbeitest sie.
       </p>
 
-      <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
-        <div class="flex-grow-1" style="min-width: 12rem;">
-          <div class="form-floating">
-            <input
-              id="sl-uebersicht-neue-gruppe-name"
-              type="text"
-              class="form-control"
-              v-model="neueGruppeNameEntwurf"
-              placeholder=" "
-              autocomplete="off" />
-            <label for="sl-uebersicht-neue-gruppe-name">Name (optional)</label>
-          </div>
+      <div class="input-group mb-3">
+        <div class="form-floating flex-grow-1" style="min-width: 12rem;">
+          <input
+            id="sl-uebersicht-neue-gruppe-name"
+            type="text"
+            class="form-control"
+            v-model="neueGruppeNameEntwurf"
+            placeholder=" "
+            autocomplete="off" />
+          <label for="sl-uebersicht-neue-gruppe-name">Name (optional)</label>
         </div>
-        <button type="button" class="btn btn-primary" @click="neueGruppe">
-          Neue Gruppe
-        </button>
+        <icon-text-button class="btn-primary" icon="add" @click="neueGruppe">
+          Hinzufügen
+        </icon-text-button>
       </div>
 
       <div v-if="!zustand.gruppen.length" class="alert alert-secondary mb-0">
-        Noch keine Gruppe — oben „Neue Gruppe“ anlegen.
+        Noch keine Gruppe — oben „Hinzufügen“ nutzen.
       </div>
 
       <div v-else class="table-responsive rounded border">

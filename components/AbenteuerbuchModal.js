@@ -4,26 +4,14 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
   props: ['uiZustand'],
   data() {
     return {
-      istVollbild: false,
-      positionX: null,
-      positionY: null,
-      ziehenAktiv: false,
-      ziehOffsetX: 0,
-      ziehOffsetY: 0,
+      ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
       quill: null,
       speichernTimer: null,
     };
   },
   computed: {
     fensterStil() {
-      if (this.istVollbild || this.positionX === null || this.positionY === null) {
-        return {};
-      }
-
-      return {
-        left: `${this.positionX}px`,
-        top: `${this.positionY}px`,
-      };
+      return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this);
     },
     vollbildIcon() {
       return this.istVollbild ? 'close_fullscreen' : 'open_in_full';
@@ -43,6 +31,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       }
 
       this.beendeZiehen();
+      this.beendeResize();
       this.istVollbild = false;
       this.speichernFlushen();
       this.quill = null;
@@ -55,6 +44,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
   beforeUnmount() {
     this.beiSeiteVerlassen();
     this.beendeZiehen();
+    this.beendeResize();
     if (this.speichernTimer) {
       window.clearTimeout(this.speichernTimer);
     }
@@ -62,99 +52,16 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
     window.removeEventListener('pagehide', this.beiSeiteVerlassen);
   },
   methods: {
+    ...window.HTBAH_MODAL_FENSTER.methoden,
     oeffnen() {
       this.uiZustand.abenteuerbuchOffen = true;
     },
     schliessen() {
       this.speichernFlushen();
       this.beendeZiehen();
+      this.beendeResize();
       this.istVollbild = false;
       this.uiZustand.abenteuerbuchOffen = false;
-    },
-    initialisierePosition() {
-      const fenster = this.$refs.fensterElement;
-      if (!fenster || this.positionX !== null || this.positionY !== null) {
-        this.stelleSichtbaresFensterSicher();
-        return;
-      }
-
-      const startX = window.innerWidth * 0.05;
-      const startY = window.innerHeight * 0.05;
-      const maxX = Math.max(0, window.innerWidth - fenster.offsetWidth);
-      const maxY = Math.max(0, window.innerHeight - fenster.offsetHeight);
-      this.positionX = Math.min(startX, maxX);
-      this.positionY = Math.min(startY, maxY);
-    },
-    starteZiehen(event) {
-      if (this.istVollbild || event.target.closest('button, a')) {
-        return;
-      }
-
-      if (event.pointerType === 'mouse' && event.button !== 0) {
-        return;
-      }
-
-      const fenster = this.$refs.fensterElement;
-      if (!fenster) {
-        return;
-      }
-
-      const rechteck = fenster.getBoundingClientRect();
-      this.ziehenAktiv = true;
-      this.ziehOffsetX = event.clientX - rechteck.left;
-      this.ziehOffsetY = event.clientY - rechteck.top;
-
-      window.addEventListener('pointermove', this.beimZiehen);
-      window.addEventListener('pointerup', this.beendeZiehen);
-      window.addEventListener('pointercancel', this.beendeZiehen);
-      event.preventDefault();
-    },
-    beimZiehen(event) {
-      if (!this.ziehenAktiv || this.istVollbild) {
-        return;
-      }
-
-      const fenster = this.$refs.fensterElement;
-      if (!fenster) {
-        return;
-      }
-
-      const maxX = Math.max(0, window.innerWidth - fenster.offsetWidth);
-      const maxY = Math.max(0, window.innerHeight - fenster.offsetHeight);
-      const neueXPosition = event.clientX - this.ziehOffsetX;
-      const neueYPosition = event.clientY - this.ziehOffsetY;
-      this.positionX = Math.min(Math.max(0, neueXPosition), maxX);
-      this.positionY = Math.min(Math.max(0, neueYPosition), maxY);
-    },
-    beendeZiehen() {
-      this.ziehenAktiv = false;
-      window.removeEventListener('pointermove', this.beimZiehen);
-      window.removeEventListener('pointerup', this.beendeZiehen);
-      window.removeEventListener('pointercancel', this.beendeZiehen);
-    },
-    vollbildUmschalten() {
-      this.istVollbild = !this.istVollbild;
-      if (!this.istVollbild) {
-        this.$nextTick(this.stelleSichtbaresFensterSicher);
-      }
-    },
-    stelleSichtbaresFensterSicher() {
-      if (this.istVollbild) {
-        return;
-      }
-
-      const fenster = this.$refs.fensterElement;
-      if (!fenster || this.positionX === null || this.positionY === null) {
-        return;
-      }
-
-      const maxX = Math.max(0, window.innerWidth - fenster.offsetWidth);
-      const maxY = Math.max(0, window.innerHeight - fenster.offsetHeight);
-      this.positionX = Math.min(Math.max(0, this.positionX), maxX);
-      this.positionY = Math.min(Math.max(0, this.positionY), maxY);
-    },
-    beiFensterGroesseGeaendert() {
-      this.$nextTick(this.stelleSichtbaresFensterSicher);
     },
     beiSeiteVerlassen() {
       if (this.speichernTimer) {
@@ -239,6 +146,12 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
           <small class="text-muted mb-0">Wird automatisch im Browser gespeichert.</small>
           <button type="button" class="btn btn-sm btn-primary" @click="schliessen">Schließen</button>
         </div>
+        <div
+          v-if="!istVollbild"
+          class="regelwerk-modal-resize-handle"
+          role="presentation"
+          aria-hidden="true"
+          @pointerdown="starteResize"></div>
       </div>
     </div>
   `,

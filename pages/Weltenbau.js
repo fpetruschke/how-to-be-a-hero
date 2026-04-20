@@ -1,6 +1,97 @@
 window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
 
-const WATABOU_URL = 'https://watabou.github.io/';
+const WELTENBAU_GENERATOREN = [
+  {
+    id: 'realm',
+    titel: '🗺️ Regionenkarte',
+    startUrl: 'https://watabou.github.io/perilous-shores',
+    sourceUrl: 'https://watabou.github.io/perilous-shores',
+  },
+  {
+    id: 'city',
+    titel: '🏙️ Stadt',
+    startUrl: 'https://watabou.github.io/city-generator',
+    sourceUrl: 'https://watabou.github.io/city-generator',
+  },
+  {
+    id: 'village',
+    titel: '🏘️ Dorf',
+    startUrl: 'https://watabou.github.io/village-generator',
+    sourceUrl: 'https://watabou.github.io/village-generator',
+  },
+  {
+    id: 'cave_glade',
+    titel: '🪨 Höhle/Lichtung',
+    startUrl: 'https://watabou.github.io/cave-generator',
+    sourceUrl: 'https://watabou.github.io/cave-generator',
+  },
+  {
+    id: 'dungeon',
+    titel: '🧱 Dungeon',
+    startUrl: 'https://watabou.github.io/one-page-dungeon',
+    sourceUrl: 'https://watabou.github.io/one-page-dungeon',
+  },
+  {
+    id: 'dwelling',
+    titel: '🏠 Wohnhaus',
+    startUrl: 'https://watabou.github.io/dwellings',
+    sourceUrl: 'https://watabou.github.io/dwellings',
+  },
+  {
+    id: 'pub',
+    titel: '🍺 Kneipe',
+    startUrl: 'https://html-classic.itch.zone/html/17194867/bin/index.html',
+    sourceUrl: 'https://html-classic.itch.zone/html/17194867/bin/index.html',
+  },
+  {
+    id: 'neighbourhood',
+    titel: '🏡 Nachbarschaft',
+    startUrl: 'https://html-classic.itch.zone/html/11441280/bin/index.html',
+    sourceUrl: 'https://html-classic.itch.zone/html/11441280/bin/index.html',
+  },
+  {
+    id: 'sailingboats',
+    titel: '⛵ Segelboote',
+    startUrl: 'https://html-classic.itch.zone/html/12857986/bin/index.html',
+    sourceUrl: 'https://html-classic.itch.zone/html/12857986/bin/index.html',
+  },
+  {
+    id: 'lighthouse',
+    titel: '🌊 Leuchtturm',
+    startUrl: 'https://html-classic.itch.zone/html/7028426/bin/index.html',
+    sourceUrl: 'https://html-classic.itch.zone/html/7028426/bin/index.html',
+  },
+  {
+    id: 'rune_alphabet',
+    titel: 'ᚱ Runen-Alphabet',
+    startUrl: 'https://html-classic.itch.zone/html/7102972/bin/index.html?v=1732313668',
+    sourceUrl: 'https://html-classic.itch.zone/html/7102972/bin/index.html?v=1732313668',
+  },
+];
+
+function istHttpUrl(text) {
+  if (typeof text !== 'string') {
+    return false;
+  }
+  return /^https?:\/\//i.test(text.trim());
+}
+
+function normalisiereGeneratorUrlMap(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return {};
+  }
+  const map = {};
+  Object.entries(roh).forEach(([id, url]) => {
+    if (typeof id !== 'string' || !id || typeof url !== 'string') {
+      return;
+    }
+    const t = url.trim();
+    if (istHttpUrl(t)) {
+      map[id] = t;
+    }
+  });
+  return map;
+}
 
 /** Rohdatei-Limit vor dem Laden (Browser- & Speicher-Schutz). */
 const WELTENBAU_MAX_ROH_DATEI_BYTES = 40 * 1024 * 1024;
@@ -31,12 +122,38 @@ window.HTBAH_SEITEN.Weltenbau = {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
   },
   data() {
+    const zustandRoh = window.HTBAH.ladeWeltenbauZustand();
+    const zustand = {
+      version: 2,
+      eintraege: Array.isArray(zustandRoh && zustandRoh.eintraege) ? zustandRoh.eintraege : [],
+      generatorUrls: normalisiereGeneratorUrlMap(zustandRoh && zustandRoh.generatorUrls),
+    };
     return {
-      watabouUrl: WATABOU_URL,
-      zustand: window.HTBAH.ladeWeltenbauZustand(),
+      generatoren: WELTENBAU_GENERATOREN,
+      zustand,
       statusMeldung: '',
       statusTyp: 'success',
       importWarteschlange: [],
+      generatorModal: {
+        offen: false,
+        generatorId: '',
+        titel: '',
+        sourceUrl: '',
+        iframeUrl: '',
+        istVollbild: false,
+        positionX: null,
+        positionY: null,
+        breite: null,
+        hoehe: null,
+        ziehenAktiv: false,
+        ziehOffsetX: 0,
+        ziehOffsetY: 0,
+        resizeAktiv: false,
+        resizeStartX: 0,
+        resizeStartY: 0,
+        resizeStartBreite: 0,
+        resizeStartHoehe: 0,
+      },
     };
   },
   computed: {
@@ -66,6 +183,32 @@ window.HTBAH_SEITEN.Weltenbau = {
     maxRohDateiHuman() {
       return formatBytes(WELTENBAU_MAX_ROH_DATEI_BYTES);
     },
+    generatorModalStil() {
+      if (
+        this.generatorModal.istVollbild ||
+        this.generatorModal.positionX === null ||
+        this.generatorModal.positionY === null
+      ) {
+        return {};
+      }
+      const stil = {
+        left: `${this.generatorModal.positionX}px`,
+        top: `${this.generatorModal.positionY}px`,
+      };
+      if (this.generatorModal.breite !== null) {
+        stil.width = `${this.generatorModal.breite}px`;
+      }
+      if (this.generatorModal.hoehe !== null) {
+        stil.height = `${this.generatorModal.hoehe}px`;
+      }
+      return stil;
+    },
+    generatorVollbildIcon() {
+      return this.generatorModal.istVollbild ? 'close_fullscreen' : 'open_in_full';
+    },
+    generatorVollbildLabel() {
+      return this.generatorModal.istVollbild ? 'Vollbild beenden' : 'Vollbild';
+    },
   },
   methods: {
     persist() {
@@ -80,6 +223,264 @@ window.HTBAH_SEITEN.Weltenbau = {
         this.statusTyp = 'success';
       }, 7200);
     },
+    persistGeneratorUrl(generatorId, url) {
+      if (typeof generatorId !== 'string' || !generatorId || !istHttpUrl(url)) {
+        return;
+      }
+      const neu = normalisiereGeneratorUrlMap({
+        ...this.zustand.generatorUrls,
+        [generatorId]: url.trim(),
+      });
+      this.zustand = {
+        ...this.zustand,
+        version: 2,
+        generatorUrls: neu,
+      };
+      this.persist();
+    },
+    gespeicherteGeneratorUrl(generator) {
+      if (!generator || typeof generator.id !== 'string') {
+        return '';
+      }
+      const gespeicherte = this.zustand.generatorUrls && this.zustand.generatorUrls[generator.id];
+      if (istHttpUrl(gespeicherte)) {
+        return gespeicherte.trim();
+      }
+      return generator.startUrl;
+    },
+    oeffneGeneratorModal(generator) {
+      if (!generator || !generator.id) {
+        return;
+      }
+      const startUrl = this.gespeicherteGeneratorUrl(generator);
+      this.generatorModal.offen = true;
+      this.generatorModal.generatorId = generator.id;
+      this.generatorModal.titel = generator.titel;
+      this.generatorModal.sourceUrl = generator.sourceUrl;
+      this.generatorModal.iframeUrl = startUrl;
+      this.generatorModal.istVollbild = false;
+      this.beendeGeneratorZiehen();
+      this.beendeGeneratorResize();
+      this.$nextTick(() => this.initialisiereGeneratorFenster());
+      this.persistGeneratorUrl(generator.id, startUrl);
+    },
+    schliesseGeneratorModal() {
+      this.beendeGeneratorZiehen();
+      this.beendeGeneratorResize();
+      this.generatorModal.offen = false;
+      this.generatorModal.istVollbild = false;
+    },
+    generatorNeuLaden() {
+      if (!this.generatorModal.offen || !istHttpUrl(this.generatorModal.iframeUrl)) {
+        return;
+      }
+      const frame = this.$refs.generatorIframe;
+      if (frame) {
+        frame.src = this.generatorModal.iframeUrl;
+      }
+    },
+    generatorInNeuemTab() {
+      if (!istHttpUrl(this.generatorModal.iframeUrl)) {
+        return;
+      }
+      window.open(this.generatorModal.iframeUrl, '_blank', 'noopener,noreferrer');
+    },
+    onGeneratorIframeLoad() {
+      const frame = this.$refs.generatorIframe;
+      if (!frame || !this.generatorModal.generatorId) {
+        return;
+      }
+      let aktuelleUrl = typeof frame.src === 'string' ? frame.src : this.generatorModal.iframeUrl;
+      try {
+        const href = frame.contentWindow && frame.contentWindow.location && frame.contentWindow.location.href;
+        if (istHttpUrl(href)) {
+          aktuelleUrl = href;
+        }
+      } catch {
+        // Cross-Origin: dann bleibt nur die (ggf. aufgelöste) iframe-src als best effort.
+      }
+      if (istHttpUrl(aktuelleUrl)) {
+        this.generatorModal.iframeUrl = aktuelleUrl;
+        this.persistGeneratorUrl(this.generatorModal.generatorId, aktuelleUrl);
+      }
+    },
+    onGeneratorUrlEingabeBlur(ev) {
+      const text = ev && ev.target ? ev.target.value : '';
+      if (!istHttpUrl(text)) {
+        return;
+      }
+      const url = text.trim();
+      this.generatorModal.iframeUrl = url;
+      this.persistGeneratorUrl(this.generatorModal.generatorId, url);
+      this.$nextTick(() => this.generatorNeuLaden());
+    },
+    ermittleViewportGroesse() {
+      const viewportBreite =
+        Math.max(document.documentElement ? document.documentElement.clientWidth : 0, window.innerWidth) ||
+        0;
+      const viewportHoehe =
+        Math.max(document.documentElement ? document.documentElement.clientHeight : 0, window.innerHeight) || 0;
+      return { viewportBreite, viewportHoehe };
+    },
+    begrenzeGeneratorFensterGroesse(breite, hoehe) {
+      const { viewportBreite, viewportHoehe } = this.ermittleViewportGroesse();
+      const minBreite = Math.min(320, viewportBreite);
+      const minHoehe = Math.min(260, viewportHoehe);
+      return {
+        breite: Math.min(Math.max(Math.round(breite), minBreite), viewportBreite),
+        hoehe: Math.min(Math.max(Math.round(hoehe), minHoehe), viewportHoehe),
+      };
+    },
+    zentriereGeneratorFenster() {
+      if (
+        this.generatorModal.istVollbild ||
+        this.generatorModal.breite === null ||
+        this.generatorModal.hoehe === null
+      ) {
+        return;
+      }
+      const { viewportBreite, viewportHoehe } = this.ermittleViewportGroesse();
+      this.generatorModal.positionX = Math.max(0, Math.round((viewportBreite - this.generatorModal.breite) / 2));
+      this.generatorModal.positionY = Math.max(0, Math.round((viewportHoehe - this.generatorModal.hoehe) / 2));
+    },
+    initialisiereGeneratorFenster() {
+      if (!this.generatorModal.offen) {
+        return;
+      }
+      const fenster = this.$refs.generatorFenster;
+      if (!fenster) {
+        return;
+      }
+      if (this.generatorModal.breite === null || this.generatorModal.hoehe === null) {
+        const groesse = this.begrenzeGeneratorFensterGroesse(fenster.offsetWidth, fenster.offsetHeight);
+        this.generatorModal.breite = groesse.breite;
+        this.generatorModal.hoehe = groesse.hoehe;
+      }
+      if (this.generatorModal.positionX === null || this.generatorModal.positionY === null) {
+        this.zentriereGeneratorFenster();
+        return;
+      }
+      this.stelleSichtbaresGeneratorFensterSicher();
+    },
+    starteGeneratorZiehen(event) {
+      if (this.generatorModal.istVollbild || event.target.closest('button, a, input')) {
+        return;
+      }
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+      const fenster = this.$refs.generatorFenster;
+      if (!fenster) {
+        return;
+      }
+      const rechteck = fenster.getBoundingClientRect();
+      this.generatorModal.ziehenAktiv = true;
+      this.generatorModal.ziehOffsetX = event.clientX - rechteck.left;
+      this.generatorModal.ziehOffsetY = event.clientY - rechteck.top;
+      window.addEventListener('pointermove', this.beimGeneratorZiehen);
+      window.addEventListener('pointerup', this.beendeGeneratorZiehen);
+      window.addEventListener('pointercancel', this.beendeGeneratorZiehen);
+      event.preventDefault();
+    },
+    beimGeneratorZiehen(event) {
+      if (!this.generatorModal.ziehenAktiv || this.generatorModal.istVollbild) {
+        return;
+      }
+      const fenster = this.$refs.generatorFenster;
+      if (!fenster) {
+        return;
+      }
+      const maxX = Math.max(0, window.innerWidth - fenster.offsetWidth);
+      const maxY = Math.max(0, window.innerHeight - fenster.offsetHeight);
+      const neueXPosition = event.clientX - this.generatorModal.ziehOffsetX;
+      const neueYPosition = event.clientY - this.generatorModal.ziehOffsetY;
+      this.generatorModal.positionX = Math.min(Math.max(0, neueXPosition), maxX);
+      this.generatorModal.positionY = Math.min(Math.max(0, neueYPosition), maxY);
+    },
+    beendeGeneratorZiehen() {
+      this.generatorModal.ziehenAktiv = false;
+      window.removeEventListener('pointermove', this.beimGeneratorZiehen);
+      window.removeEventListener('pointerup', this.beendeGeneratorZiehen);
+      window.removeEventListener('pointercancel', this.beendeGeneratorZiehen);
+    },
+    starteGeneratorResize(event) {
+      if (this.generatorModal.istVollbild) {
+        return;
+      }
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+      const fenster = this.$refs.generatorFenster;
+      if (!fenster) {
+        return;
+      }
+      this.generatorModal.resizeAktiv = true;
+      this.generatorModal.resizeStartX = event.clientX;
+      this.generatorModal.resizeStartY = event.clientY;
+      this.generatorModal.resizeStartBreite =
+        this.generatorModal.breite !== null ? this.generatorModal.breite : fenster.offsetWidth;
+      this.generatorModal.resizeStartHoehe =
+        this.generatorModal.hoehe !== null ? this.generatorModal.hoehe : fenster.offsetHeight;
+      window.addEventListener('pointermove', this.beimGeneratorResize);
+      window.addEventListener('pointerup', this.beendeGeneratorResize);
+      window.addEventListener('pointercancel', this.beendeGeneratorResize);
+      event.preventDefault();
+    },
+    beimGeneratorResize(event) {
+      if (!this.generatorModal.resizeAktiv || this.generatorModal.istVollbild) {
+        return;
+      }
+      const neueBreite = this.generatorModal.resizeStartBreite + (event.clientX - this.generatorModal.resizeStartX);
+      const neueHoehe = this.generatorModal.resizeStartHoehe + (event.clientY - this.generatorModal.resizeStartY);
+      const groesse = this.begrenzeGeneratorFensterGroesse(neueBreite, neueHoehe);
+      this.generatorModal.breite = groesse.breite;
+      this.generatorModal.hoehe = groesse.hoehe;
+      this.stelleSichtbaresGeneratorFensterSicher();
+    },
+    beendeGeneratorResize() {
+      this.generatorModal.resizeAktiv = false;
+      window.removeEventListener('pointermove', this.beimGeneratorResize);
+      window.removeEventListener('pointerup', this.beendeGeneratorResize);
+      window.removeEventListener('pointercancel', this.beendeGeneratorResize);
+    },
+    generatorVollbildUmschalten() {
+      this.generatorModal.istVollbild = !this.generatorModal.istVollbild;
+      if (!this.generatorModal.istVollbild) {
+        this.$nextTick(() => this.stelleSichtbaresGeneratorFensterSicher());
+      }
+    },
+    stelleSichtbaresGeneratorFensterSicher() {
+      if (
+        this.generatorModal.istVollbild ||
+        this.generatorModal.breite === null ||
+        this.generatorModal.hoehe === null
+      ) {
+        return;
+      }
+      const groesse = this.begrenzeGeneratorFensterGroesse(this.generatorModal.breite, this.generatorModal.hoehe);
+      this.generatorModal.breite = groesse.breite;
+      this.generatorModal.hoehe = groesse.hoehe;
+      if (this.generatorModal.positionX === null || this.generatorModal.positionY === null) {
+        this.zentriereGeneratorFenster();
+        return;
+      }
+      const { viewportBreite, viewportHoehe } = this.ermittleViewportGroesse();
+      const maxX = Math.max(0, viewportBreite - this.generatorModal.breite);
+      const maxY = Math.max(0, viewportHoehe - this.generatorModal.hoehe);
+      this.generatorModal.positionX = Math.min(Math.max(0, this.generatorModal.positionX), maxX);
+      this.generatorModal.positionY = Math.min(Math.max(0, this.generatorModal.positionY), maxY);
+    },
+    onFensterGroesseGeaendert() {
+      if (!this.generatorModal.offen) {
+        return;
+      }
+      this.$nextTick(() => this.stelleSichtbaresGeneratorFensterSicher());
+    },
+    onGlobaleTaste(ev) {
+      if (ev && ev.key === 'Escape' && this.generatorModal.offen) {
+        this.schliesseGeneratorModal();
+      }
+    },
     importNaechsteAusWarteschlange() {
       if (!this.importWarteschlange.length) {
         return;
@@ -93,7 +494,10 @@ window.HTBAH_SEITEN.Weltenbau = {
       }, 450);
     },
     onWeltenbauBildImportFertig({ dataUrl, name }) {
-      const vorher = this.zustand.eintraege.slice();
+      const vorher = {
+        ...this.zustand,
+        eintraege: this.zustand.eintraege.slice(),
+      };
       const neu = {
         id: window.HTBAH.neueEntropieId(),
         name: typeof name === 'string' && name.trim() ? name.trim() : 'Bild',
@@ -101,13 +505,14 @@ window.HTBAH_SEITEN.Weltenbau = {
         hinzugefuegtAm: new Date().toISOString(),
       };
       this.zustand = {
-        version: 1,
+        ...this.zustand,
+        version: 2,
         eintraege: [...this.zustand.eintraege, neu],
       };
       try {
         this.persist();
       } catch (err) {
-        this.zustand = { version: 1, eintraege: vorher };
+        this.zustand = vorher;
         this.importWarteschlange = [];
         if (err && err.name === 'QuotaExceededError') {
           this.zeigeStatus(
@@ -204,6 +609,17 @@ window.HTBAH_SEITEN.Weltenbau = {
       });
     },
   },
+  mounted() {
+    window.addEventListener('resize', this.onFensterGroesseGeaendert);
+    window.addEventListener('keydown', this.onGlobaleTaste);
+  },
+  beforeUnmount() {
+    this.beendeGeneratorZiehen();
+    this.beendeGeneratorResize();
+    window.removeEventListener('resize', this.onFensterGroesseGeaendert);
+    window.removeEventListener('keydown', this.onGlobaleTaste);
+    window.clearTimeout(this._statusTimer);
+  },
   template: `
     <div class="container content py-3">
       <weltenbau-bild-import-modal
@@ -214,22 +630,40 @@ window.HTBAH_SEITEN.Weltenbau = {
 
       <h4 class="mb-1">Spielleitung · Weltenbau</h4>
       <p class="small text-body-secondary mb-3">
-        Externe Generatoren (u. a. Karten, Gebäude, Dungeons) mit Export als PNG. Der JSON-Export der Generatoren
-        wird hier nicht eingebunden — nur Bilder lassen sich sinnvoll in dieser Ansicht ablegen.
+        Externe Generatoren (u. a. Karten, Gebäude, Dungeons) mit Export als PNG/JSON.
       </p>
 
       <div class="card p-3 mb-3">
         <h6 class="mb-2">Generatoren (extern)</h6>
-        <p class="small text-body-secondary mb-2">
-          Watabous Procgen-Sammlung öffnet in einem neuen Tab.
-        </p>
-        <a
-          class="btn btn-outline-primary"
-          :href="watabouUrl"
-          target="_blank"
-          rel="noopener noreferrer">
-          Watabou (Procgen) öffnen
-        </a>
+        <div class="alert alert-warning py-2 small mb-3" role="alert">
+          Diese Generatoren stammen von Watabou und werden hier nur eingebettet. JSON-Exporte kannst du
+          in den Generatoren selbst sichern und später wieder laden. Die zuletzt bekannte Generator-URL
+          (inkl. Query-Parametern, soweit vom Browser zugänglich) wird lokal gespeichert und beim nächsten Öffnen wiederverwendet.
+        </div>
+        <div class="row g-2">
+          <div
+            v-for="generator in generatoren"
+            :key="generator.id"
+            class="col-12 col-sm-6 col-lg-4">
+            <button
+              type="button"
+              class="card shadow-sm w-100 h-100 text-start htbah-weltenbau-generator-card"
+              @click="oeffneGeneratorModal(generator)">
+              <div class="card-body py-2 px-3">
+                <div class="fw-semibold mb-1">{{ generator.titel }}</div>
+                <div class="small text-body-secondary text-truncate" :title="generator.sourceUrl">
+                  Quelle: {{ generator.sourceUrl }}
+                </div>
+                <div
+                  v-if="zustand.generatorUrls && zustand.generatorUrls[generator.id]"
+                  class="small text-body-secondary text-truncate"
+                  :title="zustand.generatorUrls[generator.id]">
+                  Letzte URL: {{ zustand.generatorUrls[generator.id] }}
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="card p-3 mb-3">
@@ -310,6 +744,81 @@ window.HTBAH_SEITEN.Weltenbau = {
             @click="statusMeldung = ''"></button>
         </div>
       </teleport>
+
+      <div v-if="generatorModal.offen" class="regelwerk-modal-layer htbah-generator-modal-layer">
+        <div
+          ref="generatorFenster"
+          class="regelwerk-modal-window card shadow htbah-generator-modal-window"
+          :class="{ 'regelwerk-modal-window-fullscreen': generatorModal.istVollbild }"
+          :style="generatorModalStil">
+          <div
+            class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2"
+            @pointerdown="starteGeneratorZiehen">
+            <div class="d-flex flex-column flex-grow-1 pe-2 overflow-hidden">
+              <h6 class="mb-0 text-truncate" :title="generatorModal.titel">{{ generatorModal.titel }}</h6>
+              <small class="text-body-secondary text-truncate" :title="generatorModal.sourceUrl">
+                Quelle: {{ generatorModal.sourceUrl }}
+              </small>
+            </div>
+            <div class="d-flex gap-1 align-items-center flex-shrink-0">
+              <button
+                type="button"
+                class="regelwerk-icon-button"
+                title="Neu laden"
+                aria-label="Neu laden"
+                @click="generatorNeuLaden">
+                <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+              </button>
+              <button
+                type="button"
+                class="regelwerk-icon-button"
+                title="Im neuen Tab öffnen"
+                aria-label="Im neuen Tab öffnen"
+                @click="generatorInNeuemTab">
+                <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+              </button>
+              <button
+                type="button"
+                class="regelwerk-icon-button"
+                :title="generatorVollbildLabel"
+                :aria-label="generatorVollbildLabel"
+                @click="generatorVollbildUmschalten">
+                <span class="material-symbols-outlined" aria-hidden="true">{{ generatorVollbildIcon }}</span>
+              </button>
+              <button
+                type="button"
+                class="btn-close"
+                aria-label="Schließen"
+                title="Schließen"
+                @click="schliesseGeneratorModal"></button>
+            </div>
+          </div>
+          <div class="px-2 py-1 border-top border-bottom bg-body-tertiary">
+            <input
+              type="url"
+              class="form-control form-control-sm"
+              :value="generatorModal.iframeUrl"
+              placeholder="Generator-URL"
+              @blur="onGeneratorUrlEingabeBlur"
+              @keydown.enter.prevent="onGeneratorUrlEingabeBlur($event)" />
+            <small class="text-body-secondary">
+              Hinweis: Manche interne Navigationsschritte im eingebetteten Frame sind aus Sicherheitsgründen nicht lesbar.
+            </small>
+          </div>
+          <iframe
+            ref="generatorIframe"
+            :src="generatorModal.iframeUrl"
+            class="htbah-generator-modal-content"
+            allowfullscreen
+            @load="onGeneratorIframeLoad"></iframe>
+          <div
+            v-if="!generatorModal.istVollbild"
+            class="regelwerk-modal-resize-handle"
+            role="presentation"
+            aria-hidden="true"
+            @pointerdown="starteGeneratorResize"></div>
+        </div>
+      </div>
     </div>
   `,
 };

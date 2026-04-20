@@ -48,6 +48,13 @@
   --modal-bg: #ffffff;
 }
 
+/* Dark-Theme: Bootstrap-Hilfstexte ausreichend kontrastreich halten */
+[data-theme='dark'] .text-body-secondary,
+[data-theme='dark'] .text-secondary,
+[data-theme='dark'] .text-muted {
+  color: var(--paragraph-color) !important;
+}
+
 html,
 body {
   height: 100%;
@@ -294,6 +301,39 @@ input::placeholder {
   vertical-align: middle;
 }
 
+.htbah-weltenbau-generator-card {
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-color);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+.htbah-weltenbau-generator-card:hover,
+.htbah-weltenbau-generator-card:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--primary-color);
+}
+
+.htbah-generator-modal-layer {
+  z-index: 4060;
+}
+
+.htbah-generator-modal-window {
+  width: min(94vw, 1300px);
+  height: min(88dvh, 920px);
+  min-width: min(320px, 100vw);
+  min-height: min(260px, 100vh);
+}
+
+.htbah-generator-modal-content {
+  flex: 1 1 auto;
+  width: 100%;
+  border: none;
+  min-height: 0;
+  background: #fff;
+}
+
 /* Globale Bildbetrachter-Fenster (Weltenbau u. a.) */
 .htbah-bb-host {
   position: relative;
@@ -320,6 +360,7 @@ input::placeholder {
   cursor: move;
   user-select: none;
   flex-shrink: 0;
+  touch-action: none;
 }
 
 .htbah-bb-griff {
@@ -340,6 +381,10 @@ input::placeholder {
   min-height: 0;
   touch-action: pan-x pan-y pinch-zoom;
   background: var(--bs-secondary-bg);
+}
+
+.htbah-bb-resize-handle {
+  z-index: 4;
 }
 
 .navbar-fixed {
@@ -393,6 +438,22 @@ input::placeholder {
   color: var(--primary-color);
 }
 
+.htbah-bottom-nav-inner > a {
+  padding: 0.35rem 0.4rem;
+  border-radius: 0.6rem;
+  border: 1px solid transparent;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.htbah-bottom-nav-inner > a.router-link-active {
+  color: var(--heading-color);
+  background: color-mix(in srgb, var(--primary-color) 22%, transparent);
+  border-color: color-mix(in srgb, var(--primary-color) 58%, transparent);
+}
+
 .navbar-fixed button:hover {
   color: var(--primary-color);
 }
@@ -421,13 +482,13 @@ input::placeholder {
 
 .regelwerk-modal-window {
   position: absolute;
-  top: 5vh;
-  left: 5vw;
+  top: 0;
+  left: 0;
   width: min(90vw, 1200px);
   height: 85vh;
-  min-width: 320px;
-  min-height: 280px;
-  resize: both;
+  min-width: min(320px, 100vw);
+  min-height: min(280px, 100vh);
+  resize: none;
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -488,6 +549,30 @@ input::placeholder {
 .regelwerk-modal-window-fullscreen .regelwerk-modal-header {
   cursor: default;
   touch-action: auto;
+}
+
+.regelwerk-modal-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  cursor: nwse-resize;
+  touch-action: none;
+  z-index: 3;
+}
+
+.regelwerk-modal-resize-handle::before {
+  content: '';
+  position: absolute;
+  right: 0.3rem;
+  bottom: 0.3rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-right: 2px solid var(--text-color);
+  border-bottom: 2px solid var(--text-color);
+  border-bottom-right-radius: 2px;
+  opacity: 0.55;
 }
 
 .regelwerk-modal-content {
@@ -1179,4 +1264,102 @@ input::placeholder {
 .htbah-charakter-name-input::placeholder {
   color: var(--placeholder-color);
   font-weight: 400;
+}
+
+/* Wetter-Badge (schwebend, über der Bottom-Nav) */
+.htbah-atmosphaere-badge {
+  position: fixed;
+  z-index: 1038;
+  right: 0.65rem;
+  bottom: calc(3.35rem + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  max-width: min(17.5rem, calc(100vw - 1.25rem));
+  align-items: stretch;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.18),
+    0 0 0 1px color-mix(in srgb, var(--atmosphaere-akzent, var(--primary-color)) 35%, transparent);
+  background: color-mix(in srgb, var(--bs-body-bg) 92%, var(--atmosphaere-akzent, var(--primary-color)) 8%);
+  touch-action: manipulation;
+}
+
+.htbah-atmosphaere-badge--custom-pos {
+  right: auto;
+  bottom: auto;
+}
+
+.htbah-atmosphaere-badge__drag {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  padding: 0 0.15rem;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  font-size: 0.75rem;
+  line-height: 1;
+  letter-spacing: -0.12em;
+  color: var(--secondary-color);
+  background: color-mix(in srgb, var(--atmosphaere-akzent, var(--primary-color)) 14%, transparent);
+}
+
+.htbah-atmosphaere-badge__drag:active {
+  cursor: grabbing;
+}
+
+.htbah-atmosphaere-badge__tap {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0.45rem 0.55rem 0.45rem 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.htbah-atmosphaere-badge__tap:hover {
+  filter: brightness(1.04);
+}
+
+.htbah-atmosphaere-badge__line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.htbah-atmosphaere-badge__emoji {
+  flex-shrink: 0;
+}
+
+.htbah-atmosphaere-badge__txt {
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.htbah-atmosphaere-badge__hint {
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+.htbah-atmosphaere-modal .htbah-atmosphaere-pill {
+  display: flex;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border-color);
+}
+
+.htbah-atmosphaere-modal .htbah-atmosphaere-pill--wetter {
+  align-items: flex-start;
+}
+
+.htbah-atmosphaere-karte {
+  background: var(--bs-body-bg);
 }

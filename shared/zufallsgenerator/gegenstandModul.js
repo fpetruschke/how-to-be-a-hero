@@ -38,6 +38,33 @@ window.HTBAH = window.HTBAH || {};
     return U.zufaellig(L.SONSTIGES_ZUKUNFT);
   }
 
+  function schadenswertW10Zufaellig() {
+    const wuerfel = U.zufallsInt(1, 4);
+    const mod = U.zufallsInt(0, 5);
+    if (mod === 0) {
+      return `${wuerfel}W10`;
+    }
+    return `${wuerfel}W10+${mod}`;
+  }
+
+  function kampfartWaffeZufaellig() {
+    return U.gewichtet([
+      { wert: 'nahkampf', gewicht: 45 },
+      { wert: 'fernkampf', gewicht: 40 },
+      { wert: 'sonstiges', gewicht: 15 },
+    ]);
+  }
+
+  function kampfartLabel(k) {
+    if (k === 'fernkampf') {
+      return 'Fernkampf';
+    }
+    if (k === 'sonstiges') {
+      return 'Sonstiges';
+    }
+    return 'Nahkampf';
+  }
+
   window.HTBAH.ZufallsgeneratorGegenstandModul = {
     EPOCHE: E,
     /**
@@ -59,10 +86,16 @@ window.HTBAH = window.HTBAH || {};
 
       let basisName;
       let typLabel;
+      let istWaffe = false;
+      let schadenswert = '';
+      let kampfart = 'nahkampf';
 
       if (kategorie === 'waffe') {
         typLabel = 'Waffe';
         basisName = waffeFuerEpoche(epoche);
+        istWaffe = true;
+        schadenswert = schadenswertW10Zufaellig();
+        kampfart = kampfartWaffeZufaellig();
       } else if (kategorie === 'kleidung') {
         typLabel = 'Kleidung';
         basisName = kleidungFuerEpoche(epoche);
@@ -75,15 +108,26 @@ window.HTBAH = window.HTBAH || {};
       const zust = U.zufaellig(L.ZUSTAND_ITEM);
       const farbe = U.zufaellig(L.FARBE);
 
-      const beschreibungHtml = [
+      const kopfzeilen = [
         `<p><strong>Art:</strong> ${U.htmlEsc(typLabel)} (${U.htmlEsc(epoche)})</p>`,
         `<p><strong>Details:</strong> ${U.htmlEsc(material)}, ${U.htmlEsc(farbe)}, ${U.htmlEsc(zust)}.</p>`,
-        `<p>${U.htmlEsc(U.zufaellig(L.FLAVOR))}</p>`,
-      ].join('');
+      ];
+      if (istWaffe) {
+        kopfzeilen.push(
+          `<p><strong>Schadenswert:</strong> ${U.htmlEsc(schadenswert)} · <strong>Kampfart:</strong> ${U.htmlEsc(
+            kampfartLabel(kampfart),
+          )}</p>`,
+        );
+      }
+      kopfzeilen.push(`<p>${U.htmlEsc(U.zufaellig(L.FLAVOR))}</p>`);
+      const beschreibungHtml = kopfzeilen.join('');
 
       return {
         name: basisName,
         beschreibungHtml,
+        istWaffe,
+        schadenswert,
+        kampfart,
       };
     },
   };

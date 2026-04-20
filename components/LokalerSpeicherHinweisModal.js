@@ -1,5 +1,7 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
+const SPEICHER_KEY_VERSTANDEN_AM = 'verstanden_am';
+
 window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
   data() {
     return {
@@ -7,9 +9,26 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
     };
   },
   mounted() {
+    if (!this.sollHeuteAnzeigen()) {
+      return;
+    }
     this.$nextTick(() => this.oeffnenWennBootstrapBereit());
   },
   methods: {
+    heutigesDatum() {
+      const jetzt = new Date();
+      const jahr = String(jetzt.getFullYear());
+      const monat = String(jetzt.getMonth() + 1).padStart(2, '0');
+      const tag = String(jetzt.getDate()).padStart(2, '0');
+      return `${jahr}-${monat}-${tag}`;
+    },
+    sollHeuteAnzeigen() {
+      const gespeichert = window.HTBAH?.speicher?.leseText(SPEICHER_KEY_VERSTANDEN_AM, null);
+      return gespeichert !== this.heutigesDatum();
+    },
+    verstandenSpeichern() {
+      window.HTBAH?.speicher?.schreibeText(SPEICHER_KEY_VERSTANDEN_AM, this.heutigesDatum());
+    },
     oeffnenWennBootstrapBereit(versuch = 0) {
       const maxVersuche = 80;
       const el = this.$refs.modalElement;
@@ -68,6 +87,7 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
             <button
               type="button"
               class="btn btn-primary"
+              @click="verstandenSpeichern"
               data-bs-dismiss="modal">
               Verstanden
             </button>
