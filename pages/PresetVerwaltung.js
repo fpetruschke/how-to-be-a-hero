@@ -54,7 +54,7 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
   },
   template: `
     <div class="container content py-3">
-      <h4>Fähigkeiten-Presets</h4>
+      <h4>📦 Fähigkeiten-Presets</h4>
 
       <div class="card p-3 mb-3">
         <icon-text-button tag="router-link" to="/faehigkeiten-preset-bearbeiten" class="btn btn-success w-100 mb-2" icon="add">
@@ -94,7 +94,7 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
         </icon-text-button>
       </div>
 
-      <div style="height:80px;"></div>
+      <div class="abstandshalter" aria-hidden="true"></div>
     </div>
   `,
 };

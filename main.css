@@ -1,5 +1,9 @@
 :root,
 [data-theme='dark'] {
+  /* Wird von BottomNav per Messung gesetzt (px); Fallback bis zur ersten Messung */
+  --htbah-bottom-nav-reserve: 3.5rem;
+  /* Zusätzliche Luft unter dem letzten Inhalt (alle Seiten mit .content) */
+  --htbah-content-ende-luft: 3.25rem;
   --bg-image-url: url('assets/img/bg-desktop.png');
   --bg-overlay-color: rgba(2, 6, 23, 0.62);
   --bg-color: #0f172a;
@@ -415,10 +419,6 @@ input::placeholder {
   justify-content: center;
 }
 
-.htbah-landing.content {
-  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
-}
-
 .navbar-fixed a {
   color: var(--navbar-link);
   text-decoration: none;
@@ -458,9 +458,17 @@ input::placeholder {
   color: var(--primary-color);
 }
 
-/* Platz zum Scrollen oberhalb der festen Bottom-Navbar (inkl. Home-Indikator auf Mobilgeräten) */
+/* Platz unter dem scrollbaren Inhalt: gemessene Navbar-Höhe + extra Luft + Home-Indikator (iOS) */
 .content {
-  padding-bottom: calc(14rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(
+    var(--htbah-bottom-nav-reserve)
+    + var(--htbah-content-ende-luft)
+    + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+.abstandshalter {
+  height: 10vh;
 }
 
 /* Spielleiter: horizontale Charakter-Chips (Touch-Scroll) */
@@ -586,7 +594,9 @@ input::placeholder {
   position: fixed;
   z-index: 1990;
   right: max(0.75rem, env(safe-area-inset-right, 0px));
-  bottom: calc(50px + env(safe-area-inset-bottom, 0px) + 0.65rem);
+  bottom: calc(
+    var(--htbah-bottom-nav-reserve, 3.5rem) + env(safe-area-inset-bottom, 0px) + 0.65rem
+  );
   width: 3.25rem;
   height: 3.25rem;
   border-radius: 50%;
@@ -1271,7 +1281,9 @@ input::placeholder {
   position: fixed;
   z-index: 1038;
   right: 0.65rem;
-  bottom: calc(3.35rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(
+    var(--htbah-bottom-nav-reserve, 3.5rem) + 0.35rem + env(safe-area-inset-bottom, 0px)
+  );
   display: flex;
   max-width: min(17.5rem, calc(100vw - 1.25rem));
   align-items: stretch;

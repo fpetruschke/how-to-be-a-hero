@@ -68,7 +68,7 @@ window.HTBAH_SEITEN.Startseite = {
     this.aktualisiereCharakterStatus();
   },
   template: `
-    <div class="container content py-3 text-center htbah-landing">
+    <div class="container content py-3 text-center">
       <h2 class="d-flex align-items-center justify-content-center gap-2">
         <img
           src="assets/img/htbah-begleit-app-logo.png"
@@ -162,6 +162,8 @@ window.HTBAH_SEITEN.Startseite = {
           </div>
         </div>
       </div>
+
+      <div class="abstandshalter" aria-hidden="true"></div>
     </div>
   `,
 };

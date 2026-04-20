@@ -89,9 +89,22 @@ window.HTBAH = window.HTBAH || {};
     return U.zufaellig(namen);
   }
 
+  function fraktionAusFraktionenListe(fraktionNamen) {
+    if (!Array.isArray(fraktionNamen) || !fraktionNamen.length) {
+      return '';
+    }
+    const namen = fraktionNamen
+      .map((n) => (typeof n === 'string' ? n.trim() : ''))
+      .filter(Boolean);
+    if (!namen.length) {
+      return '';
+    }
+    return U.zufaellig(namen);
+  }
+
   window.HTBAH.ZufallsgeneratorNpcModul = {
     /**
-     * @param {{ epoche?: string, orteNamen?: string[] }} opts — orteNamen: Namen aus der Orte-Tabelle; ein zufälliger wird als Aufenthaltsort gesetzt.
+     * @param {{ epoche?: string, orteNamen?: string[], fraktionNamen?: string[], pantheonNamen?: string[] }} opts — orteNamen: Namen aus der Orte-Tabelle; fraktionNamen: Namen aus der Fraktionen-Tabelle; pantheonNamen: Gottheitsnamen aus der Pantheon-Tabelle (für Glaube, wie Fraktion zufällig wenn vorhanden).
      */
     generiere(opts) {
       opts = opts || {};
@@ -111,6 +124,8 @@ window.HTBAH = window.HTBAH || {};
       const schadenWaffenlos = waffenloserNahkampfSchaden(statur);
 
       const aufenthaltsort = aufenthaltsortAusOrteListe(opts.orteNamen);
+      const fraktion = fraktionAusFraktionenListe(opts.fraktionNamen);
+      const glaube = fraktionAusFraktionenListe(opts.pantheonNamen);
 
       const notizenHtml = [
         `<p><strong>Eindruck:</strong> ${U.htmlEsc(U.zufaellig(L.EINDRUCK))}.</p>`,
@@ -139,6 +154,8 @@ window.HTBAH = window.HTBAH || {};
         kampfart: waffe.kampfart,
         lebenspunkte,
         aufenthaltsort,
+        fraktion,
+        glaube,
         notizenHtml,
       };
     },

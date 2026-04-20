@@ -72,7 +72,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
   },
   template: `
     <div class="container content py-3">
-      <h4 class="mb-1">Spielleiter · Gruppen</h4>
+      <h4 class="mb-1">👥 Spielleiter · Gruppen</h4>
       <p class="small text-body-secondary mb-3">
         Gruppen anlegen und verwalten. In der Gruppenansicht importierst du Charakterblätter und bearbeitest sie.
       </p>
@@ -139,6 +139,8 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
           </tbody>
         </table>
       </div>
+
+      <div class="abstandshalter" aria-hidden="true"></div>
 
       <teleport to="body">
         <div

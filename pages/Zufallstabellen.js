@@ -43,21 +43,31 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       const neu = this.bearbeitungIndex < 0 ? 'Neu: ' : '';
       if (this.bearbeitung.typ === 'npc') {
-        return `${neu}NPC`;
+        return `${neu}👤 NPC`;
       }
       if (this.bearbeitung.typ === 'ort') {
-        return `${neu}Ort`;
+        return `${neu}🗺️ Ort`;
       }
       if (this.bearbeitung.typ === 'fraktion') {
-        return `${neu}Fraktion`;
+        return `${neu}🏛️ Fraktion`;
       }
       if (this.bearbeitung.typ === 'pantheon') {
-        return `${neu}Gottheit`;
+        return `${neu}✨ Gottheit`;
       }
-      return `${neu}Gegenstand`;
+      return `${neu}📦 Gegenstand`;
     },
     zufallsgeneratorBereit() {
       return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
+    },
+    /** Fraktionen mit auswählbarem Namen (NPC-Dropdown) */
+    fraktionenMitNamen() {
+      return (this.zustand.fraktionen || []).filter((f) => f && String(f.name || '').trim());
+    },
+    /** Pantheon-Namen für NPC-Glaube (Datalist / Kombinationsfeld) */
+    pantheonNamenListe() {
+      return (this.zustand.pantheon || [])
+        .map((p) => (p && p.name ? String(p.name).trim() : ''))
+        .filter(Boolean);
     },
   },
   methods: {
@@ -109,6 +119,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         schadenswert: '',
         kampfart: 'nahkampf',
         aufenthaltsort: '',
+        fraktion: '',
+        glaube: '',
         notizenHtml: '',
       };
     },
@@ -332,7 +344,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       let felder;
       if (typ === 'npc') {
         const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
-        felder = G.npc({ epoche: this.zufallNpcEpoche, orteNamen });
+        const fraktionNamen = (this.zustand.fraktionen || []).map((f) =>
+          f && f.name ? String(f.name) : '',
+        );
+        const pantheonNamen = (this.zustand.pantheon || []).map((p) =>
+          p && p.name ? String(p.name) : '',
+        );
+        felder = G.npc({
+          epoche: this.zufallNpcEpoche,
+          orteNamen,
+          fraktionNamen,
+          pantheonNamen,
+        });
       } else if (typ === 'ort') {
         felder = G.ort();
       } else if (typ === 'fraktion') {
@@ -410,13 +433,60 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         this.persist();
       }
     },
+    pantheonExportieren() {
+      const paket = window.HTBAH.erstellePantheonExportPaket();
+      const datum = new Date();
+      const yyyy = String(datum.getFullYear());
+      const mm = String(datum.getMonth() + 1).padStart(2, '0');
+      const dd = String(datum.getDate()).padStart(2, '0');
+      window.HTBAH.dateiHerunterladenJson(paket, `htbah-pantheon-${yyyy}-${mm}-${dd}.json`);
+    },
+    async pantheonImportieren(event) {
+      const datei = event.target.files?.[0];
+      if (!datei) {
+        return;
+      }
+      let text;
+      try {
+        text = await datei.text();
+      } catch {
+        window.alert('Die Datei konnte nicht gelesen werden.');
+        event.target.value = '';
+        return;
+      }
+      let roh;
+      try {
+        roh = JSON.parse(text);
+      } catch {
+        window.alert('Kein gültiges JSON.');
+        event.target.value = '';
+        return;
+      }
+      const r = window.HTBAH.pantheonImportAusPaket(roh);
+      if (!r.ok) {
+        window.alert(r.fehler);
+        event.target.value = '';
+        return;
+      }
+      if (
+        !window.confirm(
+          'Das Pantheon wird vollständig durch die Importdatei ersetzt. Fortfahren?',
+        )
+      ) {
+        event.target.value = '';
+        return;
+      }
+      this.zustand.pantheon = r.pantheon;
+      this.persist();
+      event.target.value = '';
+    },
     tabelleLeerenDialog(typ) {
       const labels = {
-        npcs: 'NPCs',
-        orte: 'Orte',
-        gegenstaende: 'Gegenstände',
-        fraktionen: 'Fraktionen',
-        pantheon: 'Pantheon',
+        npcs: '👤 NPCs',
+        orte: '🗺️ Orte',
+        gegenstaende: '📦 Gegenstände',
+        fraktionen: '🏛️ Fraktionen',
+        pantheon: '✨ Pantheon',
       };
       this.$refs.zufallstabellenBestaetigen.oeffnen({
         titel: `${labels[typ] || 'Tabelle'} leeren?`,
@@ -444,14 +514,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
   },
   template: `
     <div class="container content py-3">
-      <h4 class="text-center mb-3">Zufallstabellen</h4>
+      <h4 class="text-center mb-3">📚 Zufallstabellen</h4>
       <p class="text-secondary text-center small mb-4">
         Eigene Tabellen für Spielrunden — Einträge werden lokal gespeichert.
       </p>
 
       <div class="card mb-3 text-start">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">Orte</span>
+          <span class="fw-semibold">🗺️ Orte</span>
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('orte')">
               Leeren
@@ -506,133 +576,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
 
       <div class="card mb-3 text-start">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">NPCs</span>
-          <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('npcs')">
-              Leeren
-            </button>
-            <icon-text-button
-              type="button"
-              class="btn btn-sm btn-outline-primary flex-shrink-0"
-              icon="add"
-              @click="npcHinzufuegen"
-              aria-label="Eintrag hinzufügen">
-              Hinzufügen
-            </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm table-striped mb-0 align-middle">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Spitzname</th>
-                  <th>Geschlecht</th>
-                  <th>Alter</th>
-                  <th>Familienstand</th>
-                  <th>Statur</th>
-                  <th>LP</th>
-                  <th>Gesinnung</th>
-                  <th>Beruf</th>
-                  <th>Aufenthaltsort</th>
-                  <th>Ziel</th>
-                  <th>Stimme</th>
-                  <th>Waffe</th>
-                  <th>Werte</th>
-                  <th>Notizen</th>
-                  <th class="text-end text-nowrap">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!zustand.npcs.length">
-                  <td colspan="16" class="text-secondary text-center py-3">Noch keine Einträge.</td>
-                </tr>
-                <tr v-for="(row, index) in zustand.npcs" :key="row.id">
-                  <td>{{ row.name || '—' }}</td>
-                  <td>{{ row.spitzname || '—' }}</td>
-                  <td>{{ row.geschlecht || '—' }}</td>
-                  <td>{{ row.alter || '—' }}</td>
-                  <td>{{ row.familienstand || '—' }}</td>
-                  <td>{{ row.statur || '—' }}</td>
-                  <td>{{ row.lebenspunkte || '—' }}</td>
-                  <td>{{ row.gesinnung || '—' }}</td>
-                  <td>{{ row.beruf || '—' }}</td>
-                  <td>{{ row.aufenthaltsort || '—' }}</td>
-                  <td>{{ row.ziel || '—' }}</td>
-                  <td>{{ row.stimme || '—' }}</td>
-                  <td>{{ row.waffe || '—' }}</td>
-                  <td class="small">{{ npcWaffenWerteText(row) }}</td>
-                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
-                  <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="npcBearbeiten(row, index)">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('npc', row.id)">
-                      Löschen
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">Gegenstände</span>
-          <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('gegenstaende')">
-              Leeren
-            </button>
-            <icon-text-button
-              type="button"
-              class="btn btn-sm btn-outline-primary flex-shrink-0"
-              icon="add"
-              @click="gegenstandHinzufuegen"
-              aria-label="Eintrag hinzufügen">
-              Hinzufügen
-            </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm table-striped mb-0 align-middle">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Kampfwerte</th>
-                  <th>Beschreibung</th>
-                  <th class="text-end text-nowrap">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!zustand.gegenstaende.length">
-                  <td colspan="4" class="text-secondary text-center py-3">Noch keine Einträge.</td>
-                </tr>
-                <tr v-for="(row, index) in zustand.gegenstaende" :key="row.id">
-                  <td>{{ row.name || '—' }}</td>
-                  <td class="small text-nowrap">{{ gegenstandWaffenWerteText(row) }}</td>
-                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
-                  <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="gegenstandBearbeiten(row, index)">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">
-                      Löschen
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">Fraktionen</span>
+          <span class="fw-semibold">🏛️ Fraktionen</span>
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('fraktionen')">
               Leeren
@@ -687,8 +631,149 @@ window.HTBAH_SEITEN.Zufallstabellen = {
 
       <div class="card mb-3 text-start">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">Pantheon</span>
+          <span class="fw-semibold">👤 NPCs</span>
           <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('npcs')">
+              Leeren
+            </button>
+            <icon-text-button
+              type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0"
+              icon="add"
+              @click="npcHinzufuegen"
+              aria-label="Eintrag hinzufügen">
+              Hinzufügen
+            </icon-text-button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Spitzname</th>
+                  <th>Geschlecht</th>
+                  <th>Alter</th>
+                  <th>Familienstand</th>
+                  <th>Statur</th>
+                  <th>LP</th>
+                  <th>Gesinnung</th>
+                  <th>Glaube</th>
+                  <th>Beruf</th>
+                  <th>Fraktion</th>
+                  <th>Aufenthaltsort</th>
+                  <th>Ziel</th>
+                  <th>Stimme</th>
+                  <th>Waffe</th>
+                  <th>Werte</th>
+                  <th>Notizen</th>
+                  <th class="text-end text-nowrap">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!zustand.npcs.length">
+                  <td colspan="18" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                </tr>
+                <tr v-for="(row, index) in zustand.npcs" :key="row.id">
+                  <td>{{ row.name || '—' }}</td>
+                  <td>{{ row.spitzname || '—' }}</td>
+                  <td>{{ row.geschlecht || '—' }}</td>
+                  <td>{{ row.alter || '—' }}</td>
+                  <td>{{ row.familienstand || '—' }}</td>
+                  <td>{{ row.statur || '—' }}</td>
+                  <td>{{ row.lebenspunkte || '—' }}</td>
+                  <td>{{ row.gesinnung || '—' }}</td>
+                  <td>{{ row.glaube || '—' }}</td>
+                  <td>{{ row.beruf || '—' }}</td>
+                  <td>{{ row.fraktion || '—' }}</td>
+                  <td>{{ row.aufenthaltsort || '—' }}</td>
+                  <td>{{ row.ziel || '—' }}</td>
+                  <td>{{ row.stimme || '—' }}</td>
+                  <td>{{ row.waffe || '—' }}</td>
+                  <td class="small">{{ npcWaffenWerteText(row) }}</td>
+                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
+                  <td class="text-end text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="npcBearbeiten(row, index)">
+                      Bearbeiten
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('npc', row.id)">
+                      Löschen
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3 text-start">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold">📦 Gegenstände</span>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('gegenstaende')">
+              Leeren
+            </button>
+            <icon-text-button
+              type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0"
+              icon="add"
+              @click="gegenstandHinzufuegen"
+              aria-label="Eintrag hinzufügen">
+              Hinzufügen
+            </icon-text-button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Kampfwerte</th>
+                  <th>Beschreibung</th>
+                  <th class="text-end text-nowrap">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!zustand.gegenstaende.length">
+                  <td colspan="4" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                </tr>
+                <tr v-for="(row, index) in zustand.gegenstaende" :key="row.id">
+                  <td>{{ row.name || '—' }}</td>
+                  <td class="small text-nowrap">{{ gegenstandWaffenWerteText(row) }}</td>
+                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
+                  <td class="text-end text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="gegenstandBearbeiten(row, index)">
+                      Bearbeiten
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">
+                      Löschen
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3 text-start">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold">✨ Pantheon</span>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-sm btn-outline-secondary" @click="pantheonExportieren" title="Nur Pantheon als JSON">
+              Export
+            </button>
+            <label class="btn btn-sm btn-outline-secondary mb-0" title="Pantheon aus JSON ersetzen">
+              Import
+              <input
+                type="file"
+                class="d-none"
+                accept="application/json,.json"
+                @change="pantheonImportieren" />
+            </label>
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('pantheon')">
               Leeren
             </button>
@@ -739,6 +824,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           </div>
         </div>
       </div>
+
+      <div class="abstandshalter" aria-hidden="true"></div>
 
       <div
         class="modal fade"
@@ -830,11 +917,31 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                       <label for="zfn-gesinnung">Gesinnung</label>
                     </div>
                   </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zfn-glaube">Glaube</label>
+                    <input
+                      id="zfn-glaube"
+                      class="form-control"
+                      v-model="bearbeitung.zeile.glaube"
+                      :list="pantheonNamenListe.length ? 'zfn-glaube-datalist' : undefined"
+                      placeholder="Leer, aus Liste wählen oder Freitext"
+                      autocomplete="off" />
+                    <datalist v-if="pantheonNamenListe.length" id="zfn-glaube-datalist">
+                      <option v-for="n in pantheonNamenListe" :key="'pg-' + n" :value="n"></option>
+                    </datalist>
+                  </div>
                   <div class="col-md-6">
                     <div class="form-floating">
                       <input id="zfn-beruf" class="form-control" v-model="bearbeitung.zeile.beruf" placeholder=" " />
                       <label for="zfn-beruf">Beruf</label>
                     </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zfn-fraktion">Fraktion</label>
+                    <select id="zfn-fraktion" class="form-select" v-model="bearbeitung.zeile.fraktion">
+                      <option value="">— keine —</option>
+                      <option v-for="f in fraktionenMitNamen" :key="f.id" :value="f.name">{{ f.name }}</option>
+                    </select>
                   </div>
                   <div class="col-12">
                     <div class="form-floating">

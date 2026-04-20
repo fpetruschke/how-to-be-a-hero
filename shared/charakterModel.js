@@ -75,7 +75,7 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       alter: null,
       lebenspunkte: 100,
       statur: '',
-      religion: '',
+      glaube: '',
       beruf: '',
       familienstand: '',
       inventar: [],
@@ -100,6 +100,7 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
 
     const zusammengefuehrt = { ...basis, ...quelle };
     delete zusammengefuehrt.inventarHtml;
+    delete zusammengefuehrt.religion;
 
     const gb = quelle.geistesblitzVerbleibend;
     const geistesblitzVerbleibend =
@@ -113,8 +114,18 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
           }
         : null;
 
+    const glaubeAusQuelle =
+      typeof quelle.glaube === 'string'
+        ? quelle.glaube
+        : typeof quelle.religion === 'string'
+          ? quelle.religion
+          : typeof zusammengefuehrt.glaube === 'string'
+            ? zusammengefuehrt.glaube
+            : '';
+
     return {
       ...zusammengefuehrt,
+      glaube: glaubeAusQuelle,
       handeln: Array.isArray(quelle.handeln) ? quelle.handeln : [],
       wissen: Array.isArray(quelle.wissen) ? quelle.wissen : [],
       soziales: Array.isArray(quelle.soziales) ? quelle.soziales : [],

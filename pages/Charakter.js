@@ -129,6 +129,18 @@ window.HTBAH_SEITEN.Charakter = {
     charakter() {
       return this.spielleiterMitglied ? this.spielleiterMitglied.charakter : this.charakterLokal;
     },
+    /** Namen aus der Pantheon-Tabelle (Zufallstabellen) für das Glaube-Feld */
+    pantheonGlaubeNamen() {
+      try {
+        const z = window.HTBAH.ladeZufallstabellenZustand();
+        const p = (z && z.pantheon) || [];
+        return p
+          .map((row) => (row && row.name ? String(row.name).trim() : ''))
+          .filter(Boolean);
+      } catch {
+        return [];
+      }
+    },
     charakterBild() {
       return this.spielleiterMitglied
         ? this.spielleiterMitglied.charakterBild
@@ -569,8 +581,8 @@ window.HTBAH_SEITEN.Charakter = {
   },
   template: `
     <div class="container content py-3">
-      <h4 v-if="!spielleiterMitglied">Charakter</h4>
-      <h5 v-else class="mb-3 text-body-secondary">Charakterblatt (Spielleiter)</h5>
+      <h4 v-if="!spielleiterMitglied">🧙 Charakter</h4>
+      <h5 v-else class="mb-3 text-body-secondary">🧙 Charakterblatt (Spielleiter)</h5>
 
       <div class="card p-3 mb-2">
         <div class="row g-3">
@@ -615,10 +627,17 @@ window.HTBAH_SEITEN.Charakter = {
                 </div>
               </div>
               <div class="col-12 col-md-6">
-                <div class="form-floating">
-                  <input id="ce-char-religion" class="form-control" v-model="charakter.religion" placeholder=" ">
-                  <label for="ce-char-religion">Religion</label>
-                </div>
+                <label class="form-label text-body-secondary small mb-1" for="ce-char-glaube">Glaube</label>
+                <input
+                  id="ce-char-glaube"
+                  class="form-control"
+                  v-model="charakter.glaube"
+                  :list="pantheonGlaubeNamen.length ? 'ce-char-glaube-datalist' : undefined"
+                  placeholder="Leer, Pantheon wählen oder Freitext"
+                  autocomplete="off" />
+                <datalist v-if="pantheonGlaubeNamen.length" id="ce-char-glaube-datalist">
+                  <option v-for="n in pantheonGlaubeNamen" :key="'pgl-' + n" :value="n"></option>
+                </datalist>
               </div>
             </div>
 
@@ -1120,7 +1139,7 @@ window.HTBAH_SEITEN.Charakter = {
         :dateiname="charakterPdfDateiname"
         @schliessen="charakterPdfModalSchliessen"
       />
-      <div style="height: 80px;"></div>
+      <div class="abstandshalter" aria-hidden="true"></div>
     </div>
   `,
 };

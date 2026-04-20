@@ -513,7 +513,7 @@ window.HTBAH_SEITEN.Einstellungen = {
   },
   template: `
     <div class="container content py-3 text-center">
-      <h4>Einstellungen</h4>
+      <h4>⚙️ Einstellungen</h4>
 
       <h5 class="text-start mb-2">Theme</h5>
       <div class="card p-3 mb-3 text-start">
@@ -613,7 +613,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       </div>
 
       <h5 class="text-start mb-2">Daten löschen</h5>
-      <div class="card p-3" style="margin-bottom: 4rem;">
+      <div class="card p-3">
         <template v-if="appRolle === 'charakter'">
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
@@ -696,6 +696,8 @@ window.HTBAH_SEITEN.Einstellungen = {
           </icon-text-button>
         </template>
       </div>
+
+      <div class="abstandshalter" aria-hidden="true"></div>
 
       <teleport to="body">
         <div

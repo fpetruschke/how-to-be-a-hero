@@ -249,7 +249,7 @@
       ['Geschlecht', charakter.geschlecht],
       ['Alter', charakter.alter != null && charakter.alter !== '' ? String(charakter.alter) : ''],
       ['Statur', charakter.statur],
-      ['Religion', charakter.religion],
+      ['Glaube', charakter.glaube != null && charakter.glaube !== '' ? charakter.glaube : charakter.religion],
       ['Beruf', charakter.beruf],
       ['Familienstand', charakter.familienstand],
     ];

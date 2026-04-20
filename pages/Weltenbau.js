@@ -628,7 +628,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         @abgebrochen="onWeltenbauBildImportAbgebrochen"
         @datei-import-fehler="onWeltenbauDateiImportFehler" />
 
-      <h4 class="mb-1">Spielleitung · Weltenbau</h4>
+      <h4 class="mb-1">🗺️ Spielleitung · Weltenbau</h4>
       <p class="small text-body-secondary mb-3">
         Externe Generatoren (u. a. Karten, Gebäude, Dungeons) mit Export als PNG/JSON.
       </p>
@@ -730,6 +730,8 @@ window.HTBAH_SEITEN.Weltenbau = {
           </div>
         </div>
       </div>
+
+      <div class="abstandshalter" aria-hidden="true"></div>
 
       <teleport to="body">
         <div

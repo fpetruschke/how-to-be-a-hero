@@ -214,6 +214,8 @@ function normalisiereZufallstabellenNpcZeile(z) {
     schadenswert: typeof z.schadenswert === 'string' ? z.schadenswert : '',
     kampfart: z.kampfart === 'fernkampf' ? 'fernkampf' : 'nahkampf',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
+    fraktion: typeof z.fraktion === 'string' ? z.fraktion : '',
+    glaube: typeof z.glaube === 'string' ? z.glaube : '',
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
   };
 }
@@ -308,6 +310,35 @@ function ladeZufallstabellenZustand() {
 
 function speichereZufallstabellenZustand(zustand) {
   htbahSpeicher.schreibeJson(SPEICHER_KEY_ZUFALLSTABELLEN, zustand);
+}
+
+function erstellePantheonExportPaket() {
+  const z = ladeZufallstabellenZustand();
+  return {
+    htbahExportVersion: 1,
+    typ: 'zufallstabellen-pantheon',
+    exportiertAm: new Date().toISOString(),
+    pantheon: JSON.parse(JSON.stringify(z.pantheon || [])),
+  };
+}
+
+function pantheonImportAusPaket(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return { ok: false, fehler: 'Kein gültiges JSON-Objekt.' };
+  }
+  if (
+    roh.htbahExportVersion !== 1 ||
+    roh.typ !== 'zufallstabellen-pantheon' ||
+    !Array.isArray(roh.pantheon)
+  ) {
+    return {
+      ok: false,
+      fehler:
+        'Ungültige Pantheon-Datei. Bitte eine JSON-Datei aus „Pantheon exportieren“ (Zufallstabellen) verwenden.',
+    };
+  }
+  const pantheon = roh.pantheon.map(normalisiereZufallstabellenPantheonZeile).filter(Boolean);
+  return { ok: true, pantheon };
 }
 
 function atmosphaereLeer() {
@@ -839,6 +870,8 @@ window.HTBAH = {
   dateiHerunterladenJson,
   ladeZufallstabellenZustand,
   speichereZufallstabellenZustand,
+  erstellePantheonExportPaket,
+  pantheonImportAusPaket,
   ladeSpielleitungAbenteuerbuchHtml,
   speichereSpielleitungAbenteuerbuchHtml,
   loescheSpielleitungAbenteuerbuch,

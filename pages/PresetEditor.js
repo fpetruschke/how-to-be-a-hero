@@ -208,7 +208,7 @@ window.HTBAH_SEITEN.PresetEditor = {
   },
   template: `
     <div class="container content py-3">
-      <h4>{{ istBearbeitung ? 'Fähigkeiten-Preset bearbeiten' : 'Fähigkeiten-Preset erstellen' }}</h4>
+      <h4>📦 {{ istBearbeitung ? 'Fähigkeiten-Preset bearbeiten' : 'Fähigkeiten-Preset erstellen' }}</h4>
       <p v-if="preset.htbahPresetId" class="small text-body-secondary mb-3">
         Vorgegebenes Preset: Name und Fähigkeiten sind anpassbar; in der Übersicht kann es nicht gelöscht werden.
       </p>
@@ -323,7 +323,7 @@ window.HTBAH_SEITEN.PresetEditor = {
         Fähigkeiten-Preset speichern
       </button>
 
-      <div style="height:80px;"></div>
+      <div class="abstandshalter" aria-hidden="true"></div>
 
       <div
         class="modal fade"

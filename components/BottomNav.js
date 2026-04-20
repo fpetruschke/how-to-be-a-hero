@@ -91,7 +91,50 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       return p === '/einstellungen' || p.startsWith('/einstellungen/');
     },
   },
+  watch: {
+    zeigeNav() {
+      this.$nextTick(() => this.bindNavReserveObserver());
+    },
+  },
+  mounted() {
+    this._navReserveObserver = null;
+    this.$nextTick(() => this.bindNavReserveObserver());
+  },
+  beforeUnmount() {
+    this.unbindNavReserveObserver();
+    document.documentElement.style.removeProperty('--htbah-bottom-nav-reserve');
+  },
   methods: {
+    bindNavReserveObserver() {
+      this.unbindNavReserveObserver();
+      const el = this.$refs.navbarFixedEl;
+      if (!el) {
+        this.syncBottomNavReserve();
+        return;
+      }
+      this._navReserveObserver = new ResizeObserver(() => {
+        this.syncBottomNavReserve();
+      });
+      this._navReserveObserver.observe(el);
+      this.syncBottomNavReserve();
+    },
+    unbindNavReserveObserver() {
+      if (this._navReserveObserver) {
+        this._navReserveObserver.disconnect();
+        this._navReserveObserver = null;
+      }
+    },
+    syncBottomNavReserve() {
+      const el = this.$refs.navbarFixedEl;
+      const root = document.documentElement;
+      if (!el) {
+        root.style.setProperty('--htbah-bottom-nav-reserve', '0px');
+        return;
+      }
+      const h = el.getBoundingClientRect().height;
+      const px = Math.max(1, Math.ceil(h));
+      root.style.setProperty('--htbah-bottom-nav-reserve', `${px}px`);
+    },
     regelwerkOeffnen() {
       this.uiZustand.regelwerkOffen = true;
     },
@@ -243,6 +286,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     <teleport to="body">
       <div
         v-if="zeigeNav"
+        ref="navbarFixedEl"
         class="navbar-fixed d-flex flex-nowrap align-items-stretch w-100 px-2 py-2 htbah-bottom-nav-inner">
         <template v-if="rolle === 'charakter'">
           <router-link
