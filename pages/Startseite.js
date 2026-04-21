@@ -69,15 +69,18 @@ window.HTBAH_SEITEN.Startseite = {
   },
   template: `
     <div class="container content py-3 text-center">
-      <h2 class="d-flex align-items-center justify-content-center gap-2">
-        <img
-          src="assets/img/htbah-begleit-app-logo.png"
-          alt="How to be a Hero - Begleit-App Logo"
-          width="42"
-          height="42" />
-        <span>How to be a Hero - Begleit-App</span>
-      </h2>
-      <p class="text-secondary">Simple. Schnell. Dein Abenteuer.</p>
+      <div class="htbah-start-hero mb-3">
+        <span class="htbah-start-hero-logo-wrap">
+          <img
+            src="assets/img/htbah-begleit-app-logo.png"
+            alt="How to be a Hero - Begleit-App Logo"
+            class="htbah-start-hero-logo" />
+        </span>
+        <div class="htbah-start-hero-text text-center">
+          <h2 class="htbah-start-hero-title mb-0">How to be a Hero - Begleit-App</h2>
+          <p class="htbah-start-hero-subtitle text-secondary mb-0">Simple. Schnell. Dein Abenteuer.</p>
+        </div>
+      </div>
 
       <div
         class="card action-card text-start mb-3 cursor-pointer"

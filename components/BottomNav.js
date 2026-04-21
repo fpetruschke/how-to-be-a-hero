@@ -8,6 +8,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       anzahlW10: 1,
       ergebnisse: [],
       wuerfelModalTab: 'wuerfel',
+      atmosphaereFormularOffen: false,
       atmosphaere: {},
       badgePos: null,
       _badgeDrag: null,
@@ -27,6 +28,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     rolle() {
       void this.$route.fullPath;
       return window.HTBAH.ladeAppRolle();
+    },
+    istSpielleitung() {
+      return this.rolle === 'spielleitung';
     },
     zeigeNav() {
       const p = this.$route.path || '/';
@@ -57,6 +61,54 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         return a.jahreszeitFarbe;
       }
       return 'var(--primary-color)';
+    },
+    jahreszeitenOptionen() {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      return AZ && Array.isArray(AZ.JAHRESZEITEN) ? AZ.JAHRESZEITEN : [];
+    },
+    tageszeitenOptionen() {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      return AZ && Array.isArray(AZ.TAGESZEITEN) ? AZ.TAGESZEITEN : [];
+    },
+    temperaturOptionen() {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      return AZ && typeof AZ.temperaturOptionen === 'function' ? AZ.temperaturOptionen() : [];
+    },
+    bewoelkungOptionen() {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      return AZ && typeof AZ.bewoelkungOptionen === 'function' ? AZ.bewoelkungOptionen() : [];
+    },
+    niederschlagOptionen() {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      return AZ && typeof AZ.niederschlagOptionen === 'function' ? AZ.niederschlagOptionen() : [];
+    },
+    windstaerkeOptionen() {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      return AZ && typeof AZ.windstaerkeOptionen === 'function' ? AZ.windstaerkeOptionen() : [];
+    },
+    windrichtungOptionen() {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      return AZ && typeof AZ.windrichtungOptionen === 'function' ? AZ.windrichtungOptionen() : [];
+    },
+    aktuelleWindstaerkeBft() {
+      const wb = String(this.atmosphaere.windBeaufort || '');
+      const m = wb.match(/([\d]+(?:[\-–][\d]+)?)/);
+      if (m && m[1]) {
+        return m[1].replace(/-/g, '–');
+      }
+      return this.windstaerkeOptionen[0] ? this.windstaerkeOptionen[0].bft : '';
+    },
+    aktuelleWindrichtung() {
+      const wr = String(this.atmosphaere.windRichtung || '').trim();
+      if (wr && this.windrichtungOptionen.includes(wr)) {
+        return wr;
+      }
+      const m = String(this.atmosphaere.wind || '').match(/aus\s+([A-Z]{1,2})$/);
+      const parsed = m && m[1] ? m[1] : '';
+      if (parsed && this.windrichtungOptionen.includes(parsed)) {
+        return parsed;
+      }
+      return this.windrichtungOptionen[0] || 'N';
     },
     startseiteLandingAktiv() {
       const p = this.$route.path || '';
@@ -186,12 +238,102 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       Object.assign(this.atmosphaere, AZ.generiereTageszeit());
       this.speichereAtmosphaere();
     },
-    wuerfelModalOeffnen(tab) {
-      if (tab === 'atmosphaere' || tab === 'wuerfel') {
-        this.wuerfelModalTab = tab;
-      } else {
-        this.wuerfelModalTab = 'wuerfel';
+    atmosphaereSetzeJahreszeit(jahreszeitId) {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      if (!AZ || !jahreszeitId) {
+        return;
       }
+      const j = AZ.jahreszeitMeta(jahreszeitId);
+      Object.assign(this.atmosphaere, {
+        jahreszeitId: j.id,
+        jahreszeitLabel: j.label,
+        jahreszeitEmoji: j.emoji,
+        jahreszeitFarbe: j.farbe,
+      });
+      this.speichereAtmosphaere();
+    },
+    atmosphaereSetzeTageszeit(tageszeitId) {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      if (!AZ || !tageszeitId) {
+        return;
+      }
+      const t = AZ.tageszeitMeta(tageszeitId);
+      Object.assign(this.atmosphaere, {
+        tageszeitId: t.id,
+        tageszeitLabel: t.label,
+        tageszeitEmoji: t.emoji,
+        tageszeitFarbe: t.farbe,
+      });
+      this.speichereAtmosphaere();
+    },
+    atmosphaereSetzeTemperatur(temperatur) {
+      if (!temperatur) {
+        return;
+      }
+      this.atmosphaere.temperatur = temperatur;
+      this.speichereAtmosphaere();
+    },
+    atmosphaereSetzeBewoelkung(bewoelkung) {
+      if (!bewoelkung) {
+        return;
+      }
+      this.atmosphaere.bewoelkung = bewoelkung;
+      this.speichereAtmosphaere();
+    },
+    atmosphaereSetzeNiederschlag(niederschlagKey) {
+      const AZ = window.HTBAH.AtmosphaereZufall;
+      if (!AZ || !niederschlagKey) {
+        return;
+      }
+      const meta = AZ.niederschlagMeta(niederschlagKey);
+      Object.assign(this.atmosphaere, {
+        niederschlagKey,
+        niederschlagLabel: meta.label,
+        niederschlagEmoji: meta.emoji,
+      });
+      this.speichereAtmosphaere();
+    },
+    atmosphaereWindText(staerke, richtung) {
+      return `${staerke.label}, aus ${richtung}`;
+    },
+    atmosphaereSetzeWindstaerke(bftBand) {
+      if (!bftBand) {
+        return;
+      }
+      const staerke = this.windstaerkeOptionen.find((s) => s.bft === bftBand);
+      if (!staerke) {
+        return;
+      }
+      const richtung = this.aktuelleWindrichtung;
+      Object.assign(this.atmosphaere, {
+        wind: this.atmosphaereWindText(staerke, richtung),
+        windStaerke: staerke.kmh,
+        windBeaufort: `Beaufort ${staerke.bft}`,
+        windRichtung: richtung,
+      });
+      this.speichereAtmosphaere();
+    },
+    atmosphaereSetzeWindrichtung(richtung) {
+      if (!richtung) {
+        return;
+      }
+      const staerke =
+        this.windstaerkeOptionen.find((s) => s.bft === this.aktuelleWindstaerkeBft) || this.windstaerkeOptionen[0];
+      if (!staerke) {
+        return;
+      }
+      Object.assign(this.atmosphaere, {
+        wind: this.atmosphaereWindText(staerke, richtung),
+        windRichtung: richtung,
+      });
+      this.speichereAtmosphaere();
+    },
+    atmosphaereToggleFormular() {
+      this.atmosphaereFormularOffen = !this.atmosphaereFormularOffen;
+    },
+    wuerfelModalOeffnen(tab) {
+      const zielTab = tab === 'atmosphaere' || tab === 'wuerfel' ? tab : 'wuerfel';
+      this.wuerfelModalTab = !this.istSpielleitung && zielTab === 'atmosphaere' ? 'wuerfel' : zielTab;
       const modalElement = this.$refs.wuerfelModalElement;
       if (!modalElement) {
         return;
@@ -350,7 +492,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
     <teleport to="body">
       <div
-        v-if="zeigeNav"
+        v-if="zeigeNav && istSpielleitung"
         ref="atmosphaereBadgeEl"
         class="htbah-atmosphaere-badge"
         :class="{ 'htbah-atmosphaere-badge--custom-pos': badgePos && badgePos.mode === 'fixed' }"
@@ -410,7 +552,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
-              <ul class="nav nav-tabs mb-3" role="tablist">
+              <ul v-if="istSpielleitung" class="nav nav-tabs mb-3" role="tablist">
                 <li class="nav-item" role="presentation">
                   <button
                     type="button"
@@ -432,54 +574,50 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               </ul>
 
               <div v-show="wuerfelModalTab === 'wuerfel'">
-                <div class="card p-3 mb-3">
-                  <div class="btn-group w-100 mb-3" role="group" aria-label="Würfelmodus">
-                    <button
-                      type="button"
-                      class="btn"
-                      :class="wuerfelModus === 'w10' ? 'btn-primary' : 'btn-outline-primary'"
-                      @click="setzeWuerfelModus('w10')">
-                      x W10
-                    </button>
-                    <button
-                      type="button"
-                      class="btn"
-                      :class="wuerfelModus === 'w100' ? 'btn-primary' : 'btn-outline-primary'"
-                      @click="setzeWuerfelModus('w100')">
-                      1x W100
-                    </button>
-                  </div>
-
-                  <div class="row g-2 align-items-end">
-                    <div class="col-12" v-if="wuerfelModus === 'w10'">
-                      <div class="form-floating">
-                        <input
-                          id="nav-anzahl-w10"
-                          type="number"
-                          class="form-control"
-                          min="1"
-                          max="50"
-                          v-model.number="anzahlW10"
-                          placeholder=" " />
-                        <label for="nav-anzahl-w10">Anzahl W10</label>
-                      </div>
-                    </div>
-                    <div class="col-12" v-else>
-                      <small>W100 wird immer genau einmal gewürfelt.</small>
-                    </div>
-                    <div class="col-12">
-                      <icon-text-button
-                        type="button"
-                        class="btn btn-primary w-100"
-                        icon="casino"
-                        @click="wuerfeln">
-                        Würfeln
-                      </icon-text-button>
-                    </div>
-                  </div>
+                <div class="btn-group w-100 mb-3" role="group" aria-label="Würfelmodus">
+                  <button
+                    type="button"
+                    class="btn"
+                    :class="wuerfelModus === 'w10' ? 'btn-primary' : 'btn-outline-primary'"
+                    @click="setzeWuerfelModus('w10')">
+                    x W10
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    :class="wuerfelModus === 'w100' ? 'btn-primary' : 'btn-outline-primary'"
+                    @click="setzeWuerfelModus('w100')">
+                    1x W100
+                  </button>
                 </div>
 
-                <div class="card p-3 mb-2">
+                <div class="mb-3" v-if="wuerfelModus === 'w10'">
+                  <div class="form-floating">
+                    <input
+                      id="nav-anzahl-w10"
+                      type="number"
+                      class="form-control"
+                      min="1"
+                      max="50"
+                      v-model.number="anzahlW10"
+                      placeholder=" " />
+                    <label for="nav-anzahl-w10">Anzahl W10</label>
+                  </div>
+                </div>
+                <div class="mb-3" v-else>
+                  <small>W100 wird immer genau einmal gewürfelt.</small>
+                </div>
+                <div class="mb-3">
+                  <icon-text-button
+                    type="button"
+                    class="btn btn-primary w-100 htbah-wuerfeln-btn"
+                    icon="casino"
+                    @click="wuerfeln">
+                    Würfeln
+                  </icon-text-button>
+                </div>
+
+                <div class="card p-3 shadow-sm mb-2">
                   <div class="d-flex align-items-center justify-content-between mb-2">
                     <h6 class="mb-0">{{ ergebnisTitel }}</h6>
                     <span
@@ -507,78 +645,186 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 </div>
               </div>
 
-              <div v-show="wuerfelModalTab === 'atmosphaere'" class="htbah-atmosphaere-modal">
-                <div class="d-flex flex-wrap gap-2 mb-3">
-                  <button type="button" class="btn btn-primary" @click="atmosphaereAllesWuerfeln">
-                    Alles würfeln
-                  </button>
-                  <button type="button" class="btn btn-outline-secondary" @click="atmosphaereNurJahreszeit">
-                    Nur Jahreszeit
-                  </button>
-                  <button type="button" class="btn btn-outline-secondary" @click="atmosphaereNurWetter">
-                    Nur Wetter
-                  </button>
-                  <button type="button" class="btn btn-outline-secondary" @click="atmosphaereNurTageszeit">
-                    Nur Tageszeit
+              <div v-if="istSpielleitung" v-show="wuerfelModalTab === 'atmosphaere'" class="htbah-atmosphaere-modal">
+                <div class="d-flex align-items-stretch gap-2 mb-3">
+                  <div class="btn-group">
+                    <button type="button" class="btn btn-primary" @click="atmosphaereAllesWuerfeln">
+                      Alles würfeln
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-primary dropdown-toggle dropdown-toggle-split"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      aria-label="Würfeloption wählen">
+                      <span class="visually-hidden">Weitere Optionen</span>
+                    </button>
+                    <ul class="dropdown-menu">
+                      <li>
+                        <button type="button" class="dropdown-item" @click="atmosphaereAllesWuerfeln">
+                          Alles würfeln
+                        </button>
+                      </li>
+                      <li>
+                        <button type="button" class="dropdown-item" @click="atmosphaereNurJahreszeit">
+                          Nur Jahreszeit
+                        </button>
+                      </li>
+                      <li>
+                        <button type="button" class="dropdown-item" @click="atmosphaereNurWetter">
+                          Nur Wetter
+                        </button>
+                      </li>
+                      <li>
+                        <button type="button" class="dropdown-item" @click="atmosphaereNurTageszeit">
+                          Nur Tageszeit
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary ms-auto"
+                    @click="atmosphaereToggleFormular">
+                    {{ atmosphaereFormularOffen ? 'Ausblenden' : 'Selbst bestimmen' }}
                   </button>
                 </div>
-                <p class="small text-secondary mb-3">
-                  „Nur Wetter“ nutzt die aktuelle Jahreszeit (oder Frühling, falls noch keine gewählt).
-                  Jahreszeit und Wetter sind stimmig gewichtet (kein Schneesturm im Hochsommer).
-                </p>
-                <div
-                  class="card htbah-atmosphaere-karte border-0 shadow-sm mb-0"
-                  :style="{ borderLeft: '4px solid ' + atmosphaereAkzent }">
+                <div class="card border-0 shadow-sm mb-3" v-if="atmosphaereHatWerte" v-show="atmosphaereFormularOffen">
                   <div class="card-body">
-                    <div v-if="!atmosphaereHatWerte" class="text-secondary small">
-                      Noch keine Werte — tippe auf „Alles würfeln“.
+                    <h6 class="mb-3 fw-bold">Werte bearbeiten</h6>
+                    <div class="row g-2">
+                      <div class="col-md-6">
+                        <label class="form-label mb-1 small text-secondary" for="atmo-jahreszeit">Jahreszeit</label>
+                        <select
+                          id="atmo-jahreszeit"
+                          class="form-select"
+                          :value="atmosphaere.jahreszeitId || ''"
+                          @change="atmosphaereSetzeJahreszeit($event.target.value)">
+                          <option v-for="o in jahreszeitenOptionen" :key="'jz-' + o.id" :value="o.id">
+                            {{ o.emoji }} {{ o.label }}
+                          </option>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label mb-1 small text-secondary" for="atmo-tageszeit">Tageszeit</label>
+                        <select
+                          id="atmo-tageszeit"
+                          class="form-select"
+                          :value="atmosphaere.tageszeitId || ''"
+                          @change="atmosphaereSetzeTageszeit($event.target.value)">
+                          <option v-for="o in tageszeitenOptionen" :key="'tz-' + o.id" :value="o.id">
+                            {{ o.emoji }} {{ o.label }}
+                          </option>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label mb-1 small text-secondary" for="atmo-temperatur">Temperatur</label>
+                        <select
+                          id="atmo-temperatur"
+                          class="form-select"
+                          :value="atmosphaere.temperatur || ''"
+                          @change="atmosphaereSetzeTemperatur($event.target.value)">
+                          <option v-for="o in temperaturOptionen" :key="'temp-' + o" :value="o">
+                            {{ o }}
+                          </option>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label mb-1 small text-secondary" for="atmo-bewoelkung">Bewölkung</label>
+                        <select
+                          id="atmo-bewoelkung"
+                          class="form-select"
+                          :value="atmosphaere.bewoelkung || ''"
+                          @change="atmosphaereSetzeBewoelkung($event.target.value)">
+                          <option v-for="o in bewoelkungOptionen" :key="'bew-' + o" :value="o">
+                            {{ o }}
+                          </option>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label mb-1 small text-secondary" for="atmo-niederschlag">Niederschlag</label>
+                        <select
+                          id="atmo-niederschlag"
+                          class="form-select"
+                          :value="atmosphaere.niederschlagKey || ''"
+                          @change="atmosphaereSetzeNiederschlag($event.target.value)">
+                          <option v-for="o in niederschlagOptionen" :key="'nied-' + o.key" :value="o.key">
+                            {{ o.emoji }} {{ o.label }}
+                          </option>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label mb-1 small text-secondary" for="atmo-windrichtung">Windrichtung</label>
+                        <select
+                          id="atmo-windrichtung"
+                          class="form-select"
+                          :value="aktuelleWindrichtung"
+                          @change="atmosphaereSetzeWindrichtung($event.target.value)">
+                          <option v-for="o in windrichtungOptionen" :key="'wdir-' + o" :value="o">
+                            {{ o }}
+                          </option>
+                        </select>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label mb-1 small text-secondary" for="atmo-windstaerke">Windstärke</label>
+                        <select
+                          id="atmo-windstaerke"
+                          class="form-select"
+                          :value="aktuelleWindstaerkeBft"
+                          @change="atmosphaereSetzeWindstaerke($event.target.value)">
+                          <option v-for="o in windstaerkeOptionen" :key="'wst-' + o.bft" :value="o.bft">
+                            Beaufort {{ o.bft }} ({{ o.kmh }}) - {{ o.label }}
+                          </option>
+                        </select>
+                      </div>
                     </div>
-                    <template v-else>
-                      <div class="row g-2">
-                        <div class="col-md-6">
-                          <div class="htbah-atmosphaere-pill" :style="{ background: atmosphaere.jahreszeitFarbe + '33' }">
-                            <span class="fs-4 me-2">{{ atmosphaere.jahreszeitEmoji }}</span>
-                            <div>
-                              <div class="small text-secondary">Jahreszeit</div>
-                              <div class="fw-semibold">{{ atmosphaere.jahreszeitLabel }}</div>
-                            </div>
-                          </div>
+                  </div>
+                </div>
+                <div v-if="!atmosphaereHatWerte" class="text-secondary small">
+                  Noch keine Werte — tippe auf „Alles würfeln“.
+                </div>
+                <div v-else class="row g-2">
+                  <div class="col-md-6">
+                    <div class="htbah-atmosphaere-pill shadow-sm" :style="{ background: atmosphaere.jahreszeitFarbe + '33' }">
+                      <span class="fs-4 me-2">{{ atmosphaere.jahreszeitEmoji }}</span>
+                      <div>
+                        <div class="small text-secondary">Jahreszeit</div>
+                        <div class="fw-semibold">{{ atmosphaere.jahreszeitLabel }}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="htbah-atmosphaere-pill shadow-sm" :style="{ background: (atmosphaere.tageszeitFarbe || '#888') + '33' }">
+                      <span class="fs-4 me-2">{{ atmosphaere.tageszeitEmoji }}</span>
+                      <div>
+                        <div class="small text-secondary">Tageszeit</div>
+                        <div class="fw-semibold">{{ atmosphaere.tageszeitLabel }}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div
+                      class="htbah-atmosphaere-pill htbah-atmosphaere-pill--wetter shadow-sm"
+                      :style="{ background: (atmosphaere.wetterAkzentFarbe || atmosphaere.jahreszeitFarbe || '#38bdf8') + '33' }">
+                      <span class="fs-4 me-2 flex-shrink-0">{{ atmosphaere.niederschlagEmoji }}</span>
+                      <div class="flex-grow-1 min-w-0">
+                        <div class="small text-secondary">Wetter</div>
+                        <div class="fw-semibold">{{ atmosphaere.temperatur }}</div>
+                        <div class="small">{{ atmosphaere.bewoelkung }}</div>
+                        <div class="small">{{ atmosphaere.niederschlagLabel }}</div>
+                        <div class="small mt-2">
+                          <span class="text-secondary">Wind:</span>
+                          {{ atmosphaere.wind }}
                         </div>
-                        <div class="col-md-6">
-                          <div class="htbah-atmosphaere-pill" :style="{ background: (atmosphaere.tageszeitFarbe || '#888') + '33' }">
-                            <span class="fs-4 me-2">{{ atmosphaere.tageszeitEmoji }}</span>
-                            <div>
-                              <div class="small text-secondary">Tageszeit</div>
-                              <div class="fw-semibold">{{ atmosphaere.tageszeitLabel }}</div>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="col-12">
-                          <div
-                            class="htbah-atmosphaere-pill htbah-atmosphaere-pill--wetter"
-                            :style="{ background: (atmosphaere.wetterAkzentFarbe || atmosphaere.jahreszeitFarbe || '#38bdf8') + '33' }">
-                            <span class="fs-4 me-2 flex-shrink-0">{{ atmosphaere.niederschlagEmoji }}</span>
-                            <div class="flex-grow-1 min-w-0">
-                              <div class="small text-secondary">Wetter</div>
-                              <div class="fw-semibold">{{ atmosphaere.temperatur }}</div>
-                              <div class="small">{{ atmosphaere.bewoelkung }}</div>
-                              <div class="small">{{ atmosphaere.niederschlagLabel }}</div>
-                              <div class="small mt-2">
-                                <span class="text-secondary">Wind:</span>
-                                {{ atmosphaere.wind }}
-                              </div>
-                              <div class="small">
-                                <span class="text-secondary">Windstärke:</span>
-                                <span class="fw-medium">{{ atmosphaere.windStaerke }}</span>
-                                <span v-if="atmosphaere.windBeaufort" class="text-muted ms-1">
-                                  (<span class="fst-italic">{{ atmosphaere.windBeaufort }}</span>)
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                        <div class="small">
+                          <span class="text-secondary">Windstärke:</span>
+                          <span class="fw-medium">{{ atmosphaere.windStaerke }}</span>
+                          <span v-if="atmosphaere.windBeaufort" class="text-muted ms-1">
+                            (<span class="fst-italic">{{ atmosphaere.windBeaufort }}</span>)
+                          </span>
                         </div>
                       </div>
-                    </template>
+                    </div>
                   </div>
                 </div>
               </div>

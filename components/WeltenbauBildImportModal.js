@@ -25,6 +25,7 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
     return {
       tempObjectUrl: '',
       aktuellerDateiname: '',
+      aktuelleDateigroesseBytes: null,
       cropper: null,
       bootstrapModal: null,
       schliessenOhneAbgebrochenEvent: false,
@@ -40,6 +41,7 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
       this.cropperAufraeumen();
       this.revokeTempUrl();
       this.aktuellerDateiname = file.name || 'Bild';
+      this.aktuelleDateigroesseBytes = Number.isFinite(file.size) && file.size > 0 ? Math.round(file.size) : null;
       this.bildLaedt = true;
       this.tempObjectUrl = URL.createObjectURL(file);
       const el = this.$refs.modalElement;
@@ -55,6 +57,7 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
       this.cropperAufraeumen();
       this.revokeTempUrl();
       this.bildLaedt = false;
+      this.aktuelleDateigroesseBytes = null;
       if (!this.schliessenOhneAbgebrochenEvent) {
         this.$emit('abgebrochen');
       }
@@ -125,7 +128,7 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
       }
       const name = dateinameOhneEndung(this.aktuellerDateiname);
       this.schliessenOhneAbgebrochenEvent = true;
-      this.$emit('fertig', { dataUrl, name });
+      this.$emit('fertig', { dataUrl, name, dateigroesseBytes: this.aktuelleDateigroesseBytes });
       if (this.bootstrapModal) {
         this.bootstrapModal.hide();
       }

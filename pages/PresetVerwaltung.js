@@ -54,7 +54,13 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
   },
   template: `
     <div class="container content py-3">
-      <h4>📦 Fähigkeiten-Presets</h4>
+      <h4 class="text-center mb-1 htbah-page-title">
+        <span class="htbah-page-title-emoji" aria-hidden="true">📦</span>
+        <span>Fähigkeiten-Presets</span>
+      </h4>
+      <p class="small text-body-secondary text-center mb-3">
+        Eigene Presets erstellen, importieren und verwalten.
+      </p>
 
       <div class="card p-3 mb-3">
         <icon-text-button tag="router-link" to="/faehigkeiten-preset-bearbeiten" class="btn btn-success w-100 mb-2" icon="add">

@@ -2,13 +2,17 @@ window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
 
 function htbahTextVorschau(html, maxLen) {
   const grenze = typeof maxLen === 'number' ? maxLen : 72;
-  const div = document.createElement('div');
-  div.innerHTML = typeof html === 'string' ? html : '';
-  const t = (div.textContent || '').replace(/\s+/g, ' ').trim();
+  const t = htbahHtmlText(html);
   if (!t) {
     return '—';
   }
   return t.length > grenze ? `${t.slice(0, grenze)}…` : t;
+}
+
+function htbahHtmlText(html) {
+  const div = document.createElement('div');
+  div.innerHTML = typeof html === 'string' ? html : '';
+  return (div.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
 window.HTBAH_SEITEN.Zufallstabellen = {
@@ -29,6 +33,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       zufallFraktionEpoche: 'mittelalter',
       /** Stabile Funktion für :ref (wie InventarModal), kein String-ref im Modal */
       zeileQuillHostRefFn: null,
+      sucheOrte: '',
+      sucheFraktionen: '',
+      sucheNpcs: '',
+      sucheGegenstaende: '',
+      suchePantheon: '',
     };
   },
   created() {
@@ -69,6 +78,94 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         .map((p) => (p && p.name ? String(p.name).trim() : ''))
         .filter(Boolean);
     },
+    gefilterteOrte() {
+      const q = this.normSucheText(this.sucheOrte);
+      if (!q) {
+        return this.zustand.orte || [];
+      }
+      return (this.zustand.orte || []).filter((row) =>
+        this.trifftSucheZu(row, ['name', 'groesse', 'lage', 'zustand', 'notizenHtml'], q),
+      );
+    },
+    gefilterteFraktionen() {
+      const q = this.normSucheText(this.sucheFraktionen);
+      if (!q) {
+        return this.zustand.fraktionen || [];
+      }
+      return (this.zustand.fraktionen || []).filter((row) =>
+        this.trifftSucheZu(
+          row,
+          ['art', 'name', 'ziel', 'gesinnungVerhalten', 'beschreibungHtml'],
+          q,
+        ),
+      );
+    },
+    gefilterteNpcs() {
+      const q = this.normSucheText(this.sucheNpcs);
+      if (!q) {
+        return this.zustand.npcs || [];
+      }
+      return (this.zustand.npcs || []).filter((row) => {
+        const felder = [
+          'name',
+          'spitzname',
+          'geschlecht',
+          'alter',
+          'familienstand',
+          'statur',
+          'lebenspunkte',
+          'gesinnung',
+          'glaube',
+          'beruf',
+          'fraktion',
+          'aufenthaltsort',
+          'ziel',
+          'stimme',
+          'waffe',
+          'schadenswert',
+          'notizenHtml',
+        ];
+        return this.trifftSucheZu(row, felder, q, this.npcWaffenWerteText(row));
+      });
+    },
+    gefilterteGegenstaende() {
+      const q = this.normSucheText(this.sucheGegenstaende);
+      if (!q) {
+        return this.zustand.gegenstaende || [];
+      }
+      return (this.zustand.gegenstaende || []).filter((row) =>
+        this.trifftSucheZu(
+          row,
+          ['name', 'schadenswert', 'kampfart', 'beschreibungHtml'],
+          q,
+          this.gegenstandWaffenWerteText(row),
+        ),
+      );
+    },
+    gefiltertesPantheon() {
+      const q = this.normSucheText(this.suchePantheon);
+      if (!q) {
+        return this.zustand.pantheon || [];
+      }
+      return (this.zustand.pantheon || []).filter((row) =>
+        this.trifftSucheZu(
+          row,
+          [
+            'name',
+            'geschlecht',
+            'domaene',
+            'charakter',
+            'staerke',
+            'schwaeche',
+            'schutzpatronat',
+            'verlangen',
+            'mythosGaben',
+            'notizenHtml',
+          ],
+          q,
+        ),
+      );
+    },
   },
   methods: {
     persist() {
@@ -76,6 +173,42 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     },
     textVorschau(html) {
       return htbahTextVorschau(html);
+    },
+    normSucheText(wert) {
+      return String(wert || '')
+        .toLocaleLowerCase('de-DE')
+        .trim();
+    },
+    zeilenWertAlsText(wert) {
+      if (wert == null) {
+        return '';
+      }
+      if (typeof wert === 'string') {
+        const raw = wert.trim();
+        if (!raw) {
+          return '';
+        }
+        if (raw.includes('<') && raw.includes('>')) {
+          return htbahHtmlText(raw);
+        }
+        return raw;
+      }
+      return String(wert).trim();
+    },
+    trifftSucheZu(row, felder, query, extra) {
+      const basis = (Array.isArray(felder) ? felder : [])
+        .map((feld) => this.zeilenWertAlsText(row ? row[feld] : ''))
+        .filter(Boolean)
+        .join(' ');
+      const gesamterText = `${basis} ${this.zeilenWertAlsText(extra)}`.trim();
+      return this.normSucheText(gesamterText).includes(query);
+    },
+    karteWert(wert) {
+      const text = this.zeilenWertAlsText(wert);
+      return text || '—';
+    },
+    indexNachId(liste, id) {
+      return (liste || []).findIndex((row) => row.id === id);
     },
     npcWaffenWerteText(row) {
       const schadenswert = String(row && row.schadenswert ? row.schadenswert : '').trim();
@@ -514,9 +647,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
   },
   template: `
     <div class="container content py-3">
-      <h4 class="text-center mb-3">📚 Zufallstabellen</h4>
+      <h4 class="text-center mb-3 htbah-page-title">
+        <span class="htbah-page-title-emoji" aria-hidden="true">📚</span>
+        <span>Zufallstabellen</span>
+      </h4>
       <p class="text-secondary text-center small mb-4">
-        Eigene Tabellen für Spielrunden — Einträge werden lokal gespeichert.
+        Eigene Tabellen für Spielrunden.
       </p>
 
       <div class="card mb-3 text-start">
@@ -537,7 +673,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           </div>
         </div>
         <div class="card-body p-0">
-          <div class="table-responsive">
+          <div class="p-2 border-bottom">
+            <input
+              v-model.trim="sucheOrte"
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Orte durchsuchen…" />
+          </div>
+          <div class="table-responsive d-none d-md-block">
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
@@ -550,17 +693,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!zustand.orte.length">
+                <tr v-if="!gefilterteOrte.length">
                   <td colspan="6" class="text-secondary text-center py-3">Noch keine Einträge.</td>
                 </tr>
-                <tr v-for="(row, index) in zustand.orte" :key="row.id">
-                  <td>{{ row.name || '—' }}</td>
-                  <td>{{ row.groesse || '—' }}</td>
-                  <td>{{ row.lage || '—' }}</td>
-                  <td>{{ row.zustand || '—' }}</td>
+                <tr v-for="row in gefilterteOrte" :key="row.id">
+                  <td>{{ karteWert(row.name) }}</td>
+                  <td>{{ karteWert(row.groesse) }}</td>
+                  <td>{{ karteWert(row.lage) }}</td>
+                  <td>{{ karteWert(row.zustand) }}</td>
                   <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
                   <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="ortBearbeiten(row, index)">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary me-1"
+                      @click="ortBearbeiten(row, indexNachId(zustand.orte, row.id))">
                       Bearbeiten
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('ort', row.id)">
@@ -570,6 +716,34 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="d-md-none p-2">
+            <div v-if="!gefilterteOrte.length" class="text-secondary text-center py-3 small">
+              Noch keine Einträge.
+            </div>
+            <div v-for="row in gefilterteOrte" :key="'ort-card-' + row.id" class="card zufallstabellen-mobile-card mb-2">
+              <div class="card-body p-2">
+                <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
+                <div class="small"><span class="text-secondary">Größe:</span> {{ karteWert(row.groesse) }}</div>
+                <div class="small"><span class="text-secondary">Lage:</span> {{ karteWert(row.lage) }}</div>
+                <div class="small mb-2"><span class="text-secondary">Zustand:</span> {{ karteWert(row.zustand) }}</div>
+                <div class="small mb-2">{{ textVorschau(row.notizenHtml) }}</div>
+                <div class="d-flex gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary flex-fill"
+                    @click="ortBearbeiten(row, indexNachId(zustand.orte, row.id))">
+                    Bearbeiten
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-fill"
+                    @click="zeileLoeschenDialog('ort', row.id)">
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -592,7 +766,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           </div>
         </div>
         <div class="card-body p-0">
-          <div class="table-responsive">
+          <div class="p-2 border-bottom">
+            <input
+              v-model.trim="sucheFraktionen"
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Fraktionen durchsuchen…" />
+          </div>
+          <div class="table-responsive d-none d-md-block">
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
@@ -605,17 +786,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!zustand.fraktionen.length">
+                <tr v-if="!gefilterteFraktionen.length">
                   <td colspan="6" class="text-secondary text-center py-3">Noch keine Einträge.</td>
                 </tr>
-                <tr v-for="(row, index) in zustand.fraktionen" :key="row.id">
-                  <td>{{ row.art || '—' }}</td>
-                  <td>{{ row.name || '—' }}</td>
-                  <td class="small">{{ row.ziel || '—' }}</td>
-                  <td class="small">{{ row.gesinnungVerhalten || '—' }}</td>
+                <tr v-for="row in gefilterteFraktionen" :key="row.id">
+                  <td>{{ karteWert(row.art) }}</td>
+                  <td>{{ karteWert(row.name) }}</td>
+                  <td class="small">{{ karteWert(row.ziel) }}</td>
+                  <td class="small">{{ karteWert(row.gesinnungVerhalten) }}</td>
                   <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
                   <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="fraktionBearbeiten(row, index)">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary me-1"
+                      @click="fraktionBearbeiten(row, indexNachId(zustand.fraktionen, row.id))">
                       Bearbeiten
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('fraktion', row.id)">
@@ -625,6 +809,39 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="d-md-none p-2">
+            <div v-if="!gefilterteFraktionen.length" class="text-secondary text-center py-3 small">
+              Noch keine Einträge.
+            </div>
+            <div
+              v-for="row in gefilterteFraktionen"
+              :key="'fraktion-card-' + row.id"
+              class="card zufallstabellen-mobile-card mb-2">
+              <div class="card-body p-2">
+                <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
+                <div class="small"><span class="text-secondary">Art:</span> {{ karteWert(row.art) }}</div>
+                <div class="small"><span class="text-secondary">Ziel:</span> {{ karteWert(row.ziel) }}</div>
+                <div class="small mb-2">
+                  <span class="text-secondary">Gesinnung:</span> {{ karteWert(row.gesinnungVerhalten) }}
+                </div>
+                <div class="small mb-2">{{ textVorschau(row.beschreibungHtml) }}</div>
+                <div class="d-flex gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary flex-fill"
+                    @click="fraktionBearbeiten(row, indexNachId(zustand.fraktionen, row.id))">
+                    Bearbeiten
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-fill"
+                    @click="zeileLoeschenDialog('fraktion', row.id)">
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -647,7 +864,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           </div>
         </div>
         <div class="card-body p-0">
-          <div class="table-responsive">
+          <div class="p-2 border-bottom">
+            <input
+              v-model.trim="sucheNpcs"
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="NPCs durchsuchen…" />
+          </div>
+          <div class="table-responsive d-none d-md-block">
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
@@ -672,29 +896,32 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!zustand.npcs.length">
+                <tr v-if="!gefilterteNpcs.length">
                   <td colspan="18" class="text-secondary text-center py-3">Noch keine Einträge.</td>
                 </tr>
-                <tr v-for="(row, index) in zustand.npcs" :key="row.id">
-                  <td>{{ row.name || '—' }}</td>
-                  <td>{{ row.spitzname || '—' }}</td>
-                  <td>{{ row.geschlecht || '—' }}</td>
-                  <td>{{ row.alter || '—' }}</td>
-                  <td>{{ row.familienstand || '—' }}</td>
-                  <td>{{ row.statur || '—' }}</td>
-                  <td>{{ row.lebenspunkte || '—' }}</td>
-                  <td>{{ row.gesinnung || '—' }}</td>
-                  <td>{{ row.glaube || '—' }}</td>
-                  <td>{{ row.beruf || '—' }}</td>
-                  <td>{{ row.fraktion || '—' }}</td>
-                  <td>{{ row.aufenthaltsort || '—' }}</td>
-                  <td>{{ row.ziel || '—' }}</td>
-                  <td>{{ row.stimme || '—' }}</td>
-                  <td>{{ row.waffe || '—' }}</td>
+                <tr v-for="row in gefilterteNpcs" :key="row.id">
+                  <td>{{ karteWert(row.name) }}</td>
+                  <td>{{ karteWert(row.spitzname) }}</td>
+                  <td>{{ karteWert(row.geschlecht) }}</td>
+                  <td>{{ karteWert(row.alter) }}</td>
+                  <td>{{ karteWert(row.familienstand) }}</td>
+                  <td>{{ karteWert(row.statur) }}</td>
+                  <td>{{ karteWert(row.lebenspunkte) }}</td>
+                  <td>{{ karteWert(row.gesinnung) }}</td>
+                  <td>{{ karteWert(row.glaube) }}</td>
+                  <td>{{ karteWert(row.beruf) }}</td>
+                  <td>{{ karteWert(row.fraktion) }}</td>
+                  <td>{{ karteWert(row.aufenthaltsort) }}</td>
+                  <td>{{ karteWert(row.ziel) }}</td>
+                  <td>{{ karteWert(row.stimme) }}</td>
+                  <td>{{ karteWert(row.waffe) }}</td>
                   <td class="small">{{ npcWaffenWerteText(row) }}</td>
                   <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
                   <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="npcBearbeiten(row, index)">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary me-1"
+                      @click="npcBearbeiten(row, indexNachId(zustand.npcs, row.id))">
                       Bearbeiten
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('npc', row.id)">
@@ -704,6 +931,39 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="d-md-none p-2">
+            <div v-if="!gefilterteNpcs.length" class="text-secondary text-center py-3 small">
+              Noch keine Einträge.
+            </div>
+            <div v-for="row in gefilterteNpcs" :key="'npc-card-' + row.id" class="card zufallstabellen-mobile-card mb-2">
+              <div class="card-body p-2">
+                <div class="fw-semibold mb-1">
+                  {{ karteWert(row.name) }}
+                  <span v-if="zeilenWertAlsText(row.spitzname)" class="fw-normal text-secondary">({{ row.spitzname }})</span>
+                </div>
+                <div class="small"><span class="text-secondary">Beruf:</span> {{ karteWert(row.beruf) }}</div>
+                <div class="small"><span class="text-secondary">Gesinnung:</span> {{ karteWert(row.gesinnung) }}</div>
+                <div class="small"><span class="text-secondary">Ort:</span> {{ karteWert(row.aufenthaltsort) }}</div>
+                <div class="small"><span class="text-secondary">Fraktion:</span> {{ karteWert(row.fraktion) }}</div>
+                <div class="small mb-2"><span class="text-secondary">Werte:</span> {{ npcWaffenWerteText(row) }}</div>
+                <div class="small mb-2">{{ textVorschau(row.notizenHtml) }}</div>
+                <div class="d-flex gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary flex-fill"
+                    @click="npcBearbeiten(row, indexNachId(zustand.npcs, row.id))">
+                    Bearbeiten
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-fill"
+                    @click="zeileLoeschenDialog('npc', row.id)">
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -726,7 +986,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           </div>
         </div>
         <div class="card-body p-0">
-          <div class="table-responsive">
+          <div class="p-2 border-bottom">
+            <input
+              v-model.trim="sucheGegenstaende"
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Gegenstände durchsuchen…" />
+          </div>
+          <div class="table-responsive d-none d-md-block">
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
@@ -737,15 +1004,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!zustand.gegenstaende.length">
+                <tr v-if="!gefilterteGegenstaende.length">
                   <td colspan="4" class="text-secondary text-center py-3">Noch keine Einträge.</td>
                 </tr>
-                <tr v-for="(row, index) in zustand.gegenstaende" :key="row.id">
-                  <td>{{ row.name || '—' }}</td>
+                <tr v-for="row in gefilterteGegenstaende" :key="row.id">
+                  <td>{{ karteWert(row.name) }}</td>
                   <td class="small text-nowrap">{{ gegenstandWaffenWerteText(row) }}</td>
                   <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
                   <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="gegenstandBearbeiten(row, index)">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary me-1"
+                      @click="gegenstandBearbeiten(row, indexNachId(zustand.gegenstaende, row.id))">
                       Bearbeiten
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">
@@ -755,6 +1025,35 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="d-md-none p-2">
+            <div v-if="!gefilterteGegenstaende.length" class="text-secondary text-center py-3 small">
+              Noch keine Einträge.
+            </div>
+            <div
+              v-for="row in gefilterteGegenstaende"
+              :key="'gegenstand-card-' + row.id"
+              class="card zufallstabellen-mobile-card mb-2">
+              <div class="card-body p-2">
+                <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
+                <div class="small"><span class="text-secondary">Kampfwerte:</span> {{ gegenstandWaffenWerteText(row) }}</div>
+                <div class="small mb-2">{{ textVorschau(row.beschreibungHtml) }}</div>
+                <div class="d-flex gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary flex-fill"
+                    @click="gegenstandBearbeiten(row, indexNachId(zustand.gegenstaende, row.id))">
+                    Bearbeiten
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-fill"
+                    @click="zeileLoeschenDialog('gegenstand', row.id)">
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -788,7 +1087,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           </div>
         </div>
         <div class="card-body p-0">
-          <div class="table-responsive">
+          <div class="p-2 border-bottom">
+            <input
+              v-model.trim="suchePantheon"
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Pantheon durchsuchen…" />
+          </div>
+          <div class="table-responsive d-none d-md-block">
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
@@ -801,17 +1107,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!zustand.pantheon.length">
+                <tr v-if="!gefiltertesPantheon.length">
                   <td colspan="6" class="text-secondary text-center py-3">Noch keine Einträge.</td>
                 </tr>
-                <tr v-for="(row, index) in zustand.pantheon" :key="row.id">
-                  <td>{{ row.name || '—' }}</td>
-                  <td class="small">{{ row.domaene || '—' }}</td>
-                  <td class="small">{{ row.charakter || '—' }}</td>
-                  <td class="small">{{ row.schutzpatronat || '—' }}</td>
+                <tr v-for="row in gefiltertesPantheon" :key="row.id">
+                  <td>{{ karteWert(row.name) }}</td>
+                  <td class="small">{{ karteWert(row.domaene) }}</td>
+                  <td class="small">{{ karteWert(row.charakter) }}</td>
+                  <td class="small">{{ karteWert(row.schutzpatronat) }}</td>
                   <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
                   <td class="text-end text-nowrap">
-                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="pantheonBearbeiten(row, index)">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary me-1"
+                      @click="pantheonBearbeiten(row, indexNachId(zustand.pantheon, row.id))">
                       Bearbeiten
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('pantheon', row.id)">
@@ -821,6 +1130,39 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="d-md-none p-2">
+            <div v-if="!gefiltertesPantheon.length" class="text-secondary text-center py-3 small">
+              Noch keine Einträge.
+            </div>
+            <div
+              v-for="row in gefiltertesPantheon"
+              :key="'pantheon-card-' + row.id"
+              class="card zufallstabellen-mobile-card mb-2">
+              <div class="card-body p-2">
+                <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
+                <div class="small"><span class="text-secondary">Domäne:</span> {{ karteWert(row.domaene) }}</div>
+                <div class="small"><span class="text-secondary">Charakter:</span> {{ karteWert(row.charakter) }}</div>
+                <div class="small mb-2">
+                  <span class="text-secondary">Schutzpatronat:</span> {{ karteWert(row.schutzpatronat) }}
+                </div>
+                <div class="small mb-2">{{ textVorschau(row.notizenHtml) }}</div>
+                <div class="d-flex gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary flex-fill"
+                    @click="pantheonBearbeiten(row, indexNachId(zustand.pantheon, row.id))">
+                    Bearbeiten
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-fill"
+                    @click="zeileLoeschenDialog('pantheon', row.id)">
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -72,9 +72,12 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
   },
   template: `
     <div class="container content py-3">
-      <h4 class="mb-1">👥 Spielleiter · Gruppen</h4>
-      <p class="small text-body-secondary mb-3">
-        Gruppen anlegen und verwalten. In der Gruppenansicht importierst du Charakterblätter und bearbeitest sie.
+      <h4 class="text-center mb-1 htbah-page-title">
+        <span class="htbah-page-title-emoji" aria-hidden="true">👥</span>
+        <span>Gruppen</span>
+      </h4>
+      <p class="small text-body-secondary text-center mb-3">
+        Gruppen anlegen und verwalten.
       </p>
 
       <div class="input-group mb-3">

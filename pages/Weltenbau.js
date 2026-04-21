@@ -93,6 +93,42 @@ function normalisiereGeneratorUrlMap(roh) {
   return map;
 }
 
+function normalisiereGeneratorZeitstempelMap(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return {};
+  }
+  const map = {};
+  Object.entries(roh).forEach(([id, zeitstempel]) => {
+    if (typeof id !== 'string' || !id || typeof zeitstempel !== 'string') {
+      return;
+    }
+    const t = zeitstempel.trim();
+    if (!t || Number.isNaN(Date.parse(t))) {
+      return;
+    }
+    map[id] = t;
+  });
+  return map;
+}
+
+function formatDatumZeit(value) {
+  if (!value) {
+    return '';
+  }
+  const datum = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(datum.getTime())) {
+    return '';
+  }
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const tag = pad2(datum.getDate());
+  const monat = pad2(datum.getMonth() + 1);
+  const jahr = datum.getFullYear();
+  const stunde = pad2(datum.getHours());
+  const minute = pad2(datum.getMinutes());
+  const sekunde = pad2(datum.getSeconds());
+  return `${tag}.${monat}.${jahr} - ${stunde}:${minute}:${sekunde}`;
+}
+
 /** Rohdatei-Limit vor dem Laden (Browser- & Speicher-Schutz). */
 const WELTENBAU_MAX_ROH_DATEI_BYTES = 40 * 1024 * 1024;
 
@@ -127,6 +163,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       version: 2,
       eintraege: Array.isArray(zustandRoh && zustandRoh.eintraege) ? zustandRoh.eintraege : [],
       generatorUrls: normalisiereGeneratorUrlMap(zustandRoh && zustandRoh.generatorUrls),
+      generatorAufrufe: normalisiereGeneratorZeitstempelMap(zustandRoh && zustandRoh.generatorAufrufe),
     };
     return {
       generatoren: WELTENBAU_GENERATOREN,
@@ -134,6 +171,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       statusMeldung: '',
       statusTyp: 'success',
       importWarteschlange: [],
+      zeigeImportHinweis: false,
       generatorModal: {
         offen: false,
         generatorId: '',
@@ -223,6 +261,9 @@ window.HTBAH_SEITEN.Weltenbau = {
         this.statusTyp = 'success';
       }, 7200);
     },
+    importHinweisUmschalten() {
+      this.zeigeImportHinweis = !this.zeigeImportHinweis;
+    },
     persistGeneratorUrl(generatorId, url) {
       if (typeof generatorId !== 'string' || !generatorId || !istHttpUrl(url)) {
         return;
@@ -237,6 +278,25 @@ window.HTBAH_SEITEN.Weltenbau = {
         generatorUrls: neu,
       };
       this.persist();
+    },
+    persistGeneratorAufruf(generatorId, zeitpunkt) {
+      if (typeof generatorId !== 'string' || !generatorId) {
+        return;
+      }
+      const isoZeit = zeitpunkt instanceof Date ? zeitpunkt.toISOString() : new Date().toISOString();
+      const neu = normalisiereGeneratorZeitstempelMap({
+        ...this.zustand.generatorAufrufe,
+        [generatorId]: isoZeit,
+      });
+      this.zustand = {
+        ...this.zustand,
+        version: 2,
+        generatorAufrufe: neu,
+      };
+      this.persist();
+    },
+    formatGeneratorAufruf(zeitstempel) {
+      return formatDatumZeit(zeitstempel);
     },
     gespeicherteGeneratorUrl(generator) {
       if (!generator || typeof generator.id !== 'string') {
@@ -263,6 +323,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       this.beendeGeneratorResize();
       this.$nextTick(() => this.initialisiereGeneratorFenster());
       this.persistGeneratorUrl(generator.id, startUrl);
+      this.persistGeneratorAufruf(generator.id, new Date());
     },
     schliesseGeneratorModal() {
       this.beendeGeneratorZiehen();
@@ -493,7 +554,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         }
       }, 450);
     },
-    onWeltenbauBildImportFertig({ dataUrl, name }) {
+    onWeltenbauBildImportFertig({ dataUrl, name, dateigroesseBytes }) {
       const vorher = {
         ...this.zustand,
         eintraege: this.zustand.eintraege.slice(),
@@ -503,6 +564,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         name: typeof name === 'string' && name.trim() ? name.trim() : 'Bild',
         dataUrl,
         hinzugefuegtAm: new Date().toISOString(),
+        dateigroesseBytes: Number.isFinite(dateigroesseBytes) && dateigroesseBytes > 0 ? Math.round(dateigroesseBytes) : null,
       };
       this.zustand = {
         ...this.zustand,
@@ -608,6 +670,18 @@ window.HTBAH_SEITEN.Weltenbau = {
         weltenbauEintragId: e.id,
       });
     },
+    formatEintragImportdatum(eintrag) {
+      if (!eintrag || !eintrag.hinzugefuegtAm) {
+        return '';
+      }
+      return formatDatumZeit(eintrag.hinzugefuegtAm);
+    },
+    formatEintragDateigroesse(eintrag) {
+      if (!eintrag || !Number.isFinite(eintrag.dateigroesseBytes) || eintrag.dateigroesseBytes <= 0) {
+        return '';
+      }
+      return formatBytes(eintrag.dateigroesseBytes);
+    },
   },
   mounted() {
     window.addEventListener('resize', this.onFensterGroesseGeaendert);
@@ -628,10 +702,113 @@ window.HTBAH_SEITEN.Weltenbau = {
         @abgebrochen="onWeltenbauBildImportAbgebrochen"
         @datei-import-fehler="onWeltenbauDateiImportFehler" />
 
-      <h4 class="mb-1">🗺️ Spielleitung · Weltenbau</h4>
-      <p class="small text-body-secondary mb-3">
+      <h4 class="text-center mb-1 htbah-page-title">
+        <span class="htbah-page-title-emoji" aria-hidden="true">🗺️</span>
+        <span>Weltenbau</span>
+      </h4>
+      <p class="small text-body-secondary text-center mb-3">
         Externe Generatoren (u. a. Karten, Gebäude, Dungeons) mit Export als PNG/JSON.
       </p>
+
+      <div class="card p-3 mb-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+          <h6 class="mb-0">Importierte Bilder</h6>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge text-bg-secondary" v-if="geschaetzteSpeicherGroesseKb">
+              ca. {{ geschaetzteSpeicherGroesseKb }} KB (nur diese Seite)
+            </span>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"
+              aria-label="Hinweis zum Bildimport anzeigen"
+              :aria-expanded="zeigeImportHinweis"
+              @click="importHinweisUmschalten">
+              <span class="material-symbols-outlined" aria-hidden="true">info</span>
+            </button>
+          </div>
+        </div>
+        <div v-if="zeigeImportHinweis" class="alert alert-info py-2 small mb-3" role="note">
+          Unterstützt: gängige Bildformate (PNG, JPEG, WebP, GIF, BMP, …). Rohdateien bis
+          {{ maxRohDateiHuman }} — danach öffnet sich ein Zuschnitt mit Cropper;
+          gespeichert wird maximal 2048 px Kantenlänge als JPEG/WebP (kleiner als die Rohdatei, geeignet für den Browser-Speicher).
+          Gesamtkontingent: typisch etwa 5–10 MB pro Website im Browser — bei vollem Speicher erscheint eine Meldung.
+          Bilder lassen sich in einem eigenen Fenster vergrößern, scrollen und per Ecke in der Größe ändern (auch mehrere gleichzeitig).
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <input
+            ref="dateiInput"
+            type="file"
+            class="d-none"
+            accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/bmp,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg"
+            multiple
+            @change="onDateienGewaehlt" />
+          <icon-text-button
+            type="button"
+            class="btn btn-primary"
+            icon="add_photo_alternate"
+            @click="$refs.dateiInput.click()">
+            Bilder importieren
+          </icon-text-button>
+        </div>
+
+        <p v-if="!zustand.eintraege.length" class="small text-body-secondary mb-0">
+          Noch keine Bilder gespeichert.
+        </p>
+        <div v-else class="row g-2">
+          <div
+            v-for="e in zustand.eintraege"
+            :key="e.id"
+            class="col-6 col-md-4 col-lg-3">
+            <div class="card h-100 shadow-sm htbah-weltenbau-karte">
+              <div class="d-flex align-items-start justify-content-between gap-1 px-2 pt-2 pb-1">
+                <div class="small fw-semibold text-truncate mb-0 flex-grow-1 htbah-weltenbau-titel" :title="e.name">
+                  {{ e.name }}
+                </div>
+                <div class="dropdown htbah-weltenbau-karte-menu">
+                  <button
+                    type="button"
+                    class="btn d-flex align-items-center justify-content-center htbah-weltenbau-karte-menu-button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="Aktionen für importiertes Bild"
+                    @click.stop>
+                    <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                      <button type="button" class="dropdown-item" @click.stop="eintragUmbenennen(e)">
+                        Umbenennen
+                      </button>
+                    </li>
+                    <li>
+                      <button type="button" class="dropdown-item text-danger" @click.stop="eintragLoeschen(e)">
+                        Löschen
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="btn btn-link p-0 border-0 text-start w-100 htbah-weltenbau-thumb-wrap"
+                @click="vorschauOeffnen(e)">
+                <img
+                  class="htbah-weltenbau-thumb"
+                  :src="e.dataUrl"
+                  :alt="e.name || 'Import'" />
+              </button>
+              <div class="card-body py-1 px-2">
+                <div v-if="formatEintragImportdatum(e)" class="text-body-secondary text-truncate htbah-weltenbau-meta-zeile">
+                  Upload: {{ formatEintragImportdatum(e) }}
+                </div>
+                <div v-if="formatEintragDateigroesse(e)" class="text-body-secondary text-truncate htbah-weltenbau-meta-zeile">
+                  Dateigröße: {{ formatEintragDateigroesse(e) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="card p-3 mb-3">
         <h6 class="mb-2">Generatoren (extern)</h6>
@@ -660,73 +837,14 @@ window.HTBAH_SEITEN.Weltenbau = {
                   :title="zustand.generatorUrls[generator.id]">
                   Letzte URL: {{ zustand.generatorUrls[generator.id] }}
                 </div>
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card p-3 mb-3">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-          <h6 class="mb-0">Importierte Bilder</h6>
-          <span class="badge text-bg-secondary" v-if="geschaetzteSpeicherGroesseKb">
-            ca. {{ geschaetzteSpeicherGroesseKb }} KB (nur diese Seite)
-          </span>
-        </div>
-        <p class="small text-body-secondary mb-3">
-          Unterstützt: gängige Bildformate (PNG, JPEG, WebP, GIF, BMP, …). Rohdateien bis
-          {{ maxRohDateiHuman }} — danach öffnet sich ein Zuschnitt mit Cropper;
-          gespeichert wird maximal 2048 px Kantenlänge als JPEG/WebP (kleiner als die Rohdatei, geeignet für den Browser-Speicher).
-          Gesamtkontingent: typisch etwa 5–10 MB pro Website im Browser — bei vollem Speicher erscheint eine Meldung.
-          Bilder lassen sich in einem eigenen Fenster vergrößern, scrollen und per Ecke in der Größe ändern (auch mehrere gleichzeitig).
-        </p>
-        <div class="d-flex flex-wrap gap-2 mb-3">
-          <input
-            ref="dateiInput"
-            type="file"
-            class="d-none"
-            accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/bmp,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg"
-            multiple
-            @change="onDateienGewaehlt" />
-          <icon-text-button
-            type="button"
-            class="btn btn-primary"
-            icon="add_photo_alternate"
-            @click="$refs.dateiInput.click()">
-            Bilder importieren
-          </icon-text-button>
-        </div>
-
-        <p v-if="!zustand.eintraege.length" class="small text-body-secondary mb-0">
-          Noch keine Bilder gespeichert.
-        </p>
-        <div v-else class="row g-2">
-          <div
-            v-for="e in zustand.eintraege"
-            :key="e.id"
-            class="col-6 col-md-4 col-lg-3">
-            <div class="card h-100 shadow-sm htbah-weltenbau-karte">
-              <button
-                type="button"
-                class="btn btn-link p-0 border-0 text-start w-100 htbah-weltenbau-thumb-wrap"
-                @click="vorschauOeffnen(e)">
-                <img
-                  class="htbah-weltenbau-thumb"
-                  :src="e.dataUrl"
-                  :alt="e.name || 'Import'" />
-              </button>
-              <div class="card-body py-2 px-2">
-                <div class="small text-truncate mb-1" :title="e.name">{{ e.name }}</div>
-                <div class="d-flex flex-wrap gap-1">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" @click.stop="eintragUmbenennen(e)">
-                    Umbenennen
-                  </button>
-                  <button type="button" class="btn btn-sm btn-outline-danger" @click.stop="eintragLoeschen(e)">
-                    Löschen
-                  </button>
+                <div
+                  v-if="zustand.generatorAufrufe && zustand.generatorAufrufe[generator.id]"
+                  class="small text-body-secondary"
+                  :title="formatGeneratorAufruf(zustand.generatorAufrufe[generator.id])">
+                  Letzter Aufruf: {{ formatGeneratorAufruf(zustand.generatorAufrufe[generator.id]) }}
                 </div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>

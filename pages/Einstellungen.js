@@ -355,13 +355,11 @@ window.HTBAH_SEITEN.Einstellungen = {
       this.exportAuswahl = neueBereichsAuswahl(this.datenExportBereiche);
       this.modalAnzeigen('exportModalElement', 'exportModalInstanz');
     },
-    exportStarten() {
-      const ausgewaehlteBereiche = this.datenExportBereiche.filter((b) => this.exportAuswahl[b.id]);
+    exportPaketAusAuswahl(auswahl) {
+      const ausgewaehlteBereiche = this.datenExportBereiche.filter((b) => auswahl[b.id]);
       if (!ausgewaehlteBereiche.length) {
-        this.statusAnzeigen('Bitte wähle mindestens einen Speicherbereich für den Export aus.', 'danger');
-        return;
+        return null;
       }
-
       const daten = ausgewaehlteBereiche.map((bereich) => {
         const wert = window.HTBAH.speicher.leseText(bereich.key, null);
         const vorhanden = typeof wert === 'string';
@@ -373,19 +371,28 @@ window.HTBAH_SEITEN.Einstellungen = {
           wert: vorhanden ? wert : null,
         };
       });
-
       const paket = {
         htbahExportVersion: 1,
         typ: 'lokaler-speicher',
         exportiertAm: new Date().toISOString(),
         daten,
       };
-
       const datum = new Date();
       const yyyy = String(datum.getFullYear());
       const mm = String(datum.getMonth() + 1).padStart(2, '0');
       const dd = String(datum.getDate()).padStart(2, '0');
-      window.HTBAH.dateiHerunterladenJson(paket, `htbah-backup-${yyyy}-${mm}-${dd}.json`);
+      return {
+        paket,
+        dateiname: `htbah-backup-${yyyy}-${mm}-${dd}.json`,
+      };
+    },
+    exportStarten() {
+      const exportPaket = this.exportPaketAusAuswahl(this.exportAuswahl);
+      if (!exportPaket) {
+        this.statusAnzeigen('Bitte wähle mindestens einen Speicherbereich für den Export aus.', 'danger');
+        return;
+      }
+      window.HTBAH.dateiHerunterladenJson(exportPaket.paket, exportPaket.dateiname);
 
       if (this.exportModalInstanz) {
         this.exportModalInstanz.hide();
@@ -426,15 +433,16 @@ window.HTBAH_SEITEN.Einstellungen = {
         this.statusAnzeigen('Die ausgewählte Datei ist kein gültiges JSON.', 'danger');
         return;
       }
-
+      this.importPaketVorbereiten(roh, datei.name || 'Import-Datei');
+    },
+    importPaketVorbereiten(roh, dateiname = 'Import-Datei') {
       if (!roh || typeof roh !== 'object' || roh.typ !== 'lokaler-speicher' || !Array.isArray(roh.daten)) {
         this.statusAnzeigen(
           'Unbekanntes Importformat. Bitte wähle eine Datei aus dem Daten-Export der Einstellungen.',
           'danger',
         );
-        return;
+        return false;
       }
-
       const bekannteBereiche = new Map(this.datenExportBereiche.map((b) => [b.id, b]));
       const importBereiche = roh.daten
         .filter((eintrag) => eintrag && typeof eintrag === 'object' && typeof eintrag.key === 'string')
@@ -455,16 +463,15 @@ window.HTBAH_SEITEN.Einstellungen = {
             wert: typeof eintrag.wert === 'string' ? eintrag.wert : null,
           };
         });
-
       if (!importBereiche.length) {
         this.statusAnzeigen('Die JSON-Datei enthält keine importierbaren Speicherbereiche.', 'danger');
-        return;
+        return false;
       }
-
-      this.importDateiname = datei.name || 'Import-Datei';
+      this.importDateiname = dateiname;
       this.importBereicheAusDatei = importBereiche;
       this.importAuswahl = neueBereichsAuswahl(importBereiche);
       this.modalAnzeigen('importModalElement', 'importModalInstanz');
+      return true;
     },
     bereicheAuswahlAlleToggle(ziel) {
       if (ziel === 'export') {
@@ -479,6 +486,7 @@ window.HTBAH_SEITEN.Einstellungen = {
         this.importAuswahl = this.importAlleBereicheAusgewaehlt
           ? keineBereichsAuswahl(bereiche)
           : neueBereichsAuswahl(bereiche);
+        return;
       }
     },
     importStarten() {
@@ -513,7 +521,10 @@ window.HTBAH_SEITEN.Einstellungen = {
   },
   template: `
     <div class="container content py-3 text-center">
-      <h4>⚙️ Einstellungen</h4>
+      <h4 class="text-center mb-3 htbah-page-title">
+        <span class="htbah-page-title-emoji" aria-hidden="true">⚙️</span>
+        <span>Einstellungen</span>
+      </h4>
 
       <h5 class="text-start mb-2">Theme</h5>
       <div class="card p-3 mb-3 text-start">

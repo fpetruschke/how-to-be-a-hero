@@ -63,6 +63,26 @@ window.HTBAH = window.HTBAH || {};
   ]);
 
   const WINDRICHTUNGEN = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+  const TEMPERATUR_OPTIONEN = Object.freeze([
+    'sehr kalt',
+    'eisig',
+    'frostig',
+    'kalt',
+    'kühl',
+    'mild',
+    'angenehm',
+    'warm',
+    'heiß',
+    'schwül-heiß',
+  ]);
+  const WINDSTAERKE_OPTIONEN = Object.freeze([
+    { bft: '0–2', kmh: 'ca. 1–11 km/h', label: 'windstill bis schwache Brise' },
+    { bft: '3–4', kmh: 'ca. 12–28 km/h', label: 'schwache bis frische Brise' },
+    { bft: '5–6', kmh: 'ca. 29–49 km/h', label: 'frischer Wind bis starker Wind' },
+    { bft: '7–8', kmh: 'ca. 50–74 km/h', label: 'starker Wind / Sturmböen' },
+    { bft: '9–10', kmh: 'ca. 75–102 km/h', label: 'Sturm' },
+    { bft: '11–12', kmh: 'ca. 103–118 km/h', label: 'schwerer Sturm' },
+  ]);
 
   function jahreszeitMeta(id) {
     return JAHRESZEITEN.find((j) => j.id === id) || JAHRESZEITEN[0];
@@ -143,6 +163,23 @@ window.HTBAH = window.HTBAH || {};
     graupel: { label: 'Graupel', emoji: '🌨️' },
   };
 
+  const NIEDERSCHLAG_OPTIONEN = Object.freeze(
+    Object.keys(NIEDERSCHLAG_TEXT).map((k) => ({
+      key: k,
+      label: NIEDERSCHLAG_TEXT[k].label,
+      emoji: NIEDERSCHLAG_TEXT[k].emoji,
+    }))
+  );
+  const BEWOELKUNG_OPTIONEN = Object.freeze(
+    Array.from(
+      new Set(
+        ['fruehling', 'sommer', 'herbst', 'winter'].flatMap((jz) =>
+          bewoelkungGewichte(jz).map((e) => e.v)
+        )
+      )
+    )
+  );
+
   function bewoelkungGewichte(jz) {
     if (jz === 'sommer') {
       return [
@@ -210,12 +247,12 @@ window.HTBAH = window.HTBAH || {};
     const richtung = zufaellig(WINDRICHTUNGEN);
     /** Näherungsbereiche mittlerer Windgeschwindigkeit in km/h zu Beaufort-Bändern. */
     const staerke = gewichtet([
-      { w: 18, v: { bft: '0–2', kmh: 'ca. 1–11 km/h', label: 'windstill bis schwache Brise' } },
-      { w: 28, v: { bft: '3–4', kmh: 'ca. 12–28 km/h', label: 'schwache bis frische Brise' } },
-      { w: 26, v: { bft: '5–6', kmh: 'ca. 29–49 km/h', label: 'frischer Wind bis starker Wind' } },
-      { w: 18, v: { bft: '7–8', kmh: 'ca. 50–74 km/h', label: 'starker Wind / Sturmböen' } },
-      { w: 8, v: { bft: '9–10', kmh: 'ca. 75–102 km/h', label: 'Sturm' } },
-      { w: 2, v: { bft: '11–12', kmh: 'ca. 103–118 km/h', label: 'schwerer Sturm' } },
+      { w: 18, v: WINDSTAERKE_OPTIONEN[0] },
+      { w: 28, v: WINDSTAERKE_OPTIONEN[1] },
+      { w: 26, v: WINDSTAERKE_OPTIONEN[2] },
+      { w: 18, v: WINDSTAERKE_OPTIONEN[3] },
+      { w: 8, v: WINDSTAERKE_OPTIONEN[4] },
+      { w: 2, v: WINDSTAERKE_OPTIONEN[5] },
     ]);
     return {
       wind: `${staerke.label}, aus ${richtung}`,
@@ -270,6 +307,30 @@ window.HTBAH = window.HTBAH || {};
     const j = generiereJahreszeit();
     const wetter = generiereWetter(j.jahreszeitId);
     return { ...j, ...wetter };
+  }
+
+  function temperaturOptionen() {
+    return TEMPERATUR_OPTIONEN;
+  }
+
+  function bewoelkungOptionen() {
+    return BEWOELKUNG_OPTIONEN;
+  }
+
+  function niederschlagOptionen() {
+    return NIEDERSCHLAG_OPTIONEN;
+  }
+
+  function windstaerkeOptionen() {
+    return WINDSTAERKE_OPTIONEN;
+  }
+
+  function windrichtungOptionen() {
+    return WINDRICHTUNGEN;
+  }
+
+  function niederschlagMeta(key) {
+    return NIEDERSCHLAG_TEXT[key] || NIEDERSCHLAG_TEXT.kein;
   }
 
   function generiereAlles() {
@@ -344,6 +405,12 @@ window.HTBAH = window.HTBAH || {};
     generiereWetter,
     generiereJahreszeitUndWetter,
     generiereAlles,
+    temperaturOptionen,
+    bewoelkungOptionen,
+    niederschlagOptionen,
+    windstaerkeOptionen,
+    windrichtungOptionen,
+    niederschlagMeta,
     windStaerkeUndBeaufortNormalisieren,
   };
 })();

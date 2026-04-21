@@ -208,8 +208,11 @@ window.HTBAH_SEITEN.PresetEditor = {
   },
   template: `
     <div class="container content py-3">
-      <h4>📦 {{ istBearbeitung ? 'Fähigkeiten-Preset bearbeiten' : 'Fähigkeiten-Preset erstellen' }}</h4>
-      <p v-if="preset.htbahPresetId" class="small text-body-secondary mb-3">
+      <h4 class="text-center mb-3 htbah-page-title">
+        <span class="htbah-page-title-emoji" aria-hidden="true">📦</span>
+        <span>{{ istBearbeitung ? 'Fähigkeiten-Preset bearbeiten' : 'Fähigkeiten-Preset erstellen' }}</span>
+      </h4>
+      <p v-if="preset.htbahPresetId" class="small text-body-secondary text-center mb-3">
         Vorgegebenes Preset: Name und Fähigkeiten sind anpassbar; in der Übersicht kann es nicht gelöscht werden.
       </p>
 

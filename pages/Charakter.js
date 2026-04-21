@@ -581,8 +581,14 @@ window.HTBAH_SEITEN.Charakter = {
   },
   template: `
     <div class="container content py-3">
-      <h4 v-if="!spielleiterMitglied">🧙 Charakter</h4>
-      <h5 v-else class="mb-3 text-body-secondary">🧙 Charakterblatt (Spielleiter)</h5>
+      <h4 v-if="!spielleiterMitglied" class="text-center mb-3 htbah-page-title">
+        <span class="htbah-page-title-emoji" aria-hidden="true">🧙</span>
+        <span>Charakter</span>
+      </h4>
+      <h5 v-else class="text-center mb-3 text-body-secondary htbah-page-title">
+        <span class="htbah-page-title-emoji" aria-hidden="true">🧙</span>
+        <span>Charakterblatt (Spielleiter)</span>
+      </h5>
 
       <div class="card p-3 mb-2">
         <div class="row g-3">

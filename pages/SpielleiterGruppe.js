@@ -226,8 +226,11 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       </nav>
 
       <template v-if="aktiveGruppe">
-      <h4 class="mb-1">👥 {{ aktiveGruppe.name }}</h4>
-      <p class="small text-body-secondary mb-3">
+      <h4 class="text-center mb-1 htbah-page-title">
+        <span class="htbah-page-title-emoji" aria-hidden="true">👥</span>
+        <span>{{ aktiveGruppe.name }}</span>
+      </h4>
+      <p class="small text-body-secondary text-center mb-3">
         Charaktere per JSON importieren (Export vom Spieler), zwischen Helden wechseln und Werte bearbeiten.
       </p>
 
