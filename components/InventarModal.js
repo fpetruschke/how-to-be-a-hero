@@ -512,31 +512,34 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
                 <div class="card-body p-2">
                   <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
                     <div class="flex-grow-1">
-                      <span
-                        v-if="inventarEditId !== eintrag.id"
-                        class="badge inventar-typ-badge mb-1"
-                        :class="inventarTypBadgeClass(eintrag.typ || 'gegenstand')">
-                        {{ inventarTypLabel(eintrag.typ || 'gegenstand') }}
-                      </span>
-                      <select
-                        v-else
-                        class="form-select form-select-sm mb-1"
-                        v-model="eintrag.typ"
-                        @change="inventarTypNachAuswahlAnwenden(eintrag)"
-                        aria-label="Art des Eintrags">
-                        <option value="gegenstand">Gegenstand</option>
-                        <option value="rustung">Rüstung</option>
-                        <option value="waffe">Waffe</option>
-                      </select>
-                      <div v-if="inventarEditId !== eintrag.id" class="small fw-bold">
-                        {{ eintrag.name || '—' }}
-                      </div>
-                      <input
-                        v-else
-                        class="form-control form-control-sm"
-                        v-model="eintrag.name"
-                        placeholder="Name"
-                        autocomplete="off" />
+                      <template v-if="inventarEditId !== eintrag.id">
+                        <span
+                          class="badge inventar-typ-badge mb-1"
+                          :class="inventarTypBadgeClass(eintrag.typ || 'gegenstand')">
+                          {{ inventarTypLabel(eintrag.typ || 'gegenstand') }}
+                        </span>
+                        <div class="small fw-bold">
+                          {{ eintrag.name || '—' }}
+                        </div>
+                      </template>
+                      <template v-else>
+                        <label class="form-label small text-body-secondary mb-1">Gegenstandstyp</label>
+                        <select
+                          class="form-select form-select-sm mb-2"
+                          v-model="eintrag.typ"
+                          @change="inventarTypNachAuswahlAnwenden(eintrag)"
+                          aria-label="Art des Eintrags">
+                          <option value="gegenstand">Gegenstand</option>
+                          <option value="rustung">Rüstung</option>
+                          <option value="waffe">Waffe</option>
+                        </select>
+                        <label class="form-label small text-body-secondary mb-1">Name</label>
+                        <input
+                          class="form-control form-control-sm"
+                          v-model="eintrag.name"
+                          placeholder="Name"
+                          autocomplete="off" />
+                      </template>
                     </div>
                     <div class="dropdown">
                       <button
@@ -574,11 +577,12 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
                     </div>
                   </div>
                   <div class="small mb-2">
-                    <span class="text-body-secondary">Werte:</span>
                     <template v-if="inventarEditId !== eintrag.id">
+                      <span class="text-body-secondary">Werte:</span>
                       <span class="text-body-secondary">{{ inventarWerteText(eintrag) }}</span>
                     </template>
                     <template v-else>
+                      <label class="form-label small text-body-secondary mb-1">Werte</label>
                       <span v-if="eintrag.typ === 'gegenstand'" class="text-body-secondary">—</span>
                       <input
                         v-else-if="eintrag.typ === 'rustung'"
@@ -620,14 +624,18 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
                       </div>
                     </template>
                   </div>
-                  <div
-                    v-if="inventarEditId !== eintrag.id"
-                    class="inventar-beschreibung-vorschau small"
-                    v-html="eintrag.beschreibungHtml"></div>
-                  <div
-                    v-else
-                    :ref="inventarBeschreibungRefFn(eintrag)"
-                    class="quill-editor-host inventar-beschreibung-quill"></div>
+                  <div v-if="inventarEditId !== eintrag.id">
+                    <div class="text-body-secondary small mb-1">Beschreibung:</div>
+                    <div
+                      class="inventar-beschreibung-vorschau small"
+                      v-html="eintrag.beschreibungHtml"></div>
+                  </div>
+                  <div v-else class="inventar-mobile-editor-block">
+                    <label class="form-label small text-body-secondary mb-1">Beschreibung</label>
+                    <div
+                      :ref="inventarBeschreibungRefFn(eintrag)"
+                      class="quill-editor-host inventar-beschreibung-quill"></div>
+                  </div>
                 </div>
               </div>
             </div>

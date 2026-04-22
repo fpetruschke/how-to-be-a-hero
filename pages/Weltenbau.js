@@ -42,12 +42,14 @@ const WELTENBAU_GENERATOREN = [
     titel: '🍺 Kneipe',
     startUrl: 'https://html-classic.itch.zone/html/17194867/bin/index.html',
     sourceUrl: 'https://html-classic.itch.zone/html/17194867/bin/index.html',
+    nurExternerTab: true,
   },
   {
     id: 'neighbourhood',
     titel: '🏡 Nachbarschaft',
     startUrl: 'https://html-classic.itch.zone/html/11441280/bin/index.html',
     sourceUrl: 'https://html-classic.itch.zone/html/11441280/bin/index.html',
+    nurExternerTab: true,
   },
   {
     id: 'sailingboats',
@@ -66,6 +68,7 @@ const WELTENBAU_GENERATOREN = [
     titel: 'ᚱ Runen-Alphabet',
     startUrl: 'https://html-classic.itch.zone/html/7102972/bin/index.html?v=1732313668',
     sourceUrl: 'https://html-classic.itch.zone/html/7102972/bin/index.html?v=1732313668',
+    nurExternerTab: true,
   },
 ];
 
@@ -291,8 +294,21 @@ window.HTBAH_SEITEN.Weltenbau = {
       }
       return generator.startUrl;
     },
+    onWeltenbauGeneratorKarteKlick(generator) {
+      if (!generator) {
+        return;
+      }
+      if (generator.nurExternerTab) {
+        this.persistGeneratorAufruf(generator.id, new Date());
+        return;
+      }
+      this.oeffneGeneratorModal(generator);
+    },
     oeffneGeneratorModal(generator) {
       if (!generator || !generator.id) {
+        return;
+      }
+      if (generator.nurExternerTab) {
         return;
       }
       const startUrl = this.gespeicherteGeneratorUrl(generator);
@@ -756,7 +772,7 @@ window.HTBAH_SEITEN.Weltenbau = {
             :key="e.id"
             class="col-6 col-md-4 col-lg-3">
             <div class="card h-100 shadow-sm htbah-weltenbau-karte">
-              <div class="d-flex align-items-start justify-content-between gap-1 px-2 pt-2 pb-1">
+              <div class="d-flex align-items-center justify-content-between gap-1 px-2 pb-1 htbah-weltenbau-karte-kopf">
                 <div class="small fw-semibold text-truncate mb-0 flex-grow-1 htbah-weltenbau-titel" :title="e.name">
                   {{ e.name }}
                 </div>
@@ -818,17 +834,32 @@ window.HTBAH_SEITEN.Weltenbau = {
             v-for="generator in generatoren"
             :key="generator.id"
             class="col-12 col-sm-6 col-lg-4">
-            <button
-              type="button"
+            <component
+              :is="generator.nurExternerTab ? 'a' : 'button'"
+              v-bind="
+                generator.nurExternerTab
+                  ? { href: generator.startUrl, target: '_blank', rel: 'noopener noreferrer' }
+                  : { type: 'button' }
+              "
               class="card shadow-sm w-100 h-100 text-start htbah-weltenbau-generator-card"
-              @click="oeffneGeneratorModal(generator)">
+              :class="{ 'text-decoration-none text-body': generator.nurExternerTab }"
+              @click="onWeltenbauGeneratorKarteKlick(generator)">
               <div class="card-body py-2 px-3">
-                <div class="fw-semibold mb-1">{{ generator.titel }}</div>
+                <div class="fw-semibold mb-1 d-flex align-items-center flex-wrap gap-1">
+                  <span>{{ generator.titel }}</span>
+                  <template v-if="generator.nurExternerTab">
+                    <span class="text-body-secondary" aria-hidden="true">(</span>
+                    <span
+                      class="material-symbols-outlined htbah-weltenbau-extern-tab-icon"
+                      aria-hidden="true">open_in_new</span>
+                    <span class="text-body-secondary" aria-hidden="true">)</span>
+                  </template>
+                </div>
                 <div class="small text-body-secondary text-truncate" :title="generator.sourceUrl">
                   Quelle: {{ generator.sourceUrl }}
                 </div>
                 <div
-                  v-if="zustand.generatorUrls && zustand.generatorUrls[generator.id]"
+                  v-if="!generator.nurExternerTab && zustand.generatorUrls && zustand.generatorUrls[generator.id]"
                   class="small text-body-secondary text-truncate"
                   :title="zustand.generatorUrls[generator.id]">
                   Letzte URL: {{ zustand.generatorUrls[generator.id] }}
@@ -840,7 +871,7 @@ window.HTBAH_SEITEN.Weltenbau = {
                   Letzter Aufruf: {{ formatGeneratorAufruf(zustand.generatorAufrufe[generator.id]) }}
                 </div>
               </div>
-            </button>
+            </component>
           </div>
         </div>
       </div>

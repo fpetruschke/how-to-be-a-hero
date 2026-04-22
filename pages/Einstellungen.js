@@ -53,7 +53,7 @@ const SPEICHER_BEREICHE = {
     key: 'htbah_zufallstabellen',
     titel: 'Zufallstabellen löschen?',
     beschreibung:
-      'Alle gespeicherten Einträge in den Zufallstabellen (NPCs, Orte, Fraktionen, Pantheon, Gegenstände) werden entfernt.',
+      'Alle gespeicherten Einträge in den Zufallstabellen (NPCs, Orte, Fraktionen, Pantheon, Gegenstände, Rätsel, Bestarium) werden entfernt.',
     erfolg: 'Zufallstabellen wurden gelöscht.',
     buttonSymbol: '📚',
     buttonLabel: 'Zufallstabellen löschen',

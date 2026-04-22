@@ -1,7 +1,7 @@
 /**
  * Einstieg: Factory unter window.HTBAH.Zufallsgenerator.
  * Lädt die Skripte in index.html in dieser Reihenfolge:
- * util → Wortlisten → Module → diese Datei.
+ * util → Wortlisten → Module (inkl. Bestien) → diese Datei.
  */
 window.HTBAH = window.HTBAH || {};
 
@@ -12,8 +12,10 @@ window.HTBAH = window.HTBAH || {};
   const gegenstand = window.HTBAH.ZufallsgeneratorGegenstandModul;
   const fraktion = window.HTBAH.ZufallsgeneratorFraktionModul;
   const pantheon = window.HTBAH.ZufallsgeneratorPantheonModul;
+  const raetsel = window.HTBAH.ZufallsgeneratorRaetselModul;
+  const bestie = window.HTBAH.ZufallsgeneratorBestienModul;
 
-  if (!U || !npc || !ort || !gegenstand || !fraktion || !pantheon) {
+  if (!U || !npc || !ort || !gegenstand || !fraktion || !pantheon || !raetsel || !bestie) {
     return;
   }
 
@@ -24,5 +26,7 @@ window.HTBAH = window.HTBAH || {};
     gegenstand: (opts) => gegenstand.generiere(opts || {}),
     fraktion: (opts) => fraktion.generiere(opts || {}),
     pantheon: () => pantheon.generiere(),
+    raetsel: (opts) => raetsel.generiere(opts || {}),
+    bestie: (opts) => bestie.generiere(opts || {}),
   };
 })();

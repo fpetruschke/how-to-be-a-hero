@@ -1408,7 +1408,7 @@ window.HTBAH_SEITEN.Charakter = {
 
       <div class="card p-3 mb-2">
         <h5 class="mb-2">Verwaltung</h5>
-        <p v-if="!spielleiterMitglied" class="small text-body-secondary mb-3 mb-md-2">
+        <p v-if="!spielleiterMitglied && istEditModus" class="small text-body-secondary mb-3 mb-md-2">
           Der JSON-Export enthält alle Charakterdaten (Stammdaten, Lebenspunkte- und Bewusstseinsstatus,
           Geistesblitzkonten), das Profilbild, die drei Fähigkeitslisten, Vor- und Nachteile,
           das Inventar und die Notizen. Beim Import (z. B. in der Spielleiter-Ansicht) werden
@@ -1428,6 +1428,7 @@ window.HTBAH_SEITEN.Charakter = {
           @click="speichereCharakterFormular">
           {{ speicherButtonText }}
         </icon-text-button>
+        <hr v-if="spielleiterMitglied || istEditModus" class="border-secondary border-opacity-25 my-2" />
         <icon-text-button
           type="button"
           class="btn btn-outline-primary w-100 mb-2"
@@ -1437,18 +1438,22 @@ window.HTBAH_SEITEN.Charakter = {
           @click="charakterPdfExportieren">
           {{ pdfExportLaedt ? 'PDF wird erzeugt …' : 'PDF generieren' }}
         </icon-text-button>
+        <hr
+          v-if="(spielleiterMitglied || istEditModus) && !istEditModus"
+          class="border-secondary border-opacity-25 my-2" />
         <icon-text-button
           v-if="istEditModus"
           type="button"
-          class="btn btn-outline-secondary w-100"
+          class="btn btn-outline-secondary w-100 mb-2"
           icon="download"
           @click="charakterJsonExportieren">
           JSON exportieren
         </icon-text-button>
+        <hr v-if="istEditModus" class="border-secondary border-opacity-25 my-2" />
         <icon-text-button
           v-if="istEditModus"
           type="button"
-          class="btn btn-outline-danger w-100 mt-2"
+          class="btn btn-outline-danger w-100"
           icon="delete"
           @click="loescheDiesenCharakter">
           Charakter löschen

@@ -69,6 +69,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       zufallGegenstandEpoche: 'mittelalter',
       zufallGegenstandKleidung: true,
       zufallFraktionEpoche: 'mittelalter',
+      zufallRaetselEpoche: 'mittelalter',
       /** Stabile Funktion für :ref (wie InventarModal), kein String-ref im Modal */
       zeileQuillHostRefFn: null,
       sucheOrte: '',
@@ -76,9 +77,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       sucheNpcs: '',
       sucheGegenstaende: '',
       suchePantheon: '',
+      sucheRaetsel: '',
+      sucheBestien: '',
+      /** Filtert alle Tabellen gleichzeitig (zusätzlich zu den Feldern pro Kategorie) */
+      sucheGlobal: '',
       medienImportWarteschlange: [],
       galerieModalInstanz: null,
       galerieModalZeile: null,
+      /** { typ, zeile } — Zeile als Deep-Kopie, nur Anzeige */
+      detailAnsicht: null,
+      detailAnsichtModalInstanz: null,
     };
   },
   created() {
@@ -104,10 +112,149 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (this.bearbeitung.typ === 'pantheon') {
         return `${neu}✨ Gottheit`;
       }
+      if (this.bearbeitung.typ === 'raetsel') {
+        return `${neu}🧩 Rätsel`;
+      }
+      if (this.bearbeitung.typ === 'bestie') {
+        return `${neu}🦁 Bestarium`;
+      }
       return `${neu}📦 Gegenstand`;
     },
     zufallsgeneratorBereit() {
       return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
+    },
+    detailAnsichtTitel() {
+      if (!this.detailAnsicht) {
+        return '';
+      }
+      const t = this.detailAnsicht.typ;
+      if (t === 'npc') {
+        return '👤 NPC · Übersicht';
+      }
+      if (t === 'ort') {
+        return '🗺️ Ort · Übersicht';
+      }
+      if (t === 'fraktion') {
+        return '🏛️ Fraktion · Übersicht';
+      }
+      if (t === 'pantheon') {
+        return '✨ Gottheit · Übersicht';
+      }
+      if (t === 'raetsel') {
+        return '🧩 Rätsel · Übersicht';
+      }
+      if (t === 'bestie') {
+        return '🦁 Bestie · Übersicht';
+      }
+      return '📦 Gegenstand · Übersicht';
+    },
+    detailAnsichtFelder() {
+      if (!this.detailAnsicht) {
+        return [];
+      }
+      const z = this.detailAnsicht.zeile;
+      const typ = this.detailAnsicht.typ;
+      const plain = (label, val) => ({
+        label,
+        text: val != null ? String(val) : '',
+        html: null,
+      });
+      const rich = (label, html) => ({
+        label,
+        text: '',
+        html: typeof html === 'string' ? html : '',
+      });
+      if (typ === 'ort') {
+        return [
+          plain('Name', z.name),
+          plain('Größe', z.groesse),
+          plain('Lage', z.lage),
+          plain('Zustand', z.zustand),
+          rich('Beschreibung / Notizen', z.notizenHtml),
+        ];
+      }
+      if (typ === 'fraktion') {
+        return [
+          plain('Art', z.art),
+          plain('Name', z.name),
+          plain('Ziel', z.ziel),
+          plain('Gesinnung / Verhalten', z.gesinnungVerhalten),
+          rich('Beschreibung', z.beschreibungHtml),
+        ];
+      }
+      if (typ === 'npc') {
+        const kampfart = z && z.kampfart === 'fernkampf' ? 'Fernkampf' : 'Nahkampf';
+        return [
+          plain('Name', z.name),
+          plain('Spitzname', z.spitzname),
+          plain('Geschlecht', z.geschlecht),
+          plain('Alter', z.alter),
+          plain('Familienstand', z.familienstand),
+          plain('Statur', z.statur),
+          plain('Lebenspunkte', z.lebenspunkte),
+          plain('Gesinnung', z.gesinnung),
+          plain('Glaube', z.glaube),
+          plain('Beruf', z.beruf),
+          plain('Fraktion', z.fraktion),
+          plain('Aufenthaltsort', z.aufenthaltsort),
+          plain('Ziel', z.ziel),
+          plain('Stimme', z.stimme),
+          plain('Waffe', z.waffe),
+          plain('Schadenswert', z.schadenswert),
+          plain('Kampfart', kampfart),
+          rich('Notizen', z.notizenHtml),
+        ];
+      }
+      if (typ === 'gegenstand') {
+        const waffenText = this.gegenstandWaffenWerteText(z);
+        const istWaffe = z && z.istWaffe ? 'Ja' : 'Nein';
+        return [
+          plain('Name', z.name),
+          plain('Ist Waffe / Kampfgegenstand', istWaffe),
+          plain('Kampfwerte', waffenText),
+          rich('Beschreibung', z.beschreibungHtml),
+        ];
+      }
+      if (typ === 'pantheon') {
+        return [
+          plain('Name', z.name),
+          plain('Geschlecht / Darstellung', z.geschlecht),
+          plain('Domäne', z.domaene),
+          plain('Charakter', z.charakter),
+          plain('Stärken', z.staerke),
+          plain('Schwächen', z.schwaeche),
+          plain('Schutzpatronat', z.schutzpatronat),
+          plain('Verlangen / Opfer / Gebote', z.verlangen),
+          plain('Mythos: Gaben (Erzähltes)', z.mythosGaben),
+          rich('Notizen & Mythos (formatiert)', z.notizenHtml),
+        ];
+      }
+      if (typ === 'raetsel') {
+        return [
+          plain('Art', z.art),
+          plain('Titel / Stichwort', z.titel),
+          plain('Was könnte die Aufgabe sein?', z.aufgabeWas),
+          plain('Wie könnte die Aufgabenstellung lauten?', z.aufgabenstellung),
+          plain('Ergebnis', z.ergebnis),
+          plain('Schwierigkeit', z.schwierigkeit),
+          rich('Aufgabe, Spielleitung & Notizen', z.notizenHtml),
+        ];
+      }
+      if (typ === 'bestie') {
+        return [
+          plain('Epoche', this.bestieEpocheLabel(z.epoche)),
+          plain('Kategorie', this.bestieKategorieLabel(z.kategorie)),
+          plain('Name', z.name),
+          plain('Angriff', z.angriff),
+          plain('Verteidigung', z.verteidigung),
+          plain('Lebenspunkte', z.lebenspunkte),
+          plain('Aggressivität (1–10)', this.bestieAggressivitaetText(z)),
+          plain('Stärken', z.staerke),
+          plain('Schwächen', z.schwaeche),
+          rich('Lebensraum, Lebensweise und Legende', z.beschreibungHtml),
+        ];
+      }
+      return [];
     },
     /** Fraktionen mit auswählbarem Namen (NPC-Dropdown) */
     fraktionenMitNamen() {
@@ -207,6 +354,157 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         ),
       );
     },
+    gefilterteRaetsel() {
+      const q = this.normSucheText(this.sucheRaetsel);
+      if (!q) {
+        return this.zustand.raetsel || [];
+      }
+      return (this.zustand.raetsel || []).filter((row) =>
+        this.trifftSucheZu(
+          row,
+          ['art', 'titel', 'aufgabeWas', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'notizenHtml'],
+          q,
+        ),
+      );
+    },
+    gefilterteBestien() {
+      const q = this.normSucheText(this.sucheBestien);
+      if (!q) {
+        return this.zustand.bestien || [];
+      }
+      return (this.zustand.bestien || []).filter((row) => {
+        const ep = this.bestieEpocheLabel(row.epoche);
+        const kat = this.bestieKategorieLabel(row.kategorie);
+        return this.trifftSucheZu(
+          row,
+          [
+            'name',
+            'angriff',
+            'verteidigung',
+            'lebenspunkte',
+            'staerke',
+            'schwaeche',
+            'beschreibungHtml',
+          ],
+          q,
+          `${ep} ${kat}`,
+        );
+      });
+    },
+    globaleSucheAktiv() {
+      return !!this.normSucheText(this.sucheGlobal);
+    },
+    anzeigeOrte() {
+      const gq = this.normSucheText(this.sucheGlobal);
+      const base = this.gefilterteOrte;
+      if (!gq) {
+        return base;
+      }
+      return base.filter((row) =>
+        this.trifftSucheZu(row, ['name', 'groesse', 'lage', 'zustand', 'notizenHtml'], gq),
+      );
+    },
+    anzeigeFraktionen() {
+      const gq = this.normSucheText(this.sucheGlobal);
+      const base = this.gefilterteFraktionen;
+      if (!gq) {
+        return base;
+      }
+      return base.filter((row) =>
+        this.trifftSucheZu(row, ['art', 'name', 'ziel', 'gesinnungVerhalten', 'beschreibungHtml'], gq),
+      );
+    },
+    anzeigeNpcs() {
+      const gq = this.normSucheText(this.sucheGlobal);
+      const base = this.gefilterteNpcs;
+      if (!gq) {
+        return base;
+      }
+      return base.filter((row) => {
+        const felder = [
+          'name',
+          'spitzname',
+          'geschlecht',
+          'alter',
+          'familienstand',
+          'statur',
+          'lebenspunkte',
+          'gesinnung',
+          'glaube',
+          'beruf',
+          'fraktion',
+          'aufenthaltsort',
+          'ziel',
+          'stimme',
+          'waffe',
+          'schadenswert',
+          'notizenHtml',
+        ];
+        return this.trifftSucheZu(row, felder, gq, this.npcWaffenWerteText(row));
+      });
+    },
+    anzeigeGegenstaende() {
+      const gq = this.normSucheText(this.sucheGlobal);
+      const base = this.gefilterteGegenstaende;
+      if (!gq) {
+        return base;
+      }
+      return base.filter((row) =>
+        this.trifftSucheZu(row, ['name', 'schadenswert', 'kampfart', 'beschreibungHtml'], gq, this.gegenstandWaffenWerteText(row)),
+      );
+    },
+    anzeigePantheon() {
+      const gq = this.normSucheText(this.sucheGlobal);
+      const base = this.gefiltertesPantheon;
+      if (!gq) {
+        return base;
+      }
+      return base.filter((row) =>
+        this.trifftSucheZu(
+          row,
+          [
+            'name',
+            'geschlecht',
+            'domaene',
+            'charakter',
+            'staerke',
+            'schwaeche',
+            'schutzpatronat',
+            'verlangen',
+            'mythosGaben',
+            'notizenHtml',
+          ],
+          gq,
+        ),
+      );
+    },
+    anzeigeRaetsel() {
+      const gq = this.normSucheText(this.sucheGlobal);
+      const base = this.gefilterteRaetsel;
+      if (!gq) {
+        return base;
+      }
+      return base.filter((row) =>
+        this.trifftSucheZu(row, ['art', 'titel', 'aufgabeWas', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'notizenHtml'], gq),
+      );
+    },
+    anzeigeBestien() {
+      const gq = this.normSucheText(this.sucheGlobal);
+      const base = this.gefilterteBestien;
+      if (!gq) {
+        return base;
+      }
+      return base.filter((row) => {
+        const ep = this.bestieEpocheLabel(row.epoche);
+        const kat = this.bestieKategorieLabel(row.kategorie);
+        return this.trifftSucheZu(
+          row,
+          ['name', 'angriff', 'verteidigung', 'lebenspunkte', 'staerke', 'schwaeche', 'beschreibungHtml'],
+          gq,
+          `${ep} ${kat}`,
+        );
+      });
+    },
   },
   methods: {
     persist() {
@@ -223,6 +521,19 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       return String(wert || '')
         .toLocaleLowerCase('de-DE')
         .trim();
+    },
+    /** Leer-Zelle in Tabellen: unterscheidet „noch keine Zeilen“ und „Suche ohne Treffer“ */
+    zufallstabellenLeerNachricht(anzahlRoh, lokaleSuche) {
+      const n = Number(anzahlRoh) || 0;
+      if (!n) {
+        return 'Noch keine Einträge.';
+      }
+      const qg = this.normSucheText(this.sucheGlobal);
+      const ql = this.normSucheText(lokaleSuche);
+      if (qg || ql) {
+        return 'Keine Treffer für die aktuelle Suche.';
+      }
+      return 'Noch keine Einträge.';
     },
     zeilenWertAlsText(wert) {
       if (wert == null) {
@@ -440,6 +751,86 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     onGalerieModalHidden() {
       this.galerieModalZeile = null;
     },
+    detailRichTextAnzeige(html) {
+      const inhalt = typeof html === 'string' ? html : '';
+      return inhalt.trim() ? inhalt : '';
+    },
+    detailAnsichtOeffnen(typ, row) {
+      if (!row) {
+        return;
+      }
+      const zeileKopie = JSON.parse(JSON.stringify(row));
+      if (!Array.isArray(zeileKopie.medien)) {
+        zeileKopie.medien = [];
+      }
+      this.detailAnsicht = { typ, zeile: zeileKopie };
+      this.$nextTick(() => {
+        const el = this.$refs.detailAnsichtModalElement;
+        if (!el || !window.bootstrap) {
+          return;
+        }
+        this.detailAnsichtModalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
+        this.detailAnsichtModalInstanz.show();
+      });
+    },
+    onDetailAnsichtModalHidden() {
+      this.detailAnsicht = null;
+      this.detailAnsichtModalInstanz = null;
+    },
+    detailAnsichtBearbeiten() {
+      const d = this.detailAnsicht;
+      if (!d) {
+        return;
+      }
+      const { typ, zeile } = d;
+      const id = zeile && zeile.id;
+      let liste;
+      if (typ === 'npc') {
+        liste = this.zustand.npcs;
+      } else if (typ === 'ort') {
+        liste = this.zustand.orte;
+      } else if (typ === 'fraktion') {
+        liste = this.zustand.fraktionen;
+      } else if (typ === 'pantheon') {
+        liste = this.zustand.pantheon;
+      } else if (typ === 'raetsel') {
+        liste = this.zustand.raetsel;
+      } else if (typ === 'bestie') {
+        liste = this.zustand.bestien;
+      } else {
+        liste = this.zustand.gegenstaende;
+      }
+      const idx = this.indexNachId(liste, id);
+      const row = idx >= 0 ? liste[idx] : zeile;
+      const el = this.$refs.detailAnsichtModalElement;
+      const oeffneBearbeiten = () => {
+        if (typ === 'npc') {
+          this.npcBearbeiten(row, idx);
+        } else if (typ === 'ort') {
+          this.ortBearbeiten(row, idx);
+        } else if (typ === 'fraktion') {
+          this.fraktionBearbeiten(row, idx);
+        } else if (typ === 'pantheon') {
+          this.pantheonBearbeiten(row, idx);
+        } else if (typ === 'raetsel') {
+          this.raetselBearbeiten(row, idx);
+        } else if (typ === 'bestie') {
+          this.bestieBearbeiten(row, idx);
+        } else {
+          this.gegenstandBearbeiten(row, idx);
+        }
+      };
+      if (this.detailAnsichtModalInstanz && el) {
+        const einmal = () => {
+          el.removeEventListener('hidden.bs.modal', einmal);
+          oeffneBearbeiten();
+        };
+        el.addEventListener('hidden.bs.modal', einmal);
+        this.detailAnsichtModalInstanz.hide();
+      } else {
+        oeffneBearbeiten();
+      }
+    },
     npcWaffenWerteText(row) {
       const schadenswert = String(row && row.schadenswert ? row.schadenswert : '').trim();
       const kampfart = row && row.kampfart === 'fernkampf' ? 'Fernkampf' : 'Nahkampf';
@@ -447,6 +838,35 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return '—';
       }
       return `Schaden ${schadenswert} · ${kampfart}`;
+    },
+    bestieEpocheLabel(epoche) {
+      if (epoche === 'gegenwart') {
+        return 'Gegenwart';
+      }
+      if (epoche === 'zukunft') {
+        return 'Zukunft';
+      }
+      return 'Mittelalter';
+    },
+    bestieKategorieLabel(kategorie) {
+      if (kategorie === 'fantasy_tier') {
+        return 'Magisch / Fantasy';
+      }
+      if (kategorie === 'mutiert') {
+        return 'Mutiert';
+      }
+      if (kategorie === 'monster') {
+        return 'Monster';
+      }
+      return 'Normales Tier';
+    },
+    bestieAggressivitaetText(row) {
+      const n = row && Number(row.aggressivitaetSkala);
+      if (!Number.isFinite(n)) {
+        return '—';
+      }
+      const k = Math.min(10, Math.max(1, Math.round(n)));
+      return `${k} / 10`;
     },
     gegenstandWaffenWerteText(row) {
       if (!row || !row.istWaffe) {
@@ -537,6 +957,35 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         medien: [],
       };
     },
+    raetselLeer() {
+      return {
+        id: window.HTBAH.neueEntropieId(),
+        art: '',
+        titel: '',
+        aufgabeWas: '',
+        aufgabenstellung: '',
+        ergebnis: '',
+        schwierigkeit: '',
+        notizenHtml: '',
+        medien: [],
+      };
+    },
+    bestieLeer() {
+      return {
+        id: window.HTBAH.neueEntropieId(),
+        epoche: 'mittelalter',
+        kategorie: 'normales_tier',
+        name: '',
+        angriff: '',
+        verteidigung: '',
+        lebenspunkte: '',
+        staerke: '',
+        schwaeche: '',
+        beschreibungHtml: '',
+        aggressivitaetSkala: 5,
+        medien: [],
+      };
+    },
     zeileQuillOrphanToolbarsInModalBodyEntfernen() {
       const modal = this.$refs.zeileModalElement;
       if (!modal) {
@@ -604,6 +1053,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     pantheonBearbeiten(row, index) {
       this.zeileModalOeffnen('pantheon', row, index);
     },
+    raetselHinzufuegen() {
+      this.zeileModalOeffnen('raetsel', this.raetselLeer(), -1);
+    },
+    raetselBearbeiten(row, index) {
+      this.zeileModalOeffnen('raetsel', row, index);
+    },
+    bestieHinzufuegen() {
+      this.zeileModalOeffnen('bestie', this.bestieLeer(), -1);
+    },
+    bestieBearbeiten(row, index) {
+      this.zeileModalOeffnen('bestie', row, index);
+    },
     htmlFuerQuillAusBearbeitung() {
       if (!this.bearbeitung) {
         return '';
@@ -612,6 +1073,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return this.bearbeitung.zeile.beschreibungHtml || '';
       }
       if (this.bearbeitung.typ === 'fraktion') {
+        return this.bearbeitung.zeile.beschreibungHtml || '';
+      }
+      if (this.bearbeitung.typ === 'bestie') {
         return this.bearbeitung.zeile.beschreibungHtml || '';
       }
       return this.bearbeitung.zeile.notizenHtml || '';
@@ -692,7 +1156,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return;
       }
       const html = this.zeileQuillInstanz.root.innerHTML;
-      if (this.bearbeitung.typ === 'gegenstand' || this.bearbeitung.typ === 'fraktion') {
+      if (
+        this.bearbeitung.typ === 'gegenstand' ||
+        this.bearbeitung.typ === 'fraktion' ||
+        this.bearbeitung.typ === 'bestie'
+      ) {
         this.bearbeitung.zeile.beschreibungHtml = html;
       } else {
         this.bearbeitung.zeile.notizenHtml = html;
@@ -735,6 +1203,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         felder = G.fraktion({ epoche: this.zufallFraktionEpoche });
       } else if (typ === 'pantheon') {
         felder = G.pantheon();
+      } else if (typ === 'raetsel') {
+        const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
+        const npcNamen = (this.zustand.npcs || []).map((n) => (n && n.name ? String(n.name) : ''));
+        felder = G.raetsel({
+          epoche: this.zufallRaetselEpoche,
+          orteNamen,
+          npcNamen,
+        });
+      } else if (typ === 'bestie') {
+        const ep = z && z.epoche ? String(z.epoche) : 'mittelalter';
+        felder = G.bestie({ epoche: ep });
       } else {
         felder = G.gegenstand({
           epoche: this.zufallGegenstandEpoche,
@@ -751,6 +1230,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.quillHtmlInBearbeitungSchreiben();
       const z = this.bearbeitung.zeile;
       const typ = this.bearbeitung.typ;
+      if (typ === 'bestie' && z) {
+        let a = Number(z.aggressivitaetSkala);
+        if (!Number.isFinite(a)) {
+          a = 5;
+        }
+        a = Math.min(10, Math.max(1, Math.round(a)));
+        z.aggressivitaetSkala = a;
+      }
       let liste;
       if (typ === 'npc') {
         liste = this.zustand.npcs;
@@ -760,6 +1247,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         liste = this.zustand.fraktionen;
       } else if (typ === 'pantheon') {
         liste = this.zustand.pantheon;
+      } else if (typ === 'raetsel') {
+        liste = this.zustand.raetsel;
+      } else if (typ === 'bestie') {
+        liste = this.zustand.bestien;
       } else {
         liste = this.zustand.gegenstaende;
       }
@@ -797,6 +1288,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         liste = this.zustand.fraktionen;
       } else if (typ === 'pantheon') {
         liste = this.zustand.pantheon;
+      } else if (typ === 'raetsel') {
+        liste = this.zustand.raetsel;
+      } else if (typ === 'bestie') {
+        liste = this.zustand.bestien;
       } else {
         liste = this.zustand.gegenstaende;
       }
@@ -872,6 +1367,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         gegenstaende: '📦 Gegenstände',
         fraktionen: '🏛️ Fraktionen',
         pantheon: '✨ Pantheon',
+        raetsel: '🧩 Rätsel',
+        bestien: '🦁 Bestarium',
       };
       this.$refs.zufallstabellenBestaetigen.oeffnen({
         titel: `${labels[typ] || 'Tabelle'} leeren?`,
@@ -887,6 +1384,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             this.zustand.fraktionen = [];
           } else if (typ === 'pantheon') {
             this.zustand.pantheon = [];
+          } else if (typ === 'raetsel') {
+            this.zustand.raetsel = [];
+          } else if (typ === 'bestien') {
+            this.zustand.bestien = [];
           }
           this.persist();
         },
@@ -909,9 +1410,28 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         <span class="htbah-page-title-emoji" aria-hidden="true">📚</span>
         <span>Zufallstabellen</span>
       </h4>
-      <p class="text-secondary text-center small mb-4">
+      <p class="text-secondary text-center small mb-3">
         Eigene Tabellen für Spielrunden.
       </p>
+
+      <div class="mb-4">
+        <div class="input-group">
+          <span class="input-group-text text-secondary" aria-hidden="true">
+            <span class="material-symbols-outlined" style="font-size: 1.25rem; line-height: 1;">search</span>
+          </span>
+          <input
+            id="zufallstabellen-suche-global"
+            v-model.trim="sucheGlobal"
+            type="search"
+            class="form-control"
+            placeholder="Alle Tabellen durchsuchen …"
+            autocomplete="off"
+            aria-label="Alle Tabellen durchsuchen" />
+        </div>
+        <p v-if="globaleSucheAktiv" class="small text-secondary mb-0 mt-2">
+          Pro Kategorie siehst du die Treffer oder den Hinweis, dass es dort keine gibt.
+        </p>
+      </div>
 
       <div class="card mb-3 text-start">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -951,16 +1471,22 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!gefilterteOrte.length">
-                  <td colspan="6" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                <tr v-if="!anzeigeOrte.length">
+                  <td colspan="6" class="text-secondary text-center py-3">
+                    {{ zufallstabellenLeerNachricht((zustand.orte || []).length, sucheOrte) }}
+                  </td>
                 </tr>
-                <tr v-for="row in gefilterteOrte" :key="row.id">
+                <tr
+                  v-for="row in anzeigeOrte"
+                  :key="row.id"
+                  class="zufallstabellen-tabellenzeile-klickbar"
+                  @click="detailAnsichtOeffnen('ort', row)">
                   <td>{{ karteWert(row.name) }}</td>
                   <td>{{ karteWert(row.groesse) }}</td>
                   <td>{{ karteWert(row.lage) }}</td>
                   <td>{{ karteWert(row.zustand) }}</td>
                   <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
-                  <td class="text-end text-nowrap">
+                  <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
                       class="btn btn-sm btn-outline-secondary me-1"
@@ -982,18 +1508,22 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             </table>
           </div>
           <div class="d-md-none p-2">
-            <div v-if="!gefilterteOrte.length" class="text-secondary text-center py-3 small">
-              Noch keine Einträge.
+            <div v-if="!anzeigeOrte.length" class="text-secondary text-center py-3 small">
+              {{ zufallstabellenLeerNachricht((zustand.orte || []).length, sucheOrte) }}
             </div>
-            <div v-for="row in gefilterteOrte" :key="'ort-card-' + row.id" class="card zufallstabellen-mobile-card mb-2">
-              <div class="card-body p-2">
+            <div
+              v-for="row in anzeigeOrte"
+              :key="'ort-card-' + row.id"
+              class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
+              <div class="card-body p-2" @click="detailAnsichtOeffnen('ort', row)">
                 <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
                 <div class="small"><span class="text-secondary">Größe:</span> {{ karteWert(row.groesse) }}</div>
                 <div class="small"><span class="text-secondary">Lage:</span> {{ karteWert(row.lage) }}</div>
                 <div class="small mb-2"><span class="text-secondary">Zustand:</span> {{ karteWert(row.zustand) }}</div>
                 <div
                   v-if="medienBilderAusZeile(row).length"
-                  class="zufallstabellen-mobile-slides mb-2">
+                  class="zufallstabellen-mobile-slides mb-2"
+                  @click.stop>
                   <button
                     v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
                     :key="'ort-bild-' + row.id + '-' + bild.id"
@@ -1009,7 +1539,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   class="small mb-2 zufallstabellen-richtext-vorschau"
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2" @click.stop>
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-primary flex-fill"
@@ -1067,16 +1597,22 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!gefilterteFraktionen.length">
-                  <td colspan="6" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                <tr v-if="!anzeigeFraktionen.length">
+                  <td colspan="6" class="text-secondary text-center py-3">
+                    {{ zufallstabellenLeerNachricht((zustand.fraktionen || []).length, sucheFraktionen) }}
+                  </td>
                 </tr>
-                <tr v-for="row in gefilterteFraktionen" :key="row.id">
+                <tr
+                  v-for="row in anzeigeFraktionen"
+                  :key="row.id"
+                  class="zufallstabellen-tabellenzeile-klickbar"
+                  @click="detailAnsichtOeffnen('fraktion', row)">
                   <td>{{ karteWert(row.art) }}</td>
                   <td>{{ karteWert(row.name) }}</td>
                   <td class="small">{{ karteWert(row.ziel) }}</td>
                   <td class="small">{{ karteWert(row.gesinnungVerhalten) }}</td>
                   <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
-                  <td class="text-end text-nowrap">
+                  <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
                       class="btn btn-sm btn-outline-secondary me-1"
@@ -1098,14 +1634,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             </table>
           </div>
           <div class="d-md-none p-2">
-            <div v-if="!gefilterteFraktionen.length" class="text-secondary text-center py-3 small">
-              Noch keine Einträge.
+            <div v-if="!anzeigeFraktionen.length" class="text-secondary text-center py-3 small">
+              {{ zufallstabellenLeerNachricht((zustand.fraktionen || []).length, sucheFraktionen) }}
             </div>
             <div
-              v-for="row in gefilterteFraktionen"
+              v-for="row in anzeigeFraktionen"
               :key="'fraktion-card-' + row.id"
-              class="card zufallstabellen-mobile-card mb-2">
-              <div class="card-body p-2">
+              class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
+              <div class="card-body p-2" @click="detailAnsichtOeffnen('fraktion', row)">
                 <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
                 <div class="small"><span class="text-secondary">Art:</span> {{ karteWert(row.art) }}</div>
                 <div class="small"><span class="text-secondary">Ziel:</span> {{ karteWert(row.ziel) }}</div>
@@ -1114,7 +1650,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </div>
                 <div
                   v-if="medienBilderAusZeile(row).length"
-                  class="zufallstabellen-mobile-slides mb-2">
+                  class="zufallstabellen-mobile-slides mb-2"
+                  @click.stop>
                   <button
                     v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
                     :key="'fraktion-bild-' + row.id + '-' + bild.id"
@@ -1130,7 +1667,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   class="small mb-2 zufallstabellen-richtext-vorschau"
                   v-html="richTextHtml(row.beschreibungHtml)"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2" @click.stop>
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-primary flex-fill"
@@ -1200,10 +1737,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!gefilterteNpcs.length">
-                  <td colspan="18" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                <tr v-if="!anzeigeNpcs.length">
+                  <td colspan="18" class="text-secondary text-center py-3">
+                    {{ zufallstabellenLeerNachricht((zustand.npcs || []).length, sucheNpcs) }}
+                  </td>
                 </tr>
-                <tr v-for="row in gefilterteNpcs" :key="row.id">
+                <tr
+                  v-for="row in anzeigeNpcs"
+                  :key="row.id"
+                  class="zufallstabellen-tabellenzeile-klickbar"
+                  @click="detailAnsichtOeffnen('npc', row)">
                   <td>{{ karteWert(row.name) }}</td>
                   <td>{{ karteWert(row.spitzname) }}</td>
                   <td>{{ karteWert(row.geschlecht) }}</td>
@@ -1221,7 +1764,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td>{{ karteWert(row.waffe) }}</td>
                   <td class="small">{{ npcWaffenWerteText(row) }}</td>
                   <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
-                  <td class="text-end text-nowrap">
+                  <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
                       class="btn btn-sm btn-outline-secondary me-1"
@@ -1243,11 +1786,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             </table>
           </div>
           <div class="d-md-none p-2">
-            <div v-if="!gefilterteNpcs.length" class="text-secondary text-center py-3 small">
-              Noch keine Einträge.
+            <div v-if="!anzeigeNpcs.length" class="text-secondary text-center py-3 small">
+              {{ zufallstabellenLeerNachricht((zustand.npcs || []).length, sucheNpcs) }}
             </div>
-            <div v-for="row in gefilterteNpcs" :key="'npc-card-' + row.id" class="card zufallstabellen-mobile-card mb-2">
-              <div class="card-body p-2">
+            <div
+              v-for="row in anzeigeNpcs"
+              :key="'npc-card-' + row.id"
+              class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
+              <div class="card-body p-2" @click="detailAnsichtOeffnen('npc', row)">
                 <div class="fw-semibold mb-1">
                   {{ karteWert(row.name) }}
                   <span v-if="zeilenWertAlsText(row.spitzname)" class="fw-normal text-secondary">({{ row.spitzname }})</span>
@@ -1259,7 +1805,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small mb-2"><span class="text-secondary">Werte:</span> {{ npcWaffenWerteText(row) }}</div>
                 <div
                   v-if="medienBilderAusZeile(row).length"
-                  class="zufallstabellen-mobile-slides mb-2">
+                  class="zufallstabellen-mobile-slides mb-2"
+                  @click.stop>
                   <button
                     v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
                     :key="'npc-bild-' + row.id + '-' + bild.id"
@@ -1275,7 +1822,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   class="small mb-2 zufallstabellen-richtext-vorschau"
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2" @click.stop>
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-primary flex-fill"
@@ -1331,14 +1878,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!gefilterteGegenstaende.length">
-                  <td colspan="4" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                <tr v-if="!anzeigeGegenstaende.length">
+                  <td colspan="4" class="text-secondary text-center py-3">
+                    {{ zufallstabellenLeerNachricht((zustand.gegenstaende || []).length, sucheGegenstaende) }}
+                  </td>
                 </tr>
-                <tr v-for="row in gefilterteGegenstaende" :key="row.id">
+                <tr
+                  v-for="row in anzeigeGegenstaende"
+                  :key="row.id"
+                  class="zufallstabellen-tabellenzeile-klickbar"
+                  @click="detailAnsichtOeffnen('gegenstand', row)">
                   <td>{{ karteWert(row.name) }}</td>
                   <td class="small text-nowrap">{{ gegenstandWaffenWerteText(row) }}</td>
                   <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
-                  <td class="text-end text-nowrap">
+                  <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
                       class="btn btn-sm btn-outline-secondary me-1"
@@ -1360,19 +1913,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             </table>
           </div>
           <div class="d-md-none p-2">
-            <div v-if="!gefilterteGegenstaende.length" class="text-secondary text-center py-3 small">
-              Noch keine Einträge.
+            <div v-if="!anzeigeGegenstaende.length" class="text-secondary text-center py-3 small">
+              {{ zufallstabellenLeerNachricht((zustand.gegenstaende || []).length, sucheGegenstaende) }}
             </div>
             <div
-              v-for="row in gefilterteGegenstaende"
+              v-for="row in anzeigeGegenstaende"
               :key="'gegenstand-card-' + row.id"
-              class="card zufallstabellen-mobile-card mb-2">
-              <div class="card-body p-2">
+              class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
+              <div class="card-body p-2" @click="detailAnsichtOeffnen('gegenstand', row)">
                 <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
                 <div class="small"><span class="text-secondary">Kampfwerte:</span> {{ gegenstandWaffenWerteText(row) }}</div>
                 <div
                   v-if="medienBilderAusZeile(row).length"
-                  class="zufallstabellen-mobile-slides my-2">
+                  class="zufallstabellen-mobile-slides my-2"
+                  @click.stop>
                   <button
                     v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
                     :key="'gegenstand-bild-' + row.id + '-' + bild.id"
@@ -1388,7 +1942,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   class="small mb-2 zufallstabellen-richtext-vorschau"
                   v-html="richTextHtml(row.beschreibungHtml)"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2" @click.stop>
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-primary flex-fill"
@@ -1457,16 +2011,22 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!gefiltertesPantheon.length">
-                  <td colspan="6" class="text-secondary text-center py-3">Noch keine Einträge.</td>
+                <tr v-if="!anzeigePantheon.length">
+                  <td colspan="6" class="text-secondary text-center py-3">
+                    {{ zufallstabellenLeerNachricht((zustand.pantheon || []).length, suchePantheon) }}
+                  </td>
                 </tr>
-                <tr v-for="row in gefiltertesPantheon" :key="row.id">
+                <tr
+                  v-for="row in anzeigePantheon"
+                  :key="row.id"
+                  class="zufallstabellen-tabellenzeile-klickbar"
+                  @click="detailAnsichtOeffnen('pantheon', row)">
                   <td>{{ karteWert(row.name) }}</td>
                   <td class="small">{{ karteWert(row.domaene) }}</td>
                   <td class="small">{{ karteWert(row.charakter) }}</td>
                   <td class="small">{{ karteWert(row.schutzpatronat) }}</td>
                   <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
-                  <td class="text-end text-nowrap">
+                  <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
                       class="btn btn-sm btn-outline-secondary me-1"
@@ -1488,14 +2048,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             </table>
           </div>
           <div class="d-md-none p-2">
-            <div v-if="!gefiltertesPantheon.length" class="text-secondary text-center py-3 small">
-              Noch keine Einträge.
+            <div v-if="!anzeigePantheon.length" class="text-secondary text-center py-3 small">
+              {{ zufallstabellenLeerNachricht((zustand.pantheon || []).length, suchePantheon) }}
             </div>
             <div
-              v-for="row in gefiltertesPantheon"
+              v-for="row in anzeigePantheon"
               :key="'pantheon-card-' + row.id"
-              class="card zufallstabellen-mobile-card mb-2">
-              <div class="card-body p-2">
+              class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
+              <div class="card-body p-2" @click="detailAnsichtOeffnen('pantheon', row)">
                 <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
                 <div class="small"><span class="text-secondary">Domäne:</span> {{ karteWert(row.domaene) }}</div>
                 <div class="small"><span class="text-secondary">Charakter:</span> {{ karteWert(row.charakter) }}</div>
@@ -1504,7 +2064,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </div>
                 <div
                   v-if="medienBilderAusZeile(row).length"
-                  class="zufallstabellen-mobile-slides mb-2">
+                  class="zufallstabellen-mobile-slides mb-2"
+                  @click.stop>
                   <button
                     v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
                     :key="'pantheon-bild-' + row.id + '-' + bild.id"
@@ -1520,7 +2081,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   class="small mb-2 zufallstabellen-richtext-vorschau"
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2" @click.stop>
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-primary flex-fill"
@@ -1540,7 +2101,371 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         </div>
       </div>
 
+      <div class="card mb-3 text-start">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold">🧩 Rätsel</span>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('raetsel')">
+              Leeren
+            </button>
+            <icon-text-button
+              type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0"
+              icon="add"
+              @click="raetselHinzufuegen"
+              aria-label="Eintrag hinzufügen">
+              Hinzufügen
+            </icon-text-button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="p-2 border-bottom">
+            <input
+              v-model.trim="sucheRaetsel"
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Rätsel durchsuchen…" />
+          </div>
+          <div class="table-responsive d-none d-md-block">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Art</th>
+                  <th>Titel</th>
+                  <th>Was ist die Aufgabe?</th>
+                  <th>Aufgabenstellung</th>
+                  <th>Ergebnis</th>
+                  <th>Schwierigkeit</th>
+                  <th>Details</th>
+                  <th class="text-end text-nowrap">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!anzeigeRaetsel.length">
+                  <td colspan="8" class="text-secondary text-center py-3">
+                    {{ zufallstabellenLeerNachricht((zustand.raetsel || []).length, sucheRaetsel) }}
+                  </td>
+                </tr>
+                <tr
+                  v-for="row in anzeigeRaetsel"
+                  :key="row.id"
+                  class="zufallstabellen-tabellenzeile-klickbar"
+                  @click="detailAnsichtOeffnen('raetsel', row)">
+                  <td class="small">{{ karteWert(row.art) }}</td>
+                  <td>{{ karteWert(row.titel) }}</td>
+                  <td class="small">{{ textVorschau(row.aufgabeWas, 56) }}</td>
+                  <td class="small">{{ textVorschau(row.aufgabenstellung, 56) }}</td>
+                  <td class="small">{{ karteWert(row.ergebnis) }}</td>
+                  <td class="small">{{ karteWert(row.schwierigkeit) }}</td>
+                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
+                  <td class="text-end text-nowrap" @click.stop>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary me-1"
+                      @click="galerieFuerZeileOeffnen(row)">
+                      Medien ({{ medienAnzahl(row) }})
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary me-1"
+                      @click="raetselBearbeiten(row, indexNachId(zustand.raetsel, row.id))">
+                      Bearbeiten
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('raetsel', row.id)">
+                      Löschen
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="d-md-none p-2">
+            <div v-if="!anzeigeRaetsel.length" class="text-secondary text-center py-3 small">
+              {{ zufallstabellenLeerNachricht((zustand.raetsel || []).length, sucheRaetsel) }}
+            </div>
+            <div
+              v-for="row in anzeigeRaetsel"
+              :key="'raetsel-card-' + row.id"
+              class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
+              <div class="card-body p-2" @click="detailAnsichtOeffnen('raetsel', row)">
+                <div class="fw-semibold mb-1">{{ karteWert(row.titel) }}</div>
+                <div class="small"><span class="text-secondary">Art:</span> {{ karteWert(row.art) }}</div>
+                <div class="small"><span class="text-secondary">Aufgabe:</span> {{ textVorschau(row.aufgabeWas, 96) }}</div>
+                <div class="small"><span class="text-secondary">Formulierung:</span> {{ textVorschau(row.aufgabenstellung, 96) }}</div>
+                <div class="small"><span class="text-secondary">Ergebnis:</span> {{ karteWert(row.ergebnis) }}</div>
+                <div class="small mb-2">
+                  <span class="text-secondary">Schwierigkeit:</span> {{ karteWert(row.schwierigkeit) }}
+                </div>
+                <div
+                  v-if="medienBilderAusZeile(row).length"
+                  class="zufallstabellen-mobile-slides mb-2"
+                  @click.stop>
+                  <button
+                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
+                    :key="'raetsel-bild-' + row.id + '-' + bild.id"
+                    type="button"
+                    class="zufallstabellen-mobile-slide"
+                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
+                    @click="mediumImBildbetrachterOeffnen(bild)">
+                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                  </button>
+                </div>
+                <div
+                  v-if="zeilenWertAlsText(row.notizenHtml)"
+                  class="small mb-2 zufallstabellen-richtext-vorschau"
+                  v-html="richTextHtml(row.notizenHtml)"></div>
+                <div v-else class="small mb-2">—</div>
+                <div class="d-flex gap-2" @click.stop>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary flex-fill"
+                    @click="raetselBearbeiten(row, indexNachId(zustand.raetsel, row.id))">
+                    Bearbeiten
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-fill"
+                    @click="zeileLoeschenDialog('raetsel', row.id)">
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3 text-start">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span class="fw-semibold">🦁 Bestarium</span>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('bestien')">
+              Leeren
+            </button>
+            <icon-text-button
+              type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0"
+              icon="add"
+              @click="bestieHinzufuegen"
+              aria-label="Eintrag hinzufügen">
+              Hinzufügen
+            </icon-text-button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="p-2 border-bottom">
+            <input
+              v-model.trim="sucheBestien"
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Bestien durchsuchen…" />
+          </div>
+          <div class="table-responsive d-none d-md-block">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Epoche</th>
+                  <th>Art</th>
+                  <th>Name</th>
+                  <th>Angriff</th>
+                  <th>Verteidigung</th>
+                  <th>LP</th>
+                  <th>Aggro</th>
+                  <th>Stärken</th>
+                  <th>Schwächen</th>
+                  <th>Beschreibung</th>
+                  <th class="text-end text-nowrap">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!anzeigeBestien.length">
+                  <td colspan="11" class="text-secondary text-center py-3">
+                    {{ zufallstabellenLeerNachricht((zustand.bestien || []).length, sucheBestien) }}
+                  </td>
+                </tr>
+                <tr
+                  v-for="row in anzeigeBestien"
+                  :key="row.id"
+                  class="zufallstabellen-tabellenzeile-klickbar"
+                  @click="detailAnsichtOeffnen('bestie', row)">
+                  <td class="small text-nowrap">{{ bestieEpocheLabel(row.epoche) }}</td>
+                  <td class="small">{{ bestieKategorieLabel(row.kategorie) }}</td>
+                  <td>{{ karteWert(row.name) }}</td>
+                  <td class="small">{{ karteWert(row.angriff) }}</td>
+                  <td class="small">{{ karteWert(row.verteidigung) }}</td>
+                  <td class="small">{{ karteWert(row.lebenspunkte) }}</td>
+                  <td class="small text-nowrap">{{ bestieAggressivitaetText(row) }}</td>
+                  <td class="small">{{ textVorschau(row.staerke, 48) }}</td>
+                  <td class="small">{{ textVorschau(row.schwaeche, 48) }}</td>
+                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
+                  <td class="text-end text-nowrap" @click.stop>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary me-1"
+                      @click="galerieFuerZeileOeffnen(row)">
+                      Medien ({{ medienAnzahl(row) }})
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary me-1"
+                      @click="bestieBearbeiten(row, indexNachId(zustand.bestien, row.id))">
+                      Bearbeiten
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('bestie', row.id)">
+                      Löschen
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="d-md-none p-2">
+            <div v-if="!anzeigeBestien.length" class="text-secondary text-center py-3 small">
+              {{ zufallstabellenLeerNachricht((zustand.bestien || []).length, sucheBestien) }}
+            </div>
+            <div
+              v-for="row in anzeigeBestien"
+              :key="'bestie-card-' + row.id"
+              class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
+              <div class="card-body p-2" @click="detailAnsichtOeffnen('bestie', row)">
+                <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
+                <div class="small"><span class="text-secondary">Epoche:</span> {{ bestieEpocheLabel(row.epoche) }}</div>
+                <div class="small"><span class="text-secondary">Art:</span> {{ bestieKategorieLabel(row.kategorie) }}</div>
+                <div class="small">
+                  <span class="text-secondary">Werte:</span> A {{ karteWert(row.angriff) }} · V {{ karteWert(row.verteidigung) }} · LP
+                  {{ karteWert(row.lebenspunkte) }}
+                </div>
+                <div class="small mb-2">
+                  <span class="text-secondary">Aggressiv / offensiv:</span> {{ bestieAggressivitaetText(row) }}
+                </div>
+                <div v-if="zeilenWertAlsText(row.staerke)" class="small">
+                  <span class="text-secondary">Stärken:</span> {{ textVorschau(row.staerke, 120) }}
+                </div>
+                <div v-if="zeilenWertAlsText(row.schwaeche)" class="small mb-2">
+                  <span class="text-secondary">Schwächen:</span> {{ textVorschau(row.schwaeche, 120) }}
+                </div>
+                <div
+                  v-if="medienBilderAusZeile(row).length"
+                  class="zufallstabellen-mobile-slides mb-2"
+                  @click.stop>
+                  <button
+                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
+                    :key="'bestie-bild-' + row.id + '-' + bild.id"
+                    type="button"
+                    class="zufallstabellen-mobile-slide"
+                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
+                    @click="mediumImBildbetrachterOeffnen(bild)">
+                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                  </button>
+                </div>
+                <div
+                  v-if="zeilenWertAlsText(row.beschreibungHtml)"
+                  class="small mb-2 zufallstabellen-richtext-vorschau"
+                  v-html="richTextHtml(row.beschreibungHtml)"></div>
+                <div v-else class="small mb-2">—</div>
+                <div class="d-flex gap-2" @click.stop>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary flex-fill"
+                    @click="bestieBearbeiten(row, indexNachId(zustand.bestien, row.id))">
+                    Bearbeiten
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-fill"
+                    @click="zeileLoeschenDialog('bestie', row.id)">
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="abstandshalter" aria-hidden="true"></div>
+
+      <div
+        class="modal fade"
+        id="htbahZufallstabellenDetailModal"
+        ref="detailAnsichtModalElement"
+        tabindex="-1"
+        aria-labelledby="htbahZufallstabellenDetailModalLabel"
+        aria-hidden="true"
+        @hidden.bs.modal="onDetailAnsichtModalHidden">
+        <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-md-down modal-xl">
+          <div class="modal-content shadow border-0">
+            <div class="modal-header py-2 py-md-3 border-0 border-bottom">
+              <div class="me-auto pe-2">
+                <div class="small text-secondary text-uppercase mb-0">Nur Lesen</div>
+                <h5 class="modal-title h6 mb-0" id="htbahZufallstabellenDetailModalLabel">{{ detailAnsichtTitel }}</h5>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body text-start pt-2 pt-md-3" v-if="detailAnsicht">
+              <dl class="zufallstabellen-detail-sheet mb-0">
+                <template v-for="(p, i) in detailAnsichtFelder" :key="'zfd-' + i">
+                  <dt>{{ p.label }}</dt>
+                  <dd v-if="p.html != null">
+                    <div
+                      v-if="detailRichTextAnzeige(p.html)"
+                      class="zufallstabellen-detail-richtext"
+                      v-html="detailRichTextAnzeige(p.html)"></div>
+                    <span v-else class="text-secondary">—</span>
+                  </dd>
+                  <dd v-else class="zufallstabellen-detail-dd-plain">{{ karteWert(p.text) }}</dd>
+                </template>
+              </dl>
+              <div class="mt-3 pt-3 border-top" v-if="medienAnzahl(detailAnsicht.zeile)">
+                <h6 class="small text-secondary text-uppercase mb-2">Medien</h6>
+                <div v-if="medienBilderAusZeile(detailAnsicht.zeile).length" class="row g-2 mb-2">
+                  <div
+                    v-for="bild in medienBilderAusZeile(detailAnsicht.zeile)"
+                    :key="'detail-bild-' + bild.id"
+                    class="col-6 col-sm-4 col-lg-3">
+                    <button
+                      type="button"
+                      class="zufallstabellen-galerie-thumb"
+                      @click="mediumImBildbetrachterOeffnen(bild)">
+                      <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                    </button>
+                    <div class="small mt-1 text-break">{{ mediumDateiname(bild) }}</div>
+                  </div>
+                </div>
+                <div v-if="medienDateienAusZeile(detailAnsicht.zeile).length" class="list-group list-group-flush">
+                  <div
+                    v-for="datei in medienDateienAusZeile(detailAnsicht.zeile)"
+                    :key="'detail-datei-' + datei.id"
+                    class="list-group-item px-0 py-2">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                      <div class="small text-break">
+                        <div class="fw-semibold">{{ mediumDateiname(datei) }}</div>
+                        <div class="text-secondary">{{ mediumDateiTypLabel(datei) }}</div>
+                        <div v-if="mediumDateigroesseLabel(datei)" class="text-secondary">
+                          {{ mediumDateigroesseLabel(datei) }}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                        @click="mediumHerunterladen(datei)">
+                        Download
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="mt-3 pt-3 border-top small text-secondary">Keine Medien hinterlegt.</div>
+            </div>
+            <div class="modal-footer py-2 border-0 border-top flex-wrap gap-2">
+              <button type="button" class="btn btn-outline-primary" @click="detailAnsichtBearbeiten">
+                Bearbeiten
+              </button>
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div
         class="modal fade"
@@ -1832,6 +2757,134 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </div>
               </template>
 
+              <template v-else-if="bearbeitung.typ === 'raetsel'">
+                <div class="row g-2 mb-2 align-items-end" v-if="bearbeitungIndex < 0">
+                  <div class="col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zfr-epoche">Epoche für Zufallsvorschlag</label>
+                    <select id="zfr-epoche" class="form-select form-select-sm" v-model="zufallRaetselEpoche">
+                      <option value="mittelalter">Mittelalter</option>
+                      <option value="gegenwart">Gegenwart</option>
+                      <option value="zukunft">Zukunft</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6 small text-secondary align-self-end">
+                    Namen aus den Tabellen „Orte“ und „NPCs“ können im Ergebnistext vorkommen, wenn Einträge existieren.
+                  </div>
+                </div>
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zfr-art" class="form-control" v-model="bearbeitung.zeile.art" placeholder=" " />
+                      <label for="zfr-art">Art (z. B. Licht- & Spiegelpuzzle)</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zfr-titel" class="form-control" v-model="bearbeitung.zeile.titel" placeholder=" " />
+                      <label for="zfr-titel">Titel / Stichwort</label>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-floating">
+                      <textarea id="zfr-was" class="form-control" v-model="bearbeitung.zeile.aufgabeWas" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfr-was">Was könnte die Aufgabe sein?</label>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-floating">
+                      <textarea id="zfr-stell" class="form-control" v-model="bearbeitung.zeile.aufgabenstellung" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfr-stell">Wie könnte die Aufgabenstellung lauten?</label>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-floating">
+                      <textarea id="zfr-erg" class="form-control" v-model="bearbeitung.zeile.ergebnis" placeholder=" " style="height: 4rem"></textarea>
+                      <label for="zfr-erg">Ergebnis (Himmelsrichtung, Ort, Person, Tageszeit …)</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input id="zfr-schw" class="form-control" v-model="bearbeitung.zeile.schwierigkeit" placeholder=" " />
+                      <label for="zfr-schw">Schwierigkeit</label>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <template v-else-if="bearbeitung.typ === 'bestie'">
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zfb-epoche">Epoche</label>
+                    <select id="zfb-epoche" class="form-select" v-model="bearbeitung.zeile.epoche">
+                      <option value="mittelalter">Mittelalter</option>
+                      <option value="gegenwart">Gegenwart</option>
+                      <option value="zukunft">Zukunft</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small text-secondary mb-1" for="zfb-kat">Kategorie</label>
+                    <select id="zfb-kat" class="form-select" v-model="bearbeitung.zeile.kategorie">
+                      <option value="normales_tier">Normales Tier</option>
+                      <option value="fantasy_tier">Magisches / Fantasy-Tier</option>
+                      <option value="mutiert">Mutiertes Wesen</option>
+                      <option value="monster">Monster</option>
+                    </select>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-floating">
+                      <input id="zfb-name" class="form-control" v-model="bearbeitung.zeile.name" placeholder=" " />
+                      <label for="zfb-name">Name der Bestie</label>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="form-floating">
+                      <input id="zfb-ang" class="form-control" v-model="bearbeitung.zeile.angriff" placeholder=" " autocomplete="off" />
+                      <label for="zfb-ang">Angriff</label>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="form-floating">
+                      <input id="zfb-ver" class="form-control" v-model="bearbeitung.zeile.verteidigung" placeholder=" " autocomplete="off" />
+                      <label for="zfb-ver">Verteidigung</label>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="form-floating">
+                      <input id="zfb-lp" class="form-control" v-model="bearbeitung.zeile.lebenspunkte" placeholder=" " autocomplete="off" />
+                      <label for="zfb-lp">Lebenspunkte</label>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label small text-secondary mb-1" for="zfb-agg">
+                      Aggressivität und Offensive (Skala 1 = sehr defensiv / scheu, 10 = sehr aggressiv und offensiv)
+                    </label>
+                    <div class="d-flex align-items-center gap-3">
+                      <input
+                        id="zfb-agg"
+                        type="range"
+                        class="form-range flex-grow-1"
+                        min="1"
+                        max="10"
+                        step="1"
+                        v-model.number="bearbeitung.zeile.aggressivitaetSkala" />
+                      <span class="small text-nowrap text-secondary" style="min-width: 3.5rem">{{ bestieAggressivitaetText(bearbeitung.zeile) }}</span>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <textarea id="zfb-st" class="form-control" v-model="bearbeitung.zeile.staerke" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfb-st">Stärken (optional)</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <textarea id="zfb-sw" class="form-control" v-model="bearbeitung.zeile.schwaeche" placeholder=" " style="height: 4.5rem"></textarea>
+                      <label for="zfb-sw">Schwächen (optional)</label>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
               <template v-else-if="bearbeitung.typ === 'gegenstand'">
                 <div class="row g-2 mb-2 align-items-end" v-if="bearbeitungIndex < 0">
                   <div class="col-md-6">
@@ -1938,6 +2991,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
 
               <label class="form-label mt-3 mb-1" v-if="bearbeitung.typ === 'npc'">Notizen</label>
               <label class="form-label mt-3 mb-1" v-else-if="bearbeitung.typ === 'pantheon'">Notizen & Mythos</label>
+              <label class="form-label mt-3 mb-1" v-else-if="bearbeitung.typ === 'raetsel'">Aufgabe, Spielleitung & Notizen</label>
+              <label class="form-label mt-3 mb-1" v-else-if="bearbeitung.typ === 'bestie'">Lebensraum, Lebensweise und Legende</label>
               <label class="form-label mt-3 mb-1" v-else>Beschreibung</label>
               <div
                 class="zufallstabellen-quill-wrap"

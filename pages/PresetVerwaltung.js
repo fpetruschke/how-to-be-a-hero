@@ -91,31 +91,37 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
         </div>
       </div>
 
-      <div class="card p-3 mb-3" v-for="(preset, index) in presets">
-        <div class="d-flex flex-column gap-2 mb-2" :class="preset.htbahPresetId ? 'flex-md-row align-items-md-start justify-content-md-between' : ''">
-          <span
-            v-if="preset.htbahPresetId"
-            class="badge text-bg-secondary align-self-start order-md-2">
-            Vorgegeben
-          </span>
-          <h5 class="fw-bold mb-0 order-md-1">{{preset.name}}</h5>
+      <div class="row g-3">
+        <div class="col-12 col-sm-6 col-lg-3" v-for="(preset, index) in presets" :key="preset.htbahPresetId || preset.name || index">
+          <div class="card p-3 h-100">
+            <div class="d-flex flex-column gap-2 mb-2" :class="preset.htbahPresetId ? 'flex-md-row align-items-md-start justify-content-md-between' : ''">
+              <span
+                v-if="preset.htbahPresetId"
+                class="badge text-bg-secondary align-self-start order-md-2">
+                Vorgegeben
+              </span>
+              <h5 class="fw-bold mb-0 order-md-1">{{preset.name}}</h5>
+            </div>
+
+            <div class="d-grid gap-2 mt-auto">
+              <icon-text-button class="btn btn-sm btn-secondary" icon="edit" @click="$router.push('/faehigkeiten-preset-bearbeiten/' + index)">
+                Bearbeiten
+              </icon-text-button>
+
+              <icon-text-button class="btn btn-sm btn-primary" icon="download" @click="presetExportieren(preset)">
+                Export
+              </icon-text-button>
+
+              <icon-text-button
+                v-if="!preset.htbahPresetId"
+                class="btn btn-sm btn-danger"
+                icon="delete"
+                @click="presetEntfernen(preset)">
+                Löschen
+              </icon-text-button>
+            </div>
+          </div>
         </div>
-
-        <icon-text-button class="btn btn-sm btn-secondary me-1 mb-2" icon="edit" @click="$router.push('/faehigkeiten-preset-bearbeiten/' + index)">
-          Bearbeiten
-        </icon-text-button>
-
-        <icon-text-button class="btn btn-sm btn-primary me-1 mb-2" icon="download" @click="presetExportieren(preset)">
-          Export
-        </icon-text-button>
-
-        <icon-text-button
-          v-if="!preset.htbahPresetId"
-          class="btn btn-sm btn-danger mb-2"
-          icon="delete"
-          @click="presetEntfernen(preset)">
-          Löschen
-        </icon-text-button>
       </div>
 
       <div class="abstandshalter" aria-hidden="true"></div>

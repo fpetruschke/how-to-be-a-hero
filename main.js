@@ -323,10 +323,75 @@ function normalisiereZufallstabellenPantheonZeile(z) {
   };
 }
 
+function normalisiereZufallstabellenRaetselZeile(z) {
+  if (!z || typeof z !== 'object') {
+    return null;
+  }
+  return {
+    id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
+    art: typeof z.art === 'string' ? z.art : '',
+    titel: typeof z.titel === 'string' ? z.titel : '',
+    aufgabeWas: typeof z.aufgabeWas === 'string' ? z.aufgabeWas : '',
+    aufgabenstellung: typeof z.aufgabenstellung === 'string' ? z.aufgabenstellung : '',
+    ergebnis: typeof z.ergebnis === 'string' ? z.ergebnis : '',
+    schwierigkeit: typeof z.schwierigkeit === 'string' ? z.schwierigkeit : '',
+    notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
+    medien: normalisiereZufallstabellenMedienListe(z.medien),
+  };
+}
+
+function normalisiereZufallstabellenBestieZeile(z) {
+  if (!z || typeof z !== 'object') {
+    return null;
+  }
+  const epocheRaw = typeof z.epoche === 'string' ? z.epoche : '';
+  const epoche =
+    epocheRaw === 'gegenwart' || epocheRaw === 'zukunft' ? epocheRaw : 'mittelalter';
+  const katRaw = typeof z.kategorie === 'string' ? z.kategorie : '';
+  const kategorie =
+    katRaw === 'fantasy_tier' || katRaw === 'mutiert' || katRaw === 'monster'
+      ? katRaw
+      : 'normales_tier';
+  let agg = Number(z.aggressivitaetSkala);
+  if (!Number.isFinite(agg)) {
+    agg = 5;
+  }
+  agg = Math.round(agg);
+  if (agg < 1) {
+    agg = 1;
+  }
+  if (agg > 10) {
+    agg = 10;
+  }
+  return {
+    id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
+    epoche,
+    kategorie,
+    name: typeof z.name === 'string' ? z.name : '',
+    angriff: typeof z.angriff === 'string' ? z.angriff : '',
+    verteidigung: typeof z.verteidigung === 'string' ? z.verteidigung : '',
+    lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
+    staerke: typeof z.staerke === 'string' ? z.staerke : '',
+    schwaeche: typeof z.schwaeche === 'string' ? z.schwaeche : '',
+    beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
+    aggressivitaetSkala: agg,
+    medien: normalisiereZufallstabellenMedienListe(z.medien),
+  };
+}
+
 function ladeZufallstabellenZustand() {
   const roh = htbahSpeicher.leseJson(SPEICHER_KEY_ZUFALLSTABELLEN, null);
   if (!roh || typeof roh !== 'object') {
-    return { version: 1, npcs: [], orte: [], gegenstaende: [], fraktionen: [], pantheon: [] };
+    return {
+      version: 1,
+      npcs: [],
+      orte: [],
+      gegenstaende: [],
+      fraktionen: [],
+      pantheon: [],
+      raetsel: [],
+      bestien: [],
+    };
   }
   return {
     version: 1,
@@ -344,6 +409,12 @@ function ladeZufallstabellenZustand() {
       : [],
     pantheon: Array.isArray(roh.pantheon)
       ? roh.pantheon.map(normalisiereZufallstabellenPantheonZeile).filter(Boolean)
+      : [],
+    raetsel: Array.isArray(roh.raetsel)
+      ? roh.raetsel.map(normalisiereZufallstabellenRaetselZeile).filter(Boolean)
+      : [],
+    bestien: Array.isArray(roh.bestien)
+      ? roh.bestien.map(normalisiereZufallstabellenBestieZeile).filter(Boolean)
       : [],
   };
 }

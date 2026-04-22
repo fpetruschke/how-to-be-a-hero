@@ -1,5 +1,11 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
+function htbahBegegnungStripHtmlText(html) {
+  const div = document.createElement('div');
+  div.innerHTML = typeof html === 'string' ? html : '';
+  return (div.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 window.HTBAH_KOMPONENTEN.BottomNav = {
   props: ['uiZustand'],
   data() {
@@ -12,6 +18,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       atmosphaere: {},
       badgePos: null,
       _badgeDrag: null,
+      begegnungZiehung: null,
     };
   },
   created() {
@@ -146,10 +153,33 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const p = this.$route.path || '';
       return p === '/einstellungen' || p.startsWith('/einstellungen/');
     },
+    /** Frische Listen aus dem Speicher (Reaktivität über Tab/Route). */
+    begegnungListenAusSpeicher() {
+      void this.$route.fullPath;
+      void this.wuerfelModalTab;
+      const z = window.HTBAH.ladeZufallstabellenZustand() || {};
+      return {
+        npcs: Array.isArray(z.npcs) ? z.npcs : [],
+        bestien: Array.isArray(z.bestien) ? z.bestien : [],
+        pantheon: Array.isArray(z.pantheon) ? z.pantheon : [],
+      };
+    },
+    begegnungHatBegegnungsEintrag() {
+      const { npcs, bestien, pantheon } = this.begegnungListenAusSpeicher;
+      return npcs.length > 0 || bestien.length > 0 || pantheon.length > 0;
+    },
   },
   watch: {
     zeigeNav() {
       this.$nextTick(() => this.bindNavReserveObserver());
+    },
+    rolle(neu) {
+      if (
+        neu !== 'spielleitung' &&
+        (this.wuerfelModalTab === 'atmosphaere' || this.wuerfelModalTab === 'begegnung')
+      ) {
+        this.wuerfelModalTab = 'wuerfel';
+      }
     },
   },
   mounted() {
@@ -336,8 +366,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.atmosphaereFormularOffen = !this.atmosphaereFormularOffen;
     },
     wuerfelModalOeffnen(tab) {
-      const zielTab = tab === 'atmosphaere' || tab === 'wuerfel' ? tab : 'wuerfel';
-      this.wuerfelModalTab = !this.istSpielleitung && zielTab === 'atmosphaere' ? 'wuerfel' : zielTab;
+      const zielTab =
+        tab === 'atmosphaere' || tab === 'begegnung' || tab === 'wuerfel' ? tab : 'wuerfel';
+      const gmTab = zielTab === 'atmosphaere' || zielTab === 'begegnung';
+      this.wuerfelModalTab = !this.istSpielleitung && gmTab ? 'wuerfel' : zielTab;
       const modalElement = this.$refs.wuerfelModalElement;
       if (!modalElement) {
         return;
@@ -426,6 +458,139 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
       this.anzahlW10 = anzahl10;
       this.ergebnisse = Array.from({ length: anzahl10 }, () => window.HTBAH.wuerfelW10());
+    },
+    begegnungMediumIstBild(medium) {
+      if (!medium || typeof medium !== 'object') {
+        return false;
+      }
+      if (medium.typ === 'bild') {
+        return true;
+      }
+      if (typeof medium.mimeType === 'string' && medium.mimeType.startsWith('image/')) {
+        return true;
+      }
+      return typeof medium.dataUrl === 'string' && medium.dataUrl.startsWith('data:image/');
+    },
+    begegnungMedienAusZeile(row) {
+      return row && Array.isArray(row.medien) ? row.medien : [];
+    },
+    begegnungMedienBilder(row) {
+      return this.begegnungMedienAusZeile(row).filter((m) => this.begegnungMediumIstBild(m));
+    },
+    begegnungMedienDateien(row) {
+      return this.begegnungMedienAusZeile(row).filter((m) => !this.begegnungMediumIstBild(m));
+    },
+    begegnungMediumDateiname(medium) {
+      if (!medium) {
+        return 'Datei';
+      }
+      const text = String(medium.name || '').trim();
+      if (text) {
+        return text;
+      }
+      return this.begegnungMediumIstBild(medium) ? 'Bild' : 'Datei';
+    },
+    begegnungZeileWert(wert) {
+      const raw = wert == null ? '' : String(wert).trim();
+      if (!raw) {
+        return '—';
+      }
+      if (raw.includes('<') && raw.includes('>')) {
+        const t = htbahBegegnungStripHtmlText(raw);
+        return t || '—';
+      }
+      return raw;
+    },
+    begegnungRichTextHtml(html) {
+      const inhalt = typeof html === 'string' ? html : '';
+      return htbahBegegnungStripHtmlText(inhalt) ? inhalt : '';
+    },
+    begegnungNpcWaffenWerteText(row) {
+      const schadenswert = String(row && row.schadenswert ? row.schadenswert : '').trim();
+      const kampfart = row && row.kampfart === 'fernkampf' ? 'Fernkampf' : 'Nahkampf';
+      if (!schadenswert) {
+        return '—';
+      }
+      return `Schaden ${schadenswert} · ${kampfart}`;
+    },
+    begegnungBestieEpocheLabel(epoche) {
+      if (epoche === 'gegenwart') {
+        return 'Gegenwart';
+      }
+      if (epoche === 'zukunft') {
+        return 'Zukunft';
+      }
+      return 'Mittelalter';
+    },
+    begegnungBestieKategorieLabel(kategorie) {
+      if (kategorie === 'fantasy_tier') {
+        return 'Magisch / Fantasy';
+      }
+      if (kategorie === 'mutiert') {
+        return 'Mutiert';
+      }
+      if (kategorie === 'monster') {
+        return 'Monster';
+      }
+      return 'Normales Tier';
+    },
+    begegnungBestieAggressivitaetText(row) {
+      const n = row && Number(row.aggressivitaetSkala);
+      if (!Number.isFinite(n)) {
+        return '—';
+      }
+      const k = Math.min(10, Math.max(1, Math.round(n)));
+      return `${k} / 10`;
+    },
+    begegnungZiehen() {
+      const { npcs, bestien, pantheon } = this.begegnungListenAusSpeicher;
+      const canNpc = npcs.length > 0;
+      const canBestie = bestien.length > 0;
+      const canPantheon = pantheon.length > 0;
+      if (!canNpc && !canBestie && !canPantheon) {
+        this.begegnungZiehung = null;
+        return;
+      }
+      const rar = Math.floor(Math.random() * 10000) + 1;
+      if (canPantheon && rar <= 50 && (canNpc || canBestie)) {
+        this.begegnungZiehung = {
+          typ: 'pantheon',
+          zeile: pantheon[Math.floor(Math.random() * pantheon.length)],
+        };
+        return;
+      }
+      if (canNpc && canBestie) {
+        if (Math.random() < 0.5) {
+          this.begegnungZiehung = {
+            typ: 'npc',
+            zeile: npcs[Math.floor(Math.random() * npcs.length)],
+          };
+        } else {
+          this.begegnungZiehung = {
+            typ: 'bestie',
+            zeile: bestien[Math.floor(Math.random() * bestien.length)],
+          };
+        }
+        return;
+      }
+      if (canNpc) {
+        this.begegnungZiehung = {
+          typ: 'npc',
+          zeile: npcs[Math.floor(Math.random() * npcs.length)],
+        };
+        return;
+      }
+      if (canBestie) {
+        this.begegnungZiehung = {
+          typ: 'bestie',
+          zeile: bestien[Math.floor(Math.random() * bestien.length)],
+        };
+        return;
+      }
+      this.begegnungZiehung = {
+        typ: 'pantheon',
+        zeile: pantheon[Math.floor(Math.random() * pantheon.length)],
+      };
     },
   },
   template: `
@@ -573,6 +738,15 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     :class="{ active: wuerfelModalTab === 'atmosphaere' }"
                     @click="wuerfelModalTab = 'atmosphaere'">
                     Wetter &amp; Tageszeit
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button
+                    type="button"
+                    class="nav-link"
+                    :class="{ active: wuerfelModalTab === 'begegnung' }"
+                    @click="wuerfelModalTab = 'begegnung'">
+                    Begegnung
                   </button>
                 </li>
               </ul>
@@ -831,6 +1005,173 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div
+                v-if="istSpielleitung"
+                v-show="wuerfelModalTab === 'begegnung'"
+                class="htbah-begegnung-modal text-start">
+                <p class="small text-body-secondary mb-3">
+                  Es wird ein zufälliger Eintrag aus den Zufallstabellen gezogen: meist
+                  <strong>NPC</strong> oder <strong>Bestie</strong>, in etwa 0,5&nbsp;% der Fälle eine
+                  <strong>Gottheit</strong> aus dem Pantheon (nur wenn dort Einträge existieren).
+                </p>
+                <div v-if="!begegnungHatBegegnungsEintrag" class="alert alert-info mb-0" role="status">
+                  Noch keine passenden Einträge. Lege zuerst unter
+                  <router-link to="/zufallstabellen" class="alert-link">Zufallstabellen</router-link>
+                  mindestens einen NPC, eine Bestie oder eine Gottheit im Pantheon an — sonst kann hier
+                  nichts gezogen werden.
+                </div>
+                <template v-else>
+                  <icon-text-button
+                    type="button"
+                    class="btn btn-primary w-100 mb-3"
+                    icon="casino"
+                    @click="begegnungZiehen">
+                    Begegnung ziehen
+                  </icon-text-button>
+                  <div
+                    v-if="begegnungZiehung"
+                    class="card border-0 shadow-sm overflow-hidden">
+                    <div
+                      class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
+                      <span class="fw-semibold text-truncate me-2">{{ begegnungZiehung.zeile.name || 'Ohne Namen' }}</span>
+                      <span
+                        v-if="begegnungZiehung.typ === 'npc'"
+                        class="badge rounded-pill text-bg-primary flex-shrink-0">
+                        NPC
+                      </span>
+                      <span
+                        v-else-if="begegnungZiehung.typ === 'bestie'"
+                        class="badge rounded-pill text-bg-warning text-dark flex-shrink-0">
+                        Bestie
+                      </span>
+                      <span v-else class="badge rounded-pill text-bg-secondary flex-shrink-0">Pantheon</span>
+                    </div>
+                    <div class="card-body p-3 htbah-begegnung-ergebnis-body small">
+                      <div
+                        v-if="begegnungMedienBilder(begegnungZiehung.zeile).length"
+                        class="zufallstabellen-mobile-slides mb-3">
+                        <div
+                          v-for="(bild, bildIndex) in begegnungMedienBilder(begegnungZiehung.zeile)"
+                          :key="'bg-bild-' + bild.id + '-' + bildIndex"
+                          class="zufallstabellen-mobile-slide">
+                          <img :src="bild.dataUrl" :alt="begegnungMediumDateiname(bild)" loading="lazy" />
+                        </div>
+                      </div>
+                      <div v-if="begegnungMedienDateien(begegnungZiehung.zeile).length" class="mb-3">
+                        <div class="text-secondary mb-1">Weitere Medien</div>
+                        <ul class="mb-0 ps-3">
+                          <li v-for="d in begegnungMedienDateien(begegnungZiehung.zeile)" :key="'bg-d-' + d.id">
+                            {{ begegnungMediumDateiname(d) }}
+                          </li>
+                        </ul>
+                      </div>
+
+                      <template v-if="begegnungZiehung.typ === 'npc'">
+                        <dl class="row mb-0">
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Spitzname</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.spitzname) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Geschlecht</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.geschlecht) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Alter</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.alter) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Familienstand</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.familienstand) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Statur</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.statur) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Lebenspunkte</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.lebenspunkte) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Gesinnung</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.gesinnung) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Glaube</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.glaube) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Beruf</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.beruf) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Fraktion</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.fraktion) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Aufenthaltsort</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.aufenthaltsort) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Ziel</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.ziel) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Stimme</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.stimme) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Waffe</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.waffe) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Schaden / Kampfart</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungNpcWaffenWerteText(begegnungZiehung.zeile) }}</dd>
+                        </dl>
+                        <div v-if="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)" class="mt-2">
+                          <div class="text-secondary mb-1">Notizen</div>
+                          <div
+                            class="zufallstabellen-richtext-vorschau"
+                            v-html="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)"></div>
+                        </div>
+                      </template>
+
+                      <template v-else-if="begegnungZiehung.typ === 'bestie'">
+                        <dl class="row mb-0">
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Epoche</dt>
+                          <dd class="col-sm-8 col-lg-9">
+                            {{ begegnungBestieEpocheLabel(begegnungZiehung.zeile.epoche) }}
+                          </dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Art</dt>
+                          <dd class="col-sm-8 col-lg-9">
+                            {{ begegnungBestieKategorieLabel(begegnungZiehung.zeile.kategorie) }}
+                          </dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Angriff</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.angriff) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Verteidigung</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.verteidigung) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Lebenspunkte</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.lebenspunkte) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Aggressivität</dt>
+                          <dd class="col-sm-8 col-lg-9">
+                            {{ begegnungBestieAggressivitaetText(begegnungZiehung.zeile) }}
+                          </dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Stärken</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.staerke) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Schwächen</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.schwaeche) }}</dd>
+                        </dl>
+                        <div v-if="begegnungRichTextHtml(begegnungZiehung.zeile.beschreibungHtml)" class="mt-2">
+                          <div class="text-secondary mb-1">Beschreibung</div>
+                          <div
+                            class="zufallstabellen-richtext-vorschau"
+                            v-html="begegnungRichTextHtml(begegnungZiehung.zeile.beschreibungHtml)"></div>
+                        </div>
+                      </template>
+
+                      <template v-else>
+                        <dl class="row mb-0">
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Geschlecht</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.geschlecht) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Domäne</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.domaene) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Charakter</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.charakter) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Stärke</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.staerke) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Schwäche</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.schwaeche) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Schutzpatronat</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.schutzpatronat) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Verlangen</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.verlangen) }}</dd>
+                          <dt class="col-sm-4 col-lg-3 text-secondary">Mythos-Gaben</dt>
+                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.mythosGaben) }}</dd>
+                        </dl>
+                        <div v-if="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)" class="mt-2">
+                          <div class="text-secondary mb-1">Notizen</div>
+                          <div
+                            class="zufallstabellen-richtext-vorschau"
+                            v-html="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)"></div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                  <p v-else class="text-secondary small mb-0">Noch keine Ziehung — tippe auf „Begegnung ziehen“.</p>
+                </template>
               </div>
             </div>
             <div class="modal-footer">
