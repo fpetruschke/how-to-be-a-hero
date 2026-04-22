@@ -35,19 +35,18 @@ window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner = {
       });
     },
     bewusstseinBestaetigen() {
-      const ref = window.HTBAH._aktiverCharakter;
-      if (ref) {
-        ref.lpBewusstlosAusgeblendet = true;
-        ref.lpMassenschadenBewusstlos = false;
-        if (window.HTBAH._spielleiterAnsichtAktiv) {
-          if (typeof window.HTBAH._spielleiterPersistFn === 'function') {
-            window.HTBAH._spielleiterPersistFn();
+      const kontext = window.HTBAH._aktiverCharakterKontext;
+      if (kontext && typeof kontext.getCharakter === 'function') {
+        const ref = kontext.getCharakter();
+        if (ref && typeof ref === 'object') {
+          ref.lpBewusstlosAusgeblendet = true;
+          ref.lpMassenschadenBewusstlos = false;
+          if (typeof kontext.speichern === 'function') {
+            kontext.speichern();
           }
-        } else {
-          window.HTBAH.speichereCharakter(ref);
+          window.HTBAH.syncLebenspunkteStatusFromCharakter(ref);
+          return;
         }
-        window.HTBAH.syncLebenspunkteStatusFromCharakter(ref);
-        return;
       }
       const c = window.HTBAH.ladeCharakter();
       if (!c || typeof c !== 'object') {

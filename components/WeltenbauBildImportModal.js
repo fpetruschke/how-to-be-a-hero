@@ -30,6 +30,9 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
       bootstrapModal: null,
       schliessenOhneAbgebrochenEvent: false,
       bildLaedt: false,
+      drehungGrad: 0,
+      spiegelX: 1,
+      spiegelY: 1,
     };
   },
   methods: {
@@ -43,6 +46,9 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
       this.aktuellerDateiname = file.name || 'Bild';
       this.aktuelleDateigroesseBytes = Number.isFinite(file.size) && file.size > 0 ? Math.round(file.size) : null;
       this.bildLaedt = true;
+      this.drehungGrad = 0;
+      this.spiegelX = 1;
+      this.spiegelY = 1;
       this.tempObjectUrl = URL.createObjectURL(file);
       const el = this.$refs.modalElement;
       if (!el) {
@@ -52,12 +58,19 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
         this.bootstrapModal = window.bootstrap.Modal.getOrCreateInstance(el);
       }
       this.bootstrapModal.show();
+      this.$nextTick(() => {
+        this.setzeModalEbeneNachOben();
+        window.setTimeout(() => this.setzeModalEbeneNachOben(), 80);
+      });
     },
     beimModalVersteckt() {
       this.cropperAufraeumen();
       this.revokeTempUrl();
       this.bildLaedt = false;
       this.aktuelleDateigroesseBytes = null;
+      this.drehungGrad = 0;
+      this.spiegelX = 1;
+      this.spiegelY = 1;
       if (!this.schliessenOhneAbgebrochenEvent) {
         this.$emit('abgebrochen');
       }
@@ -67,11 +80,13 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
       this.bildLaedt = false;
       this.$nextTick(() => this.cropperInitialisieren());
     },
-    onCropperBildFehler() {
+    async onCropperBildFehler() {
       this.bildLaedt = false;
-      window.alert(
-        'Das Bild konnte nicht geladen werden (Datei zu groß oder kein unterstütztes Format).',
-      );
+      await window.HTBAH.ui.alert({
+        titel: 'Bild konnte nicht geladen werden',
+        beschreibung:
+          'Das Bild konnte nicht geladen werden (Datei zu groß oder kein unterstütztes Format).',
+      });
       this.schliessenOhneAbgebrochenEvent = true;
       this.$emit('datei-import-fehler');
       if (this.bootstrapModal) {
@@ -94,8 +109,44 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
         background: false,
         responsive: true,
       });
+      this.cropper.rotateTo(this.drehungGrad);
+      this.cropper.scaleX(this.spiegelX);
+      this.cropper.scaleY(this.spiegelY);
     },
-    zuschnittSpeichern() {
+    setzeModalEbeneNachOben() {
+      const modalElement = this.$refs.modalElement;
+      if (modalElement) {
+        modalElement.style.zIndex = '1095';
+      }
+      const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+      const letzterBackdrop = backdrops.length ? backdrops[backdrops.length - 1] : null;
+      if (letzterBackdrop) {
+        letzterBackdrop.style.zIndex = '1090';
+      }
+    },
+    drehen(delta) {
+      if (!this.cropper) {
+        return;
+      }
+      const neu = (this.drehungGrad + delta) % 360;
+      this.drehungGrad = neu < 0 ? neu + 360 : neu;
+      this.cropper.rotateTo(this.drehungGrad);
+    },
+    spiegelnHorizontal() {
+      if (!this.cropper) {
+        return;
+      }
+      this.spiegelX = this.spiegelX === 1 ? -1 : 1;
+      this.cropper.scaleX(this.spiegelX);
+    },
+    spiegelnVertikal() {
+      if (!this.cropper) {
+        return;
+      }
+      this.spiegelY = this.spiegelY === 1 ? -1 : 1;
+      this.cropper.scaleY(this.spiegelY);
+    },
+    async zuschnittSpeichern() {
       if (!this.cropper) {
         return;
       }
@@ -110,20 +161,28 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
         canvas = null;
       }
       if (!canvas) {
-        window.alert(
-          'Der Zuschnitt konnte nicht erstellt werden (Bild möglicherweise zu groß für den Browser).',
-        );
+        await window.HTBAH.ui.alert({
+          titel: 'Zuschnitt fehlgeschlagen',
+          beschreibung:
+            'Der Zuschnitt konnte nicht erstellt werden (Bild möglicherweise zu groß für den Browser).',
+        });
         return;
       }
       let dataUrl;
       try {
         dataUrl = canvasZuKomprimiertemDataUrl(canvas);
       } catch {
-        window.alert('Das Bild konnte nicht komprimiert werden.');
+        await window.HTBAH.ui.alert({
+          titel: 'Komprimierung fehlgeschlagen',
+          beschreibung: 'Das Bild konnte nicht komprimiert werden.',
+        });
         return;
       }
       if (!dataUrl || !dataUrl.startsWith('data:image/')) {
-        window.alert('Ungültiges Bildformat nach Export.');
+        await window.HTBAH.ui.alert({
+          titel: 'Ungültiges Bildformat',
+          beschreibung: 'Ungültiges Bildformat nach Export.',
+        });
         return;
       }
       const name = dateinameOhneEndung(this.aktuellerDateiname);
@@ -191,6 +250,20 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
               ${WELTENBAU_EXPORT_MAX_KANTE} px Kantenlänge als komprimiertes JPEG oder WebP
               (Transparenz geht dabei verloren).
             </p>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" @click="drehen(-90)">
+                90° links
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" @click="drehen(90)">
+                90° rechts
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" @click="spiegelnHorizontal">
+                Horizontal spiegeln
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" @click="spiegelnVertikal">
+                Vertikal spiegeln
+              </button>
+            </div>
             <div
               v-if="bildLaedt"
               class="text-center text-body-secondary small py-5">

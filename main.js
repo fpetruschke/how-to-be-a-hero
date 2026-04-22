@@ -1,8 +1,10 @@
 const SPEICHER_KEY_APP_ROLLE = 'htbah_app_rolle';
-const SPEICHER_KEY_CHARAKTER = 'htbah_character';
+const SPEICHER_KEY_CHARAKTER_LEGACY = 'htbah_character';
+const SPEICHER_KEY_CHARAKTER = 'htbah_characters';
+const SPEICHER_KEY_AKTIVER_CHARAKTER = 'htbah_active_character_id';
 const SPEICHER_KEY_PRESETS = 'htbah_presets';
 const SPEICHER_KEY_THEME = 'htbah_theme';
-const SPEICHER_KEY_CHARAKTER_BILD = 'htbah_character_image';
+const SPEICHER_KEY_CHARAKTER_BILD_LEGACY = 'htbah_character_image';
 const SPEICHER_KEY_SPIELLEITER = 'htbah_spielleiter_gruppen';
 const SPEICHER_KEY_ZUFALLSTABELLEN = 'htbah_zufallstabellen';
 const SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH = 'htbah_spielleitung_abenteuerbuch';
@@ -193,6 +195,39 @@ function speichereSpielleiterZustand(zustand) {
   htbahSpeicher.schreibeJson(SPEICHER_KEY_SPIELLEITER, zustand);
 }
 
+function normalisiereZufallstabellenMedium(eintrag) {
+  if (!eintrag || typeof eintrag !== 'object') {
+    return null;
+  }
+  const dataUrl = typeof eintrag.dataUrl === 'string' ? eintrag.dataUrl.trim() : '';
+  if (!dataUrl.startsWith('data:')) {
+    return null;
+  }
+  const mimeType = typeof eintrag.mimeType === 'string' && eintrag.mimeType.trim()
+    ? eintrag.mimeType.trim()
+    : (dataUrl.match(/^data:([^;,]+)/i) || [])[1] || '';
+  const istBild = mimeType.startsWith('image/') || dataUrl.startsWith('data:image/');
+  const typ = eintrag.typ === 'bild' || eintrag.typ === 'datei' ? eintrag.typ : (istBild ? 'bild' : 'datei');
+  const fallbackName = istBild ? 'Bild' : 'Datei';
+  const name = typeof eintrag.name === 'string' && eintrag.name.trim() ? eintrag.name.trim() : fallbackName;
+  return {
+    id: typeof eintrag.id === 'string' && eintrag.id ? eintrag.id : neueEntropieId(),
+    typ,
+    name,
+    mimeType,
+    dataUrl,
+    size: Number.isFinite(eintrag.size) && eintrag.size > 0 ? Math.round(eintrag.size) : null,
+    createdAt: typeof eintrag.createdAt === 'string' ? eintrag.createdAt : '',
+  };
+}
+
+function normalisiereZufallstabellenMedienListe(medien) {
+  if (!Array.isArray(medien)) {
+    return [];
+  }
+  return medien.map(normalisiereZufallstabellenMedium).filter(Boolean);
+}
+
 function normalisiereZufallstabellenNpcZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
@@ -217,6 +252,7 @@ function normalisiereZufallstabellenNpcZeile(z) {
     fraktion: typeof z.fraktion === 'string' ? z.fraktion : '',
     glaube: typeof z.glaube === 'string' ? z.glaube : '',
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
+    medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
 }
 
@@ -231,6 +267,7 @@ function normalisiereZufallstabellenOrtZeile(z) {
     lage: typeof z.lage === 'string' ? z.lage : '',
     zustand: typeof z.zustand === 'string' ? z.zustand : '',
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
+    medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
 }
 
@@ -247,6 +284,7 @@ function normalisiereZufallstabellenGegenstandZeile(z) {
     istWaffe: !!z.istWaffe,
     schadenswert: typeof z.schadenswert === 'string' ? z.schadenswert : '',
     kampfart,
+    medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
 }
 
@@ -261,6 +299,7 @@ function normalisiereZufallstabellenFraktionZeile(z) {
     ziel: typeof z.ziel === 'string' ? z.ziel : '',
     gesinnungVerhalten: typeof z.gesinnungVerhalten === 'string' ? z.gesinnungVerhalten : '',
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
+    medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
 }
 
@@ -280,6 +319,7 @@ function normalisiereZufallstabellenPantheonZeile(z) {
     verlangen: typeof z.verlangen === 'string' ? z.verlangen : '',
     mythosGaben: typeof z.mythosGaben === 'string' ? z.mythosGaben : '',
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
+    medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
 }
 
@@ -537,30 +577,120 @@ function erstelleCharakterExportPaket(charakter, charakterBild) {
   };
 }
 
-function parseCharakterImportPaket(roh) {
+function parseCharakterImportKandidaten(roh) {
   if (!roh || typeof roh !== 'object') {
-    return { ok: false, fehler: 'Kein gültiges JSON-Objekt.' };
+    return [];
   }
-  let charakterRoh;
-  let bild = '';
+  const kandidaten = [];
+  const pushKandidat = (charakterRoh, bild, quelle, id = null) => {
+    const charakter = window.HTBAH_CHARAKTER_MODEL.charakterMitDefaults(charakterRoh);
+    kandidaten.push({
+      id: typeof id === 'string' && id ? id : null,
+      quelle,
+      charakter,
+      charakterBild: typeof bild === 'string' ? bild : '',
+    });
+  };
+
   if (roh.htbahExportVersion === 1 && roh.typ === 'charakter' && roh.charakter) {
-    charakterRoh = roh.charakter;
-    bild = typeof roh.charakterBild === 'string' ? roh.charakterBild : '';
-  } else if (
+    pushKandidat(roh.charakter, roh.charakterBild, 'charakter-export');
+    return kandidaten;
+  }
+
+  if (
     roh.handeln !== undefined ||
     roh.wissen !== undefined ||
     roh.soziales !== undefined ||
     typeof roh.name === 'string'
   ) {
-    charakterRoh = roh;
-  } else {
+    pushKandidat(roh, '', 'charakter-objekt');
+    return kandidaten;
+  }
+
+  if (Array.isArray(roh)) {
+    roh.forEach((eintrag) => {
+      const inner = parseCharakterImportKandidaten(eintrag);
+      inner.forEach((kandidat) => kandidaten.push(kandidat));
+    });
+    return kandidaten;
+  }
+
+  if (roh.typ === 'spielleiter_gruppe' && Array.isArray(roh.mitglieder)) {
+    roh.mitglieder.forEach((mitglied) => {
+      if (!mitglied || typeof mitglied !== 'object') {
+        return;
+      }
+      pushKandidat(
+        mitglied.charakter || {},
+        mitglied.charakterBild || '',
+        'spielleiter-gruppe',
+        typeof mitglied.id === 'string' ? mitglied.id : null,
+      );
+    });
+    return kandidaten;
+  }
+
+  if (roh.typ === 'lokaler-speicher' && Array.isArray(roh.daten)) {
+    const bereichZeichenkette = roh.daten.find(
+      (eintrag) =>
+        eintrag &&
+        eintrag.key === SPEICHER_KEY_CHARAKTER &&
+        eintrag.vorhanden &&
+        typeof eintrag.wert === 'string',
+    );
+    if (bereichZeichenkette) {
+      try {
+        const parsed = JSON.parse(bereichZeichenkette.wert);
+        const sammlung = normalisiereCharakterSammlung(parsed);
+        sammlung.charaktere.forEach((eintrag) => {
+          pushKandidat(eintrag.charakter, eintrag.charakterBild, 'backup-charaktere', eintrag.id);
+        });
+      } catch {
+        // ignorieren, unten ggf. Legacy prüfen
+      }
+    }
+
+    const legacyChar = roh.daten.find(
+      (eintrag) =>
+        eintrag &&
+        eintrag.key === SPEICHER_KEY_CHARAKTER_LEGACY &&
+        eintrag.vorhanden &&
+        typeof eintrag.wert === 'string',
+    );
+    if (legacyChar) {
+      try {
+        const charakterRoh = JSON.parse(legacyChar.wert);
+        const legacyBild = roh.daten.find(
+          (eintrag) =>
+            eintrag &&
+            eintrag.key === SPEICHER_KEY_CHARAKTER_BILD_LEGACY &&
+            eintrag.vorhanden &&
+            typeof eintrag.wert === 'string',
+        );
+        pushKandidat(charakterRoh, legacyBild ? legacyBild.wert : '', 'backup-legacy-charakter');
+      } catch {
+        // ignorieren
+      }
+    }
+  }
+
+  return kandidaten;
+}
+
+function parseCharakterImportPaket(roh) {
+  const kandidaten = parseCharakterImportKandidaten(roh);
+  if (!kandidaten.length) {
     return {
       ok: false,
-      fehler: 'Unbekanntes Format (HTBAH-Export oder Charakterobjekt erwartet).',
+      fehler:
+        'Unbekanntes Format (HTBAH-Export, Charakterobjekt, Gruppen- oder Komplett-Export erwartet).',
     };
   }
-  const charakter = window.HTBAH_CHARAKTER_MODEL.charakterMitDefaults(charakterRoh);
-  return { ok: true, charakter, charakterBild: bild };
+  return {
+    ok: true,
+    charakter: kandidaten[0].charakter,
+    charakterBild: kandidaten[0].charakterBild,
+  };
 }
 
 function dateiHerunterladenJson(objekt, dateiname) {
@@ -577,20 +707,152 @@ function dateiHerunterladenJson(objekt, dateiname) {
   URL.revokeObjectURL(a.href);
 }
 
-function ladeCharakter() {
-  const roh = htbahSpeicher.leseText(SPEICHER_KEY_CHARAKTER, null);
-  if (roh == null || roh === '') {
+function normalisiereCharakterEintrag(eintrag) {
+  if (!eintrag || typeof eintrag !== 'object') {
     return null;
   }
-  try {
-    return JSON.parse(roh);
-  } catch {
+  return {
+    id: typeof eintrag.id === 'string' && eintrag.id ? eintrag.id : neueEntropieId(),
+    charakter: window.HTBAH_CHARAKTER_MODEL.charakterMitDefaults(eintrag.charakter),
+    charakterBild: typeof eintrag.charakterBild === 'string' ? eintrag.charakterBild : '',
+  };
+}
+
+function normalisiereCharakterSammlung(roh) {
+  const quelle =
+    roh && typeof roh === 'object'
+      ? Array.isArray(roh)
+        ? { charaktere: roh }
+        : roh
+      : { charaktere: [] };
+  const listeRoh = Array.isArray(quelle.charaktere) ? quelle.charaktere : [];
+  const charaktere = listeRoh
+    .map((eintrag) => {
+      if (!eintrag || typeof eintrag !== 'object') {
+        return null;
+      }
+      if (eintrag.charakter && typeof eintrag.charakter === 'object') {
+        return normalisiereCharakterEintrag(eintrag);
+      }
+      return normalisiereCharakterEintrag({
+        id: eintrag.id,
+        charakter: eintrag,
+        charakterBild: '',
+      });
+    })
+    .filter(Boolean);
+  return {
+    version: 1,
+    charaktere,
+  };
+}
+
+function ladeCharakterSammlung() {
+  const roh = htbahSpeicher.leseJson(SPEICHER_KEY_CHARAKTER, null);
+  return normalisiereCharakterSammlung(roh);
+}
+
+function speichereCharakterSammlung(sammlung) {
+  htbahSpeicher.schreibeJson(SPEICHER_KEY_CHARAKTER, normalisiereCharakterSammlung(sammlung));
+}
+
+function ladeAktivenCharakterId() {
+  const id = htbahSpeicher.leseText(SPEICHER_KEY_AKTIVER_CHARAKTER, null);
+  return typeof id === 'string' && id ? id : null;
+}
+
+function setzeAktivenCharakterId(charakterId) {
+  if (typeof charakterId === 'string' && charakterId) {
+    htbahSpeicher.schreibeText(SPEICHER_KEY_AKTIVER_CHARAKTER, charakterId);
+    return;
+  }
+  htbahSpeicher.loescheKey(SPEICHER_KEY_AKTIVER_CHARAKTER);
+}
+
+function listeCharaktere() {
+  return ladeCharakterSammlung().charaktere;
+}
+
+function ladeCharakterEintrag(charakterId) {
+  if (typeof charakterId !== 'string' || !charakterId) {
     return null;
   }
+  const eintrag = ladeCharakterSammlung().charaktere.find((item) => item.id === charakterId);
+  return eintrag || null;
+}
+
+function speichereCharakterEintrag(payload) {
+  const roh = payload && typeof payload === 'object' ? payload : {};
+  const sammlung = ladeCharakterSammlung();
+  const id = typeof roh.id === 'string' && roh.id ? roh.id : neueEntropieId();
+  const nextEintrag = normalisiereCharakterEintrag({
+    id,
+    charakter: roh.charakter || {},
+    charakterBild: roh.charakterBild || '',
+  });
+  const index = sammlung.charaktere.findIndex((item) => item.id === id);
+  if (index >= 0) {
+    sammlung.charaktere.splice(index, 1, nextEintrag);
+  } else {
+    sammlung.charaktere.push(nextEintrag);
+  }
+  speichereCharakterSammlung(sammlung);
+  setzeAktivenCharakterId(id);
+  return nextEintrag;
+}
+
+function importiereOderAktualisiereCharakterEintrag(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  return speichereCharakterEintrag({
+    id: typeof payload.id === 'string' && payload.id ? payload.id : null,
+    charakter: payload.charakter || {},
+    charakterBild: payload.charakterBild || '',
+  });
+}
+
+function loescheCharakterById(charakterId) {
+  if (typeof charakterId !== 'string' || !charakterId) {
+    return { geloescht: false, naechsteId: ladeAktivenCharakterId() };
+  }
+  const sammlung = ladeCharakterSammlung();
+  const index = sammlung.charaktere.findIndex((item) => item.id === charakterId);
+  if (index < 0) {
+    return { geloescht: false, naechsteId: ladeAktivenCharakterId() };
+  }
+  sammlung.charaktere.splice(index, 1);
+  speichereCharakterSammlung(sammlung);
+  const naechster = sammlung.charaktere[0] ? sammlung.charaktere[0].id : null;
+  const aktiveId = ladeAktivenCharakterId();
+  if (aktiveId === charakterId) {
+    setzeAktivenCharakterId(naechster);
+  }
+  return { geloescht: true, naechsteId: naechster };
+}
+
+function ladeCharakter(charakterId = null) {
+  const sammlung = ladeCharakterSammlung();
+  const id = typeof charakterId === 'string' && charakterId ? charakterId : ladeAktivenCharakterId();
+  if (id) {
+    const gefunden = sammlung.charaktere.find((eintrag) => eintrag.id === id);
+    if (gefunden) {
+      return gefunden.charakter;
+    }
+  }
+  if (sammlung.charaktere[0]) {
+    return sammlung.charaktere[0].charakter;
+  }
+  return null;
 }
 
 function speichereCharakter(charakter) {
-  htbahSpeicher.schreibeJson(SPEICHER_KEY_CHARAKTER, charakter);
+  const aktiveId = ladeAktivenCharakterId();
+  speichereCharakterEintrag({
+    id: aktiveId,
+    charakter,
+    charakterBild: ladeCharakterBild(aktiveId),
+  });
 }
 
 function istSystemFaehigkeitenPreset(preset) {
@@ -738,19 +1000,64 @@ function setzeTheme(theme) {
   return gueltigesTheme;
 }
 
-function ladeCharakterBild() {
-  return htbahSpeicher.leseText(SPEICHER_KEY_CHARAKTER_BILD, '') || '';
+function ladeCharakterBild(charakterId = null) {
+  const id = typeof charakterId === 'string' && charakterId ? charakterId : ladeAktivenCharakterId();
+  if (!id) {
+    return '';
+  }
+  const eintrag = ladeCharakterEintrag(id);
+  return eintrag ? eintrag.charakterBild : '';
 }
 
-function speichereCharakterBild(dataUrl) {
-  htbahSpeicher.schreibeText(SPEICHER_KEY_CHARAKTER_BILD, dataUrl);
+function speichereCharakterBild(dataUrl, charakterId = null) {
+  const id = typeof charakterId === 'string' && charakterId ? charakterId : ladeAktivenCharakterId();
+  if (!id) {
+    return null;
+  }
+  const eintrag = ladeCharakterEintrag(id);
+  if (!eintrag) {
+    return null;
+  }
+  return speichereCharakterEintrag({
+    id,
+    charakter: eintrag.charakter,
+    charakterBild: typeof dataUrl === 'string' ? dataUrl : '',
+  });
 }
 
-function loescheCharakterBild() {
-  htbahSpeicher.loescheKey(SPEICHER_KEY_CHARAKTER_BILD);
+function loescheCharakterBild(charakterId = null) {
+  return speichereCharakterBild('', charakterId);
+}
+
+function migriereLegacyCharakterSpeicherWennNoetig() {
+  const sammlung = ladeCharakterSammlung();
+  if (sammlung.charaktere.length) {
+    return;
+  }
+  const legacyCharRoh = htbahSpeicher.leseText(SPEICHER_KEY_CHARAKTER_LEGACY, null);
+  if (legacyCharRoh == null || legacyCharRoh === '') {
+    return;
+  }
+  try {
+    const legacyChar = JSON.parse(legacyCharRoh);
+    const legacyBild = htbahSpeicher.leseText(SPEICHER_KEY_CHARAKTER_BILD_LEGACY, '') || '';
+    const eintrag = speichereCharakterEintrag({
+      id: neueEntropieId(),
+      charakter: legacyChar,
+      charakterBild: legacyBild,
+    });
+    if (eintrag && eintrag.id) {
+      setzeAktivenCharakterId(eintrag.id);
+    }
+    htbahSpeicher.loescheKey(SPEICHER_KEY_CHARAKTER_LEGACY);
+    htbahSpeicher.loescheKey(SPEICHER_KEY_CHARAKTER_BILD_LEGACY);
+  } catch {
+    // Legacy-Daten sind defekt -> ignorieren
+  }
 }
 
 setzeTheme(ladeTheme());
+migriereLegacyCharakterSpeicherWennNoetig();
 
 /**
  * @returns {'charakter' | 'spielleitung' | null}
@@ -834,9 +1141,11 @@ function bildbetrachterNachVorne(fensterId) {
 const HTBAH_SPEICHER_KEYS = Object.freeze({
   appRolle: SPEICHER_KEY_APP_ROLLE,
   charakter: SPEICHER_KEY_CHARAKTER,
+  aktiverCharakter: SPEICHER_KEY_AKTIVER_CHARAKTER,
+  legacyCharakter: SPEICHER_KEY_CHARAKTER_LEGACY,
   presets: SPEICHER_KEY_PRESETS,
   theme: SPEICHER_KEY_THEME,
-  charakterBild: SPEICHER_KEY_CHARAKTER_BILD,
+  legacyCharakterBild: SPEICHER_KEY_CHARAKTER_BILD_LEGACY,
   spielleiter: SPEICHER_KEY_SPIELLEITER,
   zufallstabellen: SPEICHER_KEY_ZUFALLSTABELLEN,
   spielleitungAbenteuerbuch: SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH,
@@ -849,6 +1158,15 @@ window.HTBAH = {
   ...(window.HTBAH || {}),
   ladeCharakter,
   speichereCharakter,
+  ladeCharakterSammlung,
+  listeCharaktere,
+  ladeCharakterEintrag,
+  speichereCharakterEintrag,
+  importiereOderAktualisiereCharakterEintrag,
+  loescheCharakterById,
+  migriereLegacyCharakterSpeicherWennNoetig,
+  ladeAktivenCharakterId,
+  setzeAktivenCharakterId,
   ladePresets,
   speicherePresets,
   istSystemFaehigkeitenPreset,
@@ -866,6 +1184,7 @@ window.HTBAH = {
   ladeSpielleiterZustand,
   speichereSpielleiterZustand,
   erstelleCharakterExportPaket,
+  parseCharakterImportKandidaten,
   parseCharakterImportPaket,
   dateiHerunterladenJson,
   ladeZufallstabellenZustand,
@@ -892,11 +1211,119 @@ window.HTBAH = {
   speicherKeys: HTBAH_SPEICHER_KEYS,
 };
 
+const uiApi = {
+  _refs: {
+    bestaetigenModal: null,
+    hinweisModal: null,
+    eingabeModal: null,
+    toastHost: null,
+  },
+  setRefs(refs) {
+    this._refs = {
+      ...this._refs,
+      ...(refs && typeof refs === 'object' ? refs : {}),
+    };
+  },
+  confirm({
+    titel = 'Bestätigen',
+    beschreibung = '',
+    bestaetigenText = 'Bestätigen',
+    bestaetigenButtonClass = 'btn-primary',
+    warnhinweisAnzeigen = false,
+  } = {}) {
+    const modal = this._refs.bestaetigenModal;
+    if (!modal || typeof modal.oeffnen !== 'function') {
+      return Promise.resolve(window.confirm(String(beschreibung || titel || 'Bestätigen?')));
+    }
+    return new Promise((resolve) => {
+      modal.oeffnen({
+        titel,
+        beschreibung,
+        bestaetigenText,
+        bestaetigenButtonClass,
+        warnhinweisAnzeigen,
+        onBestaetigen: () => resolve(true),
+        onAbbrechen: () => resolve(false),
+      });
+    });
+  },
+  alert({
+    titel = 'Hinweis',
+    beschreibung = '',
+    bestaetigenText = 'OK',
+    bestaetigenButtonClass = 'btn-primary',
+  } = {}) {
+    const modal = this._refs.hinweisModal;
+    if (!modal || typeof modal.oeffnen !== 'function') {
+      window.alert(String(beschreibung || titel || 'Hinweis'));
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      modal.oeffnen({
+        titel,
+        beschreibung,
+        bestaetigenText,
+        bestaetigenButtonClass,
+        onBestaetigen: resolve,
+      });
+    });
+  },
+  prompt({
+    titel = 'Eingabe',
+    beschreibung = '',
+    label = 'Eingabe',
+    startwert = '',
+    placeholder = '',
+    bestaetigenText = 'Speichern',
+    bestaetigenButtonClass = 'btn-primary',
+    trim = false,
+  } = {}) {
+    const modal = this._refs.eingabeModal;
+    if (!modal || typeof modal.oeffnen !== 'function') {
+      const fallback = window.prompt(String(titel || 'Eingabe'), String(startwert || ''));
+      if (fallback == null) {
+        return Promise.resolve(null);
+      }
+      return Promise.resolve(trim ? fallback.trim() : fallback);
+    }
+    return new Promise((resolve) => {
+      modal.oeffnen({
+        titel,
+        beschreibung,
+        label,
+        startwert,
+        placeholder,
+        bestaetigenText,
+        bestaetigenButtonClass,
+        onBestaetigen: (wert) => resolve(trim ? String(wert || '').trim() : String(wert || '')),
+        onAbbrechen: () => resolve(null),
+      });
+    });
+  },
+  notify({ text, typ = 'success', dauerMs = 3200 } = {}) {
+    const toastHost = this._refs.toastHost;
+    if (!toastHost || typeof toastHost.notify !== 'function') {
+      return null;
+    }
+    return toastHost.notify({ text, typ, dauerMs });
+  },
+};
+
+window.HTBAH.ui = uiApi;
+
 const routes = [
   { path: '/', component: window.HTBAH_SEITEN.Startseite },
   { path: '/spieler', redirect: '/charakter' },
-  { path: '/charakter', component: window.HTBAH_SEITEN.Charakter },
-  { path: '/charakter-erstellung', redirect: '/charakter' },
+  {
+    path: '/charakter',
+    redirect: () => {
+      const aktiveId = window.HTBAH.ladeAktivenCharakterId();
+      return aktiveId ? `/charakter/${aktiveId}` : '/charakter/neu';
+    },
+  },
+  { path: '/charakter/neu', component: window.HTBAH_SEITEN.Charakter },
+  { path: '/charakter/:id', component: window.HTBAH_SEITEN.Charakter },
+  { path: '/charakter-erstellung', redirect: '/charakter/neu' },
   { path: '/faehigkeiten-presets', component: window.HTBAH_SEITEN.PresetVerwaltung },
   { path: '/faehigkeiten-preset-bearbeiten', component: window.HTBAH_SEITEN.PresetEditor },
   { path: '/faehigkeiten-preset-bearbeiten/:id', component: window.HTBAH_SEITEN.PresetEditor },
@@ -905,7 +1332,7 @@ const routes = [
   { path: '/spielleiter/gruppe/:gruppeId', component: window.HTBAH_SEITEN.SpielleiterGruppe },
   { path: '/zufallstabellen', component: window.HTBAH_SEITEN.Zufallstabellen },
   { path: '/weltenbau', component: window.HTBAH_SEITEN.Weltenbau },
-  { path: '/create', redirect: '/charakter' },
+  { path: '/create', redirect: '/charakter/neu' },
   { path: '/presets', redirect: '/faehigkeiten-presets' },
   { path: '/presets/form', redirect: '/faehigkeiten-preset-bearbeiten' },
   { path: '/presets/form/:id', redirect: '/faehigkeiten-preset-bearbeiten/:id' },
@@ -922,7 +1349,10 @@ const router = VueRouter.createRouter({
 });
 
 function istNurCharakterRoute(pfad) {
-  return pfad === '/charakter';
+  if (pfad === '/charakter' || pfad === '/charakter/neu') {
+    return true;
+  }
+  return /^\/charakter\/[^/]+$/.test(pfad);
 }
 
 function istNurSpielleitungRoute(pfad) {
@@ -954,11 +1384,23 @@ router.beforeEach((to) => {
   }
 
   if (rolle === 'charakter' && istNurSpielleitungRoute(ziel)) {
-    return { path: '/charakter' };
+    const aktiveId = window.HTBAH.ladeAktivenCharakterId();
+    return { path: aktiveId ? `/charakter/${aktiveId}` : '/charakter/neu' };
   }
 
   if (rolle === 'spielleitung' && istNurCharakterRoute(ziel)) {
     return { path: '/spielleiter' };
+  }
+
+  if (/^\/charakter\/[^/]+$/.test(ziel) && ziel !== '/charakter/neu') {
+    const charakterId = to.params && typeof to.params.id === 'string' ? to.params.id : '';
+    if (charakterId) {
+      const eintrag = window.HTBAH.ladeCharakterEintrag(charakterId);
+      if (!eintrag) {
+        return { path: '/charakter/neu' };
+      }
+      window.HTBAH.setzeAktivenCharakterId(charakterId);
+    }
   }
 
   return true;
@@ -974,24 +1416,30 @@ const lebenspunkteStatus = Vue.reactive({
   bewusstlos: false,
 });
 
-function syncLebenspunkteStatusFromCharakter(charakter) {
+function berechneLebenspunkteStatus(charakter) {
   if (!charakter || typeof charakter !== 'object') {
-    lebenspunkteStatus.tot = false;
-    lebenspunkteStatus.bewusstlos = false;
-    return;
+    return { tot: false, bewusstlos: false };
   }
   const lp = Math.max(0, Math.round(Number(charakter.lebenspunkte) || 0));
   const tot = lp === 0;
   const ausgeblendet = Boolean(charakter.lpBewusstlosAusgeblendet);
   const massenschaden = Boolean(charakter.lpMassenschadenBewusstlos);
-  lebenspunkteStatus.tot = tot;
   const bewusstlosTypisch = lp >= 1 && lp <= 10;
   const bewusstlosMassenschaden = massenschaden && lp > 10;
-  lebenspunkteStatus.bewusstlos =
-    !tot && !ausgeblendet && (bewusstlosTypisch || bewusstlosMassenschaden);
+  return {
+    tot,
+    bewusstlos: !tot && !ausgeblendet && (bewusstlosTypisch || bewusstlosMassenschaden),
+  };
+}
+
+function syncLebenspunkteStatusFromCharakter(charakter) {
+  const status = berechneLebenspunkteStatus(charakter);
+  lebenspunkteStatus.tot = status.tot;
+  lebenspunkteStatus.bewusstlos = status.bewusstlos;
 }
 
 window.HTBAH.lebenspunkteStatus = lebenspunkteStatus;
+window.HTBAH.berechneLebenspunkteStatus = berechneLebenspunkteStatus;
 window.HTBAH.syncLebenspunkteStatusFromCharakter = syncLebenspunkteStatusFromCharakter;
 
 const app = Vue.createApp({
@@ -1003,9 +1451,21 @@ const app = Vue.createApp({
   created() {
     syncLebenspunkteStatusFromCharakter(window.HTBAH.ladeCharakter());
   },
+  mounted() {
+    window.HTBAH.ui.setRefs({
+      bestaetigenModal: this.$refs.globalBestaetigenModal || null,
+      hinweisModal: this.$refs.globalHinweisModal || null,
+      eingabeModal: this.$refs.globalEingabeModal || null,
+      toastHost: this.$refs.globalToastHost || null,
+    });
+  },
   template: `
     <lebenspunkte-status-banner />
     <router-view></router-view>
+    <bestaetigen-modal ref="globalBestaetigenModal" modal-id="htbahGlobalBestaetigenModal" />
+    <hinweis-modal ref="globalHinweisModal" />
+    <eingabe-modal ref="globalEingabeModal" />
+    <ui-toast-host ref="globalToastHost" />
     <lokaler-speicher-hinweis-modal />
     <regelwerk-modal :ui-zustand="uiZustand"></regelwerk-modal>
     <abenteuerbuch-modal :ui-zustand="uiZustand"></abenteuerbuch-modal>
@@ -1019,7 +1479,12 @@ router.afterEach((to) => {
   if (to.path.startsWith('/spielleiter/gruppe/')) {
     return;
   }
-  syncLebenspunkteStatusFromCharakter(window.HTBAH.ladeCharakter());
+  if (to.path === '/charakter/neu') {
+    syncLebenspunkteStatusFromCharakter(null);
+    return;
+  }
+  const charakterId = to.params && typeof to.params.id === 'string' ? to.params.id : null;
+  syncLebenspunkteStatusFromCharakter(window.HTBAH.ladeCharakter(charakterId));
 });
 app.component('regelwerk-modal', window.HTBAH_KOMPONENTEN.RegelwerkModal);
 app.component('abenteuerbuch-modal', window.HTBAH_KOMPONENTEN.AbenteuerbuchModal);
@@ -1029,6 +1494,9 @@ app.component(
 );
 app.component('bottom-nav', window.HTBAH_KOMPONENTEN.BottomNav);
 app.component('bestaetigen-modal', window.HTBAH_KOMPONENTEN.BestaetigenModal);
+app.component('hinweis-modal', window.HTBAH_KOMPONENTEN.HinweisModal);
+app.component('eingabe-modal', window.HTBAH_KOMPONENTEN.EingabeModal);
+app.component('ui-toast-host', window.HTBAH_KOMPONENTEN.UiToastHost);
 app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner);
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);
 app.component('bildbetrachter-host', window.HTBAH_KOMPONENTEN.BildbetrachterHost);

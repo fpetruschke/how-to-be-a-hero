@@ -15,7 +15,45 @@ function htbahHtmlText(html) {
   return (div.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
+const ZUFALLSTABELLEN_MAX_ROH_DATEI_BYTES = 40 * 1024 * 1024;
+
+function zufallstabellenIstBildDatei(file) {
+  if (!file) {
+    return false;
+  }
+  if (file.type && file.type.startsWith('image/')) {
+    return true;
+  }
+  const n = String(file.name || '').toLowerCase();
+  return /\.(png|apng|jpe?g|gif|webp|bmp|svg|avif|heic|heif|tiff?)$/i.test(n);
+}
+
+function zufallstabellenFormatBytes(n) {
+  if (!Number.isFinite(n) || n <= 0) {
+    return '';
+  }
+  if (n >= 1024 * 1024) {
+    return `${(n / (1024 * 1024)).toFixed(1).replace('.', ',')} MiB`;
+  }
+  if (n >= 1024) {
+    return `${Math.round(n / 1024)} KiB`;
+  }
+  return `${Math.round(n)} B`;
+}
+
+function zufallstabellenDateiZuDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden.'));
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsDataURL(file);
+  });
+}
+
 window.HTBAH_SEITEN.Zufallstabellen = {
+  components: {
+    WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
+  },
   data() {
     return {
       zustand: window.HTBAH.ladeZufallstabellenZustand(),
@@ -38,6 +76,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       sucheNpcs: '',
       sucheGegenstaende: '',
       suchePantheon: '',
+      medienImportWarteschlange: [],
+      galerieModalInstanz: null,
+      galerieModalZeile: null,
     };
   },
   created() {
@@ -174,6 +215,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     textVorschau(html) {
       return htbahTextVorschau(html);
     },
+    richTextHtml(html) {
+      const inhalt = typeof html === 'string' ? html : '';
+      return htbahHtmlText(inhalt) ? inhalt : '';
+    },
     normSucheText(wert) {
       return String(wert || '')
         .toLocaleLowerCase('de-DE')
@@ -209,6 +254,191 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     },
     indexNachId(liste, id) {
       return (liste || []).findIndex((row) => row.id === id);
+    },
+    medienAusZeile(row) {
+      return row && Array.isArray(row.medien) ? row.medien : [];
+    },
+    medienBilderAusZeile(row) {
+      return this.medienAusZeile(row).filter((m) => this.mediumIstBild(m));
+    },
+    medienDateienAusZeile(row) {
+      return this.medienAusZeile(row).filter((m) => !this.mediumIstBild(m));
+    },
+    medienAnzahl(row) {
+      return this.medienAusZeile(row).length;
+    },
+    mediumIstBild(medium) {
+      if (!medium || typeof medium !== 'object') {
+        return false;
+      }
+      if (medium.typ === 'bild') {
+        return true;
+      }
+      if (typeof medium.mimeType === 'string' && medium.mimeType.startsWith('image/')) {
+        return true;
+      }
+      return typeof medium.dataUrl === 'string' && medium.dataUrl.startsWith('data:image/');
+    },
+    mediumDateiname(medium) {
+      if (!medium) {
+        return 'Datei';
+      }
+      const text = String(medium.name || '').trim();
+      if (text) {
+        return text;
+      }
+      return this.mediumIstBild(medium) ? 'Bild' : 'Datei';
+    },
+    mediumDateiTypLabel(medium) {
+      const mime = String((medium && medium.mimeType) || '').trim();
+      if (mime) {
+        return mime;
+      }
+      return this.mediumIstBild(medium) ? 'Bilddatei' : 'Datei';
+    },
+    mediumDateigroesseLabel(medium) {
+      return zufallstabellenFormatBytes(medium && medium.size);
+    },
+    mediumImBildbetrachterOeffnen(medium) {
+      if (!this.mediumIstBild(medium)) {
+        return;
+      }
+      const dataUrl = typeof medium.dataUrl === 'string' ? medium.dataUrl : '';
+      if (!dataUrl.startsWith('data:image/')) {
+        return;
+      }
+      window.HTBAH.bildbetrachterOeffnen({
+        dataUrl,
+        titel: this.mediumDateiname(medium),
+      });
+    },
+    mediumHerunterladen(medium) {
+      if (!medium || typeof medium.dataUrl !== 'string' || !medium.dataUrl.startsWith('data:')) {
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = medium.dataUrl;
+      a.download = this.mediumDateiname(medium);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    },
+    mediumAusBearbeitungEntfernen(index) {
+      if (!this.bearbeitung || !this.bearbeitung.zeile || !Array.isArray(this.bearbeitung.zeile.medien)) {
+        return;
+      }
+      if (!Number.isInteger(index) || index < 0 || index >= this.bearbeitung.zeile.medien.length) {
+        return;
+      }
+      this.bearbeitung.zeile.medien.splice(index, 1);
+    },
+    mediumZurBearbeitungHinzufuegen(eintrag) {
+      if (!this.bearbeitung || !this.bearbeitung.zeile || !eintrag) {
+        return;
+      }
+      if (!Array.isArray(this.bearbeitung.zeile.medien)) {
+        this.bearbeitung.zeile.medien = [];
+      }
+      this.bearbeitung.zeile.medien.push(eintrag);
+    },
+    bildImportNaechstesAusWarteschlange() {
+      if (!this.medienImportWarteschlange.length) {
+        return;
+      }
+      const file = this.medienImportWarteschlange.shift();
+      window.setTimeout(() => {
+        const modal = this.$refs.zufallstabellenBildImportModal;
+        if (modal && typeof modal.oeffnenMitDatei === 'function') {
+          modal.oeffnenMitDatei(file);
+        }
+      }, 200);
+    },
+    onZufallstabellenBildImportFertig({ dataUrl, name, dateigroesseBytes }) {
+      if (!dataUrl || !String(dataUrl).startsWith('data:image/')) {
+        this.bildImportNaechstesAusWarteschlange();
+        return;
+      }
+      this.mediumZurBearbeitungHinzufuegen({
+        id: window.HTBAH.neueEntropieId(),
+        typ: 'bild',
+        name: typeof name === 'string' && name.trim() ? name.trim() : 'Bild',
+        mimeType: (String(dataUrl).match(/^data:([^;,]+)/i) || [])[1] || '',
+        dataUrl,
+        size: Number.isFinite(dateigroesseBytes) && dateigroesseBytes > 0 ? Math.round(dateigroesseBytes) : null,
+        createdAt: new Date().toISOString(),
+      });
+      this.bildImportNaechstesAusWarteschlange();
+    },
+    onZufallstabellenBildImportAbgebrochen() {
+      this.medienImportWarteschlange = [];
+    },
+    onZufallstabellenBildImportFehler() {
+      this.bildImportNaechstesAusWarteschlange();
+    },
+    async onBearbeitungsMedienDateienGewaehlt(ev) {
+      const input = ev && ev.target ? ev.target : null;
+      const dateiListe = input && input.files ? Array.from(input.files) : [];
+      if (input) {
+        input.value = '';
+      }
+      if (!dateiListe.length) {
+        return;
+      }
+      const max = ZUFALLSTABELLEN_MAX_ROH_DATEI_BYTES;
+      const zuGross = dateiListe.filter((f) => Number.isFinite(f.size) && f.size > max);
+      const verwertbar = dateiListe.filter((f) => !Number.isFinite(f.size) || f.size <= max);
+      if (zuGross.length) {
+        const namen = zuGross.map((f) => `"${f.name}" (${zufallstabellenFormatBytes(f.size)})`).join(', ');
+        await window.HTBAH.ui.alert({
+          titel: 'Dateien übersprungen',
+          beschreibung:
+            `Übersprungen (zu groß, max. ${zufallstabellenFormatBytes(max)} pro Datei): ${namen}`,
+        });
+      }
+      const bildDateien = verwertbar.filter(zufallstabellenIstBildDatei);
+      const sonstigeDateien = verwertbar.filter((f) => !zufallstabellenIstBildDatei(f));
+      if (bildDateien.length) {
+        this.medienImportWarteschlange = this.medienImportWarteschlange.concat(bildDateien);
+        if (this.medienImportWarteschlange.length === bildDateien.length) {
+          this.bildImportNaechstesAusWarteschlange();
+        }
+      }
+      for (const file of sonstigeDateien) {
+        try {
+          const dataUrl = await zufallstabellenDateiZuDataUrl(file);
+          if (!dataUrl || !dataUrl.startsWith('data:')) {
+            throw new Error('Ungültige Datei');
+          }
+          this.mediumZurBearbeitungHinzufuegen({
+            id: window.HTBAH.neueEntropieId(),
+            typ: 'datei',
+            name: typeof file.name === 'string' && file.name.trim() ? file.name.trim() : 'Datei',
+            mimeType: typeof file.type === 'string' ? file.type : '',
+            dataUrl,
+            size: Number.isFinite(file.size) && file.size > 0 ? Math.round(file.size) : null,
+            createdAt: new Date().toISOString(),
+          });
+        } catch {
+          await window.HTBAH.ui.alert({
+            titel: 'Datei konnte nicht gelesen werden',
+            beschreibung: `Datei konnte nicht gelesen werden: ${file && file.name ? file.name : 'Unbekannt'}`,
+          });
+        }
+      }
+    },
+    galerieFuerZeileOeffnen(row) {
+      this.galerieModalZeile = row || null;
+      this.$nextTick(() => {
+        const el = this.$refs.galerieModalElement;
+        if (!el || !window.bootstrap) {
+          return;
+        }
+        this.galerieModalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
+        this.galerieModalInstanz.show();
+      });
+    },
+    onGalerieModalHidden() {
+      this.galerieModalZeile = null;
     },
     npcWaffenWerteText(row) {
       const schadenswert = String(row && row.schadenswert ? row.schadenswert : '').trim();
@@ -255,6 +485,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         fraktion: '',
         glaube: '',
         notizenHtml: '',
+        medien: [],
       };
     },
     ortLeer() {
@@ -265,6 +496,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         lage: '',
         zustand: '',
         notizenHtml: '',
+        medien: [],
       };
     },
     gegenstandLeer() {
@@ -275,6 +507,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         istWaffe: false,
         schadenswert: '',
         kampfart: 'nahkampf',
+        medien: [],
       };
     },
     fraktionLeer() {
@@ -285,6 +518,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         ziel: '',
         gesinnungVerhalten: '',
         beschreibungHtml: '',
+        medien: [],
       };
     },
     pantheonLeer() {
@@ -300,6 +534,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         verlangen: '',
         mythosGaben: '',
         notizenHtml: '',
+        medien: [],
       };
     },
     zeileQuillOrphanToolbarsInModalBodyEntfernen() {
@@ -320,9 +555,13 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.zeileQuillInstanz = null;
       this.zeileQuillHostElement = null;
       this.zeileQuillSession += 1;
+      const zeileKopie = JSON.parse(JSON.stringify(zeile));
+      if (!Array.isArray(zeileKopie.medien)) {
+        zeileKopie.medien = [];
+      }
       this.bearbeitung = {
         typ,
-        zeile: JSON.parse(JSON.stringify(zeile)),
+        zeile: zeileKopie,
       };
       this.bearbeitungIndex = index;
       this.$nextTick(() => {
@@ -443,6 +682,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     onZeileModalHidden() {
       this.zeileQuillInstanz = null;
       this.zeileQuillHostElement = null;
+      this.medienImportWarteschlange = [];
       this.bearbeitung = null;
       this.bearbeitungIndex = -1;
       this.$nextTick(() => this.zeileQuillOrphanToolbarsInModalBodyEntfernen());
@@ -583,7 +823,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       try {
         text = await datei.text();
       } catch {
-        window.alert('Die Datei konnte nicht gelesen werden.');
+        await window.HTBAH.ui.alert({
+          titel: 'Import fehlgeschlagen',
+          beschreibung: 'Die Datei konnte nicht gelesen werden.',
+        });
         event.target.value = '';
         return;
       }
@@ -591,21 +834,30 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       try {
         roh = JSON.parse(text);
       } catch {
-        window.alert('Kein gültiges JSON.');
+        await window.HTBAH.ui.alert({
+          titel: 'Ungültige Datei',
+          beschreibung: 'Kein gültiges JSON.',
+        });
         event.target.value = '';
         return;
       }
       const r = window.HTBAH.pantheonImportAusPaket(roh);
       if (!r.ok) {
-        window.alert(r.fehler);
+        await window.HTBAH.ui.alert({
+          titel: 'Import fehlgeschlagen',
+          beschreibung: r.fehler,
+        });
         event.target.value = '';
         return;
       }
-      if (
-        !window.confirm(
-          'Das Pantheon wird vollständig durch die Importdatei ersetzt. Fortfahren?',
-        )
-      ) {
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Pantheon ersetzen?',
+        beschreibung: 'Das Pantheon wird vollständig durch die Importdatei ersetzt. Fortfahren?',
+        bestaetigenText: 'Ersetzen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
         event.target.value = '';
         return;
       }
@@ -647,6 +899,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
   },
   template: `
     <div class="container content py-3">
+      <weltenbau-bild-import-modal
+        ref="zufallstabellenBildImportModal"
+        @fertig="onZufallstabellenBildImportFertig"
+        @abgebrochen="onZufallstabellenBildImportAbgebrochen"
+        @datei-import-fehler="onZufallstabellenBildImportFehler" />
+
       <h4 class="text-center mb-3 htbah-page-title">
         <span class="htbah-page-title-emoji" aria-hidden="true">📚</span>
         <span>Zufallstabellen</span>
@@ -705,6 +963,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="text-end text-nowrap">
                     <button
                       type="button"
+                      class="btn btn-sm btn-outline-secondary me-1"
+                      @click="galerieFuerZeileOeffnen(row)">
+                      Medien ({{ medienAnzahl(row) }})
+                    </button>
+                    <button
+                      type="button"
                       class="btn btn-sm btn-outline-primary me-1"
                       @click="ortBearbeiten(row, indexNachId(zustand.orte, row.id))">
                       Bearbeiten
@@ -727,7 +991,24 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small"><span class="text-secondary">Größe:</span> {{ karteWert(row.groesse) }}</div>
                 <div class="small"><span class="text-secondary">Lage:</span> {{ karteWert(row.lage) }}</div>
                 <div class="small mb-2"><span class="text-secondary">Zustand:</span> {{ karteWert(row.zustand) }}</div>
-                <div class="small mb-2">{{ textVorschau(row.notizenHtml) }}</div>
+                <div
+                  v-if="medienBilderAusZeile(row).length"
+                  class="zufallstabellen-mobile-slides mb-2">
+                  <button
+                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
+                    :key="'ort-bild-' + row.id + '-' + bild.id"
+                    type="button"
+                    class="zufallstabellen-mobile-slide"
+                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
+                    @click="mediumImBildbetrachterOeffnen(bild)">
+                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                  </button>
+                </div>
+                <div
+                  v-if="zeilenWertAlsText(row.notizenHtml)"
+                  class="small mb-2 zufallstabellen-richtext-vorschau"
+                  v-html="richTextHtml(row.notizenHtml)"></div>
+                <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2">
                   <button
                     type="button"
@@ -798,6 +1079,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="text-end text-nowrap">
                     <button
                       type="button"
+                      class="btn btn-sm btn-outline-secondary me-1"
+                      @click="galerieFuerZeileOeffnen(row)">
+                      Medien ({{ medienAnzahl(row) }})
+                    </button>
+                    <button
+                      type="button"
                       class="btn btn-sm btn-outline-primary me-1"
                       @click="fraktionBearbeiten(row, indexNachId(zustand.fraktionen, row.id))">
                       Bearbeiten
@@ -825,7 +1112,24 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small mb-2">
                   <span class="text-secondary">Gesinnung:</span> {{ karteWert(row.gesinnungVerhalten) }}
                 </div>
-                <div class="small mb-2">{{ textVorschau(row.beschreibungHtml) }}</div>
+                <div
+                  v-if="medienBilderAusZeile(row).length"
+                  class="zufallstabellen-mobile-slides mb-2">
+                  <button
+                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
+                    :key="'fraktion-bild-' + row.id + '-' + bild.id"
+                    type="button"
+                    class="zufallstabellen-mobile-slide"
+                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
+                    @click="mediumImBildbetrachterOeffnen(bild)">
+                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                  </button>
+                </div>
+                <div
+                  v-if="zeilenWertAlsText(row.beschreibungHtml)"
+                  class="small mb-2 zufallstabellen-richtext-vorschau"
+                  v-html="richTextHtml(row.beschreibungHtml)"></div>
+                <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2">
                   <button
                     type="button"
@@ -920,6 +1224,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="text-end text-nowrap">
                     <button
                       type="button"
+                      class="btn btn-sm btn-outline-secondary me-1"
+                      @click="galerieFuerZeileOeffnen(row)">
+                      Medien ({{ medienAnzahl(row) }})
+                    </button>
+                    <button
+                      type="button"
                       class="btn btn-sm btn-outline-primary me-1"
                       @click="npcBearbeiten(row, indexNachId(zustand.npcs, row.id))">
                       Bearbeiten
@@ -947,7 +1257,24 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small"><span class="text-secondary">Ort:</span> {{ karteWert(row.aufenthaltsort) }}</div>
                 <div class="small"><span class="text-secondary">Fraktion:</span> {{ karteWert(row.fraktion) }}</div>
                 <div class="small mb-2"><span class="text-secondary">Werte:</span> {{ npcWaffenWerteText(row) }}</div>
-                <div class="small mb-2">{{ textVorschau(row.notizenHtml) }}</div>
+                <div
+                  v-if="medienBilderAusZeile(row).length"
+                  class="zufallstabellen-mobile-slides mb-2">
+                  <button
+                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
+                    :key="'npc-bild-' + row.id + '-' + bild.id"
+                    type="button"
+                    class="zufallstabellen-mobile-slide"
+                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
+                    @click="mediumImBildbetrachterOeffnen(bild)">
+                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                  </button>
+                </div>
+                <div
+                  v-if="zeilenWertAlsText(row.notizenHtml)"
+                  class="small mb-2 zufallstabellen-richtext-vorschau"
+                  v-html="richTextHtml(row.notizenHtml)"></div>
+                <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2">
                   <button
                     type="button"
@@ -1014,6 +1341,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="text-end text-nowrap">
                     <button
                       type="button"
+                      class="btn btn-sm btn-outline-secondary me-1"
+                      @click="galerieFuerZeileOeffnen(row)">
+                      Medien ({{ medienAnzahl(row) }})
+                    </button>
+                    <button
+                      type="button"
                       class="btn btn-sm btn-outline-primary me-1"
                       @click="gegenstandBearbeiten(row, indexNachId(zustand.gegenstaende, row.id))">
                       Bearbeiten
@@ -1037,7 +1370,24 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               <div class="card-body p-2">
                 <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
                 <div class="small"><span class="text-secondary">Kampfwerte:</span> {{ gegenstandWaffenWerteText(row) }}</div>
-                <div class="small mb-2">{{ textVorschau(row.beschreibungHtml) }}</div>
+                <div
+                  v-if="medienBilderAusZeile(row).length"
+                  class="zufallstabellen-mobile-slides my-2">
+                  <button
+                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
+                    :key="'gegenstand-bild-' + row.id + '-' + bild.id"
+                    type="button"
+                    class="zufallstabellen-mobile-slide"
+                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
+                    @click="mediumImBildbetrachterOeffnen(bild)">
+                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                  </button>
+                </div>
+                <div
+                  v-if="zeilenWertAlsText(row.beschreibungHtml)"
+                  class="small mb-2 zufallstabellen-richtext-vorschau"
+                  v-html="richTextHtml(row.beschreibungHtml)"></div>
+                <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2">
                   <button
                     type="button"
@@ -1119,6 +1469,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="text-end text-nowrap">
                     <button
                       type="button"
+                      class="btn btn-sm btn-outline-secondary me-1"
+                      @click="galerieFuerZeileOeffnen(row)">
+                      Medien ({{ medienAnzahl(row) }})
+                    </button>
+                    <button
+                      type="button"
                       class="btn btn-sm btn-outline-primary me-1"
                       @click="pantheonBearbeiten(row, indexNachId(zustand.pantheon, row.id))">
                       Bearbeiten
@@ -1146,7 +1502,24 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small mb-2">
                   <span class="text-secondary">Schutzpatronat:</span> {{ karteWert(row.schutzpatronat) }}
                 </div>
-                <div class="small mb-2">{{ textVorschau(row.notizenHtml) }}</div>
+                <div
+                  v-if="medienBilderAusZeile(row).length"
+                  class="zufallstabellen-mobile-slides mb-2">
+                  <button
+                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
+                    :key="'pantheon-bild-' + row.id + '-' + bild.id"
+                    type="button"
+                    class="zufallstabellen-mobile-slide"
+                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
+                    @click="mediumImBildbetrachterOeffnen(bild)">
+                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                  </button>
+                </div>
+                <div
+                  v-if="zeilenWertAlsText(row.notizenHtml)"
+                  class="small mb-2 zufallstabellen-richtext-vorschau"
+                  v-html="richTextHtml(row.notizenHtml)"></div>
+                <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2">
                   <button
                     type="button"
@@ -1507,6 +1880,62 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </div>
               </template>
 
+              <div class="mt-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                  <label class="form-label mb-0">Medien & Dateien</label>
+                  <label class="btn btn-sm btn-outline-secondary mb-0">
+                    Hochladen
+                    <input
+                      type="file"
+                      class="d-none"
+                      multiple
+                      @change="onBearbeitungsMedienDateienGewaehlt" />
+                  </label>
+                </div>
+                <div v-if="!medienAusZeile(bearbeitung.zeile).length" class="text-secondary small">
+                  Noch keine Medien.
+                </div>
+                <div v-else class="row g-2">
+                  <div
+                    v-for="(medium, mediumIndex) in medienAusZeile(bearbeitung.zeile)"
+                    :key="'bearbeitung-medium-' + medium.id"
+                    class="col-12 col-md-6">
+                    <div class="border rounded p-2 h-100 zufallstabellen-medium-karte">
+                      <button
+                        v-if="mediumIstBild(medium)"
+                        type="button"
+                        class="zufallstabellen-medium-thumb-button mb-2"
+                        @click="mediumImBildbetrachterOeffnen(medium)">
+                        <img :src="medium.dataUrl" :alt="mediumDateiname(medium)" />
+                      </button>
+                      <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="small">
+                          <div class="fw-semibold">{{ mediumDateiname(medium) }}</div>
+                          <div class="text-secondary">{{ mediumDateiTypLabel(medium) }}</div>
+                          <div v-if="mediumDateigroesseLabel(medium)" class="text-secondary">
+                            {{ mediumDateigroesseLabel(medium) }}
+                          </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            @click="mediumHerunterladen(medium)">
+                            Download
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            @click="mediumAusBearbeitungEntfernen(mediumIndex)">
+                            Entfernen
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <label class="form-label mt-3 mb-1" v-if="bearbeitung.typ === 'npc'">Notizen</label>
               <label class="form-label mt-3 mb-1" v-else-if="bearbeitung.typ === 'pantheon'">Notizen & Mythos</label>
               <label class="form-label mt-3 mb-1" v-else>Beschreibung</label>
@@ -1521,6 +1950,76 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
               <button type="button" class="btn btn-primary" @click="zeileSpeichern">Speichern</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="modal fade"
+        id="htbahZufallstabellenGalerieModal"
+        ref="galerieModalElement"
+        tabindex="-1"
+        aria-labelledby="htbahZufallstabellenGalerieModalLabel"
+        aria-hidden="true"
+        @hidden.bs.modal="onGalerieModalHidden">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+          <div class="modal-content shadow">
+            <div class="modal-header">
+              <h5 class="modal-title" id="htbahZufallstabellenGalerieModalLabel">Medien</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body text-start">
+              <div v-if="!galerieModalZeile || !medienAnzahl(galerieModalZeile)" class="text-secondary small">
+                Für diesen Eintrag sind keine Medien hinterlegt.
+              </div>
+              <template v-else>
+                <h6 class="small text-secondary text-uppercase mb-2">Bilder</h6>
+                <div v-if="!medienBilderAusZeile(galerieModalZeile).length" class="small text-secondary mb-3">
+                  Keine Bilder.
+                </div>
+                <div v-else class="row g-2 mb-3">
+                  <div
+                    v-for="bild in medienBilderAusZeile(galerieModalZeile)"
+                    :key="'galerie-bild-' + bild.id"
+                    class="col-6 col-md-4">
+                    <button
+                      type="button"
+                      class="zufallstabellen-galerie-thumb"
+                      @click="mediumImBildbetrachterOeffnen(bild)">
+                      <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                    </button>
+                    <div class="small mt-1 text-truncate">{{ mediumDateiname(bild) }}</div>
+                  </div>
+                </div>
+
+                <h6 class="small text-secondary text-uppercase mb-2">Dateien</h6>
+                <div v-if="!medienDateienAusZeile(galerieModalZeile).length" class="small text-secondary">
+                  Keine weiteren Dateien.
+                </div>
+                <div v-else class="list-group list-group-flush">
+                  <div
+                    v-for="datei in medienDateienAusZeile(galerieModalZeile)"
+                    :key="'galerie-datei-' + datei.id"
+                    class="list-group-item px-0">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                      <div class="small">
+                        <div class="fw-semibold">{{ mediumDateiname(datei) }}</div>
+                        <div class="text-secondary">{{ mediumDateiTypLabel(datei) }}</div>
+                        <div v-if="mediumDateigroesseLabel(datei)" class="text-secondary">
+                          {{ mediumDateigroesseLabel(datei) }}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        @click="mediumHerunterladen(datei)">
+                        Download
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>

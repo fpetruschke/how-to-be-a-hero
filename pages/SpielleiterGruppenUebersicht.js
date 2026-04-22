@@ -5,7 +5,6 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
     return {
       zustand: window.HTBAH.ladeSpielleiterZustand(),
       neueGruppeNameEntwurf: '',
-      statusMeldung: '',
     };
   },
   methods: {
@@ -13,11 +12,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       window.HTBAH.speichereSpielleiterZustand(this.zustand);
     },
     zeigeStatus(text) {
-      this.statusMeldung = text;
-      window.clearTimeout(this._statusTimer);
-      this._statusTimer = window.setTimeout(() => {
-        this.statusMeldung = '';
-      }, 3200);
+      window.HTBAH.ui.notify({ text, typ: 'success' });
     },
     neueGruppe() {
       const name =
@@ -31,11 +26,18 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       this.zeigeStatus('Gruppe angelegt.');
       this.$router.push('/spielleiter/gruppe/' + id);
     },
-    gruppeUmbenennen(g) {
+    async gruppeUmbenennen(g) {
       if (!g) {
         return;
       }
-      const neu = window.prompt('Neuer Gruppenname:', g.name);
+      const neu = await window.HTBAH.ui.prompt({
+        titel: 'Gruppe umbenennen',
+        beschreibung: 'Neuer Gruppenname:',
+        label: 'Gruppenname',
+        startwert: g.name || '',
+        bestaetigenText: 'Speichern',
+        trim: false,
+      });
       if (neu === null) {
         return;
       }
@@ -47,15 +49,18 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       this.persist();
       this.zeigeStatus('Name gespeichert.');
     },
-    gruppeLoeschen(g) {
+    async gruppeLoeschen(g) {
       if (!g) {
         return;
       }
-      if (
-        !window.confirm(
-          `Gruppe „${g.name}“ inklusive aller importierten Charaktere löschen?`,
-        )
-      ) {
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Gruppe löschen?',
+        beschreibung: `Gruppe „${g.name}“ inklusive aller importierten Charaktere löschen?`,
+        bestaetigenText: 'Löschen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
         return;
       }
       const gid = g.id;
@@ -145,19 +150,6 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
 
       <div class="abstandshalter" aria-hidden="true"></div>
 
-      <teleport to="body">
-        <div
-          v-if="statusMeldung"
-          class="htbah-erfolgs-toast alert alert-success alert-dismissible py-2 mb-0 text-center shadow"
-          role="status">
-          {{ statusMeldung }}
-          <button
-            type="button"
-            class="btn-close"
-            aria-label="Meldung schließen"
-            @click="statusMeldung = ''"></button>
-        </div>
-      </teleport>
     </div>
   `,
 };

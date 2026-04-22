@@ -3,9 +3,7 @@ window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
 window.HTBAH_SEITEN.Startseite = {
   data() {
     return {
-      hatCharakter: false,
-      charakterName: '',
-      charakterBildUrl: '',
+      charakterEintraege: [],
     };
   },
   computed: {
@@ -15,49 +13,79 @@ window.HTBAH_SEITEN.Startseite = {
     projektUntertitel() {
       return 'Diese Anwendung dient als Begleit-App zum Pen-&-Paper-Regelwerk von Hauke Gerdes und dem How to be a Hero e.V.';
     },
-    charakterModusTitel() {
-      if (this.hatCharakter && this.charakterName) {
-        return `Ich bin ${this.charakterName}`;
-      }
-      return 'Ich bin ein Charakter';
-    },
-    charakterModusAriaLabel() {
-      if (this.hatCharakter && this.charakterName) {
-        return `Modus Spielende: ${this.charakterName}`;
-      }
-      return 'Modus Spielende: Charakter';
+    sortierteCharaktere() {
+      return [...this.charakterEintraege].sort((a, b) => {
+        const aName = this.charakterName(a).toLocaleLowerCase('de');
+        const bName = this.charakterName(b).toLocaleLowerCase('de');
+        return aName.localeCompare(bName, 'de');
+      });
     },
   },
   methods: {
-    aktualisiereCharakterStatus() {
-      const charakter = window.HTBAH.ladeCharakter();
-      this.charakterName = '';
-      this.charakterBildUrl = window.HTBAH.ladeCharakterBild() || '';
-
+    aktualisiereCharakterListe() {
+      const liste = window.HTBAH.listeCharaktere();
+      this.charakterEintraege = Array.isArray(liste) ? liste : [];
+    },
+    charakterName(eintrag) {
+      const name =
+        eintrag && eintrag.charakter && typeof eintrag.charakter.name === 'string'
+          ? eintrag.charakter.name.trim()
+          : '';
+      return name || 'Unbenannter Charakter';
+    },
+    charakterUntertitel(eintrag) {
+      const charakter = eintrag && eintrag.charakter ? eintrag.charakter : null;
       if (!charakter) {
-        this.hatCharakter = false;
-        return;
+        return 'Noch keine Angaben';
       }
-
-      const nameTrim =
-        typeof charakter.name === 'string' ? charakter.name.trim() : '';
-      if (nameTrim) {
-        this.charakterName = nameTrim;
+      const beruf = typeof charakter.beruf === 'string' ? charakter.beruf.trim() : '';
+      const glaube = typeof charakter.glaube === 'string' ? charakter.glaube.trim() : '';
+      if (beruf && glaube) {
+        return `${beruf} · ${glaube}`;
       }
-
-      const hatName = nameTrim.length > 0;
-      const hatFaehigkeiten = ['handeln', 'wissen', 'soziales'].some(
-        (kategorie) => Array.isArray(charakter[kategorie]) && charakter[kategorie].length > 0,
-      );
-
-      this.hatCharakter = hatName || hatFaehigkeiten;
+      return beruf || glaube || 'Zum Bearbeiten öffnen';
+    },
+    charakterZustandStatus(eintrag) {
+      const berechne =
+        window.HTBAH && typeof window.HTBAH.berechneLebenspunkteStatus === 'function'
+          ? window.HTBAH.berechneLebenspunkteStatus
+          : null;
+      if (!berechne) {
+        return { tot: false, bewusstlos: false };
+      }
+      return berechne(eintrag && eintrag.charakter ? eintrag.charakter : null);
+    },
+    charakterZustandEmoji(eintrag) {
+      const status = this.charakterZustandStatus(eintrag);
+      if (status.tot) {
+        return '💀';
+      }
+      if (status.bewusstlos) {
+        return '😵';
+      }
+      return '';
+    },
+    charakterZustandLabel(eintrag) {
+      const status = this.charakterZustandStatus(eintrag);
+      if (status.tot) {
+        return 'Charakter ist tot';
+      }
+      if (status.bewusstlos) {
+        return 'Charakter ist bewusstlos';
+      }
+      return '';
     },
     regelwerkOeffnen() {
       this.$root.uiZustand.regelwerkOffen = true;
     },
-    rolleCharakterWaehlen() {
+    rolleCharakterNeuWaehlen() {
       window.HTBAH.speichereAppRolle('charakter');
-      this.$router.push('/charakter');
+      this.$router.push('/charakter/neu');
+    },
+    rolleCharakterMitIdWaehlen(id) {
+      window.HTBAH.speichereAppRolle('charakter');
+      window.HTBAH.setzeAktivenCharakterId(id);
+      this.$router.push(`/charakter/${id}`);
     },
     rolleSpielleitungWaehlen() {
       window.HTBAH.speichereAppRolle('spielleitung');
@@ -65,7 +93,7 @@ window.HTBAH_SEITEN.Startseite = {
     },
   },
   mounted() {
-    this.aktualisiereCharakterStatus();
+    this.aktualisiereCharakterListe();
   },
   template: `
     <div class="container content py-3 text-center">
@@ -113,25 +141,17 @@ window.HTBAH_SEITEN.Startseite = {
             class="card action-card text-start h-100 cursor-pointer"
             role="button"
             tabindex="0"
-            :aria-label="charakterModusAriaLabel"
-            @click="rolleCharakterWaehlen"
-            @keydown.enter.prevent="rolleCharakterWaehlen"
-            @keydown.space.prevent="rolleCharakterWaehlen">
+            aria-label="Neuen Charakter erstellen"
+            @click="rolleCharakterNeuWaehlen"
+            @keydown.enter.prevent="rolleCharakterNeuWaehlen"
+            @keydown.space.prevent="rolleCharakterNeuWaehlen">
             <div class="d-flex align-items-center justify-content-between gap-2">
               <div class="htbah-start-card-avatar flex-shrink-0">
-                <img
-                  v-if="hatCharakter && charakterBildUrl"
-                  :src="charakterBildUrl"
-                  alt=""
-                  class="htbah-start-card-avatar-img" />
-                <span
-                  v-else
-                  class="htbah-start-card-avatar-emoji"
-                  aria-hidden="true">🧙</span>
+                <span class="htbah-start-card-avatar-emoji" aria-hidden="true">➕</span>
               </div>
               <div class="min-w-0 flex-grow-1 text-start">
                 <h5 class="mb-0 text-truncate htbah-start-card-charaktername htbah-start-card-modus-titel">
-                  {{ charakterModusTitel }}
+                  Neuen Charakter erstellen
                 </h5>
               </div>
               <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
@@ -161,6 +181,56 @@ window.HTBAH_SEITEN.Startseite = {
               <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
                 chevron_right
               </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="sortierteCharaktere.length" class="mb-3">
+        <h5 class="text-start mb-2">Gespeicherte Charaktere</h5>
+        <div class="row g-3">
+          <div
+            v-for="eintrag in sortierteCharaktere"
+            :key="eintrag.id"
+            class="col-12 col-md-6">
+            <div
+              class="card action-card text-start h-100 cursor-pointer"
+              role="button"
+              tabindex="0"
+              :aria-label="'Charakter öffnen: ' + charakterName(eintrag)"
+              @click="rolleCharakterMitIdWaehlen(eintrag.id)"
+              @keydown.enter.prevent="rolleCharakterMitIdWaehlen(eintrag.id)"
+              @keydown.space.prevent="rolleCharakterMitIdWaehlen(eintrag.id)">
+              <div class="d-flex align-items-center justify-content-between gap-2">
+                <div class="htbah-start-card-avatar flex-shrink-0">
+                  <img
+                    v-if="eintrag.charakterBild"
+                    :src="eintrag.charakterBild"
+                    alt=""
+                    class="htbah-start-card-avatar-img" />
+                  <span
+                    v-else
+                    class="htbah-start-card-avatar-emoji"
+                    aria-hidden="true">🧙</span>
+                  <span
+                    v-if="charakterZustandEmoji(eintrag)"
+                    class="htbah-charakter-zustand-overlay"
+                    :aria-label="charakterZustandLabel(eintrag)"
+                    role="img">
+                    {{ charakterZustandEmoji(eintrag) }}
+                  </span>
+                </div>
+                <div class="min-w-0 flex-grow-1">
+                  <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
+                    Charakter
+                  </p>
+                  <h5 class="mb-1 text-truncate htbah-start-card-charaktername">{{ charakterName(eintrag) }}</h5>
+                  <p class="mb-0 small text-body-secondary text-truncate">{{ charakterUntertitel(eintrag) }}</p>
+                </div>
+                <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
+                  chevron_right
+                </span>
+              </div>
             </div>
           </div>
         </div>

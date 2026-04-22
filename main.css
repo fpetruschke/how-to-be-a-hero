@@ -181,6 +181,27 @@ h5 {
   line-height: 1;
 }
 
+.htbah-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.htbah-back-link:hover,
+.htbah-back-link:focus-visible {
+  text-decoration: underline;
+  color: var(--primary-color);
+}
+
+.htbah-back-link .material-symbols-outlined {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 p {
   color: var(--paragraph-color);
   margin-bottom: 6px;
@@ -842,7 +863,31 @@ input::placeholder {
 }
 
 .htbah-weltenbau-import-cropper-wrap {
-  min-height: min(50vh, 420px);
+  min-height: min(58vh, 560px);
+  width: 100%;
+}
+
+#weltenbauBildImportModal {
+  z-index: 1095;
+}
+
+#weltenbauBildImportModal .modal-dialog {
+  max-width: min(96vw, 1500px);
+}
+
+#weltenbauBildImportModal .modal-body {
+  padding-left: 0.9rem;
+  padding-right: 0.9rem;
+}
+
+#weltenbauBildImportModal .htbah-weltenbau-import-cropper-wrap .cropper-container {
+  width: 100% !important;
+}
+
+#weltenbauBildImportModal .cropper-image {
+  width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
 }
 
 @media (min-width: 992px) {
@@ -1038,6 +1083,15 @@ input::placeholder {
 
 .inventar-tabelle-wrap {
   font-size: 0.875rem;
+}
+
+.inventar-mobile-list {
+  font-size: 0.875rem;
+}
+
+.inventar-mobile-card {
+  border-color: var(--border-color);
+  background: var(--card-bg);
 }
 
 .inventar-tabelle {
@@ -1343,6 +1397,7 @@ input::placeholder {
 }
 
 .htbah-start-card-avatar {
+  position: relative;
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 0.75rem;
@@ -1365,6 +1420,37 @@ input::placeholder {
 .htbah-start-card-avatar-emoji {
   font-size: 1.85rem;
   line-height: 1;
+}
+
+.htbah-charakterbild-status-wrap {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.htbah-charakter-zustand-overlay {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.htbah-charakter-zustand-overlay--gross {
+  width: 2.2rem;
+  height: 2.2rem;
+  font-size: 1.35rem;
+  top: 0.4rem;
+  right: 0.4rem;
 }
 
 /* Charakter-Seite: prominenter Name */
@@ -1494,4 +1580,66 @@ input::placeholder {
   border-radius: 0.75rem;
   border-color: var(--border-color);
   background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+}
+
+.zufallstabellen-richtext-vorschau {
+  max-height: 8rem;
+  overflow: auto;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.zufallstabellen-richtext-vorschau :first-child {
+  margin-top: 0;
+}
+
+.zufallstabellen-richtext-vorschau :last-child {
+  margin-bottom: 0;
+}
+
+.zufallstabellen-mobile-slides {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scroll-snap-type: x mandatory;
+}
+
+.zufallstabellen-mobile-slide {
+  flex: 0 0 7.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.6rem;
+  overflow: hidden;
+  background: var(--bs-secondary-bg);
+  padding: 0;
+  scroll-snap-align: start;
+}
+
+.zufallstabellen-mobile-slide img {
+  display: block;
+  width: 100%;
+  height: 5.5rem;
+  object-fit: cover;
+}
+
+.zufallstabellen-medium-karte {
+  background: var(--bs-body-bg);
+}
+
+.zufallstabellen-medium-thumb-button,
+.zufallstabellen-galerie-thumb {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 0.6rem;
+  overflow: hidden;
+  padding: 0;
+  background: var(--bs-secondary-bg);
+}
+
+.zufallstabellen-medium-thumb-button img,
+.zufallstabellen-galerie-thumb img {
+  display: block;
+  width: 100%;
+  height: 9.5rem;
+  object-fit: cover;
 }

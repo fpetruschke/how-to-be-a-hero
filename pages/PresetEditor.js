@@ -73,10 +73,13 @@ window.HTBAH_SEITEN.PresetEditor = {
       }
       return v;
     },
-    faehigkeitHinzufuegen() {
+    async faehigkeitHinzufuegen() {
       const nameTrim = String(this.neueFaehigkeit.name || '').trim();
       if (!nameTrim) {
-        alert('Gib einen Namen an.');
+        await window.HTBAH.ui.alert({
+          titel: 'Eingabe unvollständig',
+          beschreibung: 'Gib einen Namen an.',
+        });
         return;
       }
 
@@ -85,7 +88,10 @@ window.HTBAH_SEITEN.PresetEditor = {
       if (v !== null && v !== undefined && v !== '') {
         const n = Number(v);
         if (!Number.isFinite(n) || n < 1 || n > 100) {
-          alert('Wert muss zwischen 1 und 100 liegen oder leer bleiben.');
+          await window.HTBAH.ui.alert({
+            titel: 'Ungültiger Wert',
+            beschreibung: 'Wert muss zwischen 1 und 100 liegen oder leer bleiben.',
+          });
           return;
         }
         wert = n;
@@ -132,7 +138,7 @@ window.HTBAH_SEITEN.PresetEditor = {
         }
       }
     },
-    bearbeitungSpeichern() {
+    async bearbeitungSpeichern() {
       const { name, value, type } = this.bearbeitungEntwurf;
       const ref = this.bearbeitungReferenz;
       const altKat = this.bearbeitungKategorie;
@@ -143,7 +149,10 @@ window.HTBAH_SEITEN.PresetEditor = {
 
       const nameTrim = typeof name === 'string' ? name.trim() : '';
       if (!nameTrim) {
-        alert('Gib einen Namen an.');
+        await window.HTBAH.ui.alert({
+          titel: 'Eingabe unvollständig',
+          beschreibung: 'Gib einen Namen an.',
+        });
         return;
       }
 
@@ -151,7 +160,10 @@ window.HTBAH_SEITEN.PresetEditor = {
       if (value !== null && value !== undefined && value !== '') {
         const n = Number(value);
         if (!Number.isFinite(n) || n < 1 || n > 100) {
-          alert('Wert muss zwischen 1 und 100 liegen oder leer bleiben.');
+          await window.HTBAH.ui.alert({
+            titel: 'Ungültiger Wert',
+            beschreibung: 'Wert muss zwischen 1 und 100 liegen oder leer bleiben.',
+          });
           return;
         }
         wert = n;
@@ -184,9 +196,12 @@ window.HTBAH_SEITEN.PresetEditor = {
         },
       });
     },
-    presetSpeichern() {
+    async presetSpeichern() {
       if (!this.preset.name) {
-        alert('Name fehlt');
+        await window.HTBAH.ui.alert({
+          titel: 'Preset kann nicht gespeichert werden',
+          beschreibung: 'Name fehlt.',
+        });
         return;
       }
 
@@ -208,6 +223,13 @@ window.HTBAH_SEITEN.PresetEditor = {
   },
   template: `
     <div class="container content py-3">
+      <nav class="mb-2" aria-label="Brotkrumen">
+        <router-link to="/faehigkeiten-presets" class="htbah-back-link">
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+          <span>Zurück zur Übersicht</span>
+        </router-link>
+      </nav>
+
       <h4 class="text-center mb-3 htbah-page-title">
         <span class="htbah-page-title-emoji" aria-hidden="true">📦</span>
         <span>{{ istBearbeitung ? 'Fähigkeiten-Preset bearbeiten' : 'Fähigkeiten-Preset erstellen' }}</span>

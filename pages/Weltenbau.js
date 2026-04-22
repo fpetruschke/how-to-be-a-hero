@@ -168,8 +168,6 @@ window.HTBAH_SEITEN.Weltenbau = {
     return {
       generatoren: WELTENBAU_GENERATOREN,
       zustand,
-      statusMeldung: '',
-      statusTyp: 'success',
       importWarteschlange: [],
       zeigeImportHinweis: false,
       generatorModal: {
@@ -209,15 +207,6 @@ window.HTBAH_SEITEN.Weltenbau = {
         return 0;
       }
     },
-    statusAlertKlasse() {
-      if (this.statusTyp === 'warning') {
-        return 'alert-warning';
-      }
-      if (this.statusTyp === 'danger') {
-        return 'alert-danger';
-      }
-      return 'alert-success';
-    },
     maxRohDateiHuman() {
       return formatBytes(WELTENBAU_MAX_ROH_DATEI_BYTES);
     },
@@ -253,13 +242,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       window.HTBAH.speichereWeltenbauZustand(this.zustand);
     },
     zeigeStatus(text, typ = 'success') {
-      this.statusMeldung = text;
-      this.statusTyp = typ;
-      window.clearTimeout(this._statusTimer);
-      this._statusTimer = window.setTimeout(() => {
-        this.statusMeldung = '';
-        this.statusTyp = 'success';
-      }, 7200);
+      window.HTBAH.ui.notify({ text, typ, dauerMs: 7200 });
     },
     importHinweisUmschalten() {
       this.zeigeImportHinweis = !this.zeigeImportHinweis;
@@ -629,11 +612,18 @@ window.HTBAH_SEITEN.Weltenbau = {
       this.importWarteschlange = ok.slice();
       this.importNaechsteAusWarteschlange();
     },
-    eintragUmbenennen(e) {
+    async eintragUmbenennen(e) {
       if (!e) {
         return;
       }
-      const neu = window.prompt('Bezeichnung:', e.name || '');
+      const neu = await window.HTBAH.ui.prompt({
+        titel: 'Eintrag umbenennen',
+        beschreibung: 'Bezeichnung:',
+        label: 'Bezeichnung',
+        startwert: e.name || '',
+        bestaetigenText: 'Speichern',
+        trim: false,
+      });
       if (neu === null) {
         return;
       }
@@ -648,11 +638,18 @@ window.HTBAH_SEITEN.Weltenbau = {
       this.persist();
       this.zeigeStatus('Bezeichnung gespeichert.');
     },
-    eintragLoeschen(e) {
+    async eintragLoeschen(e) {
       if (!e) {
         return;
       }
-      if (!window.confirm('Dieses Bild aus dem Speicher entfernen?')) {
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Bild entfernen?',
+        beschreibung: 'Dieses Bild aus dem Speicher entfernen?',
+        bestaetigenText: 'Entfernen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
         return;
       }
       window.HTBAH.bildbetrachterSchliesseFuerWeltenbauEintrag(e.id);
@@ -692,7 +689,6 @@ window.HTBAH_SEITEN.Weltenbau = {
     this.beendeGeneratorResize();
     window.removeEventListener('resize', this.onFensterGroesseGeaendert);
     window.removeEventListener('keydown', this.onGlobaleTaste);
-    window.clearTimeout(this._statusTimer);
   },
   template: `
     <div class="container content py-3">
@@ -850,20 +846,6 @@ window.HTBAH_SEITEN.Weltenbau = {
       </div>
 
       <div class="abstandshalter" aria-hidden="true"></div>
-
-      <teleport to="body">
-        <div
-          v-if="statusMeldung"
-          :class="['htbah-erfolgs-toast alert alert-dismissible py-2 mb-0 text-center shadow', statusAlertKlasse]"
-          role="status">
-          {{ statusMeldung }}
-          <button
-            type="button"
-            class="btn-close"
-            aria-label="Meldung schließen"
-            @click="statusMeldung = ''"></button>
-        </div>
-      </teleport>
 
       <div v-if="generatorModal.offen" class="regelwerk-modal-layer htbah-generator-modal-layer">
         <div

@@ -182,9 +182,12 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
     inventarQuillRefFnEntfernen(id) {
       delete this.inventarQuillRefFnCache[id];
     },
-    inventarBearbeiten(eintrag) {
+    async inventarBearbeiten(eintrag) {
       if (this.inventarEditId && this.inventarEditId !== eintrag.id) {
-        alert('Bitte die laufende Bearbeitung zuerst speichern oder abbrechen.');
+        await window.HTBAH.ui.alert({
+          titel: 'Bearbeitung läuft',
+          beschreibung: 'Bitte die laufende Bearbeitung zuerst speichern oder abbrechen.',
+        });
         return;
       }
       this.inventarTypNachAuswahlAnwenden(eintrag);
@@ -250,9 +253,12 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
       this.inventarEditId = null;
       this.inventarBackup = null;
     },
-    inventarZeileHinzufuegen() {
+    async inventarZeileHinzufuegen() {
       if (this.inventarEditId) {
-        alert('Bitte die laufende Bearbeitung zuerst speichern oder abbrechen.');
+        await window.HTBAH.ui.alert({
+          titel: 'Bearbeitung läuft',
+          beschreibung: 'Bitte die laufende Bearbeitung zuerst speichern oder abbrechen.',
+        });
         return;
       }
       const neu = {
@@ -276,9 +282,16 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
       };
       this.inventarEditId = neu.id;
     },
-    inventarZeileLoeschen(eintrag) {
+    async inventarZeileLoeschen(eintrag) {
       const label = eintrag.name || 'diesen Eintrag';
-      if (!confirm(`„${label}“ wirklich löschen?`)) {
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Inventar-Eintrag löschen?',
+        beschreibung: `„${label}“ wirklich löschen?`,
+        bestaetigenText: 'Löschen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
         return;
       }
       if (this.inventarEditId === eintrag.id) {
@@ -350,7 +363,7 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
                 Hinzufügen
               </icon-text-button>
             </div>
-            <div class="table-responsive inventar-tabelle-wrap">
+            <div class="table-responsive inventar-tabelle-wrap d-none d-md-block">
               <table class="table table-sm align-middle mb-0 inventar-tabelle">
                 <thead>
                   <tr>
@@ -487,6 +500,136 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div class="d-md-none inventar-mobile-list">
+              <div v-if="!charakter.inventar.length" class="text-body-secondary small py-2">
+                Noch keine Gegenstände — „Hinzufügen“ nutzen.
+              </div>
+              <div
+                v-for="eintrag in charakter.inventar"
+                :key="'inventar-card-' + eintrag.id"
+                class="card inventar-mobile-card mb-2">
+                <div class="card-body p-2">
+                  <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                    <div class="flex-grow-1">
+                      <span
+                        v-if="inventarEditId !== eintrag.id"
+                        class="badge inventar-typ-badge mb-1"
+                        :class="inventarTypBadgeClass(eintrag.typ || 'gegenstand')">
+                        {{ inventarTypLabel(eintrag.typ || 'gegenstand') }}
+                      </span>
+                      <select
+                        v-else
+                        class="form-select form-select-sm mb-1"
+                        v-model="eintrag.typ"
+                        @change="inventarTypNachAuswahlAnwenden(eintrag)"
+                        aria-label="Art des Eintrags">
+                        <option value="gegenstand">Gegenstand</option>
+                        <option value="rustung">Rüstung</option>
+                        <option value="waffe">Waffe</option>
+                      </select>
+                      <div v-if="inventarEditId !== eintrag.id" class="small fw-bold">
+                        {{ eintrag.name || '—' }}
+                      </div>
+                      <input
+                        v-else
+                        class="form-control form-control-sm"
+                        v-model="eintrag.name"
+                        placeholder="Name"
+                        autocomplete="off" />
+                    </div>
+                    <div class="dropdown">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center py-0 px-1"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        aria-label="Aktionen für Eintrag"
+                        @click.stop>
+                        <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li v-if="inventarEditId !== eintrag.id">
+                          <button type="button" class="dropdown-item" @click="inventarBearbeiten(eintrag)">
+                            Bearbeiten
+                          </button>
+                        </li>
+                        <li v-if="inventarEditId === eintrag.id">
+                          <button type="button" class="dropdown-item" @click="inventarSpeichernZeile">
+                            Speichern
+                          </button>
+                        </li>
+                        <li v-if="inventarEditId === eintrag.id">
+                          <button type="button" class="dropdown-item" @click="inventarAbbrechenZeile">
+                            Abbrechen
+                          </button>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                          <button type="button" class="dropdown-item text-danger" @click="inventarZeileLoeschen(eintrag)">
+                            Löschen
+                          </button>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div class="small mb-2">
+                    <span class="text-body-secondary">Werte:</span>
+                    <template v-if="inventarEditId !== eintrag.id">
+                      <span class="text-body-secondary">{{ inventarWerteText(eintrag) }}</span>
+                    </template>
+                    <template v-else>
+                      <span v-if="eintrag.typ === 'gegenstand'" class="text-body-secondary">—</span>
+                      <input
+                        v-else-if="eintrag.typ === 'rustung'"
+                        class="form-control form-control-sm mt-1"
+                        v-model="eintrag.rustwert"
+                        placeholder="Rüstwert"
+                        inputmode="decimal"
+                        autocomplete="off" />
+                      <div v-else-if="eintrag.typ === 'waffe'" class="d-flex flex-column gap-1 mt-1">
+                        <input
+                          class="form-control form-control-sm"
+                          v-model="eintrag.schadenswert"
+                          placeholder="Schadenswert"
+                          autocomplete="off" />
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Nah- oder Fernkampf">
+                          <button
+                            type="button"
+                            class="btn"
+                            :class="
+                              eintrag.kampfart === 'nahkampf'
+                                ? 'btn-primary'
+                                : 'btn-outline-secondary'
+                            "
+                            @click="eintrag.kampfart = 'nahkampf'">
+                            Nahkampf
+                          </button>
+                          <button
+                            type="button"
+                            class="btn"
+                            :class="
+                              eintrag.kampfart === 'fernkampf'
+                                ? 'btn-primary'
+                                : 'btn-outline-secondary'
+                            "
+                            @click="eintrag.kampfart = 'fernkampf'">
+                            Fernkampf
+                          </button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                  <div
+                    v-if="inventarEditId !== eintrag.id"
+                    class="inventar-beschreibung-vorschau small"
+                    v-html="eintrag.beschreibungHtml"></div>
+                  <div
+                    v-else
+                    :ref="inventarBeschreibungRefFn(eintrag)"
+                    class="quill-editor-host inventar-beschreibung-quill"></div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="modal-footer">

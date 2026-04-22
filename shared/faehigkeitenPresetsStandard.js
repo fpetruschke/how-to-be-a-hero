@@ -10,7 +10,7 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
     handeln: [
       { name: 'Schwertkampf', value: null },
       { name: 'Nahkampf (bewaffnet)', value: null },
-      { name: 'Faustkampf', value: null },
+      { name: 'Nahkampf (unbewaffnet)', value: null },
       { name: 'Bogenschießen', value: null },
       { name: 'Reiten', value: null },
       { name: 'Schleichen', value: null },

@@ -130,6 +130,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const p = this.$route.path || '';
       return p === '/charakter' || p.startsWith('/charakter/');
     },
+    charakterLink() {
+      const id = window.HTBAH.ladeAktivenCharakterId();
+      return id ? `/charakter/${id}` : '/charakter/neu';
+    },
     zufallstabellenAktiv() {
       const p = this.$route.path || '';
       return p === '/zufallstabellen' || p.startsWith('/zufallstabellen/');
@@ -438,7 +442,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             🏠
           </router-link>
           <router-link
-            to="/charakter"
+            :to="charakterLink"
             title="Charakter"
             :class="{ 'router-link-active': charakterAktiv }">
             🧙

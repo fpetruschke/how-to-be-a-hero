@@ -175,9 +175,12 @@ window.HTBAH_KOMPONENTEN.VorNachteileModal = {
       delete this.quillRefFnCache[`${id}-v`];
       delete this.quillRefFnCache[`${id}-n`];
     },
-    bearbeiten(eintrag) {
+    async bearbeiten(eintrag) {
       if (this.editId && this.editId !== eintrag.id) {
-        alert('Bitte die laufende Bearbeitung zuerst speichern oder abbrechen.');
+        await window.HTBAH.ui.alert({
+          titel: 'Bearbeitung läuft',
+          beschreibung: 'Bitte die laufende Bearbeitung zuerst speichern oder abbrechen.',
+        });
         return;
       }
       this.backup = {
@@ -237,9 +240,12 @@ window.HTBAH_KOMPONENTEN.VorNachteileModal = {
       this.editId = null;
       this.backup = null;
     },
-    paarHinzufuegen() {
+    async paarHinzufuegen() {
       if (this.editId) {
-        alert('Bitte die laufende Bearbeitung zuerst speichern oder abbrechen.');
+        await window.HTBAH.ui.alert({
+          titel: 'Bearbeitung läuft',
+          beschreibung: 'Bitte die laufende Bearbeitung zuerst speichern oder abbrechen.',
+        });
         return;
       }
       const neu = {
@@ -252,8 +258,15 @@ window.HTBAH_KOMPONENTEN.VorNachteileModal = {
       this.quillNachPaarId[neu.id] = { vorteil: null, nachteil: null };
       this.editId = neu.id;
     },
-    paarLoeschen(eintrag) {
-      if (!confirm('Dieses Paar wirklich löschen?')) {
+    async paarLoeschen(eintrag) {
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Paar löschen?',
+        beschreibung: 'Dieses Paar wirklich löschen?',
+        bestaetigenText: 'Löschen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
         return;
       }
       if (this.editId === eintrag.id) {

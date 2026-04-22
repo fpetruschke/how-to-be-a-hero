@@ -7,12 +7,22 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
     };
   },
   methods: {
-    presetEntfernen(preset) {
+    async presetEntfernen(preset) {
       if (window.HTBAH.istSystemFaehigkeitenPreset(preset)) {
-        alert('Vorgegebene Fähigkeiten-Presets können nicht gelöscht werden.');
+        await window.HTBAH.ui.alert({
+          titel: 'Löschen nicht möglich',
+          beschreibung: 'Vorgegebene Fähigkeiten-Presets können nicht gelöscht werden.',
+        });
         return;
       }
-      if (!confirm(`Fähigkeiten-Preset „${preset.name}“ löschen?`)) return;
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Fähigkeiten-Preset löschen?',
+        beschreibung: `Fähigkeiten-Preset „${preset.name}“ löschen?`,
+        bestaetigenText: 'Löschen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) return;
       this.presets = this.presets.filter((eintrag) => eintrag !== preset);
       window.HTBAH.speicherePresets(this.presets);
     },
@@ -37,7 +47,7 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
       if (!datei) return;
 
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         try {
           const json = JSON.parse(reader.result);
           if (json && typeof json === 'object' && json.htbahPresetId) {
@@ -46,7 +56,10 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
           this.presets.push(json);
           window.HTBAH.speicherePresets(this.presets);
         } catch {
-          alert('Ungültige Datei');
+          await window.HTBAH.ui.alert({
+            titel: 'Import fehlgeschlagen',
+            beschreibung: 'Ungültige Datei.',
+          });
         }
       };
       reader.readAsText(datei);
@@ -67,6 +80,7 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
           Neues Fähigkeiten-Preset
         </icon-text-button>
 
+        <h5 class="mb-2">Preset Import</h5>
         <div class="form-floating">
           <input
             id="pv-preset-import"
@@ -78,10 +92,14 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
       </div>
 
       <div class="card p-3 mb-3" v-for="(preset, index) in presets">
-        <h5 class="fw-bold d-flex flex-wrap align-items-center gap-2">
-          <span>{{preset.name}}</span>
-          <span v-if="preset.htbahPresetId" class="badge text-bg-secondary">Vorgegeben</span>
-        </h5>
+        <div class="d-flex flex-column gap-2 mb-2" :class="preset.htbahPresetId ? 'flex-md-row align-items-md-start justify-content-md-between' : ''">
+          <span
+            v-if="preset.htbahPresetId"
+            class="badge text-bg-secondary align-self-start order-md-2">
+            Vorgegeben
+          </span>
+          <h5 class="fw-bold mb-0 order-md-1">{{preset.name}}</h5>
+        </div>
 
         <icon-text-button class="btn btn-sm btn-secondary me-1 mb-2" icon="edit" @click="$router.push('/faehigkeiten-preset-bearbeiten/' + index)">
           Bearbeiten

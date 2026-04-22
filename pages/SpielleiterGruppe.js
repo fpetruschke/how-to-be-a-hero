@@ -8,7 +8,8 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
     return {
       zustand: window.HTBAH.ladeSpielleiterZustand(),
       aktivesMitgliedId: null,
-      statusMeldung: '',
+      zielGruppeId: '',
+      verschiebeModalInstanz: null,
     };
   },
   computed: {
@@ -24,6 +25,10 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         return null;
       }
       return g.mitglieder.find((m) => m.id === this.aktivesMitgliedId) || null;
+    },
+    andereGruppen() {
+      const aktiveId = this.gruppeId;
+      return this.zustand.gruppen.filter((g) => g.id !== aktiveId);
     },
   },
   watch: {
@@ -48,6 +53,10 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
     }
   },
   beforeUnmount() {
+    if (this.verschiebeModalInstanz) {
+      this.verschiebeModalInstanz.hide();
+      this.verschiebeModalInstanz = null;
+    }
     window.HTBAH._spielleiterAnsichtAktiv = false;
     window.HTBAH._spielleiterPersistFn = null;
     window.HTBAH.syncLebenspunkteStatusFromCharakter(window.HTBAH.ladeCharakter());
@@ -75,11 +84,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       window.HTBAH.speichereSpielleiterZustand(this.zustand);
     },
     zeigeStatus(text) {
-      this.statusMeldung = text;
-      window.clearTimeout(this._statusTimer);
-      this._statusTimer = window.setTimeout(() => {
-        this.statusMeldung = '';
-      }, 3200);
+      window.HTBAH.ui.notify({ text, typ: 'success' });
     },
     charakterName(m) {
       const n = m && m.charakter && typeof m.charakter.name === 'string' ? m.charakter.name : '';
@@ -108,19 +113,64 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       }
       this.persist();
     },
-    mitgliedEntfernen() {
+    async mitgliedEntfernen() {
       const g = this.aktiveGruppe;
       const m = this.aktivesMitglied;
       if (!g || !m) {
         return;
       }
-      if (!window.confirm(`„${this.charakterName(m)}“ aus dieser Gruppe entfernen?`)) {
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Mitglied entfernen?',
+        beschreibung: `„${this.charakterName(m)}“ aus dieser Gruppe entfernen?`,
+        bestaetigenText: 'Entfernen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
         return;
       }
       g.mitglieder = g.mitglieder.filter((x) => x.id !== m.id);
       this.beiGruppenwechsel();
       this.persist();
       this.zeigeStatus('Charakter entfernt.');
+    },
+    oeffneVerschiebenModal() {
+      if (!this.aktivesMitglied || this.andereGruppen.length === 0 || !window.bootstrap) {
+        return;
+      }
+      this.zielGruppeId = this.andereGruppen[0].id;
+      this.$nextTick(() => {
+        const el = this.$refs.verschiebeModalElement;
+        if (!el) {
+          return;
+        }
+        this.verschiebeModalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
+        this.verschiebeModalInstanz.show();
+      });
+    },
+    verschiebeMitgliedInAndereGruppe() {
+      const quellGruppe = this.aktiveGruppe;
+      const m = this.aktivesMitglied;
+      if (!quellGruppe || !m) {
+        return;
+      }
+      const zielGruppe = this.andereGruppen.find((g) => g.id === this.zielGruppeId) || null;
+      if (!zielGruppe) {
+        return;
+      }
+
+      quellGruppe.mitglieder = quellGruppe.mitglieder.filter((x) => x.id !== m.id);
+      zielGruppe.mitglieder.push(m);
+      this.zustand.mitgliedWahlProGruppe[zielGruppe.id] = m.id;
+
+      const name = this.charakterName(m);
+      this.beiGruppenwechsel();
+      this.persist();
+
+      if (this.verschiebeModalInstanz) {
+        this.verschiebeModalInstanz.hide();
+      }
+      this.zeigeStatus(`„${name}“ wurde verschoben.`);
     },
     fuegeMitgliedHinzu(charakter, charakterBild) {
       const g = this.aktiveGruppe;
@@ -149,14 +199,20 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         try {
           text = await datei.text();
         } catch {
-          alert(`Datei „${datei.name}“ konnte nicht gelesen werden.`);
+          await window.HTBAH.ui.alert({
+            titel: 'Import fehlgeschlagen',
+            beschreibung: `Datei „${datei.name}“ konnte nicht gelesen werden.`,
+          });
           continue;
         }
         let json;
         try {
           json = JSON.parse(text);
         } catch {
-          alert(`„${datei.name}“ ist kein gültiges JSON.`);
+          await window.HTBAH.ui.alert({
+            titel: 'Ungültige Datei',
+            beschreibung: `„${datei.name}“ ist kein gültiges JSON.`,
+          });
           continue;
         }
         if (
@@ -178,15 +234,19 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         }
         const stuecke = Array.isArray(json) ? json : [json];
         for (let j = 0; j < stuecke.length; j++) {
-          const ergebnis = window.HTBAH.parseCharakterImportPaket(stuecke[j]);
-          if (!ergebnis.ok) {
-            alert(
-              `„${datei.name}“${stuecke.length > 1 ? ` (Eintrag ${j + 1})` : ''}: ${ergebnis.fehler}`,
-            );
+          const kandidaten = window.HTBAH.parseCharakterImportKandidaten(stuecke[j]);
+          if (!kandidaten.length) {
+            await window.HTBAH.ui.alert({
+              titel: 'Import nicht möglich',
+              beschreibung:
+                `„${datei.name}“${stuecke.length > 1 ? ` (Eintrag ${j + 1})` : ''}: Kein importierbarer Charakter.`,
+            });
             continue;
           }
-          this.fuegeMitgliedHinzu(ergebnis.charakter, ergebnis.charakterBild);
-          importiert += 1;
+          kandidaten.forEach((kandidat) => {
+            this.fuegeMitgliedHinzu(kandidat.charakter, kandidat.charakterBild);
+            importiert += 1;
+          });
         }
       }
       input.value = '';
@@ -220,8 +280,9 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
   template: `
     <div class="container content py-3">
       <nav class="mb-2" aria-label="Brotkrumen">
-        <router-link to="/spielleiter" class="small text-decoration-none">
-          ← Zurück zur Gruppenübersicht
+        <router-link to="/spielleiter" class="htbah-back-link">
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+          <span>Zurück zur Übersicht</span>
         </router-link>
       </nav>
 
@@ -280,6 +341,13 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         </p>
 
         <button
+          v-if="aktivesMitglied && andereGruppen.length"
+          type="button"
+          class="btn btn-outline-primary btn-sm me-2"
+          @click="oeffneVerschiebenModal">
+          In andere Gruppe verschieben
+        </button>
+        <button
           v-if="aktivesMitglied"
           type="button"
           class="btn btn-outline-danger btn-sm"
@@ -306,15 +374,59 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
 
       <teleport to="body">
         <div
-          v-if="statusMeldung"
-          class="htbah-erfolgs-toast alert alert-success alert-dismissible py-2 mb-0 text-center shadow"
-          role="status">
-          {{ statusMeldung }}
-          <button
-            type="button"
-            class="btn-close"
-            aria-label="Meldung schließen"
-            @click="statusMeldung = ''"></button>
+          ref="verschiebeModalElement"
+          class="modal fade"
+          id="spielleiterVerschiebenModal"
+          tabindex="-1"
+          aria-labelledby="spielleiterVerschiebenModalLabel"
+          aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow">
+              <div class="modal-header">
+                <h5 class="modal-title" id="spielleiterVerschiebenModalLabel">
+                  In andere Gruppe verschieben
+                </h5>
+                <button
+                  type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="Schließen"></button>
+              </div>
+              <div class="modal-body">
+                <label for="spielleiter-ziel-gruppe" class="form-label">
+                  Zielgruppe auswählen
+                </label>
+                <select
+                  id="spielleiter-ziel-gruppe"
+                  class="form-select"
+                  v-model="zielGruppeId">
+                  <option v-for="g in andereGruppen" :key="g.id" :value="g.id">
+                    {{ g.name }}
+                  </option>
+                </select>
+                <p class="small text-body-secondary mb-0 mt-2">
+                  „{{ aktivesMitglied ? charakterName(aktivesMitglied) : '' }}“ nach
+                  „{{ (andereGruppen.find((g) => g.id === zielGruppeId) || {}).name || '' }}“
+                  verschieben?
+                </p>
+              </div>
+              <div class="modal-footer">
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  data-bs-dismiss="modal">
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  :disabled="!zielGruppeId"
+                  @click="verschiebeMitgliedInAndereGruppe">
+                  Verschieben
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </teleport>
     </div>

@@ -74,8 +74,9 @@ window.HTBAH_SEITEN.Charakter = {
     return {
       presets: window.HTBAH.ladePresets(),
       ausgewaehltesPreset: '',
-      charakterLokal: M.charakterMitDefaults(window.HTBAH.ladeCharakter()),
-      charakterBildLokal: window.HTBAH.ladeCharakterBild(),
+      charakterLokal: M.charakterMitDefaults(M.leererCharakter()),
+      charakterBildLokal: '',
+      charakterId: null,
       aktiveInfo: null,
       aktiveKategorieInfo: null,
       zeigePresetAktionen: false,
@@ -86,10 +87,17 @@ window.HTBAH_SEITEN.Charakter = {
       geistesblitzAusgebenModus: false,
       aktiveGeistesblitzInfo: null,
       _prevLpSnapshot: null,
+      _lpEingabeAktiv: false,
+      _lpSnapshotVorEingabe: null,
+      _lpAenderungWaehrenEingabe: false,
       pdfExportLaedt: false,
       charakterPdfModalOffen: false,
       charakterPdfBlobUrl: null,
       charakterPdfDateiname: '',
+      importKandidaten: [],
+      importAuswahlIndex: '',
+      importDateiname: '',
+      importHinweis: '',
     };
   },
   computed: {
@@ -146,8 +154,55 @@ window.HTBAH_SEITEN.Charakter = {
         ? this.spielleiterMitglied.charakterBild
         : this.charakterBildLokal;
     },
+    istNeuModus() {
+      return !this.spielleiterMitglied && this.charakterId === null;
+    },
+    istEditModus() {
+      return !this.spielleiterMitglied && this.charakterId !== null;
+    },
+    speicherButtonText() {
+      return this.istEditModus ? 'Änderungen speichern' : 'Charakter speichern';
+    },
+    importAuswahlHatMehrere() {
+      return this.importKandidaten.length > 1;
+    },
+    kannImportAuswahlUebernehmen() {
+      if (!this.importAuswahlHatMehrere) {
+        return this.importKandidaten.length === 1;
+      }
+      return this.importAuswahlIndex !== '';
+    },
+    charakterLebenspunkteStatus() {
+      const berechne =
+        window.HTBAH && typeof window.HTBAH.berechneLebenspunkteStatus === 'function'
+          ? window.HTBAH.berechneLebenspunkteStatus
+          : null;
+      if (!berechne) {
+        return { tot: false, bewusstlos: false };
+      }
+      return berechne(this.charakter);
+    },
+    charakterZustandEmoji() {
+      if (this.charakterLebenspunkteStatus.tot) {
+        return '💀';
+      }
+      if (this.charakterLebenspunkteStatus.bewusstlos) {
+        return '😵';
+      }
+      return '';
+    },
+    charakterZustandLabel() {
+      if (this.charakterLebenspunkteStatus.tot) {
+        return 'Charakter ist tot';
+      }
+      if (this.charakterLebenspunkteStatus.bewusstlos) {
+        return 'Charakter ist bewusstlos';
+      }
+      return '';
+    },
   },
   created() {
+    this.initialisiereCharakterAusRoute();
     this.initialisiereGeistesblitzVerbleibend();
     this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
     this._prevLpSnapshot = this.normalisiereLp(this.charakter.lebenspunkte);
@@ -155,31 +210,41 @@ window.HTBAH_SEITEN.Charakter = {
     window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
   },
   mounted() {
-    window.HTBAH._aktiverCharakter = this.charakter;
+    this.aktualisiereAktivenCharakterKontext();
   },
   beforeUnmount() {
-    if (window.HTBAH._aktiverCharakter === this.charakter) {
-      window.HTBAH._aktiverCharakter = null;
+    if (window.HTBAH._aktiverCharakterKontextQuelle === this) {
+      window.HTBAH._aktiverCharakterKontext = null;
+      window.HTBAH._aktiverCharakterKontextQuelle = null;
     }
     if (this.charakterPdfBlobUrl) {
       URL.revokeObjectURL(this.charakterPdfBlobUrl);
     }
   },
   watch: {
+    '$route.fullPath'() {
+      if (!this.spielleiterMitglied) {
+        this.initialisiereCharakterAusRoute();
+      }
+    },
     charakter: {
       deep: true,
       handler() {
         const lp = this.normalisiereLp(this.charakter.lebenspunkte);
         if (lp !== this._prevLpSnapshot) {
-          this.verarbeiteLebenspunkteAenderung(this._prevLpSnapshot, lp);
-          this._prevLpSnapshot = this.normalisiereLp(this.charakter.lebenspunkte);
+          if (this._lpEingabeAktiv) {
+            this._lpAenderungWaehrenEingabe = true;
+          } else {
+            this.verarbeiteLebenspunkteAenderung(this._prevLpSnapshot, lp);
+            this._prevLpSnapshot = this.normalisiereLp(this.charakter.lebenspunkte);
+          }
         }
         if (this.spielleiterMitglied) {
           this.onSpielleiterPersist?.();
-        } else {
-          window.HTBAH.speichereCharakter(this.charakter);
         }
-        window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
+        if (!this._lpEingabeAktiv) {
+          window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
+        }
       },
     },
     geistesblitzWerte: {
@@ -201,14 +266,220 @@ window.HTBAH_SEITEN.Charakter = {
         this._prevGeistesblitzMax = { ...neu };
       },
     },
+    charakterId() {
+      if (!this.spielleiterMitglied) {
+        this.aktualisiereAktivenCharakterKontext();
+      }
+    },
   },
   methods: {
+    initialisiereCharakterAusRoute() {
+      if (this.spielleiterMitglied) {
+        return;
+      }
+      const pfad = this.$route.path || '';
+      if (pfad === '/charakter/neu') {
+        this.charakterId = null;
+        this.charakterLokal = M.charakterMitDefaults(M.leererCharakter());
+        this.charakterBildLokal = '';
+        this.initialisiereGeistesblitzVerbleibend();
+        this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
+        this._prevLpSnapshot = this.normalisiereLp(this.charakterLokal.lebenspunkte);
+        window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakterLokal);
+        return;
+      }
+      const routeId = this.$route.params && typeof this.$route.params.id === 'string'
+        ? this.$route.params.id
+        : '';
+      if (!routeId || routeId === 'neu') {
+        this.$router.replace('/charakter/neu');
+        return;
+      }
+      const eintrag = window.HTBAH.ladeCharakterEintrag(routeId);
+      if (!eintrag) {
+        this.$router.replace('/charakter/neu');
+        return;
+      }
+      this.charakterId = eintrag.id;
+      this.charakterLokal = M.charakterMitDefaults(eintrag.charakter);
+      this.charakterBildLokal = eintrag.charakterBild || '';
+      window.HTBAH.setzeAktivenCharakterId(eintrag.id);
+      this.initialisiereGeistesblitzVerbleibend();
+      this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
+      this._prevLpSnapshot = this.normalisiereLp(this.charakterLokal.lebenspunkte);
+      window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakterLokal);
+    },
+    aktualisiereAktivenCharakterKontext() {
+      if (this.spielleiterMitglied) {
+        window.HTBAH._aktiverCharakterKontext = {
+          typ: 'spielleiter',
+          getCharakter: () => this.charakter,
+          speichern: () => this.onSpielleiterPersist?.(),
+        };
+        window.HTBAH._aktiverCharakterKontextQuelle = this;
+        return;
+      }
+      window.HTBAH._aktiverCharakterKontext = {
+        typ: 'charakter',
+        charakterId: this.charakterId,
+        getCharakter: () => this.charakter,
+        speichern: () => {
+          if (this.charakterId) {
+            window.HTBAH.speichereCharakterEintrag({
+              id: this.charakterId,
+              charakter: this.charakter,
+              charakterBild: this.charakterBild,
+            });
+          }
+        },
+      };
+      window.HTBAH._aktiverCharakterKontextQuelle = this;
+    },
+    speichereCharakterFormular() {
+      if (this.spielleiterMitglied) {
+        this.onSpielleiterPersist?.();
+        return;
+      }
+      const warEditModus = this.istEditModus;
+      const gespeichert = window.HTBAH.speichereCharakterEintrag({
+        id: this.charakterId,
+        charakter: this.charakter,
+        charakterBild: this.charakterBild,
+      });
+      this.charakterId = gespeichert.id;
+      window.HTBAH.setzeAktivenCharakterId(gespeichert.id);
+      this.$router.replace(`/charakter/${gespeichert.id}`);
+      this.importHinweis = warEditModus ? 'Änderungen gespeichert.' : 'Charakter gespeichert.';
+    },
+    async loescheDiesenCharakter() {
+      if (this.spielleiterMitglied || !this.charakterId) {
+        return;
+      }
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Charakter löschen?',
+        beschreibung: 'Diesen Charakter wirklich löschen?',
+        bestaetigenText: 'Löschen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
+        return;
+      }
+      const result = window.HTBAH.loescheCharakterById(this.charakterId);
+      if (result.naechsteId) {
+        this.$router.replace(`/charakter/${result.naechsteId}`);
+      } else {
+        this.$router.replace('/charakter/neu');
+      }
+    },
+    importDateiAusgewaehlt(event) {
+      const input = event && event.target ? event.target : null;
+      const datei = input && input.files ? input.files[0] : null;
+      if (!datei) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const json = JSON.parse(String(reader.result || ''));
+          const kandidaten = window.HTBAH.parseCharakterImportKandidaten(json);
+          if (!kandidaten.length) {
+            await window.HTBAH.ui.alert({
+              titel: 'Import nicht möglich',
+              beschreibung: 'Die Datei enthält keinen importierbaren Charakter.',
+            });
+            return;
+          }
+          this.importDateiname = datei.name || 'Import-Datei';
+          this.importKandidaten = kandidaten;
+          this.importAuswahlIndex = kandidaten.length > 1 ? '' : '0';
+          if (kandidaten.length === 1) {
+            this.importAuswahlUebernehmen();
+          }
+        } catch {
+          await window.HTBAH.ui.alert({
+            titel: 'Ungültige Datei',
+            beschreibung: 'Datei konnte nicht gelesen werden (kein gültiges JSON).',
+          });
+        } finally {
+          input.value = '';
+        }
+      };
+      reader.onerror = async () => {
+        await window.HTBAH.ui.alert({
+          titel: 'Import fehlgeschlagen',
+          beschreibung: 'Datei konnte nicht gelesen werden.',
+        });
+        input.value = '';
+      };
+      reader.readAsText(datei);
+    },
+    importAuswahlText(kandidat, index) {
+      const name = kandidat && kandidat.charakter && typeof kandidat.charakter.name === 'string'
+        ? kandidat.charakter.name.trim()
+        : '';
+      const titel = name || `Charakter ${index + 1}`;
+      return `${titel} (${kandidat.quelle || 'Import'})`;
+    },
+    importAuswahlUebernehmen() {
+      if (!this.importKandidaten.length) {
+        return;
+      }
+      const index = this.importAuswahlHatMehrere ? Number(this.importAuswahlIndex) : 0;
+      const kandidat = this.importKandidaten[index];
+      if (!kandidat) {
+        return;
+      }
+      this.charakterLokal = M.charakterMitDefaults(kandidat.charakter);
+      this.charakterBildLokal = typeof kandidat.charakterBild === 'string' ? kandidat.charakterBild : '';
+      this.charakterId = null;
+      this.initialisiereGeistesblitzVerbleibend();
+      this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
+      this._prevLpSnapshot = this.normalisiereLp(this.charakterLokal.lebenspunkte);
+      window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakterLokal);
+      this.importHinweis =
+        this.importKandidaten.length > 1
+          ? 'Charakter aus Auswahl übernommen. Zum Abschließen speichern.'
+          : 'Charakter importiert. Zum Abschließen speichern.';
+    },
     normalisiereLp(roh) {
       const n = Math.round(Number(roh));
       if (Number.isNaN(n) || n < 0) {
         return 0;
       }
       return n;
+    },
+    lebenspunkteEingabeFokus() {
+      this._lpEingabeAktiv = true;
+      this._lpAenderungWaehrenEingabe = false;
+      this._lpSnapshotVorEingabe = this._prevLpSnapshot;
+    },
+    lebenspunkteEingabeBlur() {
+      if (!this._lpEingabeAktiv) {
+        return;
+      }
+      this._lpEingabeAktiv = false;
+      this.finalisiereLebenspunkteEingabe();
+    },
+    finalisiereLebenspunkteEingabe() {
+      const lpFinal = this.normalisiereLp(this.charakter.lebenspunkte);
+      if (lpFinal !== this.charakter.lebenspunkte) {
+        this.charakter.lebenspunkte = lpFinal;
+      }
+
+      const hatteLpAenderung = this._lpAenderungWaehrenEingabe || lpFinal !== this._prevLpSnapshot;
+      if (hatteLpAenderung) {
+        const vorher =
+          this._lpAenderungWaehrenEingabe && this._lpSnapshotVorEingabe != null
+            ? this.normalisiereLp(this._lpSnapshotVorEingabe)
+            : this._prevLpSnapshot;
+        this.verarbeiteLebenspunkteAenderung(vorher, lpFinal);
+        this._prevLpSnapshot = this.normalisiereLp(this.charakter.lebenspunkte);
+      }
+
+      this._lpSnapshotVorEingabe = null;
+      this._lpAenderungWaehrenEingabe = false;
+      window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
     },
     verarbeiteLebenspunkteAenderung(vorher, nach) {
       let n = this.normalisiereLp(nach);
@@ -269,12 +540,16 @@ window.HTBAH_SEITEN.Charakter = {
       if (!v || v[kategorie] <= 0) return;
       v[kategorie] = Math.max(0, Math.min(v[kategorie] - 1, max));
     },
-    geistesblitzKontenAuffuellen() {
-      if (
-        !confirm(
+    async geistesblitzKontenAuffuellen() {
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Geistesblitz auffüllen?',
+        beschreibung:
           'Alle Geistesblitzkonten auf den aktuellen Maximalwert setzen? (Typisch nach Abenteuerende / neuem Abenteuer.)',
-        )
-      ) {
+        bestaetigenText: 'Auffüllen',
+        bestaetigenButtonClass: 'btn-warning',
+        warnhinweisAnzeigen: false,
+      });
+      if (!bestaetigt) {
         return;
       }
       const m = this.geistesblitzWerte;
@@ -290,11 +565,18 @@ window.HTBAH_SEITEN.Charakter = {
       this.charakter.wissen = JSON.parse(JSON.stringify(preset.wissen));
       this.charakter.soziales = JSON.parse(JSON.stringify(preset.soziales));
     },
-    presetAnwenden() {
+    async presetAnwenden() {
       const preset = this.presets.find((eintrag) => eintrag.name === this.ausgewaehltesPreset);
       if (!preset) return;
 
-      if (!confirm('Aktuellen Charakter überschreiben?')) return;
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Charakter überschreiben?',
+        beschreibung: 'Aktuellen Charakter überschreiben?',
+        bestaetigenText: 'Überschreiben',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: false,
+      });
+      if (!bestaetigt) return;
 
       this.faehigkeitenPresetAufCharakterAnwenden(preset);
     },
@@ -304,27 +586,44 @@ window.HTBAH_SEITEN.Charakter = {
       if (!datei) return;
 
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         try {
           const json = JSON.parse(reader.result);
           const preset = normalisiereFaehigkeitenPreset(json);
           if (!preset) {
-            alert('Ungültige Fähigkeiten-Preset-Datei (erwartet: handeln, wissen, soziales als Listen).');
+            await window.HTBAH.ui.alert({
+              titel: 'Ungültiges Preset',
+              beschreibung:
+                'Ungültige Fähigkeiten-Preset-Datei (erwartet: handeln, wissen, soziales als Listen).',
+            });
             return;
           }
           const titel = preset.name ? `„${preset.name}“` : 'dieses Fähigkeiten-Preset';
-          if (!confirm(`Aktuellen Charakter mit ${titel} aus der Datei überschreiben?`)) {
+          const bestaetigt = await window.HTBAH.ui.confirm({
+            titel: 'Charakter überschreiben?',
+            beschreibung: `Aktuellen Charakter mit ${titel} aus der Datei überschreiben?`,
+            bestaetigenText: 'Überschreiben',
+            bestaetigenButtonClass: 'btn-danger',
+            warnhinweisAnzeigen: false,
+          });
+          if (!bestaetigt) {
             return;
           }
           this.faehigkeitenPresetAufCharakterAnwenden(preset);
         } catch {
-          alert('Datei konnte nicht gelesen werden (kein gültiges JSON).');
+          await window.HTBAH.ui.alert({
+            titel: 'Ungültige Datei',
+            beschreibung: 'Datei konnte nicht gelesen werden (kein gültiges JSON).',
+          });
         } finally {
           input.value = '';
         }
       };
-      reader.onerror = () => {
-        alert('Datei konnte nicht gelesen werden.');
+      reader.onerror = async () => {
+        await window.HTBAH.ui.alert({
+          titel: 'Import fehlgeschlagen',
+          beschreibung: 'Datei konnte nicht gelesen werden.',
+        });
         input.value = '';
       };
       reader.readAsText(datei);
@@ -374,7 +673,7 @@ window.HTBAH_SEITEN.Charakter = {
         }
       }
     },
-    bearbeitungSpeichern() {
+    async bearbeitungSpeichern() {
       const { name, value, type } = this.bearbeitungEntwurf;
       const ref = this.bearbeitungReferenz;
       const altKat = this.bearbeitungKategorie;
@@ -385,25 +684,37 @@ window.HTBAH_SEITEN.Charakter = {
 
       const nameTrim = typeof name === 'string' ? name.trim() : '';
       if (!nameTrim) {
-        alert('Gib einen Namen an.');
+        await window.HTBAH.ui.alert({
+          titel: 'Eingabe unvollständig',
+          beschreibung: 'Gib einen Namen an.',
+        });
         return;
       }
 
       const wert = Number(value);
 
       if (wert <= 0) {
-        alert('Wert muss größer als 0 sein');
+        await window.HTBAH.ui.alert({
+          titel: 'Ungültiger Wert',
+          beschreibung: 'Wert muss größer als 0 sein.',
+        });
         return;
       }
 
       if (wert > 100) {
-        alert('Maximalwert ist 100');
+        await window.HTBAH.ui.alert({
+          titel: 'Ungültiger Wert',
+          beschreibung: 'Maximalwert ist 100.',
+        });
         return;
       }
 
       const punkteOhne = this.punkte - ref.value;
       if (punkteOhne + wert > 400) {
-        alert('Du hast nicht genug Punkte übrig');
+        await window.HTBAH.ui.alert({
+          titel: 'Zu wenig Punkte',
+          beschreibung: 'Du hast nicht genug Punkte übrig.',
+        });
         return;
       }
 
@@ -435,27 +746,39 @@ window.HTBAH_SEITEN.Charakter = {
         },
       });
     },
-    faehigkeitHinzufuegen() {
+    async faehigkeitHinzufuegen() {
       const nameTrim = String(this.neueFaehigkeit.name || '').trim();
       if (!nameTrim) {
-        alert('Gib einen Namen an.');
+        await window.HTBAH.ui.alert({
+          titel: 'Eingabe unvollständig',
+          beschreibung: 'Gib einen Namen an.',
+        });
         return;
       }
 
       const wert = Number(this.neueFaehigkeit.value);
 
       if (wert <= 0) {
-        alert('Wert muss größer als 0 sein');
+        await window.HTBAH.ui.alert({
+          titel: 'Ungültiger Wert',
+          beschreibung: 'Wert muss größer als 0 sein.',
+        });
         return;
       }
 
       if (wert > 100) {
-        alert('Maximalwert ist 100');
+        await window.HTBAH.ui.alert({
+          titel: 'Ungültiger Wert',
+          beschreibung: 'Maximalwert ist 100.',
+        });
         return;
       }
 
       if (this.punkte + wert > 400) {
-        alert('Du hast nicht genug Punkte übrig');
+        await window.HTBAH.ui.alert({
+          titel: 'Zu wenig Punkte',
+          beschreibung: 'Du hast nicht genug Punkte übrig.',
+        });
         return;
       }
 
@@ -476,7 +799,6 @@ window.HTBAH_SEITEN.Charakter = {
         this.spielleiterMitglied.charakterBild = dataUrl;
       } else {
         this.charakterBildLokal = dataUrl;
-        window.HTBAH.speichereCharakterBild(dataUrl);
       }
       this.onSpielleiterPersist?.();
     },
@@ -504,7 +826,10 @@ window.HTBAH_SEITEN.Charakter = {
           ? window.HTBAH.erzeugeCharakterPdfBlob
           : null;
       if (!fn) {
-        alert('PDF-Funktion nicht geladen. Seite neu laden und erneut versuchen.');
+        await window.HTBAH.ui.alert({
+          titel: 'PDF-Funktion nicht verfügbar',
+          beschreibung: 'PDF-Funktion nicht geladen. Seite neu laden und erneut versuchen.',
+        });
         return;
       }
       this.pdfExportLaedt = true;
@@ -519,7 +844,10 @@ window.HTBAH_SEITEN.Charakter = {
         this.charakterPdfModalOffen = true;
       } catch (e) {
         console.error(e);
-        alert(e && e.message ? e.message : 'PDF konnte nicht erzeugt werden.');
+        await window.HTBAH.ui.alert({
+          titel: 'PDF-Erstellung fehlgeschlagen',
+          beschreibung: e && e.message ? e.message : 'PDF konnte nicht erzeugt werden.',
+        });
       } finally {
         this.pdfExportLaedt = false;
       }
@@ -583,12 +911,61 @@ window.HTBAH_SEITEN.Charakter = {
     <div class="container content py-3">
       <h4 v-if="!spielleiterMitglied" class="text-center mb-3 htbah-page-title">
         <span class="htbah-page-title-emoji" aria-hidden="true">🧙</span>
-        <span>Charakter</span>
+        <span>{{ istEditModus ? 'Charakter bearbeiten' : 'Neuen Charakter erstellen' }}</span>
       </h4>
       <h5 v-else class="text-center mb-3 text-body-secondary htbah-page-title">
         <span class="htbah-page-title-emoji" aria-hidden="true">🧙</span>
         <span>Charakterblatt (Spielleiter)</span>
       </h5>
+
+      <div
+        v-if="!spielleiterMitglied && istNeuModus"
+        class="alert alert-info mb-2">
+        <p class="small mb-2">
+          Bestehenden Charakter importieren (Einzel-Export oder Komplett-Export).
+          Bei mehreren enthaltenen Charakteren kannst du danach einen auswählen.
+        </p>
+        <div class="row g-2">
+          <div class="col-12 col-md-6">
+            <div class="form-floating">
+              <input
+                id="ce-char-import"
+                type="file"
+                accept="application/json,.json"
+                class="form-control"
+                @change="importDateiAusgewaehlt" />
+              <label for="ce-char-import">Charakter aus Datei importieren</label>
+            </div>
+          </div>
+          <div v-if="importAuswahlHatMehrere" class="col-12 col-md-6">
+            <div class="form-floating">
+              <select id="ce-char-import-auswahl" class="form-select" v-model="importAuswahlIndex">
+                <option value="">Charakter auswählen …</option>
+                <option v-for="(kandidat, index) in importKandidaten" :key="'imp-' + index" :value="String(index)">
+                  {{ importAuswahlText(kandidat, index) }}
+                </option>
+              </select>
+              <label for="ce-char-import-auswahl">Aus Datei übernehmen</label>
+            </div>
+          </div>
+          <div v-if="importKandidaten.length" class="col-12">
+            <button
+              type="button"
+              class="btn btn-outline-primary w-100"
+              :disabled="!kannImportAuswahlUebernehmen"
+              @click="importAuswahlUebernehmen">
+              Import-Auswahl übernehmen
+            </button>
+            <p v-if="importDateiname" class="small text-body-secondary mb-0 mt-2">
+              Datei: {{ importDateiname }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="importHinweis && !spielleiterMitglied" class="alert alert-secondary py-2 mb-2">
+        {{ importHinweis }}
+      </div>
 
       <div class="card p-3 mb-2">
         <div class="row g-3">
@@ -619,7 +996,15 @@ window.HTBAH_SEITEN.Charakter = {
               </div>
               <div class="col-12 col-md-4">
                 <div class="form-floating">
-                  <input id="ce-char-lp" type="number" class="form-control" v-model.number="charakter.lebenspunkte" min="0" placeholder=" ">
+                  <input
+                    id="ce-char-lp"
+                    type="number"
+                    class="form-control"
+                    v-model.number="charakter.lebenspunkte"
+                    min="0"
+                    placeholder=" "
+                    @focus="lebenspunkteEingabeFokus"
+                    @blur="lebenspunkteEingabeBlur">
                   <label for="ce-char-lp">Lebenspunkte</label>
                 </div>
               </div>
@@ -666,13 +1051,22 @@ window.HTBAH_SEITEN.Charakter = {
           <div class="col-12 col-lg-4 d-flex flex-column">
             <h6 class="mb-2 flex-shrink-0">Charakterbild</h6>
             <div class="text-center mb-2 flex-shrink-0">
-              <img
-                v-if="charakterBild"
-                :src="charakterBild"
-                alt="Charakterbild"
-                class="charakterbild-vorschau-klein" />
-              <div v-else class="charakterbild-platzhalter-klein">
-                <span class="material-symbols-outlined" aria-hidden="true">person</span>
+              <div class="htbah-charakterbild-status-wrap">
+                <img
+                  v-if="charakterBild"
+                  :src="charakterBild"
+                  alt="Charakterbild"
+                  class="charakterbild-vorschau-klein" />
+                <div v-else class="charakterbild-platzhalter-klein">
+                  <span class="material-symbols-outlined" aria-hidden="true">person</span>
+                </div>
+                <span
+                  v-if="charakterZustandEmoji"
+                  class="htbah-charakter-zustand-overlay htbah-charakter-zustand-overlay--gross"
+                  :aria-label="charakterZustandLabel"
+                  role="img">
+                  {{ charakterZustandEmoji }}
+                </span>
               </div>
             </div>
 
@@ -1027,20 +1421,37 @@ window.HTBAH_SEITEN.Charakter = {
           zum Ausdrucken verkleinert).
         </p>
         <icon-text-button
+          v-if="!spielleiterMitglied"
+          type="button"
+          class="btn btn-primary w-100 mb-2"
+          icon="save"
+          @click="speichereCharakterFormular">
+          {{ speicherButtonText }}
+        </icon-text-button>
+        <icon-text-button
           type="button"
           class="btn btn-outline-primary w-100 mb-2"
           icon="picture_as_pdf"
+          v-if="spielleiterMitglied || istEditModus"
           :disabled="pdfExportLaedt"
           @click="charakterPdfExportieren">
           {{ pdfExportLaedt ? 'PDF wird erzeugt …' : 'PDF generieren' }}
         </icon-text-button>
         <icon-text-button
-          v-if="!spielleiterMitglied"
+          v-if="istEditModus"
           type="button"
           class="btn btn-outline-secondary w-100"
           icon="download"
           @click="charakterJsonExportieren">
           JSON exportieren
+        </icon-text-button>
+        <icon-text-button
+          v-if="istEditModus"
+          type="button"
+          class="btn btn-outline-danger w-100 mt-2"
+          icon="delete"
+          @click="loescheDiesenCharakter">
+          Charakter löschen
         </icon-text-button>
       </div>
 

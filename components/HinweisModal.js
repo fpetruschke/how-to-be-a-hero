@@ -1,10 +1,10 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
-window.HTBAH_KOMPONENTEN.BestaetigenModal = {
+window.HTBAH_KOMPONENTEN.HinweisModal = {
   props: {
     modalId: {
       type: String,
-      default: 'htbahBestaetigenModal',
+      default: 'htbahHinweisModal',
     },
   },
   computed: {
@@ -16,12 +16,10 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
     return {
       titel: '',
       beschreibung: '',
-      bestaetigenText: 'Ja, löschen',
-      bestaetigenButtonClass: 'btn-danger',
-      warnhinweisAnzeigen: true,
+      bestaetigenText: 'OK',
+      bestaetigenButtonClass: 'btn-primary',
       _onBestaetigen: null,
-      _onAbbrechen: null,
-      _hatBestaetigt: false,
+      _erledigt: false,
       modalInstanz: null,
     };
   },
@@ -29,53 +27,42 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
     oeffnen({
       titel,
       beschreibung,
+      bestaetigenText = 'OK',
+      bestaetigenButtonClass = 'btn-primary',
       onBestaetigen,
-      onAbbrechen,
-      bestaetigenText = 'Ja, löschen',
-      bestaetigenButtonClass = 'btn-danger',
-      warnhinweisAnzeigen = true,
     }) {
-      this.titel = titel || '';
+      this.titel = titel || 'Hinweis';
       this.beschreibung = beschreibung || '';
-      this.bestaetigenText = bestaetigenText;
-      this.bestaetigenButtonClass = bestaetigenButtonClass || 'btn-danger';
-      this.warnhinweisAnzeigen = warnhinweisAnzeigen;
+      this.bestaetigenText = bestaetigenText || 'OK';
+      this.bestaetigenButtonClass = bestaetigenButtonClass || 'btn-primary';
       this._onBestaetigen = typeof onBestaetigen === 'function' ? onBestaetigen : null;
-      this._onAbbrechen = typeof onAbbrechen === 'function' ? onAbbrechen : null;
-      this._hatBestaetigt = false;
+      this._erledigt = false;
 
       this.$nextTick(() => {
         const el = this.$refs.modalElement;
         if (!el || !window.bootstrap) {
           return;
         }
-
         this.modalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
         this.modalInstanz.show();
       });
     },
     bestaetigen() {
-      this._hatBestaetigt = true;
+      this._erledigt = true;
       if (this._onBestaetigen) {
         this._onBestaetigen();
       }
-      this.schliessen();
-    },
-    schliessen() {
+      this._onBestaetigen = null;
       if (this.modalInstanz) {
         this.modalInstanz.hide();
       }
     },
-    zuruecksetzenCallbacks() {
-      this._onBestaetigen = null;
-      this._onAbbrechen = null;
-      this._hatBestaetigt = false;
-    },
     modalGeschlossen() {
-      if (!this._hatBestaetigt && this._onAbbrechen) {
-        this._onAbbrechen();
+      if (!this._erledigt && this._onBestaetigen) {
+        this._onBestaetigen();
       }
-      this.zuruecksetzenCallbacks();
+      this._onBestaetigen = null;
+      this._erledigt = false;
     },
   },
   mounted() {
@@ -101,30 +88,17 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow">
           <div class="modal-header">
-            <h5 class="modal-title" :id="titelLabelId">
-              {{ titel }}
-            </h5>
+            <h5 class="modal-title" :id="titelLabelId">{{ titel }}</h5>
             <button
               type="button"
               class="btn-close"
               data-bs-dismiss="modal"
               aria-label="Schließen"></button>
           </div>
-          <div class="modal-body text-start htbah-bestaetigen-beschreibung">
+          <div class="modal-body text-start">
             {{ beschreibung }}
-            <template v-if="warnhinweisAnzeigen">
-              <br />
-              <br />
-              Dieser Schritt kann nicht rückgängig gemacht werden.
-            </template>
           </div>
           <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              data-bs-dismiss="modal">
-              Abbrechen
-            </button>
             <button
               type="button"
               :class="['btn', bestaetigenButtonClass]"

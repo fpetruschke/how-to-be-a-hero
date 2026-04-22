@@ -14,13 +14,13 @@ function htbahFormatBytes(bytes) {
 
 const SPEICHER_BEREICHE = {
   charakter: {
-    key: 'htbah_character',
-    titel: 'Charakterdaten löschen?',
+    keys: ['htbah_characters', 'htbah_active_character_id', 'htbah_character', 'htbah_character_image'],
+    titel: 'Alle Charakterdaten löschen?',
     beschreibung:
-      'Dein erstellter Charakter mit allen Werten sowie Inventar und Notizen wird entfernt. Das Charakterbild bleibt erhalten.',
-    erfolg: 'Charakterdaten wurden gelöscht.',
+      'Alle gespeicherten Charaktere mit ihren Bildern werden entfernt.',
+    erfolg: 'Alle Charakterdaten wurden gelöscht.',
     buttonSymbol: '🧙',
-    buttonLabel: 'Charakterdaten löschen',
+    buttonLabel: 'Alle Charakterdaten löschen',
   },
   charakterbild: {
     key: 'htbah_character_image',
@@ -87,6 +87,8 @@ const SPEICHER_BEREICHE = {
   },
   alles: {
     keys: [
+      'htbah_characters',
+      'htbah_active_character_id',
       'htbah_character',
       'htbah_character_image',
       'htbah_presets',
@@ -113,14 +115,9 @@ const DATEN_EXPORT_BEREICHE = [
     label: 'App-Rolle (Spieler/Spielleitung)',
   },
   {
-    id: 'charakter',
-    key: 'htbah_character',
-    label: 'Charakterdaten',
-  },
-  {
-    id: 'charakterbild',
-    key: 'htbah_character_image',
-    label: 'Charakterbild',
+    id: 'aktiverCharakter',
+    key: 'htbah_active_character_id',
+    label: 'Aktiver Charakter',
   },
   {
     id: 'presets',
@@ -175,12 +172,10 @@ window.HTBAH_SEITEN.Einstellungen = {
     return {
       istHellesTheme: window.HTBAH.ladeTheme() === 'light',
       zuLoeschenderBereich: 'charakter',
-      statusMeldung: '',
       speicherBereiche: SPEICHER_BEREICHE,
       browserSpeicher: null,
       browserSpeicherFehler: '',
       browserSpeicherLaden: true,
-      statusTyp: 'success',
       datenExportBereiche: DATEN_EXPORT_BEREICHE,
       exportAuswahl: neueBereichsAuswahl(DATEN_EXPORT_BEREICHE),
       importAuswahl: {},
@@ -244,17 +239,14 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
       return 'bg-success';
     },
-    statusAlertKlasse() {
-      return this.statusTyp === 'danger' ? 'alert-danger' : 'alert-success';
-    },
     hatExportAuswahl() {
-      return this.datenExportBereiche.some((b) => this.exportAuswahl[b.id]);
+      return this.exportBereicheMitCharakteren.some((b) => this.exportAuswahl[b.id]);
     },
     hatImportAuswahl() {
       return this.importBereicheAusDatei.some((b) => this.importAuswahl[b.id]);
     },
     exportAlleBereicheAusgewaehlt() {
-      const bereiche = this.datenExportBereiche;
+      const bereiche = this.exportBereicheMitCharakteren;
       if (!bereiche.length) {
         return false;
       }
@@ -267,8 +259,54 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
       return bereiche.every((b) => this.importAuswahl[b.id]);
     },
+    charakterEintraege() {
+      return window.HTBAH.listeCharaktere();
+    },
+    exportBereicheMitCharakteren() {
+      const basis = this.datenExportBereiche.filter((bereich) => bereich.id !== 'aktiverCharakter');
+      const charakterBereiche = this.charakterEintraege.map((eintrag) => ({
+        id: `charakter:${eintrag.id}`,
+        key: `htbah_character_entry:${eintrag.id}`,
+        label: `Charakter: ${this.charakterName(eintrag)}`,
+      }));
+      const aktiveInfo = {
+        id: 'aktiverCharakter',
+        key: 'htbah_active_character_id',
+        label: 'Aktiver Charakter',
+      };
+      return [...charakterBereiche, aktiveInfo, ...basis];
+    },
   },
   methods: {
+    charakterName(eintrag) {
+      const name =
+        eintrag && eintrag.charakter && typeof eintrag.charakter.name === 'string'
+          ? eintrag.charakter.name.trim()
+          : '';
+      return name || 'Unbenannter Charakter';
+    },
+    async loescheEinzelCharakter(eintrag) {
+      if (!eintrag || !eintrag.id) {
+        return;
+      }
+      const name = this.charakterName(eintrag);
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Charakter löschen?',
+        beschreibung: `„${name}“ wirklich löschen?`,
+        bestaetigenText: 'Löschen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
+        return;
+      }
+      const result = window.HTBAH.loescheCharakterById(eintrag.id);
+      if (!result.geloescht) {
+        this.statusAnzeigen('Charakter konnte nicht gelöscht werden.', 'danger');
+        return;
+      }
+      this.statusAnzeigen(`„${name}“ wurde gelöscht.`);
+    },
     themeUmschalten() {
       const neuesTheme = this.istHellesTheme ? 'light' : 'dark';
       window.HTBAH.setzeTheme(neuesTheme);
@@ -302,7 +340,6 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
 
       this.zuLoeschenderBereich = bereich;
-      this.statusMeldung = '';
 
       this.$refs.bestaetigenModal.oeffnen({
         titel: eintrag.titel,
@@ -338,8 +375,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       this.speicherSchaetzungLaden();
     },
     statusAnzeigen(text, typ = 'success') {
-      this.statusTyp = typ === 'danger' ? 'danger' : 'success';
-      this.statusMeldung = text;
+      window.HTBAH.ui.notify({ text, typ: typ === 'danger' ? 'danger' : 'success' });
     },
     modalAnzeigen(modalRefName, instanzName) {
       this.$nextTick(() => {
@@ -352,15 +388,27 @@ window.HTBAH_SEITEN.Einstellungen = {
       });
     },
     exportModalOeffnen() {
-      this.exportAuswahl = neueBereichsAuswahl(this.datenExportBereiche);
+      this.exportAuswahl = neueBereichsAuswahl(this.exportBereicheMitCharakteren);
       this.modalAnzeigen('exportModalElement', 'exportModalInstanz');
     },
     exportPaketAusAuswahl(auswahl) {
-      const ausgewaehlteBereiche = this.datenExportBereiche.filter((b) => auswahl[b.id]);
+      const ausgewaehlteBereiche = this.exportBereicheMitCharakteren.filter((b) => auswahl[b.id]);
       if (!ausgewaehlteBereiche.length) {
         return null;
       }
       const daten = ausgewaehlteBereiche.map((bereich) => {
+        if (bereich.key.startsWith('htbah_character_entry:')) {
+          const charakterId = bereich.key.slice('htbah_character_entry:'.length);
+          const eintrag = window.HTBAH.ladeCharakterEintrag(charakterId);
+          const vorhanden = Boolean(eintrag);
+          return {
+            id: bereich.id,
+            key: bereich.key,
+            label: bereich.label,
+            vorhanden,
+            wert: vorhanden ? JSON.stringify(eintrag) : null,
+          };
+        }
         const wert = window.HTBAH.speicher.leseText(bereich.key, null);
         const vorhanden = typeof wert === 'string';
         return {
@@ -475,7 +523,7 @@ window.HTBAH_SEITEN.Einstellungen = {
     },
     bereicheAuswahlAlleToggle(ziel) {
       if (ziel === 'export') {
-        const bereiche = this.datenExportBereiche;
+        const bereiche = this.exportBereicheMitCharakteren;
         this.exportAuswahl = this.exportAlleBereicheAusgewaehlt
           ? keineBereichsAuswahl(bereiche)
           : neueBereichsAuswahl(bereiche);
@@ -497,12 +545,30 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
 
       ausgewaehlteBereiche.forEach((bereich) => {
+        if (bereich.key.startsWith('htbah_character_entry:')) {
+          const charakterId = bereich.key.slice('htbah_character_entry:'.length);
+          if (bereich.vorhanden && typeof bereich.wert === 'string') {
+            try {
+              const payload = JSON.parse(bereich.wert);
+              window.HTBAH.importiereOderAktualisiereCharakterEintrag({
+                ...payload,
+                id: payload && payload.id ? payload.id : charakterId,
+              });
+            } catch {
+              // defekten Eintrag ignorieren
+            }
+          } else {
+            window.HTBAH.loescheCharakterById(charakterId);
+          }
+          return;
+        }
         if (bereich.vorhanden && typeof bereich.wert === 'string') {
           window.HTBAH.speicher.schreibeText(bereich.key, bereich.wert);
         } else {
           window.HTBAH.speicher.loescheKey(bereich.key);
         }
       });
+      window.HTBAH.migriereLegacyCharakterSpeicherWennNoetig();
 
       if (ausgewaehlteBereiche.some((b) => b.key === 'htbah_theme')) {
         window.HTBAH.setzeTheme(window.HTBAH.ladeTheme());
@@ -625,6 +691,22 @@ window.HTBAH_SEITEN.Einstellungen = {
 
       <h5 class="text-start mb-2">Daten löschen</h5>
       <div class="card p-3">
+        <div class="mb-3">
+          <h6 class="mb-2">Einzelne Charaktere</h6>
+          <p v-if="!charakterEintraege.length" class="small text-body-secondary mb-2">
+            Keine gespeicherten Charaktere vorhanden.
+          </p>
+          <div v-else class="d-flex flex-column gap-2">
+            <button
+              v-for="eintrag in charakterEintraege"
+              :key="'del-char-' + eintrag.id"
+              type="button"
+              class="btn btn-outline-danger btn-sm text-start"
+              @click="loescheEinzelCharakter(eintrag)">
+              {{ charakterName(eintrag) }} löschen
+            </button>
+          </div>
+        </div>
         <template v-if="appRolle === 'charakter'">
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
@@ -632,13 +714,6 @@ window.HTBAH_SEITEN.Einstellungen = {
             :symbol="speicherBereiche.charakter.buttonSymbol"
             @click="oeffneLoeschDialog('charakter')">
             {{ speicherBereiche.charakter.buttonLabel }}
-          </icon-text-button>
-          <icon-text-button
-            class="btn btn-outline-danger w-100 mb-2"
-            type="button"
-            :symbol="speicherBereiche.charakterbild.buttonSymbol"
-            @click="oeffneLoeschDialog('charakterbild')">
-            {{ speicherBereiche.charakterbild.buttonLabel }}
           </icon-text-button>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
@@ -710,21 +785,6 @@ window.HTBAH_SEITEN.Einstellungen = {
 
       <div class="abstandshalter" aria-hidden="true"></div>
 
-      <teleport to="body">
-        <div
-          v-if="statusMeldung"
-          class="htbah-erfolgs-toast alert alert-dismissible py-2 mb-0 text-center shadow"
-          :class="statusAlertKlasse"
-          role="status">
-          {{ statusMeldung }}
-          <button
-            type="button"
-            class="btn-close"
-            aria-label="Meldung schließen"
-            @click="statusMeldung = ''"></button>
-        </div>
-      </teleport>
-
       <div
         ref="exportModalElement"
         class="modal fade"
@@ -755,7 +815,7 @@ window.HTBAH_SEITEN.Einstellungen = {
                 </button>
               </div>
               <div
-                v-for="bereich in datenExportBereiche"
+                v-for="bereich in exportBereicheMitCharakteren"
                 :key="'export-' + bereich.id"
                 class="form-check form-switch mb-2">
                 <input

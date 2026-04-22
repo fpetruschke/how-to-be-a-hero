@@ -24,14 +24,17 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
       this.bildVerwaltungModal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
       this.bildVerwaltungModal.show();
     },
-    bildDateiAusgewaehlt(event) {
+    async bildDateiAusgewaehlt(event) {
       const datei = event.target.files && event.target.files[0];
       if (!datei) {
         return;
       }
 
       if (!datei.type.startsWith('image/')) {
-        alert('Bitte wähle eine Bilddatei aus.');
+        await window.HTBAH.ui.alert({
+          titel: 'Ungültige Datei',
+          beschreibung: 'Bitte wähle eine Bilddatei aus.',
+        });
         event.target.value = '';
         return;
       }
@@ -97,7 +100,7 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
       this.cropperScaleX = 1;
       this.cropperScaleY = 1;
     },
-    zugeschnittenesBildSpeichern() {
+    async zugeschnittenesBildSpeichern() {
       if (!this.cropper) {
         return;
       }
@@ -109,13 +112,15 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
       });
 
       if (!canvas) {
-        alert('Das Bild konnte nicht zugeschnitten werden.');
+        await window.HTBAH.ui.alert({
+          titel: 'Zuschnitt fehlgeschlagen',
+          beschreibung: 'Das Bild konnte nicht zugeschnitten werden.',
+        });
         return;
       }
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
       this.$emit('update:charakterBild', dataUrl);
-      window.HTBAH.speichereCharakterBild(dataUrl);
       this.cropperAufraeumen();
     },
     zuschnittMitAktuellemBildStarten() {
@@ -129,17 +134,23 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
     zuschnittAbbrechen() {
       this.cropperAufraeumen();
     },
-    charakterBildEntfernen() {
+    async charakterBildEntfernen() {
       if (!this.charakterBild) {
         return;
       }
 
-      if (!confirm('Charakterbild wirklich entfernen?')) {
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Charakterbild entfernen?',
+        beschreibung: 'Charakterbild wirklich entfernen?',
+        bestaetigenText: 'Entfernen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
         return;
       }
 
       this.$emit('update:charakterBild', '');
-      window.HTBAH.loescheCharakterBild();
     },
     cropperAufraeumen() {
       if (this.cropper) {
