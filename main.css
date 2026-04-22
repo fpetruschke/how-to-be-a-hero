@@ -821,8 +821,7 @@ input::placeholder {
 }
 
 .charakterbild-vorschau-klein {
-  max-height: 180px;
-  width: auto;
+  width: 100%;
   max-width: 100%;
   aspect-ratio: 3 / 4;
   object-fit: cover;
@@ -844,7 +843,6 @@ input::placeholder {
 }
 
 .charakterbild-platzhalter-klein {
-  max-height: 180px;
   width: 100%;
   border-radius: 10px;
   border: 1px dashed var(--border-color);
@@ -854,6 +852,10 @@ input::placeholder {
   color: var(--paragraph-color);
   background: var(--input-bg);
   aspect-ratio: 3 / 4;
+}
+
+.charakterbild-platzhalter-klein .material-symbols-outlined {
+  font-size: 2.4rem;
 }
 
 .cropper-image {
@@ -1425,7 +1427,14 @@ input::placeholder {
 .htbah-charakterbild-status-wrap {
   position: relative;
   display: inline-block;
+  width: min(100%, 14rem);
   max-width: 100%;
+}
+
+@media (min-width: 992px) {
+  .htbah-charakterbild-status-wrap {
+    width: min(100%, 16rem);
+  }
 }
 
 .htbah-charakter-zustand-overlay {

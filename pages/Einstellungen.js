@@ -44,7 +44,7 @@ const SPEICHER_BEREICHE = {
     key: 'htbah_theme',
     titel: 'Darstellung zurücksetzen?',
     beschreibung:
-      'Deine gespeicherte Theme-Auswahl wird entfernt und die App nutzt wieder das dunkle Standard-Theme.',
+      'Deine gespeicherte Theme-Auswahl wird entfernt und die App nutzt wieder das helle Standard-Theme.',
     erfolg: 'Darstellung wurde auf das Standard-Theme zurückgesetzt.',
     buttonSymbol: '🎨',
     buttonLabel: 'Theme-Einstellung löschen',
@@ -361,9 +361,9 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
 
       if (this.zuLoeschenderBereich === 'theme' || this.zuLoeschenderBereich === 'alles') {
-        this.istHellesTheme = false;
-        document.documentElement.setAttribute('data-theme', 'dark');
-        document.documentElement.setAttribute('data-bs-theme', 'dark');
+        this.istHellesTheme = true;
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-bs-theme', 'light');
       }
 
       this.statusAnzeigen(bereich.erfolg, 'success');

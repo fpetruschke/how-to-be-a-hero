@@ -989,7 +989,7 @@ function ermittleRegelwerkQuelleUrl() {
 
 function ladeTheme() {
   const gespeichertesTheme = htbahSpeicher.leseText(SPEICHER_KEY_THEME, null);
-  return gespeichertesTheme === 'light' ? 'light' : 'dark';
+  return gespeichertesTheme === 'dark' ? 'dark' : 'light';
 }
 
 function setzeTheme(theme) {

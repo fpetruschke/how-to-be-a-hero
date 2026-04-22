@@ -20,6 +20,9 @@ window.HTBAH_SEITEN.Startseite = {
         return aName.localeCompare(bName, 'de');
       });
     },
+    hatGespeicherteCharaktere() {
+      return this.sortierteCharaktere.length > 0;
+    },
   },
   methods: {
     aktualisiereCharakterListe() {
@@ -186,7 +189,7 @@ window.HTBAH_SEITEN.Startseite = {
         </div>
       </div>
 
-      <div v-if="sortierteCharaktere.length" class="mb-3">
+      <div v-if="hatGespeicherteCharaktere" class="mb-3">
         <h5 class="text-start mb-2">Gespeicherte Charaktere</h5>
         <div class="row g-3">
           <div
