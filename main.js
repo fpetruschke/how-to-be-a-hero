@@ -11,6 +11,11 @@ const SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH = 'htbah_spielleitung_abenteuerbuch
 const SPEICHER_KEY_WELTENBAU = 'htbah_weltenbau';
 const SPEICHER_KEY_ATMOSPHAERE = 'htbah_atmosphaere';
 const SPEICHER_KEY_ATMOSPHAERE_BADGE = 'htbah_atmosphaere_badge_pos';
+const SPEICHER_KEY_WUERFEL_AUDIO = 'htbah_wuerfel_audio';
+/** @deprecated nur Migration; neuer Speicher: SPEICHER_KEY_WUERFEL_AUDIO */
+const SPEICHER_KEY_WUERFEL_SOUND_LEGACY = 'htbah_wuerfel_sound';
+const SPEICHER_KEY_DICE_COLORS = 'htbah_dice_colors';
+const SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER = 'htbah_wuerfel_beutel_fenster';
 
 function erstelleLocalStorageBackend() {
   return {
@@ -232,6 +237,9 @@ function normalisiereZufallstabellenNpcZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
   }
+  const handeln = Math.max(0, Math.min(40, Math.round(Number(z.handeln) || 0)));
+  const wissen = Math.max(0, Math.min(40, Math.round(Number(z.wissen) || 0)));
+  const soziales = Math.max(0, Math.min(40, Math.round(Number(z.soziales) || 0)));
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     name: typeof z.name === 'string' ? z.name : '',
@@ -246,11 +254,17 @@ function normalisiereZufallstabellenNpcZeile(z) {
     stimme: typeof z.stimme === 'string' ? z.stimme : '',
     waffe: typeof z.waffe === 'string' ? z.waffe : '',
     lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
+    lpBewusstlosAusgeblendet: Boolean(z.lpBewusstlosAusgeblendet),
+    lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
     schadenswert: typeof z.schadenswert === 'string' ? z.schadenswert : '',
     kampfart: z.kampfart === 'fernkampf' ? 'fernkampf' : 'nahkampf',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
+    handeln,
+    wissen,
+    soziales,
     fraktion: typeof z.fraktion === 'string' ? z.fraktion : '',
     glaube: typeof z.glaube === 'string' ? z.glaube : '',
+    initiative: typeof z.initiative === 'string' ? z.initiative : '',
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
     medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
@@ -284,6 +298,13 @@ function normalisiereZufallstabellenGegenstandZeile(z) {
     istWaffe: !!z.istWaffe,
     schadenswert: typeof z.schadenswert === 'string' ? z.schadenswert : '',
     kampfart,
+    aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
+    initiative: typeof z.initiative === 'string' ? z.initiative : '',
+    fraktionen: Array.isArray(z.fraktionen)
+      ? z.fraktionen.map((f) => (typeof f === 'string' ? f.trim() : '')).filter(Boolean)
+      : [],
+    lpBewusstlosAusgeblendet: Boolean(z.lpBewusstlosAusgeblendet),
+    lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
     medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
 }
@@ -292,12 +313,20 @@ function normalisiereZufallstabellenFraktionZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
   }
+  const orteListe = Array.isArray(z.orte)
+    ? z.orte
+        .map((ort) => (typeof ort === 'string' ? ort.trim() : ''))
+        .filter(Boolean)
+    : [];
+  const altAufenthaltsort = typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort.trim() : '';
+  const orte = orteListe.length ? orteListe : altAufenthaltsort ? [altAufenthaltsort] : [];
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     art: typeof z.art === 'string' ? z.art : '',
     name: typeof z.name === 'string' ? z.name : '',
     ziel: typeof z.ziel === 'string' ? z.ziel : '',
     gesinnungVerhalten: typeof z.gesinnungVerhalten === 'string' ? z.gesinnungVerhalten : '',
+    orte,
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
     medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
@@ -335,6 +364,8 @@ function normalisiereZufallstabellenRaetselZeile(z) {
     aufgabenstellung: typeof z.aufgabenstellung === 'string' ? z.aufgabenstellung : '',
     ergebnis: typeof z.ergebnis === 'string' ? z.ergebnis : '',
     schwierigkeit: typeof z.schwierigkeit === 'string' ? z.schwierigkeit : '',
+    aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
+    geloest: Boolean(z.geloest),
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
     medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
@@ -363,6 +394,9 @@ function normalisiereZufallstabellenBestieZeile(z) {
   if (agg > 10) {
     agg = 10;
   }
+  const handeln = Math.max(0, Math.min(40, Math.round(Number(z.handeln) || 0)));
+  const wissen = Math.max(0, Math.min(40, Math.round(Number(z.wissen) || 0)));
+  const soziales = Math.max(0, Math.min(40, Math.round(Number(z.soziales) || 0)));
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     epoche,
@@ -371,6 +405,13 @@ function normalisiereZufallstabellenBestieZeile(z) {
     angriff: typeof z.angriff === 'string' ? z.angriff : '',
     verteidigung: typeof z.verteidigung === 'string' ? z.verteidigung : '',
     lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
+    aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
+    handeln,
+    wissen,
+    soziales,
+    initiative: typeof z.initiative === 'string' ? z.initiative : '',
+    lpBewusstlosAusgeblendet: Boolean(z.lpBewusstlosAusgeblendet),
+    lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
     staerke: typeof z.staerke === 'string' ? z.staerke : '',
     schwaeche: typeof z.schwaeche === 'string' ? z.schwaeche : '',
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
@@ -619,21 +660,80 @@ function normalisiereWeltenbauGeneratorUrls(roh) {
   return map;
 }
 
+function normalisiereWeltenbauMapHintergruende(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return {};
+  }
+  const map = {};
+  Object.entries(roh).forEach(([gruppeId, dataUrl]) => {
+    if (typeof gruppeId !== 'string' || !gruppeId || typeof dataUrl !== 'string') {
+      return;
+    }
+    const t = dataUrl.trim();
+    if (t.startsWith('data:image/')) {
+      map[gruppeId] = t;
+    }
+  });
+  return map;
+}
+
+function normalisiereWeltenbauMapEinstellungen(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return {};
+  }
+  const map = {};
+  Object.entries(roh).forEach(([gruppeId, einstellungen]) => {
+    if (typeof gruppeId !== 'string' || !gruppeId || !einstellungen || typeof einstellungen !== 'object') {
+      return;
+    }
+    const itemScaleNum = Number(einstellungen.itemScale);
+    const itemScale = Number.isFinite(itemScaleNum) ? Math.max(0, Math.min(500, Math.round(itemScaleNum))) : 100;
+    const edgeColorRoh = typeof einstellungen.edgeColor === 'string' ? einstellungen.edgeColor.trim() : '';
+    const edgeColor = /^#[0-9a-fA-F]{6}$/.test(edgeColorRoh) ? edgeColorRoh : '#5c636a';
+    const filter = einstellungen.sichtbarkeitsFilter && typeof einstellungen.sichtbarkeitsFilter === 'object'
+      ? einstellungen.sichtbarkeitsFilter
+      : {};
+    map[gruppeId] = {
+      itemScale,
+      edgeColor,
+      sichtbarkeitsFilter: {
+        toteNpcsAnzeigen: filter.toteNpcsAnzeigen !== false,
+        toteBestienAnzeigen: filter.toteBestienAnzeigen !== false,
+        geloesteRaetselAnzeigen: filter.geloesteRaetselAnzeigen !== false,
+      },
+    };
+  });
+  return map;
+}
+
 function ladeWeltenbauZustand() {
   const roh = htbahSpeicher.leseJson(SPEICHER_KEY_WELTENBAU, null);
   if (!roh || typeof roh !== 'object') {
-    return { version: 2, eintraege: [], generatorUrls: {} };
+    return {
+      version: 4,
+      eintraege: [],
+      generatorUrls: {},
+      generatorAufrufe: {},
+      mapLayouts: {},
+      mapHintergruende: {},
+      mapEinstellungen: {},
+    };
   }
   const eintraege = Array.isArray(roh.eintraege)
     ? roh.eintraege.map(normalisiereWeltenbauEintrag).filter(Boolean)
     : [];
   const generatorUrls = normalisiereWeltenbauGeneratorUrls(roh.generatorUrls);
-  return { version: 2, eintraege, generatorUrls };
+  const generatorAufrufe = roh.generatorAufrufe && typeof roh.generatorAufrufe === 'object' ? roh.generatorAufrufe : {};
+  const mapLayouts = roh.mapLayouts && typeof roh.mapLayouts === 'object' ? roh.mapLayouts : {};
+  const mapHintergruende = normalisiereWeltenbauMapHintergruende(roh.mapHintergruende);
+  const mapEinstellungen = normalisiereWeltenbauMapEinstellungen(roh.mapEinstellungen);
+  return { version: 4, eintraege, generatorUrls, generatorAufrufe, mapLayouts, mapHintergruende, mapEinstellungen };
 }
 
 function speichereWeltenbauZustand(zustand) {
   htbahSpeicher.schreibeJson(SPEICHER_KEY_WELTENBAU, zustand);
 }
+
 
 function erstelleCharakterExportPaket(charakter, charakterBild) {
   const roh =
@@ -1054,6 +1154,99 @@ function ermittleAssetUrl(relativerPfad) {
   return window.location.origin + basisPfad + relativerPfad.replace(/^\/+/, '');
 }
 
+function ermittleWuerfelSoundUrl() {
+  return ermittleAssetUrl('assets/audio/wuerfel.mp3');
+}
+
+/**
+ * @returns {{ stumm: boolean, lautstaerke: number }}
+ */
+function ladeWuerfelAudioProfil() {
+  const defaults = { stumm: false, lautstaerke: 0.88 };
+  try {
+    const roh = htbahSpeicher.leseText(SPEICHER_KEY_WUERFEL_AUDIO, null);
+    if (roh && String(roh).trim().startsWith('{')) {
+      const o = JSON.parse(roh);
+      const lz =
+        typeof o.lautstaerke === 'number' && Number.isFinite(o.lautstaerke)
+          ? Math.min(1, Math.max(0, o.lautstaerke))
+          : defaults.lautstaerke;
+      return {
+        stumm: Boolean(o.stumm),
+        lautstaerke: lz,
+      };
+    }
+  } catch {
+    /* defektes JSON */
+  }
+  const legacy = htbahSpeicher.leseText(SPEICHER_KEY_WUERFEL_SOUND_LEGACY, null);
+  if (legacy === '0') {
+    return { stumm: true, lautstaerke: defaults.lautstaerke };
+  }
+  return defaults;
+}
+
+/**
+ * @param {{ stumm?: boolean, lautstaerke?: number }} teil
+ */
+function setzeWuerfelAudioProfil(teil) {
+  const aktuell = ladeWuerfelAudioProfil();
+  const neu = {
+    stumm: teil.stumm !== undefined ? Boolean(teil.stumm) : aktuell.stumm,
+    lautstaerke:
+      teil.lautstaerke !== undefined
+        ? Math.min(1, Math.max(0, Number(teil.lautstaerke) || aktuell.lautstaerke))
+        : aktuell.lautstaerke,
+  };
+  htbahSpeicher.schreibeText(SPEICHER_KEY_WUERFEL_AUDIO, JSON.stringify(neu));
+  try {
+    htbahSpeicher.loescheKey(SPEICHER_KEY_WUERFEL_SOUND_LEGACY);
+  } catch {
+    /* optional */
+  }
+  return neu;
+}
+
+/**
+ * Spielt den Würfel-Klang einmal pro Würfel. Erster Klang bei delay 0 ms (Klickfeedback);
+ * weitere leicht zufällig gestaffelt (wirkt natürlicher als fester Abstand).
+ * @param {number} anzahl
+ */
+function spieleWuerfelSounds(anzahl) {
+  const n = Math.max(0, Math.min(50, Math.floor(Number(anzahl) || 0)));
+  if (n === 0) {
+    return;
+  }
+  const profil = ladeWuerfelAudioProfil();
+  if (profil.stumm) {
+    return;
+  }
+  const vol = Math.min(1, Math.max(0, profil.lautstaerke));
+  const url = ermittleWuerfelSoundUrl();
+  /** Mindest- und Zusatz-Millisekunden bis zum nächsten Klang (nur bei n > 1). */
+  const staffelMinMs = 85;
+  const staffelZufallMs = 110;
+  let t = 0;
+  for (let i = 0; i < n; i++) {
+    const delay = t;
+    window.setTimeout(() => {
+      try {
+        const a = new Audio(url);
+        a.volume = vol;
+        const p = a.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
+      } catch {
+        /* optional: Autoplay / MIME */
+      }
+    }, delay);
+    if (i < n - 1) {
+      t += staffelMinMs + Math.floor(Math.random() * staffelZufallMs);
+    }
+  }
+}
+
 function ermittleRegelwerkQuelleUrl() {
   return ermittleAssetUrl('assets/pdf/how-to-be-a-hero-Regelwerk-hoschianer.pdf');
 }
@@ -1223,6 +1416,9 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   weltenbau: SPEICHER_KEY_WELTENBAU,
   atmosphaere: SPEICHER_KEY_ATMOSPHAERE,
   atmosphaereBadge: SPEICHER_KEY_ATMOSPHAERE_BADGE,
+  wuerfelAudio: SPEICHER_KEY_WUERFEL_AUDIO,
+  diceColors: SPEICHER_KEY_DICE_COLORS,
+  wuerfelBeutelFenster: SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER,
 });
 
 window.HTBAH = {
@@ -1243,6 +1439,9 @@ window.HTBAH = {
   istSystemFaehigkeitenPreset,
   wuerfelW10,
   wuerfelW100,
+  ladeWuerfelAudioProfil,
+  setzeWuerfelAudioProfil,
+  spieleWuerfelSounds,
   berechneProbeAuswertung,
   ermittleAssetUrl,
   ermittleRegelwerkQuelleUrl,

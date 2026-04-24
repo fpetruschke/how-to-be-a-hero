@@ -41,6 +41,7 @@ window.HTBAH_KOMPONENTEN.InitiativeModal = {
     },
     wuerfeln() {
       this.letzterW10 = window.HTBAH.wuerfelW10();
+      window.HTBAH.spieleWuerfelSounds(1);
     },
   },
   template: `

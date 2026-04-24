@@ -159,18 +159,33 @@ function formatBytes(n) {
 window.HTBAH_SEITEN.Weltenbau = {
   components: {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
+    WeltenbauUebersichtModal: window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal,
   },
   data() {
     const zustandRoh = window.HTBAH.ladeWeltenbauZustand();
     const zustand = {
-      version: 2,
+      version: 4,
       eintraege: Array.isArray(zustandRoh && zustandRoh.eintraege) ? zustandRoh.eintraege : [],
       generatorUrls: normalisiereGeneratorUrlMap(zustandRoh && zustandRoh.generatorUrls),
       generatorAufrufe: normalisiereGeneratorZeitstempelMap(zustandRoh && zustandRoh.generatorAufrufe),
+      mapLayouts: zustandRoh && zustandRoh.mapLayouts && typeof zustandRoh.mapLayouts === 'object' ? zustandRoh.mapLayouts : {},
+      mapHintergruende:
+        zustandRoh && zustandRoh.mapHintergruende && typeof zustandRoh.mapHintergruende === 'object'
+          ? zustandRoh.mapHintergruende
+          : {},
+      mapEinstellungen:
+        zustandRoh && zustandRoh.mapEinstellungen && typeof zustandRoh.mapEinstellungen === 'object'
+          ? zustandRoh.mapEinstellungen
+          : {},
     };
     return {
       generatoren: WELTENBAU_GENERATOREN,
       zustand,
+      weltenbauMapModalOffen: false,
+      ausgewaehlteGruppeId:
+        (window.HTBAH.ladeSpielleiterZustand().aktiveGruppeId ||
+          ((window.HTBAH.ladeSpielleiterZustand().gruppen || [])[0] || {}).id ||
+          ''),
       importWarteschlange: [],
       zeigeImportHinweis: false,
       generatorModal: {
@@ -196,6 +211,13 @@ window.HTBAH_SEITEN.Weltenbau = {
     };
   },
   computed: {
+    spielleiterGruppen() {
+      const sl = window.HTBAH.ladeSpielleiterZustand();
+      return Array.isArray(sl && sl.gruppen) ? sl.gruppen : [];
+    },
+    gruppenAuswahlDeaktiviert() {
+      return this.spielleiterGruppen.length <= 1;
+    },
     geschaetzteSpeicherGroesseKb() {
       try {
         let n = 0;
@@ -241,8 +263,27 @@ window.HTBAH_SEITEN.Weltenbau = {
     },
   },
   methods: {
+    onWeltenbauMapModalSchliessen() {
+      this.weltenbauMapModalOffen = false;
+    },
     persist() {
-      window.HTBAH.speichereWeltenbauZustand(this.zustand);
+      const aktuell = window.HTBAH.ladeWeltenbauZustand();
+      window.HTBAH.speichereWeltenbauZustand({
+        ...aktuell,
+        ...this.zustand,
+        mapLayouts:
+          this.zustand && this.zustand.mapLayouts && typeof this.zustand.mapLayouts === 'object'
+            ? this.zustand.mapLayouts
+            : aktuell.mapLayouts || {},
+        mapHintergruende:
+          this.zustand && this.zustand.mapHintergruende && typeof this.zustand.mapHintergruende === 'object'
+            ? this.zustand.mapHintergruende
+            : aktuell.mapHintergruende || {},
+        mapEinstellungen:
+          this.zustand && this.zustand.mapEinstellungen && typeof this.zustand.mapEinstellungen === 'object'
+            ? this.zustand.mapEinstellungen
+            : aktuell.mapEinstellungen || {},
+      });
     },
     zeigeStatus(text, typ = 'success') {
       window.HTBAH.ui.notify({ text, typ, dauerMs: 7200 });
@@ -260,7 +301,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       });
       this.zustand = {
         ...this.zustand,
-        version: 2,
+        version: 4,
         generatorUrls: neu,
       };
       this.persist();
@@ -276,7 +317,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       });
       this.zustand = {
         ...this.zustand,
-        version: 2,
+        version: 4,
         generatorAufrufe: neu,
       };
       this.persist();
@@ -567,7 +608,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       };
       this.zustand = {
         ...this.zustand,
-        version: 2,
+        version: 4,
         eintraege: [...this.zustand.eintraege, neu],
       };
       try {
@@ -708,6 +749,10 @@ window.HTBAH_SEITEN.Weltenbau = {
   },
   template: `
     <div class="container content py-3">
+      <weltenbau-uebersicht-modal
+        :offen="weltenbauMapModalOffen"
+        :gruppe-id="ausgewaehlteGruppeId"
+        @schliessen="onWeltenbauMapModalSchliessen" />
       <weltenbau-bild-import-modal
         ref="weltenbauImportModal"
         @fertig="onWeltenbauBildImportFertig"
@@ -721,6 +766,34 @@ window.HTBAH_SEITEN.Weltenbau = {
       <p class="small text-body-secondary text-center mb-3">
         Externe Generatoren (u. a. Karten, Gebäude, Dungeons) mit Export als PNG/JSON.
       </p>
+
+      <div class="card p-3 mb-3">
+        <div class="row">
+          <div class="col-12">
+            <p class="small text-body-secondary mb-3">
+              Im interaktiven Weltenbau-Übersichts-Modal siehst du alle NPCs, Orte, Fraktionen, Bestien usw.<br>
+              Dafür musst du zuerst eine Gruppe von Spielenden auswählen.
+            </p>
+          </div>          
+        </div>
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-md-8">
+            <label class="form-label small text-secondary mb-1" for="weltenbau-gruppe-select">Gruppe</label>
+            <select
+              id="weltenbau-gruppe-select"
+              class="form-select"
+              v-model="ausgewaehlteGruppeId"
+              :disabled="gruppenAuswahlDeaktiviert">
+              <option v-for="g in spielleiterGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4 d-grid">
+            <button type="button" class="btn btn-primary" :disabled="!ausgewaehlteGruppeId" @click="weltenbauMapModalOffen = true">
+              Interaktive Übersicht öffnen
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div class="card p-3 mb-3">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">

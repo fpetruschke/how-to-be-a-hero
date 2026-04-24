@@ -135,11 +135,36 @@ window.HTBAH = window.HTBAH || {};
     return `<p><strong>${n}</strong> (${kl}) lebt typischerweise in oder nahe: ${lr}.</p><p>Verhalten und Jagdweise können je nach Beute, Jahreszeit und Nahrungsdruck stark variieren.</p>`;
   }
 
+  function aufenthaltsortAusOrteListe(orteNamen) {
+    if (!Array.isArray(orteNamen) || !orteNamen.length) {
+      return '';
+    }
+    const namen = orteNamen
+      .map((n) => (typeof n === 'string' ? n.trim() : ''))
+      .filter(Boolean);
+    if (!namen.length) {
+      return '';
+    }
+    return U.zufaellig(namen);
+  }
+
+  function begabungswerteVerteilen() {
+    // Regelwerk: 400 Fähigkeitspunkte gesamt -> max. Begabungswert pro Gruppe 40.
+    const gesamt = 40;
+    const handeln = U.zufallsInt(10, 24);
+    const wissen = U.zufallsInt(2, 12);
+    let soziales = gesamt - handeln - wissen;
+    if (soziales < 0) {
+      soziales = 0;
+    }
+    return { handeln, wissen, soziales };
+  }
+
   window.HTBAH.ZufallsgeneratorBestienModul = {
     EPOCHE: E,
     KATEGORIEN: KAT,
     /**
-     * @param {{ epoche?: string }} opts
+     * @param {{ epoche?: string, orteNamen?: string[] }} opts
      */
     generiere(opts) {
       const epoche = (opts && opts.epoche) || E.MITTELALTER;
@@ -151,6 +176,7 @@ window.HTBAH = window.HTBAH || {};
       const staerke = optionalText('STAERKEN', 0.72);
       const schwaeche = optionalText('SCHWAECHEN', 0.72);
       const aggressivitaetSkala = aggressivitaetFuer(kategorie);
+      const begabung = begabungswerteVerteilen();
       const lebensraum = lebensraumFuer(epoche);
       const katLabels = {
         [KAT.NORM]: 'normales Tier',
@@ -173,6 +199,11 @@ window.HTBAH = window.HTBAH || {};
         staerke,
         schwaeche,
         aggressivitaetSkala,
+        handeln: begabung.handeln,
+        wissen: begabung.wissen,
+        soziales: begabung.soziales,
+        aufenthaltsort: aufenthaltsortAusOrteListe(opts && opts.orteNamen),
+        fraktionen: [],
         beschreibungHtml,
       };
     },

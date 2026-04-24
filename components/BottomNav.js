@@ -1,5 +1,18 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
+/** Aufgelöste URL für dynamisches import() (Bare Specifier wie "assets/…" sind im Browser ungültig). */
+function htbahAssetUrl(relMitPunktSlash) {
+  try {
+    return new URL(relMitPunktSlash, document.baseURI || window.location.href).href;
+  } catch {
+    return relMitPunktSlash;
+  }
+}
+
+const HTBAH_DICE_BOX_MODULE_URL = htbahAssetUrl('./assets/js/dice-box.es.min.js');
+const HTBAH_DICE_INIT_TIMEOUT_MS = 7000;
+const HTBAH_APP_ORIGIN = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
+
 function htbahBegegnungStripHtmlText(html) {
   const div = document.createElement('div');
   div.innerHTML = typeof html === 'string' ? html : '';
@@ -12,6 +25,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     return {
       wuerfelModus: 'w10',
       anzahlW10: 1,
+      anzahlW100: 1,
       ergebnisse: [],
       wuerfelModalTab: 'wuerfel',
       atmosphaereFormularOffen: false,
@@ -19,18 +33,35 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       badgePos: null,
       _badgeDrag: null,
       begegnungZiehung: null,
+      diceBox: null,
+      diceReady: false,
+      dice3dAktiv: true,
+      diceInitPromise: null,
+      diceModulLadenPromise: null,
+      diceFehler: '',
+      diceThemeColor: '#509b4a',
+      ...(() => {
+        const p = window.HTBAH.ladeWuerfelAudioProfil();
+        return {
+          wuerfelAudioStumm: p.stumm,
+          wuerfelAudioLautstaerke: p.lautstaerke,
+        };
+      })(),
+      wuerfelBeutelOffen: false,
+      wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
     };
   },
   created() {
     this.atmosphaere = window.HTBAH.ladeAtmosphaereZustand();
     this.badgePos = window.HTBAH.ladeAtmosphaereBadgePosition();
+    this.ladeWuerfelBeutelFenster();
   },
   computed: {
     ergebnisSumme() {
       return this.ergebnisse.reduce((summe, wert) => summe + wert, 0);
     },
     ergebnisTitel() {
-      return this.wuerfelModus === 'w10' ? 'W10 Ergebnisse' : 'W100 Ergebnis';
+      return this.wuerfelModus === 'w10' ? 'W10 Ergebnisse' : 'W100 Ergebnisse';
     },
     rolle() {
       void this.$route.fullPath;
@@ -168,6 +199,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const { npcs, bestien, pantheon } = this.begegnungListenAusSpeicher;
       return npcs.length > 0 || bestien.length > 0 || pantheon.length > 0;
     },
+    wuerfelBeutelFensterStil() {
+      return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this.wuerfelBeutelFenster);
+    },
+    wuerfelAudioLautProzent() {
+      return Math.round(Math.min(1, Math.max(0, Number(this.wuerfelAudioLautstaerke) || 0)) * 100);
+    },
   },
   watch: {
     zeigeNav() {
@@ -181,16 +218,211 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.wuerfelModalTab = 'wuerfel';
       }
     },
+    wuerfelModalTab(neu) {
+      if (neu === 'wuerfel' && this.dice3dAktiv) {
+        this.$nextTick(() => {
+          this.stelleDiceBoxBereit();
+        });
+      }
+    },
+    dice3dAktiv(neu) {
+      this.speichereDiceFarbwahl();
+      if (neu) {
+        this.$nextTick(() => {
+          this.stelleDiceBoxBereit();
+        });
+      } else {
+        this.diceFehler = '';
+        if (this.diceBox && typeof this.diceBox.clear === 'function') {
+          this.diceBox.clear();
+        }
+      }
+    },
+    diceThemeColor() {
+      this.speichereDiceFarbwahl();
+      this.aktualisiereDiceTheme();
+    },
+    wuerfelBeutelOffen(neu) {
+      if (neu) {
+        window.addEventListener('resize', this.wuerfelBeutelBeiViewportResize);
+      } else {
+        window.removeEventListener('resize', this.wuerfelBeutelBeiViewportResize);
+        this.wuerfelBeutelBeendeZiehen();
+        this.wuerfelBeutelBeendeResize();
+      }
+    },
   },
   mounted() {
     this._navReserveObserver = null;
     this.$nextTick(() => this.bindNavReserveObserver());
+    this.ladeDiceFarbwahl();
   },
   beforeUnmount() {
     this.unbindNavReserveObserver();
     document.documentElement.style.removeProperty('--htbah-bottom-nav-reserve');
+    document.documentElement.style.removeProperty('--htbah-top-nav-reserve');
+    this.diceBox = null;
+    this.diceReady = false;
+    this.diceInitPromise = null;
+    this.diceModulLadenPromise = null;
+    window.removeEventListener('resize', this.wuerfelBeutelBeiViewportResize);
+    this.speichereWuerfelBeutelFenster();
+    this.wuerfelBeutelBeendeZiehen();
+    this.wuerfelBeutelBeendeResize();
   },
   methods: {
+    warte(ms) {
+      return new Promise((resolve) => {
+        window.setTimeout(resolve, ms);
+      });
+    },
+    ladeDiceFarbwahl() {
+      try {
+        const key = window.HTBAH?.speicherKeys?.diceColors || 'htbah_dice_colors';
+        const raw = window.HTBAH?.speicher?.leseText(key, null);
+        if (!raw) {
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          if (typeof parsed.enabled === 'boolean') {
+            this.dice3dAktiv = parsed.enabled;
+          }
+          const theme = typeof parsed.theme === 'string' ? parsed.theme.trim() : '';
+          if (/^#[0-9a-fA-F]{6}$/.test(theme)) {
+            this.diceThemeColor = theme;
+          }
+        }
+      } catch {
+        // Optional: Farbwahl aus LocalStorage ist defekt.
+      }
+    },
+    speichereDiceFarbwahl() {
+      try {
+        const key = window.HTBAH?.speicherKeys?.diceColors || 'htbah_dice_colors';
+        window.HTBAH?.speicher?.schreibeText(
+          key,
+          JSON.stringify({
+            enabled: this.dice3dAktiv,
+            theme: this.diceThemeColor,
+          }),
+        );
+      } catch {
+        // Optional: Speicher evtl. gesperrt.
+      }
+    },
+    async ladeDiceBoxKlasse() {
+      if (window.HTBAH_DICE_BOX_KLASSE) {
+        return window.HTBAH_DICE_BOX_KLASSE;
+      }
+      if (!this.diceModulLadenPromise) {
+        this.diceModulLadenPromise = import(HTBAH_DICE_BOX_MODULE_URL)
+          .then((mod) => {
+            const DiceBox = mod && mod.default ? mod.default : null;
+            if (!DiceBox) {
+              throw new Error('DiceBox-Klasse konnte nicht geladen werden.');
+            }
+            window.HTBAH_DICE_BOX_KLASSE = DiceBox;
+            return DiceBox;
+          })
+          .catch((err) => {
+            this.diceModulLadenPromise = null;
+            throw err;
+          });
+      }
+      return this.diceModulLadenPromise;
+    },
+    async stelleDiceBoxBereit() {
+      if (!this.dice3dAktiv) {
+        return null;
+      }
+      if (this.diceReady && this.diceBox) {
+        return this.diceBox;
+      }
+      if (this.diceInitPromise) {
+        return this.diceInitPromise;
+      }
+      const zielElement = this.$refs.diceBoxElement;
+      if (!zielElement) {
+        return null;
+      }
+      this.diceInitPromise = this.ladeDiceBoxKlasse()
+        .then(async (DiceBox) => {
+          this.diceFehler = '';
+          // DiceBox erwartet einen Selector-String; Element-Refs koennen fehlschlagen.
+          const box = new DiceBox('#htbah-dice-box', {
+            // Relativ zu origin (DiceBox: fetch = origin + assetPath)
+            assetPath: 'assets/dice-box/assets/',
+            origin: HTBAH_APP_ORIGIN,
+            theme: 'default',
+            themeColor: this.diceThemeColor,
+            offscreen: true,
+            scale: 16,
+          });
+          await box.init();
+          // Wichtig: Klassen mit JS-Privatfeldern duerfen nicht durch Vue-Proxies laufen.
+          this.diceBox = Vue.markRaw(box);
+          this.diceReady = true;
+          this.aktualisiereDiceTheme();
+          return this.diceBox;
+        })
+        .catch((err) => {
+          this.diceReady = false;
+          this.diceBox = null;
+          const meldung =
+            err && typeof err.message === 'string' && err.message.trim()
+              ? err.message.trim()
+              : 'Unbekannter Initialisierungsfehler';
+          this.diceFehler = `3D-Würfel konnten nicht geladen werden (${meldung}). Standard-Wurf bleibt aktiv.`;
+          console.error('[HTBAH] Dice init fehlgeschlagen:', err);
+          return null;
+        })
+        .finally(() => {
+          this.diceInitPromise = null;
+        });
+      return this.diceInitPromise;
+    },
+    aktualisiereDiceTheme() {
+      if (!this.diceReady || !this.diceBox || typeof this.diceBox.updateConfig !== 'function') {
+        return;
+      }
+      this.diceBox.updateConfig({
+        themeColor: this.diceThemeColor,
+      });
+    },
+    baueDiceNotation() {
+      if (this.wuerfelModus === 'w100') {
+        const anzahl100 = Math.max(1, Math.min(50, Number(this.anzahlW100) || 1));
+        this.anzahlW100 = anzahl100;
+        return `${anzahl100}d100`;
+      }
+      const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
+      this.anzahlW10 = anzahl10;
+      return `${anzahl10}d10`;
+    },
+    ergebnisseAusDiceRoll(rollWert) {
+      if (!Array.isArray(rollWert)) {
+        return [];
+      }
+      const out = [];
+      rollWert.forEach((eintrag) => {
+        if (eintrag == null) {
+          return;
+        }
+        if (typeof eintrag === 'number') {
+          out.push(eintrag);
+          return;
+        }
+        if (typeof eintrag.value === 'number') {
+          out.push(eintrag.value);
+          return;
+        }
+        if (typeof eintrag.result === 'number') {
+          out.push(eintrag.result);
+        }
+      });
+      return out;
+    },
     bindNavReserveObserver() {
       this.unbindNavReserveObserver();
       const el = this.$refs.navbarFixedEl;
@@ -213,13 +445,21 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     syncBottomNavReserve() {
       const el = this.$refs.navbarFixedEl;
       const root = document.documentElement;
+      const istDesktop = window.matchMedia('(min-width: 992px)').matches;
       if (!el) {
         root.style.setProperty('--htbah-bottom-nav-reserve', '0px');
+        root.style.setProperty('--htbah-top-nav-reserve', '0px');
         return;
       }
       const h = el.getBoundingClientRect().height;
       const px = Math.max(1, Math.ceil(h));
+      if (istDesktop) {
+        root.style.setProperty('--htbah-bottom-nav-reserve', '0px');
+        root.style.setProperty('--htbah-top-nav-reserve', `${px}px`);
+        return;
+      }
       root.style.setProperty('--htbah-bottom-nav-reserve', `${px}px`);
+      root.style.setProperty('--htbah-top-nav-reserve', '0px');
     },
     regelwerkOeffnen() {
       this.uiZustand.regelwerkOffen = true;
@@ -365,17 +605,229 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     atmosphaereToggleFormular() {
       this.atmosphaereFormularOffen = !this.atmosphaereFormularOffen;
     },
+    ladeWuerfelBeutelFenster() {
+      try {
+        const key = window.HTBAH?.speicherKeys?.wuerfelBeutelFenster || 'htbah_wuerfel_beutel_fenster';
+        const o = window.HTBAH?.speicher?.leseJson(key, null);
+        if (!o || typeof o !== 'object') {
+          return;
+        }
+        const f = this.wuerfelBeutelFenster;
+        const br = Number(o.breite);
+        const ho = Number(o.hoehe);
+        if (Number.isFinite(br) && Number.isFinite(ho) && br > 0 && ho > 0) {
+          const g = window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(br, ho, 300, 260);
+          f.breite = g.breite;
+          f.hoehe = g.hoehe;
+        }
+        const px = Number(o.positionX);
+        const py = Number(o.positionY);
+        if (Number.isFinite(px) && Number.isFinite(py) && f.breite != null && f.hoehe != null) {
+          const p = window.HTBAH_MODAL_FENSTER.utils.begrenzePosition(px, py, f.breite, f.hoehe);
+          f.positionX = p.x;
+          f.positionY = p.y;
+        }
+      } catch {
+        /* Optional: defekter LocalStorage-Eintrag */
+      }
+    },
+    speichereWuerfelBeutelFenster() {
+      try {
+        const f = this.wuerfelBeutelFenster;
+        if (
+          f.breite == null ||
+          f.hoehe == null ||
+          f.positionX == null ||
+          f.positionY == null
+        ) {
+          return;
+        }
+        const key = window.HTBAH?.speicherKeys?.wuerfelBeutelFenster || 'htbah_wuerfel_beutel_fenster';
+        window.HTBAH?.speicher?.schreibeJson(key, {
+          breite: Math.round(f.breite),
+          hoehe: Math.round(f.hoehe),
+          positionX: Math.round(f.positionX),
+          positionY: Math.round(f.positionY),
+        });
+      } catch {
+        /* Optional: Speicher gesperrt */
+      }
+    },
     wuerfelModalOeffnen(tab) {
       const zielTab =
         tab === 'atmosphaere' || tab === 'begegnung' || tab === 'wuerfel' ? tab : 'wuerfel';
       const gmTab = zielTab === 'atmosphaere' || zielTab === 'begegnung';
       this.wuerfelModalTab = !this.istSpielleitung && gmTab ? 'wuerfel' : zielTab;
-      const modalElement = this.$refs.wuerfelModalElement;
-      if (!modalElement) {
+      this.wuerfelBeutelOffen = true;
+      this.$nextTick(() => {
+        this.wuerfelBeutelInitialisierePosition();
+        if (this.wuerfelModalTab === 'wuerfel') {
+          this.stelleDiceBoxBereit();
+        }
+      });
+    },
+    wuerfelBeutelSchliessen() {
+      this.speichereWuerfelBeutelFenster();
+      this.wuerfelBeutelOffen = false;
+    },
+    wuerfelBeutelErmittleViewport() {
+      return window.HTBAH_MODAL_FENSTER.utils.ermittleViewportGroesse();
+    },
+    wuerfelBeutelBegrenzeGroesse(breite, hoehe) {
+      return window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(breite, hoehe, 300, 260);
+    },
+    wuerfelBeutelInitialisierePosition() {
+      const fenster = this.$refs.wuerfelBeutelFensterRef;
+      if (!fenster) {
         return;
       }
-      const modal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
-      modal.show();
+      if (this.wuerfelBeutelFenster.breite == null || this.wuerfelBeutelFenster.hoehe == null) {
+        const groesse = this.wuerfelBeutelBegrenzeGroesse(fenster.offsetWidth, fenster.offsetHeight);
+        this.wuerfelBeutelFenster.breite = groesse.breite;
+        this.wuerfelBeutelFenster.hoehe = groesse.hoehe;
+      } else {
+        const groesse = this.wuerfelBeutelBegrenzeGroesse(
+          this.wuerfelBeutelFenster.breite,
+          this.wuerfelBeutelFenster.hoehe,
+        );
+        this.wuerfelBeutelFenster.breite = groesse.breite;
+        this.wuerfelBeutelFenster.hoehe = groesse.hoehe;
+      }
+      if (this.wuerfelBeutelFenster.positionX == null || this.wuerfelBeutelFenster.positionY == null) {
+        const v = this.wuerfelBeutelErmittleViewport();
+        this.wuerfelBeutelFenster.positionX = Math.max(
+          0,
+          Math.round((v.viewportBreite - this.wuerfelBeutelFenster.breite) / 2),
+        );
+        this.wuerfelBeutelFenster.positionY = Math.max(
+          0,
+          Math.round((v.viewportHoehe - this.wuerfelBeutelFenster.hoehe) / 2),
+        );
+      }
+      this.wuerfelBeutelStelleSichtbar();
+    },
+    wuerfelBeutelStelleSichtbar() {
+      if (this.wuerfelBeutelFenster.istVollbild) {
+        return;
+      }
+      if (this.wuerfelBeutelFenster.breite == null || this.wuerfelBeutelFenster.hoehe == null) {
+        return;
+      }
+      const groesse = this.wuerfelBeutelBegrenzeGroesse(
+        this.wuerfelBeutelFenster.breite,
+        this.wuerfelBeutelFenster.hoehe,
+      );
+      this.wuerfelBeutelFenster.breite = groesse.breite;
+      this.wuerfelBeutelFenster.hoehe = groesse.hoehe;
+      const v = this.wuerfelBeutelErmittleViewport();
+      const maxX = Math.max(0, v.viewportBreite - this.wuerfelBeutelFenster.breite);
+      const maxY = Math.max(0, v.viewportHoehe - this.wuerfelBeutelFenster.hoehe);
+      this.wuerfelBeutelFenster.positionX = Math.min(
+        Math.max(0, this.wuerfelBeutelFenster.positionX || 0),
+        maxX,
+      );
+      this.wuerfelBeutelFenster.positionY = Math.min(
+        Math.max(0, this.wuerfelBeutelFenster.positionY || 0),
+        maxY,
+      );
+    },
+    wuerfelBeutelBeiViewportResize() {
+      this.wuerfelBeutelStelleSichtbar();
+      if (this.wuerfelBeutelOffen) {
+        this.speichereWuerfelBeutelFenster();
+      }
+    },
+    wuerfelBeutelStarteZiehen(event) {
+      if (this.wuerfelBeutelFenster.istVollbild || event.target.closest('button, a, input, textarea, select')) {
+        return;
+      }
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+      const fenster = this.$refs.wuerfelBeutelFensterRef;
+      if (!fenster) {
+        return;
+      }
+      const rect = fenster.getBoundingClientRect();
+      this.wuerfelBeutelFenster.ziehenAktiv = true;
+      this.wuerfelBeutelFenster.ziehOffsetX = event.clientX - rect.left;
+      this.wuerfelBeutelFenster.ziehOffsetY = event.clientY - rect.top;
+      window.addEventListener('pointermove', this.wuerfelBeutelBeimZiehen);
+      window.addEventListener('pointerup', this.wuerfelBeutelBeendeZiehen);
+      window.addEventListener('pointercancel', this.wuerfelBeutelBeendeZiehen);
+      event.preventDefault();
+    },
+    wuerfelBeutelBeimZiehen(event) {
+      if (!this.wuerfelBeutelFenster.ziehenAktiv || this.wuerfelBeutelFenster.istVollbild) {
+        return;
+      }
+      const fenster = this.$refs.wuerfelBeutelFensterRef;
+      if (!fenster) {
+        return;
+      }
+      const maxX = Math.max(0, window.innerWidth - fenster.offsetWidth);
+      const maxY = Math.max(0, window.innerHeight - fenster.offsetHeight);
+      this.wuerfelBeutelFenster.positionX = Math.min(
+        Math.max(0, event.clientX - this.wuerfelBeutelFenster.ziehOffsetX),
+        maxX,
+      );
+      this.wuerfelBeutelFenster.positionY = Math.min(
+        Math.max(0, event.clientY - this.wuerfelBeutelFenster.ziehOffsetY),
+        maxY,
+      );
+    },
+    wuerfelBeutelBeendeZiehen() {
+      this.wuerfelBeutelFenster.ziehenAktiv = false;
+      window.removeEventListener('pointermove', this.wuerfelBeutelBeimZiehen);
+      window.removeEventListener('pointerup', this.wuerfelBeutelBeendeZiehen);
+      window.removeEventListener('pointercancel', this.wuerfelBeutelBeendeZiehen);
+      if (this.wuerfelBeutelOffen) {
+        this.speichereWuerfelBeutelFenster();
+      }
+    },
+    wuerfelBeutelStarteResize(event) {
+      if (this.wuerfelBeutelFenster.istVollbild) {
+        return;
+      }
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+      const fenster = this.$refs.wuerfelBeutelFensterRef;
+      if (!fenster) {
+        return;
+      }
+      this.wuerfelBeutelFenster.resizeAktiv = true;
+      this.wuerfelBeutelFenster.resizeStartX = event.clientX;
+      this.wuerfelBeutelFenster.resizeStartY = event.clientY;
+      this.wuerfelBeutelFenster.resizeStartBreite =
+        this.wuerfelBeutelFenster.breite != null ? this.wuerfelBeutelFenster.breite : fenster.offsetWidth;
+      this.wuerfelBeutelFenster.resizeStartHoehe =
+        this.wuerfelBeutelFenster.hoehe != null ? this.wuerfelBeutelFenster.hoehe : fenster.offsetHeight;
+      window.addEventListener('pointermove', this.wuerfelBeutelBeimResize);
+      window.addEventListener('pointerup', this.wuerfelBeutelBeendeResize);
+      window.addEventListener('pointercancel', this.wuerfelBeutelBeendeResize);
+      event.preventDefault();
+    },
+    wuerfelBeutelBeimResize(event) {
+      if (!this.wuerfelBeutelFenster.resizeAktiv || this.wuerfelBeutelFenster.istVollbild) {
+        return;
+      }
+      const groesse = this.wuerfelBeutelBegrenzeGroesse(
+        this.wuerfelBeutelFenster.resizeStartBreite + (event.clientX - this.wuerfelBeutelFenster.resizeStartX),
+        this.wuerfelBeutelFenster.resizeStartHoehe + (event.clientY - this.wuerfelBeutelFenster.resizeStartY),
+      );
+      this.wuerfelBeutelFenster.breite = groesse.breite;
+      this.wuerfelBeutelFenster.hoehe = groesse.hoehe;
+      this.wuerfelBeutelStelleSichtbar();
+    },
+    wuerfelBeutelBeendeResize() {
+      this.wuerfelBeutelFenster.resizeAktiv = false;
+      window.removeEventListener('pointermove', this.wuerfelBeutelBeimResize);
+      window.removeEventListener('pointerup', this.wuerfelBeutelBeendeResize);
+      window.removeEventListener('pointercancel', this.wuerfelBeutelBeendeResize);
+      if (this.wuerfelBeutelOffen) {
+        this.speichereWuerfelBeutelFenster();
+      }
     },
     atmosphaereBadgeOeffnen() {
       this.wuerfelModalOeffnen('atmosphaere');
@@ -450,14 +902,72 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.wuerfelModus = modus === 'w100' ? 'w100' : 'w10';
       this.ergebnisse = [];
     },
-    wuerfeln() {
-      if (this.wuerfelModus === 'w100') {
-        this.ergebnisse = [window.HTBAH.wuerfelW100()];
+    wuerfelAudioPersistiere() {
+      window.HTBAH.setzeWuerfelAudioProfil({
+        stumm: this.wuerfelAudioStumm,
+        lautstaerke: this.wuerfelAudioLautstaerke,
+      });
+    },
+    wuerfelAudioStummToggle() {
+      this.wuerfelAudioStumm = !this.wuerfelAudioStumm;
+      this.wuerfelAudioPersistiere();
+    },
+    wuerfelAudioSetzeLautstaerkeProzent(istRoh) {
+      const n = Math.max(0, Math.min(100, Math.round(Number(istRoh) || 0)));
+      this.wuerfelAudioLautstaerke = n / 100;
+      this.wuerfelAudioPersistiere();
+    },
+    async wuerfeln() {
+      const notation = this.baueDiceNotation();
+      const wuerfelAnzahl =
+        this.wuerfelModus === 'w100'
+          ? Math.max(1, Math.min(50, Number(this.anzahlW100) || 1))
+          : Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
+      if (!this.dice3dAktiv) {
+        this.diceFehler = '';
+        if (this.wuerfelModus === 'w100') {
+          const anzahl100 = Math.max(1, Math.min(50, Number(this.anzahlW100) || 1));
+          this.anzahlW100 = anzahl100;
+          this.ergebnisse = Array.from({ length: anzahl100 }, () => window.HTBAH.wuerfelW100());
+        } else {
+          const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
+          this.anzahlW10 = anzahl10;
+          this.ergebnisse = Array.from({ length: anzahl10 }, () => window.HTBAH.wuerfelW10());
+        }
+        window.HTBAH.spieleWuerfelSounds(this.ergebnisse.length);
         return;
       }
-      const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
-      this.anzahlW10 = anzahl10;
-      this.ergebnisse = Array.from({ length: anzahl10 }, () => window.HTBAH.wuerfelW10());
+      window.HTBAH.spieleWuerfelSounds(wuerfelAnzahl);
+      const box = await Promise.race([
+        this.stelleDiceBoxBereit(),
+        this.warte(HTBAH_DICE_INIT_TIMEOUT_MS).then(() => '__timeout__'),
+      ]);
+      if (box === '__timeout__') {
+        this.diceFehler = '3D-Würfel initialisieren zu langsam. Standard-Wurf bleibt aktiv.';
+      }
+      if (box && this.diceReady && typeof box.roll === 'function') {
+        try {
+          const rolled = await box.roll(notation, {
+            themeColor: this.diceThemeColor,
+          });
+          const extrahiert = this.ergebnisseAusDiceRoll(rolled);
+          if (extrahiert.length > 0) {
+            this.ergebnisse = extrahiert;
+            return;
+          }
+        } catch {
+          // Fallback unten bleibt aktiv.
+        }
+      }
+      if (this.wuerfelModus === 'w100') {
+        const anzahl100 = Math.max(1, Math.min(50, Number(this.anzahlW100) || 1));
+        this.anzahlW100 = anzahl100;
+        this.ergebnisse = Array.from({ length: anzahl100 }, () => window.HTBAH.wuerfelW100());
+      } else {
+        const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
+        this.anzahlW10 = anzahl10;
+        this.ergebnisse = Array.from({ length: anzahl10 }, () => window.HTBAH.wuerfelW10());
+      }
     },
     begegnungMediumIstBild(medium) {
       if (!medium || typeof medium !== 'object') {
@@ -598,64 +1108,146 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       <div
         v-if="zeigeNav"
         ref="navbarFixedEl"
-        class="navbar-fixed d-flex flex-nowrap align-items-stretch w-100 px-2 py-2 htbah-bottom-nav-inner">
-        <template v-if="rolle === 'charakter'">
-          <router-link
-            to="/"
-            title="App-Startseite (Rollenwahl)"
-            :class="{ 'router-link-active': startseiteLandingAktiv }">
-            🏠
+        class="navbar-fixed">
+        <div class="htbah-top-nav-desktop d-none d-lg-flex align-items-center">
+          <router-link to="/" title="Startseite" class="htbah-top-nav-logo">
+            <img src="assets/img/htbah-begleit-app-logo.png" alt="How To Be A Hero Begleit-App" />
           </router-link>
+          <div class="htbah-top-nav-menu d-flex align-items-center gap-1">
+            <router-link
+              to="/"
+              title="App-Startseite (Rollenwahl)"
+              class="htbah-nav-item"
+              :class="{ 'router-link-active': startseiteLandingAktiv }">
+              <span class="htbah-nav-item-emoji" aria-hidden="true">🏠</span>
+              <span class="htbah-nav-item-label">Start</span>
+            </router-link>
+            <template v-if="rolle === 'charakter'">
+              <router-link
+                :to="charakterLink"
+                title="Charakter"
+                class="htbah-nav-item"
+                :class="{ 'router-link-active': charakterAktiv }">
+                <span class="htbah-nav-item-emoji" aria-hidden="true">🧙</span>
+                <span class="htbah-nav-item-label">Charakter</span>
+              </router-link>
+            </template>
+            <template v-else-if="rolle === 'spielleitung'">
+              <router-link
+                to="/spielleiter"
+                title="Gruppen"
+                class="htbah-nav-item"
+                :class="{ 'router-link-active': spielleiterGruppenAktiv }">
+                <span class="htbah-nav-item-emoji" aria-hidden="true">👥</span>
+                <span class="htbah-nav-item-label">Gruppen</span>
+              </router-link>
+              <router-link
+                to="/faehigkeiten-presets"
+                title="Fähigkeiten-Presets"
+                class="htbah-nav-item"
+                :class="{ 'router-link-active': presetVerwaltungAktiv }">
+                <span class="htbah-nav-item-emoji" aria-hidden="true">📦</span>
+                <span class="htbah-nav-item-label">Presets</span>
+              </router-link>
+              <router-link
+                to="/zufallstabellen"
+                title="Zufallstabellen"
+                class="htbah-nav-item"
+                :class="{ 'router-link-active': zufallstabellenAktiv }">
+                <span class="htbah-nav-item-emoji" aria-hidden="true">📚</span>
+                <span class="htbah-nav-item-label">Zufallstabellen</span>
+              </router-link>
+              <router-link
+                to="/weltenbau"
+                title="Weltenbau"
+                class="htbah-nav-item"
+                :class="{ 'router-link-active': weltenbauAktiv }">
+                <span class="htbah-nav-item-emoji" aria-hidden="true">🗺️</span>
+                <span class="htbah-nav-item-label">Weltenbau</span>
+              </router-link>
+              <button type="button" title="Abenteuerbuch" class="htbah-nav-item" @click="abenteuerbuchOeffnen">
+                <span class="htbah-nav-item-emoji" aria-hidden="true">📔</span>
+                <span class="htbah-nav-item-label">Abenteuerbuch</span>
+              </button>
+            </template>
+            <button type="button" title="Regelwerk" class="htbah-nav-item" @click="regelwerkOeffnen">
+              <span class="htbah-nav-item-emoji" aria-hidden="true">📜</span>
+              <span class="htbah-nav-item-label">Regelwerk</span>
+            </button>
+            <button type="button" title="Würfel" class="htbah-nav-item" @click="wuerfelModalOeffnen('wuerfel')">
+              <span class="htbah-nav-item-emoji" aria-hidden="true">🎲</span>
+              <span class="htbah-nav-item-label">Würfel</span>
+            </button>
+            <router-link
+              to="/einstellungen"
+              title="Einstellungen"
+              class="htbah-nav-item"
+              :class="{ 'router-link-active': einstellungenAktiv }">
+              <span class="htbah-nav-item-emoji" aria-hidden="true">⚙️</span>
+              <span class="htbah-nav-item-label">Einstellungen</span>
+            </router-link>
+          </div>
+        </div>
+
+        <div class="htbah-bottom-nav-inner d-flex d-lg-none flex-nowrap align-items-stretch w-100 px-2 py-2">
+          <template v-if="rolle === 'charakter'">
+            <router-link
+              to="/"
+              title="App-Startseite (Rollenwahl)"
+              :class="{ 'router-link-active': startseiteLandingAktiv }">
+              🏠
+            </router-link>
+            <router-link
+              :to="charakterLink"
+              title="Charakter"
+              :class="{ 'router-link-active': charakterAktiv }">
+              🧙
+            </router-link>
+          </template>
+          <template v-else-if="rolle === 'spielleitung'">
+            <router-link
+              to="/"
+              title="App-Startseite (Rollenwahl)"
+              :class="{ 'router-link-active': startseiteLandingAktiv }">
+              🏠
+            </router-link>
+            <router-link
+              to="/spielleiter"
+              title="Gruppen"
+              :class="{ 'router-link-active': spielleiterGruppenAktiv }">
+              👥
+            </router-link>
+            <router-link
+              to="/faehigkeiten-presets"
+              title="Fähigkeiten-Presets"
+              :class="{ 'router-link-active': presetVerwaltungAktiv }">
+              📦
+            </router-link>
+            <router-link
+              to="/zufallstabellen"
+              title="Zufallstabellen"
+              :class="{ 'router-link-active': zufallstabellenAktiv }">
+              📚
+            </router-link>
+            <router-link
+              to="/weltenbau"
+              title="Weltenbau"
+              :class="{ 'router-link-active': weltenbauAktiv }">
+              🗺️
+            </router-link>
+            <button type="button" title="Abenteuerbuch" @click="abenteuerbuchOeffnen">
+              📔
+            </button>
+          </template>
+          <button type="button" title="Regelwerk" @click="regelwerkOeffnen">📜</button>
+          <button type="button" title="Würfel" @click="wuerfelModalOeffnen('wuerfel')">🎲</button>
           <router-link
-            :to="charakterLink"
-            title="Charakter"
-            :class="{ 'router-link-active': charakterAktiv }">
-            🧙
+            to="/einstellungen"
+            title="Einstellungen"
+            :class="{ 'router-link-active': einstellungenAktiv }">
+            ⚙️
           </router-link>
-        </template>
-        <template v-else-if="rolle === 'spielleitung'">
-          <router-link
-            to="/"
-            title="App-Startseite (Rollenwahl)"
-            :class="{ 'router-link-active': startseiteLandingAktiv }">
-            🏠
-          </router-link>
-          <router-link
-            to="/spielleiter"
-            title="Gruppen"
-            :class="{ 'router-link-active': spielleiterGruppenAktiv }">
-            👥
-          </router-link>
-          <router-link
-            to="/faehigkeiten-presets"
-            title="Fähigkeiten-Presets"
-            :class="{ 'router-link-active': presetVerwaltungAktiv }">
-            📦
-          </router-link>
-          <router-link
-            to="/zufallstabellen"
-            title="Zufallstabellen"
-            :class="{ 'router-link-active': zufallstabellenAktiv }">
-            📚
-          </router-link>
-          <router-link
-            to="/weltenbau"
-            title="Weltenbau"
-            :class="{ 'router-link-active': weltenbauAktiv }">
-            🗺️
-          </router-link>
-          <button type="button" title="Spielleitungsnotizen (Abenteuerbuch)" @click="abenteuerbuchOeffnen">
-            📝
-          </button>
-        </template>
-        <button type="button" title="Regelwerk" @click="regelwerkOeffnen">📜</button>
-        <button type="button" title="Würfel" @click="wuerfelModalOeffnen('wuerfel')">🎲</button>
-        <router-link
-          to="/einstellungen"
-          title="Einstellungen"
-          :class="{ 'router-link-active': einstellungenAktiv }">
-          ⚙️
-        </router-link>
+        </div>
       </div>
     </teleport>
 
@@ -701,26 +1293,31 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
     <teleport to="body">
       <div
-        class="modal fade"
-        id="wuerfelModal"
-        ref="wuerfelModalElement"
-        tabindex="-1"
-        aria-labelledby="wuerfelModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-          <div class="modal-content shadow">
-            <div class="modal-header">
-              <h5 class="modal-title d-flex align-items-center gap-2" id="wuerfelModalLabel">
-                <span aria-hidden="true">🎲</span>
-                Würfelbeutel
-              </h5>
-              <button
-                type="button"
-                class="btn-close"
-                data-bs-dismiss="modal"
-                aria-label="Schließen"></button>
-            </div>
-            <div class="modal-body">
+        v-if="wuerfelBeutelOffen"
+        class="regelwerk-modal-layer htbah-wuerfel-beutel-layer"
+        role="presentation">
+        <div
+          ref="wuerfelBeutelFensterRef"
+          class="regelwerk-modal-window card shadow htbah-wuerfel-beutel-window"
+          :style="wuerfelBeutelFensterStil"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="wuerfelModalLabel"
+          tabindex="-1">
+          <div
+            class="regelwerk-modal-header d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
+            @pointerdown="wuerfelBeutelStarteZiehen($event)">
+            <h5 class="modal-title d-flex align-items-center gap-2 mb-0" id="wuerfelModalLabel">
+              <span aria-hidden="true">🎲</span>
+              Würfelbeutel
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              aria-label="Schließen"
+              @click="wuerfelBeutelSchliessen"></button>
+          </div>
+          <div class="flex-grow-1 min-h-0 overflow-auto px-3 py-2">
               <ul v-if="istSpielleitung" class="nav nav-tabs mb-3" role="tablist">
                 <li class="nav-item" role="presentation">
                   <button
@@ -767,6 +1364,75 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     @click="setzeWuerfelModus('w100')">
                     1x W100
                   </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary d-flex align-items-center justify-content-center gap-1"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#htbah-wuerfel-einstellungen"
+                    aria-expanded="false"
+                    aria-controls="htbah-wuerfel-einstellungen">
+                    <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+                    Einstellungen
+                  </button>
+                </div>
+                <div class="collapse mb-3" id="htbah-wuerfel-einstellungen">
+                  <div class="card border-0 bg-body-tertiary">
+                    <div class="card-body py-2">
+                      <div class="form-check form-switch mb-3">
+                        <input
+                          id="htbah-dice-3d-toggle"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          v-model="dice3dAktiv" />
+                        <label class="form-check-label" for="htbah-dice-3d-toggle">
+                          3D Würfel anzeigen
+                        </label>
+                      </div>
+                      <div class="d-flex align-items-center gap-2 flex-wrap pt-2 border-top border-secondary border-opacity-25">
+                        <span class="small text-secondary text-nowrap">Klang</span>
+                        <input
+                          type="range"
+                          class="form-range flex-grow-1 m-0 htbah-wuerfel-audio-range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          :disabled="wuerfelAudioStumm"
+                          :value="wuerfelAudioLautProzent"
+                          @input="wuerfelAudioSetzeLautstaerkeProzent($event.target.value)"
+                          :aria-valuenow="wuerfelAudioLautProzent"
+                          aria-valuemin="0"
+                          aria-valuemax="100"
+                          aria-label="Würfelklang Lautstärke" />
+                        <span class="small text-secondary tabular-nums text-nowrap" style="min-width: 2.5rem">
+                          {{ wuerfelAudioLautProzent }}%
+                        </span>
+                        <button
+                          type="button"
+                          class="btn btn-outline-secondary btn-sm px-2 py-0 flex-shrink-0"
+                          :title="wuerfelAudioStumm ? 'Ton an' : 'Stumm'"
+                          :aria-pressed="wuerfelAudioStumm ? 'true' : 'false'"
+                          :aria-label="wuerfelAudioStumm ? 'Ton einschalten' : 'Stumm schalten'"
+                          @click="wuerfelAudioStummToggle">
+                          <span
+                            class="material-symbols-outlined htbah-wuerfel-audio-mute-ico"
+                            aria-hidden="true">
+                            {{ wuerfelAudioStumm ? 'volume_off' : 'volume_up' }}
+                          </span>
+                        </button>
+                      </div>
+                      <div class="row g-2" v-if="dice3dAktiv">
+                        <div class="col-12">
+                          <label class="form-label small mb-1" for="htbah-dice-color">Würfelfarbe</label>
+                          <input
+                            id="htbah-dice-color"
+                            type="color"
+                            class="form-control form-control-color w-100 htbah-dice-color-input"
+                            v-model="diceThemeColor" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="mb-3" v-if="wuerfelModus === 'w10'">
@@ -783,7 +1449,17 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                   </div>
                 </div>
                 <div class="mb-3" v-else>
-                  <small>W100 wird immer genau einmal gewürfelt.</small>
+                  <div class="form-floating">
+                    <input
+                      id="nav-anzahl-w100"
+                      type="number"
+                      class="form-control"
+                      min="1"
+                      max="50"
+                      v-model.number="anzahlW100"
+                      placeholder=" " />
+                    <label for="nav-anzahl-w100">Anzahl W100</label>
+                  </div>
                 </div>
                 <div class="mb-3">
                   <icon-text-button
@@ -805,6 +1481,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                       Summe: {{ ergebnisSumme }}
                     </span>
                   </div>
+                  <div class="htbah-dice-box-wrap mb-2" v-show="dice3dAktiv">
+                    <div id="htbah-dice-box" ref="diceBoxElement" class="htbah-dice-box"></div>
+                  </div>
+                  <small v-if="diceFehler" class="text-warning d-block mb-2">{{ diceFehler }}</small>
                   <div class="d-flex flex-wrap gap-2" v-if="ergebnisse.length">
                     <span
                       class="wuerfel-ergebnis-chip"
@@ -1174,15 +1854,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 </template>
               </div>
             </div>
-            <div class="modal-footer">
-              <button
-                type="button"
-                class="btn btn-secondary"
-                data-bs-dismiss="modal">
+            <div class="border-top px-3 py-2 d-flex justify-content-end flex-shrink-0 bg-body-tertiary">
+              <button type="button" class="btn btn-secondary" @click="wuerfelBeutelSchliessen">
                 Schließen
               </button>
             </div>
-          </div>
+            <div class="regelwerk-modal-resize-handle" @pointerdown="wuerfelBeutelStarteResize($event)"></div>
         </div>
       </div>
     </teleport>

@@ -102,6 +102,18 @@ window.HTBAH = window.HTBAH || {};
     return U.zufaellig(namen);
   }
 
+  function begabungswerteVerteilen() {
+    // Regelwerk: 400 Fähigkeitspunkte gesamt -> max. Begabungswert pro Gruppe 40.
+    const gesamt = 40;
+    const handeln = U.zufallsInt(8, 20);
+    const wissen = U.zufallsInt(6, 18);
+    let soziales = gesamt - handeln - wissen;
+    if (soziales < 0) {
+      soziales = 0;
+    }
+    return { handeln, wissen, soziales };
+  }
+
   window.HTBAH.ZufallsgeneratorNpcModul = {
     /**
      * @param {{ epoche?: string, orteNamen?: string[], fraktionNamen?: string[], pantheonNamen?: string[] }} opts — orteNamen: Namen aus der Orte-Tabelle; fraktionNamen: Namen aus der Fraktionen-Tabelle; pantheonNamen: Gottheitsnamen aus der Pantheon-Tabelle (für Glaube, wie Fraktion zufällig wenn vorhanden).
@@ -122,6 +134,7 @@ window.HTBAH = window.HTBAH || {};
       const statur = U.zufaellig(L.STATUR);
       const lebenspunkte = lebenspunkteFuerStaturUndAlter(statur, alter);
       const schadenWaffenlos = waffenloserNahkampfSchaden(statur);
+      const begabung = begabungswerteVerteilen();
 
       const aufenthaltsort = aufenthaltsortAusOrteListe(opts.orteNamen);
       const fraktion = fraktionAusFraktionenListe(opts.fraktionNamen);
@@ -154,6 +167,9 @@ window.HTBAH = window.HTBAH || {};
         kampfart: waffe.kampfart,
         lebenspunkte,
         aufenthaltsort,
+        handeln: begabung.handeln,
+        wissen: begabung.wissen,
+        soziales: begabung.soziales,
         fraktion,
         glaube,
         notizenHtml,

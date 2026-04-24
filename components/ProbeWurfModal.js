@@ -54,6 +54,7 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
     },
     wuerfeln() {
       this.letzterWurf = window.HTBAH.wuerfelW100();
+      window.HTBAH.spieleWuerfelSounds(1);
     },
   },
   template: `

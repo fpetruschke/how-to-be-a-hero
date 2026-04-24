@@ -442,6 +442,64 @@ window.HTBAH_SEITEN.Charakter = {
           ? 'Charakter aus Auswahl übernommen. Zum Abschließen speichern.'
           : 'Charakter importiert. Zum Abschließen speichern.';
     },
+    pantheonImportDialogOeffnen() {
+      this.$refs.pantheonImportInput?.click();
+    },
+    async pantheonDateiAusgewaehlt(event) {
+      const input = event && event.target ? event.target : null;
+      const datei = input && input.files ? input.files[0] : null;
+      if (!datei) {
+        return;
+      }
+      let text = '';
+      try {
+        text = await datei.text();
+      } catch {
+        await window.HTBAH.ui.alert({
+          titel: 'Import fehlgeschlagen',
+          beschreibung: 'Die Datei konnte nicht gelesen werden.',
+        });
+        if (input) input.value = '';
+        return;
+      }
+      let roh;
+      try {
+        roh = JSON.parse(text);
+      } catch {
+        await window.HTBAH.ui.alert({
+          titel: 'Ungültige Datei',
+          beschreibung: 'Kein gültiges JSON.',
+        });
+        if (input) input.value = '';
+        return;
+      }
+      const ergebnis = window.HTBAH.pantheonImportAusPaket(roh);
+      if (!ergebnis.ok) {
+        await window.HTBAH.ui.alert({
+          titel: 'Import fehlgeschlagen',
+          beschreibung: ergebnis.fehler,
+        });
+        if (input) input.value = '';
+        return;
+      }
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Pantheon ersetzen?',
+        beschreibung:
+          'Das Pantheon wird vollständig durch die Importdatei ersetzt. Fortfahren?',
+        bestaetigenText: 'Ersetzen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!bestaetigt) {
+        if (input) input.value = '';
+        return;
+      }
+      const zustand = window.HTBAH.ladeZufallstabellenZustand();
+      zustand.pantheon = ergebnis.pantheon;
+      window.HTBAH.speichereZufallstabellenZustand(zustand);
+      this.importHinweis = 'Pantheon importiert. Die Glaube-Auswahl wurde aktualisiert.';
+      if (input) input.value = '';
+    },
     normalisiereLp(roh) {
       const n = Math.round(Number(roh));
       if (Number.isNaN(n) || n < 0) {
@@ -1029,6 +1087,20 @@ window.HTBAH_SEITEN.Charakter = {
                 <datalist v-if="pantheonGlaubeNamen.length" id="ce-char-glaube-datalist">
                   <option v-for="n in pantheonGlaubeNamen" :key="'pgl-' + n" :value="n"></option>
                 </datalist>
+                <div v-if="!spielleiterMitglied" class="d-flex justify-content-end mt-2">
+                  <input
+                    ref="pantheonImportInput"
+                    type="file"
+                    accept="application/json,.json"
+                    class="d-none"
+                    @change="pantheonDateiAusgewaehlt" />
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    @click="pantheonImportDialogOeffnen">
+                    Pantheon importieren
+                  </button>
+                </div>
               </div>
             </div>
 

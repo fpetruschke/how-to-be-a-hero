@@ -76,6 +76,29 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '🗺️',
     buttonLabel: 'Weltenbau-Bilder löschen',
   },
+  wuerfelbeutelUndAtmosphaere: {
+    keys: [
+      'htbah_dice_colors',
+      'htbah_wuerfel_beutel_fenster',
+      'htbah_atmosphaere',
+      'htbah_atmosphaere_badge_pos',
+    ],
+    titel: 'Würfelbeutel-Layout & Atmosphäre löschen?',
+    beschreibung:
+      '3D-Würfel (Aktivierung und Farbe), gespeicherte Größe und Position des Würfelbeutel-Fensters sowie die im Würfelbeutel gespeicherte Atmosphäre inklusive Badge-Position werden entfernt.',
+    erfolg: 'Würfelbeutel-Layout und Atmosphäre wurden gelöscht.',
+    buttonSymbol: '🎲',
+    buttonLabel: 'Würfelbeutel-Layout & Atmosphäre löschen',
+  },
+  wuerfelAudioLoeschen: {
+    keys: ['htbah_wuerfel_audio', 'htbah_wuerfel_sound'],
+    titel: 'Würfel-Audio löschen?',
+    beschreibung:
+      'Lautstärke und Stummschaltung im Würfelbeutel sowie die ältere Ton-Einstellung werden aus dem lokalen Speicher entfernt.',
+    erfolg: 'Würfel-Audio-Einstellungen wurden gelöscht.',
+    buttonSymbol: '🔊',
+    buttonLabel: 'Würfel-Audio löschen',
+  },
   spielleiter: {
     key: 'htbah_spielleiter_gruppen',
     titel: 'Spielleiter-Gruppen löschen?',
@@ -98,10 +121,16 @@ const SPEICHER_BEREICHE = {
       'htbah_spielleitung_abenteuerbuch',
       'htbah_weltenbau',
       'htbah_app_rolle',
+      'htbah_wuerfel_audio',
+      'htbah_wuerfel_sound',
+      'htbah_atmosphaere',
+      'htbah_atmosphaere_badge_pos',
+      'htbah_dice_colors',
+      'htbah_wuerfel_beutel_fenster',
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Gruppen, Zufallstabellen, das Abenteuerbuch der Spielleitung, unter „Weltenbau“ gespeicherte Bilder, die gewählte Rolle (Charakter/Spielleitung) und deine Theme-Auswahl entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Gruppen, Zufallstabellen, das Abenteuerbuch der Spielleitung, unter „Weltenbau“ gespeicherte Bilder, die gewählte Rolle (Charakter/Spielleitung), deine Theme-Auswahl, die Würfel-Audio-Einstellungen, die Atmosphäre im Würfelbeutel, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
@@ -148,6 +177,36 @@ const DATEN_EXPORT_BEREICHE = [
     id: 'theme',
     key: 'htbah_theme',
     label: 'Theme-Einstellung',
+  },
+  {
+    id: 'wuerfelAudio',
+    key: 'htbah_wuerfel_audio',
+    label: 'Würfelbeutel-Audio (Lautstärke, Stumm)',
+  },
+  {
+    id: 'wuerfelSoundLegacy',
+    key: 'htbah_wuerfel_sound',
+    label: 'Würfelton (ältere Einstellung, Migration)',
+  },
+  {
+    id: 'atmosphaere',
+    key: 'htbah_atmosphaere',
+    label: 'Atmosphäre (Würfelbeutel)',
+  },
+  {
+    id: 'atmosphaereBadge',
+    key: 'htbah_atmosphaere_badge_pos',
+    label: 'Atmosphären-Badge-Position',
+  },
+  {
+    id: 'diceColors',
+    key: 'htbah_dice_colors',
+    label: '3D-Würfel (Aktivierung & Farbe)',
+  },
+  {
+    id: 'wuerfelBeutelFenster',
+    key: 'htbah_wuerfel_beutel_fenster',
+    label: 'Würfelbeutel-Fenster (Größe & Position)',
   },
 ];
 
@@ -365,7 +424,6 @@ window.HTBAH_SEITEN.Einstellungen = {
         document.documentElement.setAttribute('data-theme', 'light');
         document.documentElement.setAttribute('data-bs-theme', 'light');
       }
-
       this.statusAnzeigen(bereich.erfolg, 'success');
 
       if (this.zuLoeschenderBereich === 'alles') {
@@ -574,7 +632,6 @@ window.HTBAH_SEITEN.Einstellungen = {
         window.HTBAH.setzeTheme(window.HTBAH.ladeTheme());
         this.istHellesTheme = window.HTBAH.ladeTheme() === 'light';
       }
-
       if (this.importModalInstanz) {
         this.importModalInstanz.hide();
       }
@@ -718,6 +775,20 @@ window.HTBAH_SEITEN.Einstellungen = {
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
             type="button"
+            :symbol="speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonSymbol"
+            @click="oeffneLoeschDialog('wuerfelbeutelUndAtmosphaere')">
+            {{ speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.wuerfelAudioLoeschen.buttonSymbol"
+            @click="oeffneLoeschDialog('wuerfelAudioLoeschen')">
+            {{ speicherBereiche.wuerfelAudioLoeschen.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
             :symbol="speicherBereiche.theme.buttonSymbol"
             @click="oeffneLoeschDialog('theme')">
             {{ speicherBereiche.theme.buttonLabel }}
@@ -765,6 +836,20 @@ window.HTBAH_SEITEN.Einstellungen = {
             :symbol="speicherBereiche.weltenbau.buttonSymbol"
             @click="oeffneLoeschDialog('weltenbau')">
             {{ speicherBereiche.weltenbau.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonSymbol"
+            @click="oeffneLoeschDialog('wuerfelbeutelUndAtmosphaere')">
+            {{ speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.wuerfelAudioLoeschen.buttonSymbol"
+            @click="oeffneLoeschDialog('wuerfelAudioLoeschen')">
+            {{ speicherBereiche.wuerfelAudioLoeschen.buttonLabel }}
           </icon-text-button>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"

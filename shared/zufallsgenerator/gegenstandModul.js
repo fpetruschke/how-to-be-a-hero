@@ -65,10 +65,23 @@ window.HTBAH = window.HTBAH || {};
     return 'Nahkampf';
   }
 
+  function aufenthaltsortAusOrteListe(orteNamen) {
+    if (!Array.isArray(orteNamen) || !orteNamen.length) {
+      return '';
+    }
+    const namen = orteNamen
+      .map((n) => (typeof n === 'string' ? n.trim() : ''))
+      .filter(Boolean);
+    if (!namen.length) {
+      return '';
+    }
+    return U.zufaellig(namen);
+  }
+
   window.HTBAH.ZufallsgeneratorGegenstandModul = {
     EPOCHE: E,
     /**
-     * @param {{ epoche?: string, mitKleidung?: boolean }} opts
+     * @param {{ epoche?: string, mitKleidung?: boolean, orteNamen?: string[] }} opts
      */
     generiere(opts) {
       const epoche = (opts && opts.epoche) || E.MITTELALTER;
@@ -128,6 +141,7 @@ window.HTBAH = window.HTBAH || {};
         istWaffe,
         schadenswert,
         kampfart,
+        aufenthaltsort: aufenthaltsortAusOrteListe(opts && opts.orteNamen),
       };
     },
   };

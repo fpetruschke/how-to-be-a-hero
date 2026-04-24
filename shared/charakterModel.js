@@ -74,6 +74,10 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       geschlecht: '',
       alter: null,
       lebenspunkte: 100,
+      initiative: '',
+      aufenthaltsort: '',
+      fraktion: '',
+      fraktionen: [],
       statur: '',
       glaube: '',
       beruf: '',
@@ -126,6 +130,13 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
     return {
       ...zusammengefuehrt,
       glaube: glaubeAusQuelle,
+      aufenthaltsort: typeof quelle.aufenthaltsort === 'string' ? quelle.aufenthaltsort : '',
+      fraktion: typeof quelle.fraktion === 'string' ? quelle.fraktion : '',
+      fraktionen: Array.isArray(quelle.fraktionen)
+        ? quelle.fraktionen.map((f) => (typeof f === 'string' ? f.trim() : '')).filter(Boolean)
+        : typeof quelle.fraktion === 'string' && quelle.fraktion.trim()
+          ? [quelle.fraktion.trim()]
+          : [],
       handeln: Array.isArray(quelle.handeln) ? quelle.handeln : [],
       wissen: Array.isArray(quelle.wissen) ? quelle.wissen : [],
       soziales: Array.isArray(quelle.soziales) ? quelle.soziales : [],
