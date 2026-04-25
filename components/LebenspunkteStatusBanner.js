@@ -2,10 +2,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
 window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner = {
   computed: {
+    /** Route-Abhängigkeit: Rolle kann sich beim Navigieren ändern */
+    appRolle() {
+      void this.$route.fullPath;
+      return window.HTBAH && typeof window.HTBAH.ladeAppRolle === 'function'
+        ? window.HTBAH.ladeAppRolle()
+        : '';
+    },
     status() {
       return window.HTBAH.lebenspunkteStatus;
     },
     bannerSichtbar() {
+      if (this.appRolle === 'spielleitung') {
+        return false;
+      }
       return Boolean(this.status.tot || this.status.bewusstlos);
     },
   },

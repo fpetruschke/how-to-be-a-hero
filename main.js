@@ -1760,6 +1760,10 @@ router.afterEach((to) => {
   if (to.path.startsWith('/spielleiter/gruppe/')) {
     return;
   }
+  if (to.path === '/') {
+    syncLebenspunkteStatusFromCharakter(null);
+    return;
+  }
   if (to.path.startsWith('/charakter/neu')) {
     syncLebenspunkteStatusFromCharakter(null);
     return;

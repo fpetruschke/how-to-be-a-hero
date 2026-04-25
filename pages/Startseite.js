@@ -78,6 +78,16 @@ window.HTBAH_SEITEN.Startseite = {
       }
       return '';
     },
+    charakterKartenStatusKlasse(eintrag) {
+      const status = this.charakterZustandStatus(eintrag);
+      if (status.tot) {
+        return 'htbah-start-charakterkarte--tot';
+      }
+      if (status.bewusstlos) {
+        return 'htbah-start-charakterkarte--bewusstlos';
+      }
+      return '';
+    },
     regelwerkOeffnen() {
       this.$root.uiZustand.regelwerkOffen = true;
     },
@@ -198,6 +208,7 @@ window.HTBAH_SEITEN.Startseite = {
             class="col-12 col-md-6">
             <div
               class="card action-card text-start h-100 cursor-pointer"
+              :class="charakterKartenStatusKlasse(eintrag)"
               role="button"
               tabindex="0"
               :aria-label="'Charakter öffnen: ' + charakterName(eintrag)"

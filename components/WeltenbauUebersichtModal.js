@@ -91,6 +91,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           redoStack: [],
           pendingBefore: null,
           zoomCommitTimer: 0,
+          mapScaleSpeicherTimer: 0,
         },
         nodeDrag: {
           aktiv: false,
@@ -511,6 +512,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             ? gruppe.sichtbarkeitsFilter
             : {};
         return {
+          mapScale: this.begrenzeMapScale(
+            Number.isFinite(Number(gruppe.zoomScale)) ? Number(gruppe.zoomScale) : 1,
+          ),
           itemScale: Number.isFinite(Number(gruppe.itemScale))
             ? Math.max(0, Math.min(500, Math.round(Number(gruppe.itemScale))))
             : 100,
@@ -530,6 +534,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       uebernehmeMapEinstellungen() {
         const einstellungen = this.ladeMapEinstellungen();
+        this.map.scale = einstellungen.mapScale;
         this.map.itemScale = einstellungen.itemScale;
         this.map.edgeColor = einstellungen.edgeColor;
         this.map.edgeWidth = einstellungen.edgeWidth;
@@ -1513,6 +1518,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           window.clearTimeout(this.verlauf.zoomCommitTimer);
           this.verlauf.zoomCommitTimer = 0;
         }
+        if (this.verlauf.mapScaleSpeicherTimer) {
+          window.clearTimeout(this.verlauf.mapScaleSpeicherTimer);
+          this.verlauf.mapScaleSpeicherTimer = 0;
+        }
         this.verlauf.undoStack = [];
         this.verlauf.redoStack = [];
         this.verlauf.pendingBefore = null;
@@ -1546,6 +1555,19 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.verlauf.zoomCommitTimer = 0;
           this.bestaetigeVerlaufAktion();
         }, 220);
+      },
+      planeMapScaleEinstellungSpeichern(wert) {
+        if (!Number.isFinite(Number(wert))) {
+          return;
+        }
+        const normalisiert = this.begrenzeMapScale(wert);
+        if (this.verlauf.mapScaleSpeicherTimer) {
+          window.clearTimeout(this.verlauf.mapScaleSpeicherTimer);
+        }
+        this.verlauf.mapScaleSpeicherTimer = window.setTimeout(() => {
+          this.verlauf.mapScaleSpeicherTimer = 0;
+          this.speichereMapEinstellung('zoomScale', normalisiert);
+        }, 180);
       },
       wendeSnapshotAn(snapshot) {
         if (!snapshot || typeof snapshot !== 'object') {
@@ -2331,6 +2353,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (typeof neu === 'string' && /^#[0-9a-fA-F]{6}$/.test(neu)) {
           this.speichereMapEinstellung('edgeColor', neu);
         }
+      },
+      'map.scale'(neu) {
+        if (!Number.isFinite(Number(neu))) {
+          return;
+        }
+        const normalisiert = this.begrenzeMapScale(neu);
+        if (normalisiert !== neu) {
+          this.map.scale = normalisiert;
+          return;
+        }
+        this.planeMapScaleEinstellungSpeichern(normalisiert);
       },
       sichtbarkeitsFilter: {
         deep: true,

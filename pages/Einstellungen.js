@@ -98,15 +98,6 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '🛑',
     buttonLabel: 'Sicherheitsmechanismen löschen',
   },
-  wuerfelAudioLoeschen: {
-    keys: ['htbah_wuerfel_audio', 'htbah_wuerfel_sound'],
-    titel: 'Würfel-Audio löschen?',
-    beschreibung:
-      'Lautstärke und Stummschaltung im Würfelbeutel sowie die ältere Ton-Einstellung werden aus dem lokalen Speicher entfernt.',
-    erfolg: 'Würfel-Audio-Einstellungen wurden gelöscht.',
-    buttonSymbol: '🔊',
-    buttonLabel: 'Würfel-Audio löschen',
-  },
   spielleiter: {
     key: 'htbah_spielleiter_gruppen',
     titel: 'Spielleiter-Gruppen löschen?',
@@ -371,6 +362,10 @@ window.HTBAH_SEITEN.Einstellungen = {
       if (!result.geloescht) {
         this.statusAnzeigen('Charakter konnte nicht gelöscht werden.', 'danger');
         return;
+      }
+      // In den Einstellungen keinen LP-Statusbanner anzeigen.
+      if (window.HTBAH && typeof window.HTBAH.syncLebenspunkteStatusFromCharakter === 'function') {
+        window.HTBAH.syncLebenspunkteStatusFromCharakter(null);
       }
       this.statusAnzeigen(`„${name}“ wurde gelöscht.`);
     },
@@ -804,6 +799,7 @@ window.HTBAH_SEITEN.Einstellungen = {
             </div>
           </div>
         </div>
+        <hr class="border-secondary border-opacity-25 my-3" />
         <template v-if="appRolle === 'charakter'">
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
@@ -825,13 +821,6 @@ window.HTBAH_SEITEN.Einstellungen = {
             :symbol="speicherBereiche.sicherheitsmechanismen.buttonSymbol"
             @click="oeffneLoeschDialog('sicherheitsmechanismen')">
             {{ speicherBereiche.sicherheitsmechanismen.buttonLabel }}
-          </icon-text-button>
-          <icon-text-button
-            class="btn btn-outline-danger w-100 mb-2"
-            type="button"
-            :symbol="speicherBereiche.wuerfelAudioLoeschen.buttonSymbol"
-            @click="oeffneLoeschDialog('wuerfelAudioLoeschen')">
-            {{ speicherBereiche.wuerfelAudioLoeschen.buttonLabel }}
           </icon-text-button>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
@@ -897,13 +886,6 @@ window.HTBAH_SEITEN.Einstellungen = {
             :symbol="speicherBereiche.sicherheitsmechanismen.buttonSymbol"
             @click="oeffneLoeschDialog('sicherheitsmechanismen')">
             {{ speicherBereiche.sicherheitsmechanismen.buttonLabel }}
-          </icon-text-button>
-          <icon-text-button
-            class="btn btn-outline-danger w-100 mb-2"
-            type="button"
-            :symbol="speicherBereiche.wuerfelAudioLoeschen.buttonSymbol"
-            @click="oeffneLoeschDialog('wuerfelAudioLoeschen')">
-            {{ speicherBereiche.wuerfelAudioLoeschen.buttonLabel }}
           </icon-text-button>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"

@@ -181,6 +181,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const p = this.$route.path || '';
       return p === '/einstellungen' || p.startsWith('/einstellungen/');
     },
+    wuerfelNavAktiv() {
+      return this.wuerfelBeutelOffen;
+    },
     /** Frische Listen aus dem Speicher (Reaktivität über Tab/Route). */
     begegnungListenAusSpeicher() {
       void this.$route.fullPath;
@@ -1236,7 +1239,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               <span class="htbah-nav-item-emoji" aria-hidden="true">📜</span>
               <span class="htbah-nav-item-label">Regelwerk</span>
             </button>
-            <button type="button" title="Würfel" class="htbah-nav-item" @click="wuerfelModalOeffnen('wuerfel')">
+            <button
+              type="button"
+              title="Würfel"
+              class="htbah-nav-item"
+              :class="{ 'htbah-nav-button-active': wuerfelNavAktiv }"
+              @click="wuerfelModalOeffnen('wuerfel')">
               <span class="htbah-nav-item-emoji" aria-hidden="true">🎲</span>
               <span class="htbah-nav-item-label">Würfel</span>
             </button>
@@ -1296,7 +1304,13 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </button>
           </template>
           <button type="button" title="Regelwerk" @click="regelwerkOeffnen">📜</button>
-          <button type="button" title="Würfel" @click="wuerfelModalOeffnen('wuerfel')">🎲</button>
+          <button
+            type="button"
+            title="Würfel"
+            :class="{ 'htbah-nav-button-active': wuerfelNavAktiv }"
+            @click="wuerfelModalOeffnen('wuerfel')">
+            🎲
+          </button>
           <router-link
             to="/einstellungen"
             title="Einstellungen"
