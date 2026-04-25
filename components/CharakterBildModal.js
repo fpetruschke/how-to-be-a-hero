@@ -1,4 +1,5 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
+const CHARAKTERBILD_EXPORT_MAX_KANTE = 1600;
 
 window.HTBAH_KOMPONENTEN.CharakterBildModal = {
   props: {
@@ -59,7 +60,7 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
       }
 
       this.cropper = new window.Cropper(bildElement, {
-        aspectRatio: 3 / 4,
+        aspectRatio: NaN,
         viewMode: 1,
         autoCropArea: 1,
         background: false,
@@ -106,8 +107,8 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
       }
 
       const canvas = this.cropper.getCroppedCanvas({
-        width: 360,
-        height: 480,
+        maxWidth: CHARAKTERBILD_EXPORT_MAX_KANTE,
+        maxHeight: CHARAKTERBILD_EXPORT_MAX_KANTE,
         imageSmoothingQuality: 'high',
       });
 

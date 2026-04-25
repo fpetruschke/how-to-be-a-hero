@@ -1,5 +1,5 @@
 /**
- * Charakterbogen als PDF (eine DIN-A4-Seite).
+ * Charakterbogen als PDF (zwei DIN-A4-Seiten).
  * Nutzung: await window.HTBAH.erzeugeCharakterPdfBlob(charakter, charakterBild)
  * Benötigt globale libs: window.jspdf, window.html2canvas
  */
@@ -10,6 +10,84 @@
   const LEERZEILEN_VOR_NACHTEILE = 3;
   const LEERZEILEN_FAEHIGKEITEN = 5;
   const LEERZEILEN_INVENTAR = 10;
+  const PDF_STILE = {
+    'fantasy-mittelalter': {
+      rahmenAussen: '#7c8692',
+      rahmenInnen: '#b2bac4',
+      akzent: '#2f6a29',
+      kopfTitel: '#5b3b17',
+      kopfUntertitel: '#6b4f2b',
+      schrift: "'Palatino Linotype',Palatino,Georgia,'Times New Roman',serif",
+      hintergrundAussen: '#f7f1e3',
+      kachelVerlaufStart: '#fcf8ef',
+      kachelVerlaufEnde: '#ffffff',
+      panelBg: '#fcf8ef',
+      panelInset: '#fcf8ef',
+      tabellenKopf: '#eee6d8',
+      zebra: '#fdfaf3',
+      werteVerlaufStart: '#f6f1e4',
+      werteVerlaufEnde: '#ffffff',
+      schattenInnen: '#ece1cc',
+      dekoTitel: '✦ ❦ ✦',
+      dekoAbschnitt: '❧',
+      tabellenRahmen: '#7a5d35',
+      kartenRahmen: '#8b6f47',
+      kopfMuster: 'linear-gradient(to bottom, #f6ecd9 0%, #fff9ed 100%)',
+    },
+    gegenwart: {
+      rahmenAussen: '#6b7280',
+      rahmenInnen: '#bcc2ca',
+      akzent: '#1f6aa5',
+      kopfTitel: '#1f2937',
+      kopfUntertitel: '#334155',
+      schrift: "system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+      hintergrundAussen: '#f5f7fa',
+      kachelVerlaufStart: '#f8fafc',
+      kachelVerlaufEnde: '#ffffff',
+      panelBg: '#f8fafc',
+      panelInset: '#f8fafc',
+      tabellenKopf: '#e7edf3',
+      zebra: '#fbfdff',
+      werteVerlaufStart: '#f2f8ff',
+      werteVerlaufEnde: '#ffffff',
+      schattenInnen: '#e8edf3',
+      dekoTitel: '• • •',
+      dekoAbschnitt: '•',
+      tabellenRahmen: '#66758a',
+      kartenRahmen: '#8a95a5',
+      kopfMuster: 'linear-gradient(to bottom, #f2f6fb 0%, #ffffff 100%)',
+    },
+    'modern-futuristisch': {
+      rahmenAussen: '#475569',
+      rahmenInnen: '#94a3b8',
+      akzent: '#4f46e5',
+      kopfTitel: '#0f172a',
+      kopfUntertitel: '#3730a3',
+      schrift: "'JetBrains Mono','Fira Code','Consolas','Courier New',monospace",
+      hintergrundAussen: '#eef2ff',
+      kachelVerlaufStart: '#f3f6ff',
+      kachelVerlaufEnde: '#ffffff',
+      panelBg: '#f3f6ff',
+      panelInset: '#f3f6ff',
+      tabellenKopf: '#e5eafc',
+      zebra: '#f8faff',
+      werteVerlaufStart: '#eef2ff',
+      werteVerlaufEnde: '#ffffff',
+      schattenInnen: '#e0e7ff',
+      dekoTitel: '▮ ▯ ▮',
+      dekoAbschnitt: '▸',
+      tabellenRahmen: '#4f46e5',
+      kartenRahmen: '#6366f1',
+      kopfMuster: 'linear-gradient(135deg, #eaf0ff 0%, #f7f9ff 100%)',
+    },
+  };
+
+  function lesePdfStilKonfiguration(optionen) {
+    const stil = optionen && typeof optionen.stil === 'string'
+      ? optionen.stil.trim()
+      : '';
+    return PDF_STILE[stil] || PDF_STILE['fantasy-mittelalter'];
+  }
 
   function leereTabellenZeilenHtml(spalten, anzahl, ersteSpalteZusatzCss) {
     let html = '';
@@ -121,21 +199,37 @@
     };
   }
 
-  function lpStatusKurz(charakter) {
-    const teile = [];
-    if (charakter.lpStatusTot) {
-      teile.push('tot');
+  function fraktionenText(charakter) {
+    const ausListe = Array.isArray(charakter.fraktionen)
+      ? charakter.fraktionen.map((f) => String(f || '').trim()).filter(Boolean)
+      : [];
+    const ausEinzelfeld = String(charakter.fraktion || '').trim();
+    const gesamt = ausEinzelfeld ? [ausEinzelfeld, ...ausListe] : ausListe;
+    const eindeutig = [...new Set(gesamt)];
+    return eindeutig.length ? eindeutig.join(', ') : '';
+  }
+
+  function kuerzeMitEllipse(text, maxLaenge) {
+    const roh = String(text == null ? '' : text).trim();
+    if (!roh) {
+      return '';
     }
-    if (charakter.lpBewusstlosAusgeblendet === false && !charakter.lpStatusTot) {
-      const lp = Number(charakter.lebenspunkte);
-      if (!Number.isNaN(lp) && lp >= 1 && lp <= 10) {
-        teile.push('bewusstlos möglich');
-      }
+    if (roh.length <= maxLaenge) {
+      return roh;
     }
-    if (charakter.lpMassenschadenBewusstlos) {
-      teile.push('Massenschaden');
+    return `${roh.slice(0, Math.max(0, maxLaenge - 1)).trim()}…`;
+  }
+
+  function wertMitSchreiblinieHtml(text, maxLaenge) {
+    const gekuerzt = kuerzeMitEllipse(text, maxLaenge);
+    if (gekuerzt) {
+      return `<div style="display:flex;align-items:flex-end;gap:4px;min-width:0;">
+      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">${escapeHtml(gekuerzt)}</span>
+    </div>`;
     }
-    return teile.length ? teile.join(', ') : '—';
+    return `<div style="display:flex;align-items:flex-end;gap:4px;min-width:0;">
+      <span style="flex:1;border-bottom:1px solid #d7d7d7;height:0.8em;"></span>
+    </div>`;
   }
 
   function faehigkeitenBlockHtml(kategorie, titel, charakter, begabungen, gbVerbleibend, gbMax, summen) {
@@ -177,7 +271,8 @@
       </div>`;
   }
 
-  function baueHtml(charakter, charakterBild) {
+  function baueHtml(charakter, charakterBild, optionen) {
+    const stil = lesePdfStilKonfiguration(optionen);
     const summen = summenBerechnen(charakter);
     const begabungen = begabungenAusSummen(summen);
     const gbMax = geistesblitzMaxAusCharakter(charakter, begabungen);
@@ -188,7 +283,6 @@
       ? gbRaw
       : { handeln: gbMax.handeln, wissen: gbMax.wissen, soziales: gbMax.soziales };
 
-    const punkte = summen.handeln + summen.wissen + summen.soziales;
     const name = typeof charakter.name === 'string' ? charakter.name.trim() : '';
     const bild =
       typeof charakterBild === 'string' && charakterBild.startsWith('data:')
@@ -196,20 +290,17 @@
         : '';
 
     const paare = Array.isArray(charakter.vorNachteilePaare) ? charakter.vorNachteilePaare : [];
-    const vnErsteSpalteLeer =
-      'width:20px;text-align:right;color:#ccc;';
     let vnRows = '';
     if (!paare.length) {
-      vnRows = leereTabellenZeilenHtml(3, LEERZEILEN_VOR_NACHTEILE, vnErsteSpalteLeer);
+      vnRows = leereTabellenZeilenHtml(2, LEERZEILEN_VOR_NACHTEILE, '');
     } else {
-      paare.forEach((paar, i) => {
+      paare.forEach((paar) => {
         vnRows += `<tr>
-          <td style="vertical-align:top;text-align:right;color:#666;width:20px;padding:2px 4px;border:1px solid #ccc;">${i + 1}</td>
           <td style="vertical-align:top;padding:2px 4px;border:1px solid #ccc;font-size:7px;" class="htbah-pdf-html">${paar.vorteilHtml || ''}</td>
           <td style="vertical-align:top;padding:2px 4px;border:1px solid #ccc;font-size:7px;" class="htbah-pdf-html">${paar.nachteilHtml || ''}</td>
         </tr>`;
       });
-      vnRows += leereTabellenZeilenHtml(3, LEERZEILEN_VOR_NACHTEILE, vnErsteSpalteLeer);
+      vnRows += leereTabellenZeilenHtml(2, LEERZEILEN_VOR_NACHTEILE, '');
     }
 
     const inventar = Array.isArray(charakter.inventar) ? charakter.inventar : [];
@@ -237,39 +328,46 @@
     const journalHtml =
       typeof charakter.journalHtml === 'string' && charakter.journalHtml.trim()
         ? charakter.journalHtml
-        : '<p style="margin:0;color:#666;font-style:italic;">Keine Notizen</p>';
+        : '';
 
-    const heute = new Date().toLocaleDateString('de-DE', {
+    const jetzt = new Date();
+    const heute = jetzt.toLocaleDateString('de-DE', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
     });
+    const uhrzeit = jetzt.toLocaleTimeString('de-DE', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
 
     const stammdatenZeilen = [
-      ['Geschlecht', charakter.geschlecht],
-      ['Alter', charakter.alter != null && charakter.alter !== '' ? String(charakter.alter) : ''],
-      ['Statur', charakter.statur],
-      ['Glaube', charakter.glaube != null && charakter.glaube !== '' ? charakter.glaube : charakter.religion],
-      ['Beruf', charakter.beruf],
-      ['Familienstand', charakter.familienstand],
+      ['Geschlecht', charakter.geschlecht, 18],
+      ['Alter', charakter.alter != null && charakter.alter !== '' ? String(charakter.alter) : '', 6],
+      ['Fraktion(en)', fraktionenText(charakter), 24],
+      ['Statur', charakter.statur, 16],
+      ['Beruf', charakter.beruf, 18],
+      ['Familienstand', charakter.familienstand, 16],
+      ['Glaube', charakter.glaube != null && charakter.glaube !== '' ? charakter.glaube : charakter.religion, 18],
     ];
 
     let stamTabelle = '';
-    for (const [label, wert] of stammdatenZeilen) {
-      if (!wert && wert !== 0) {
-        continue;
-      }
+    for (const [label, wert, maxLaenge] of stammdatenZeilen) {
       stamTabelle += `<tr>
         <td style="color:#555;padding:0 6px 1px 0;white-space:nowrap;font-size:7.5px;">${escapeHtml(label)}</td>
-        <td style="padding-bottom:1px;font-size:7.5px;">${escapeHtml(String(wert))}</td>
+        <td style="padding-bottom:1px;font-size:7.5px;min-width:0;">${wertMitSchreiblinieHtml(wert, maxLaenge || 20)}</td>
       </tr>`;
     }
+    const lpStartwert = Number.isFinite(Number(charakter.lebenspunkte))
+      ? String(Math.max(0, Math.round(Number(charakter.lebenspunkte))))
+      : '—';
 
     const bildBlock = bild
       ? `<img src="${bild}" alt="" crossorigin="anonymous" style="width:92px;height:110px;object-fit:cover;border:1px solid #ccc;border-radius:4px;display:block;background:#f0f0f0;"/>`
       : `<div style="width:92px;height:110px;border:1px dashed #bbb;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:7px;color:#888;text-align:center;line-height:1.2;">Kein Bild</div>`;
 
-    return `<div class="htbah-pdf-wurzel" style="box-sizing:border-box;width:${PDF_BREITE_PX}px;padding:${PDF_PADDING};background:#fff;color:#111;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;line-height:1.2;">
+    return `<div class="htbah-pdf-wurzel" style="box-sizing:border-box;width:${PDF_BREITE_PX}px;padding:${PDF_PADDING};background:#fff;color:#111;font-family:${stil.schrift};line-height:1.2;">
       <style>
         .htbah-pdf-wurzel .htbah-pdf-html p { margin: 0 0 2px 0; }
         .htbah-pdf-wurzel .htbah-pdf-html ul, .htbah-pdf-wurzel .htbah-pdf-html ol { margin: 0; padding-left: 12px; }
@@ -278,14 +376,24 @@
         .htbah-pdf-notizen ul, .htbah-pdf-notizen ol { margin: 0; padding-left: 12px; font-size: 7px; }
         .htbah-pdf-inv-beschr p { margin: 0 0 2px 0; }
         .htbah-pdf-inv-beschr ul, .htbah-pdf-inv-beschr ol { margin: 0; padding-left: 11px; }
+        .htbah-pdf-wurzel .htbah-pdf-tabelle tbody tr:nth-child(even) td { background: ${stil.zebra}; }
+        .htbah-pdf-wurzel .htbah-pdf-kachel {
+          border: 2px solid ${stil.kartenRahmen};
+          border-radius: 3px;
+          padding: 4px;
+          background: ${stil.panelBg};
+          box-shadow: inset 0 0 0 1px ${stil.panelInset};
+          box-sizing: border-box;
+        }
       </style>
-      <div style="border:1px solid #bbb;border-radius:2px;padding:5px 6px;margin-bottom:6px;background:linear-gradient(to bottom,#fafafa 0%,#fff 12px);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #336a2b;padding-bottom:4px;margin-bottom:5px;">
+      <div style="border:3px double ${stil.rahmenAussen};border-radius:3px;padding:2px;background:${stil.hintergrundAussen};">
+      <div style="border:1px solid ${stil.rahmenInnen};border-radius:2px;padding:5px 6px;margin-bottom:6px;background:${stil.kopfMuster};box-shadow:inset 0 0 0 1px ${stil.schattenInnen};">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid ${stil.akzent};padding-bottom:4px;margin-bottom:5px;">
           <div style="min-width:0;">
-            <div style="font-size:8px;color:#444;margin-bottom:1px;letter-spacing:0.02em;">CHARAKTERBOGEN · HOW TO BE A HERO</div>
-            <div style="font-size:15px;font-weight:800;letter-spacing:-0.02em;color:#0f172a;">${escapeHtml(name || 'Unbenannt')}</div>
+            <div style="font-size:8px;color:${stil.kopfUntertitel};margin-bottom:1px;letter-spacing:0.02em;">CHARAKTERBOGEN · HOW TO BE A HERO</div>
+            <div style="font-size:15px;font-weight:800;letter-spacing:-0.02em;color:${stil.kopfTitel};">${stil.dekoAbschnitt}<span style="display:inline-block;margin:0 6px;">${escapeHtml(name || 'Unbenannt')}</span>${stil.dekoAbschnitt}</div>
           </div>
-          <div style="font-size:7.5px;color:#666;text-align:right;white-space:nowrap;">Stand: ${escapeHtml(heute)}</div>
+          <div style="font-size:7.5px;color:#666;text-align:right;white-space:nowrap;">Stand: ${escapeHtml(heute)} ${escapeHtml(uhrzeit)}</div>
         </div>
 
       <div style="display:flex;gap:8px;margin-bottom:5px;align-items:flex-start;">
@@ -293,69 +401,125 @@
         <div style="flex:1;min-width:0;">
           <table style="border-collapse:collapse;">${stamTabelle}</table>
         </div>
-        <div style="flex-shrink:0;width:150px;font-size:7.5px;border:1px solid #ddd;border-radius:4px;padding:5px;background:#f8faf8;">
-          <div style="font-weight:700;margin-bottom:3px;color:#336a2b;">Werte</div>
-          <div>Lebenspunkte: <strong>${escapeHtml(String(charakter.lebenspunkte != null ? charakter.lebenspunkte : '—'))}</strong></div>
-          <div style="margin-top:2px;">LP-Status: ${escapeHtml(lpStatusKurz(charakter))}</div>
-          <div style="margin-top:3px;">Fähigkeitspunkte: <strong>${escapeHtml(String(punkte))}</strong> / 400</div>
-          <div style="margin-top:2px;">Begabungen: H ${escapeHtml(String(begabungen.handeln))} · W ${escapeHtml(String(begabungen.wissen))} · S ${escapeHtml(String(begabungen.soziales))}</div>
+        <div style="flex-shrink:0;width:188px;font-size:7px;border:2px solid ${stil.kartenRahmen};border-radius:4px;padding:5px;background:${stil.panelBg};box-shadow:inset 0 0 0 1px ${stil.panelInset};">
+          <div style="font-weight:700;margin-bottom:3px;color:${stil.akzent};text-transform:uppercase;letter-spacing:0.04em;">${stil.dekoAbschnitt} Lebenspunkte ${stil.dekoAbschnitt}</div>
+          <div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px;">
+            <span>Start-LP: <strong>${escapeHtml(lpStartwert)}</strong></span>
+            <span>Aktuell: <span style="display:inline-block;min-width:28px;border-bottom:1px solid #b6bec8;text-align:center;">&#160;</span></span>
+          </div>
+          <div style="font-size:5.5px;color:#555;margin-bottom:3px;white-space:nowrap;">Bewusstlos bei LP 1-10 oder Einzelschaden >= 60 · Tot: LP = 0.</div>
+          <div style="border:1px solid #ddd;background:#fff;min-height:78px;padding:3px;">
+            <div style="font-size:6px;font-weight:600;letter-spacing:0.02em;color:${stil.akzent};margin-bottom:2px;text-transform:uppercase;">Änderungsprotokoll</div>
+          </div>
         </div>
       </div>
 
       <div style="margin-bottom:5px;">
-        <div style="font-weight:800;font-size:8px;margin-bottom:2px;color:#222;letter-spacing:0.04em;text-transform:uppercase;">Vorteile und Nachteile</div>
-        <table style="width:100%;border-collapse:collapse;font-size:7px;border:1px solid #999;">
+        <div style="font-weight:800;font-size:8px;margin-bottom:2px;color:#222;letter-spacing:0.04em;text-transform:uppercase;">${stil.dekoAbschnitt} Vorteile und Nachteile ${stil.dekoAbschnitt}</div>
+        <table class="htbah-pdf-tabelle" style="width:100%;border-collapse:collapse;font-size:7px;border:2px solid ${stil.tabellenRahmen};">
           <thead>
-            <tr style="background:#e8e8e8;">
-              <th style="text-align:right;width:20px;padding:3px 4px;border:1px solid #999;border-bottom:1px solid #666;">#</th>
-              <th style="text-align:left;padding:3px 4px;border:1px solid #999;border-bottom:1px solid #666;width:38%;">Vorteil</th>
-              <th style="text-align:left;padding:3px 4px;border:1px solid #999;border-bottom:1px solid #666;">Nachteil</th>
+            <tr style="background:${stil.tabellenKopf};">
+              <th style="text-align:left;padding:3px 4px;border:1px solid ${stil.tabellenRahmen};border-bottom:2px solid ${stil.tabellenRahmen};width:42%;">Vorteil</th>
+              <th style="text-align:left;padding:3px 4px;border:1px solid ${stil.tabellenRahmen};border-bottom:2px solid ${stil.tabellenRahmen};">Nachteil</th>
             </tr>
           </thead>
           <tbody>${vnRows}</tbody>
         </table>
       </div>
 
-      <div style="font-weight:800;font-size:8px;margin-bottom:3px;color:#222;letter-spacing:0.04em;text-transform:uppercase;">Begabungen und Fähigkeiten</div>
+      <div style="font-weight:800;font-size:8px;margin-bottom:3px;color:#222;letter-spacing:0.04em;text-transform:uppercase;">${stil.dekoAbschnitt} Begabungen und Fähigkeiten ${stil.dekoAbschnitt}</div>
       <div style="display:flex;gap:4px;margin-bottom:5px;align-items:stretch;">
         ${faehigkeitenBlockHtml('handeln', 'Handeln', charakter, begabungen, gbVerbleibend, gbMax, summen)}
         ${faehigkeitenBlockHtml('wissen', 'Wissen', charakter, begabungen, gbVerbleibend, gbMax, summen)}
         ${faehigkeitenBlockHtml('soziales', 'Soziales', charakter, begabungen, gbVerbleibend, gbMax, summen)}
       </div>
 
-      <table style="width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;margin:0;padding:0;">
-        <colgroup>
-          <col style="width:58%;" />
-          <col style="width:42%;" />
-        </colgroup>
-        <tbody>
-          <tr>
-            <td style="vertical-align:top;padding:0 5px 0 0;border:none;">
-              <div style="border:1px solid #999;padding:4px;background:#fafafa;box-sizing:border-box;">
-                <div style="font-weight:800;font-size:8px;margin-bottom:3px;color:#222;letter-spacing:0.04em;text-transform:uppercase;">Inventar</div>
-                <table style="width:100%;border-collapse:collapse;font-size:7px;border:1px solid #999;">
+      <div style="display:flex;gap:10px;align-items:stretch;width:100%;margin:0;padding:0;">
+        <div style="flex:58 1 0;min-width:0;">
+          <div class="htbah-pdf-kachel" style="height:100%;">
+                <div style="font-weight:800;font-size:8px;margin-bottom:3px;color:#222;letter-spacing:0.04em;text-transform:uppercase;">${stil.dekoAbschnitt} Inventar ${stil.dekoAbschnitt}</div>
+                <table class="htbah-pdf-tabelle" style="width:100%;border-collapse:collapse;font-size:7px;border:2px solid ${stil.tabellenRahmen};">
                   <thead>
-                    <tr style="background:#e8e8e8;">
-                      <th style="text-align:left;border:1px solid #999;padding:2px 4px;border-bottom:1px solid #666;width:18%;">Gegenstand</th>
-                      <th style="text-align:left;border:1px solid #999;padding:2px 4px;border-bottom:1px solid #666;white-space:nowrap;width:12%;">Typ</th>
-                      <th style="text-align:left;border:1px solid #999;padding:2px 4px;border-bottom:1px solid #666;white-space:nowrap;width:16%;">Werte</th>
-                      <th style="text-align:left;border:1px solid #999;padding:2px 4px;border-bottom:1px solid #666;">Beschreibung</th>
+                    <tr style="background:${stil.tabellenKopf};">
+                      <th style="text-align:left;border:1px solid ${stil.tabellenRahmen};padding:2px 4px;border-bottom:2px solid ${stil.tabellenRahmen};width:18%;">Gegenstand</th>
+                      <th style="text-align:left;border:1px solid ${stil.tabellenRahmen};padding:2px 4px;border-bottom:2px solid ${stil.tabellenRahmen};white-space:nowrap;width:12%;">Typ</th>
+                      <th style="text-align:left;border:1px solid ${stil.tabellenRahmen};padding:2px 4px;border-bottom:2px solid ${stil.tabellenRahmen};white-space:nowrap;width:16%;">Werte</th>
+                      <th style="text-align:left;border:1px solid ${stil.tabellenRahmen};padding:2px 4px;border-bottom:2px solid ${stil.tabellenRahmen};">Beschreibung</th>
                     </tr>
                   </thead>
                   <tbody>${invRows}</tbody>
                 </table>
-              </div>
-            </td>
-            <td style="vertical-align:top;padding:0 0 0 5px;border:none;">
-              <div style="border:1px solid #999;padding:4px;background:#fafafa;display:flex;flex-direction:column;box-sizing:border-box;height:100%;min-height:100%;">
-                <div style="font-weight:800;font-size:8px;margin-bottom:3px;color:#222;letter-spacing:0.04em;text-transform:uppercase;flex-shrink:0;">Notizen</div>
-                <div class="htbah-pdf-notizen htbah-pdf-html" style="flex:1 1 auto;width:100%;box-sizing:border-box;border:1px solid #ddd;background:#fff;padding:4px;font-size:7px;line-height:1.25;color:#222;">${journalHtml}</div>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+          </div>
+        </div>
+        <div style="flex:42 1 0;min-width:0;display:flex;">
+          <div class="htbah-pdf-kachel" style="display:flex;flex-direction:column;flex:1 1 auto;">
+            <div style="font-weight:800;font-size:8px;margin-bottom:3px;color:#222;letter-spacing:0.04em;text-transform:uppercase;flex-shrink:0;">${stil.dekoAbschnitt} Notizen ${stil.dekoAbschnitt}</div>
+            <div class="htbah-pdf-notizen htbah-pdf-html" style="flex:1 1 auto;width:100%;box-sizing:border-box;border:1px solid #ddd;background:${stil.panelBg};padding:4px;font-size:7px;line-height:1.25;color:#222;">${journalHtml}</div>
+          </div>
+        </div>
+      </div>
 
+      </div>
+      </div>
+    </div>`;
+  }
+
+  function baueSicherheitsseiteHtml(charakter, optionen) {
+    const stil = lesePdfStilKonfiguration(optionen);
+    const sicher = charakter && charakter.sicherheitsmechanismen && typeof charakter.sicherheitsmechanismen === 'object'
+      ? charakter.sicherheitsmechanismen
+      : {};
+    const tabuHtml =
+      typeof sicher.tabuHtml === 'string' && sicher.tabuHtml.trim()
+        ? sicher.tabuHtml
+        : '<p style="color:#666;">Keine Einträge.</p>';
+    const schleierHtml =
+      typeof sicher.schleierHtml === 'string' && sicher.schleierHtml.trim()
+        ? sicher.schleierHtml
+        : '<p style="color:#666;">Keine Einträge.</p>';
+    return `<div class="htbah-pdf-wurzel" style="box-sizing:border-box;width:${PDF_BREITE_PX}px;padding:${PDF_PADDING};background:#fff;color:#111;font-family:${stil.schrift};line-height:1.25;min-height:1110px;display:flex;flex-direction:column;">
+      <style>
+        .htbah-pdf-wurzel .htbah-pdf-html p { margin: 0 0 2px 0; }
+        .htbah-pdf-wurzel .htbah-pdf-html ul, .htbah-pdf-wurzel .htbah-pdf-html ol { margin: 0; padding-left: 12px; }
+        .htbah-pdf-wurzel .htbah-pdf-html strong { font-weight: 700; }
+      </style>
+      <div style="border:3px double ${stil.rahmenAussen};border-radius:4px;padding:8px;background:${stil.hintergrundAussen};box-sizing:border-box;">
+        <div style="border:1px solid ${stil.rahmenInnen};border-radius:3px;padding:8px;background:${stil.kopfMuster};margin-bottom:8px;">
+          <div style="font-size:16px;font-weight:800;color:${stil.kopfTitel};margin-bottom:3px;">Session Zero und Sicherheitsmechanismen</div>
+          <div style="font-size:9px;color:${stil.kopfUntertitel};">
+            In der Session Zero legen alle gemeinsam Grenzen, Schleier und die X-Karte fest.
+            Die Vereinbarung gilt für die gesamte Runde.
+          </div>
+        </div>
+
+        <div style="border:2px solid #b91c1c;border-radius:3px;padding:8px;background:#fee2e2;margin-bottom:8px;">
+          <div style="font-size:10px;font-weight:800;color:#7f1d1d;margin-bottom:3px;">X-Karte-Regel</div>
+          <div style="font-size:8px;color:#7f1d1d;line-height:1.35;">
+            Wird eine X-Karte gelegt, wird die Szene sofort beendet oder umgeschnitten.
+            Es gibt keine Diskussion, keine Nachfrage und keine Rechtfertigungspflicht.
+          </div>
+        </div>
+
+        <div style="border:1px solid ${stil.kartenRahmen};border-radius:3px;padding:7px;background:#fff;margin-bottom:8px;">
+          <div style="font-size:10px;font-weight:700;margin-bottom:4px;color:${stil.akzent};">Diese Inhalte wollen wir nicht:</div>
+          <div class="htbah-pdf-html" style="font-size:8px;line-height:1.35;min-height:120px;">${tabuHtml}</div>
+        </div>
+
+        <div style="border:1px solid ${stil.kartenRahmen};border-radius:3px;padding:7px;background:#fff;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:700;margin-bottom:4px;color:${stil.akzent};">Diese Inhalte sollen verschleiert werden:</div>
+          <div class="htbah-pdf-html" style="font-size:8px;line-height:1.35;min-height:120px;">${schleierHtml}</div>
+        </div>
+
+      </div>
+      <div style="display:flex;justify-content:center;align-items:center;margin-top:auto;padding-top:8px;">
+        <div style="width:240px;height:336px;border:8px solid #dc2626;border-radius:12px;background:#fff;display:flex;flex-direction:column;justify-content:space-between;padding:14px;box-sizing:border-box;">
+          <div style="font-size:16px;font-weight:800;color:#b91c1c;text-align:center;">X-Karte</div>
+          <div style="font-size:140px;line-height:1;text-align:center;color:#dc2626;font-weight:900;">X</div>
+          <div style="font-size:8px;line-height:1.35;color:#7f1d1d;text-align:center;">
+            Diese Karte wird kommentarlos gelegt oder gezeigt, wenn eine Szene sofort beendet oder umgeschnitten werden soll.
+            Niemand darf eine Begründung einfordern.
+          </div>
+        </div>
       </div>
     </div>`;
   }
@@ -366,18 +530,7 @@
     return `htbah-charakter-${sicher}.pdf`;
   }
 
-  async function erzeugeCharakterPdfBlob(charakter, charakterBild) {
-    if (!charakter || typeof charakter !== 'object') {
-      throw new Error('Kein Charakter übergeben.');
-    }
-
-    const jspdfNs = window.jspdf;
-    const jsPDF = jspdfNs && (jspdfNs.jsPDF || jspdfNs.default);
-    if (!jsPDF || typeof window.html2canvas !== 'function') {
-      throw new Error('PDF-Bibliotheken fehlen (jspdf, html2canvas).');
-    }
-
-    const html = baueHtml(charakter, charakterBild);
+  async function renderHtmlZuCanvas(html) {
     const host = document.createElement('div');
     host.setAttribute('aria-hidden', 'true');
     host.style.cssText =
@@ -386,16 +539,13 @@
       'px;z-index:-1;pointer-events:none;overflow:visible;';
     host.innerHTML = html;
     document.body.appendChild(host);
-
     const el = host.querySelector('.htbah-pdf-wurzel');
     if (!el) {
       document.body.removeChild(host);
       throw new Error('PDF-Markup fehlerhaft.');
     }
-
-    let canvas;
     try {
-      canvas = await window.html2canvas(el, {
+      return await window.html2canvas(el, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
@@ -406,6 +556,38 @@
     } finally {
       document.body.removeChild(host);
     }
+  }
+
+  function fuegeCanvasAlsA4SeiteHinzu(pdf, canvas) {
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const cw = canvas.width;
+    const ch = canvas.height;
+    let finalW = pageW;
+    let finalH = (ch * pageW) / cw;
+    if (finalH > pageH) {
+      finalH = pageH;
+      finalW = (cw * pageH) / ch;
+    }
+    pdf.addImage(imgData, 'JPEG', 0, 0, finalW, finalH);
+  }
+
+  async function erzeugeCharakterPdfBlob(charakter, charakterBild, optionen) {
+    if (!charakter || typeof charakter !== 'object') {
+      throw new Error('Kein Charakter übergeben.');
+    }
+
+    const jspdfNs = window.jspdf;
+    const jsPDF = jspdfNs && (jspdfNs.jsPDF || jspdfNs.default);
+    if (!jsPDF || typeof window.html2canvas !== 'function') {
+      throw new Error('PDF-Bibliotheken fehlen (jspdf, html2canvas).');
+    }
+
+    const htmlSeite1 = baueHtml(charakter, charakterBild, optionen);
+    const htmlSeite2 = baueSicherheitsseiteHtml(charakter, optionen);
+    const canvasSeite1 = await renderHtmlZuCanvas(htmlSeite1);
+    const canvasSeite2 = await renderHtmlZuCanvas(htmlSeite2);
 
     const pdf = new jsPDF({
       orientation: 'portrait',
@@ -414,22 +596,9 @@
       compress: true,
     });
 
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
-    const cw = canvas.width;
-    const ch = canvas.height;
-
-    let finalW = pageW;
-    let finalH = (ch * pageW) / cw;
-    if (finalH > pageH) {
-      finalH = pageH;
-      finalW = (cw * pageH) / ch;
-    }
-    const x = 0;
-    const y = 0;
-
-    pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+    fuegeCanvasAlsA4SeiteHinzu(pdf, canvasSeite1);
+    pdf.addPage();
+    fuegeCanvasAlsA4SeiteHinzu(pdf, canvasSeite2);
     const ab = pdf.output('arraybuffer');
     const blob = new Blob([ab], { type: 'application/pdf' });
     const dateiname = dateinameAusCharaktername(charakter.name);

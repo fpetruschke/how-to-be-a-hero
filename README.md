@@ -1,4 +1,4 @@
-# How to be a hero - Begleiter
+# How to be a hero - Begleit-App
 
 ![HTBAH Begleit-App Logo](assets/img/htbah-begleit-app-logo.png)
 

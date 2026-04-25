@@ -49,6 +49,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       })(),
       wuerfelBeutelOffen: false,
       wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
+      sicherheitsmechanismenModalOffen: false,
     };
   },
   created() {
@@ -170,15 +171,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     charakterLink() {
       const id = window.HTBAH.ladeAktivenCharakterId();
-      return id ? `/charakter/${id}` : '/charakter/neu';
-    },
-    zufallstabellenAktiv() {
-      const p = this.$route.path || '';
-      return p === '/zufallstabellen' || p.startsWith('/zufallstabellen/');
+      return id ? `/charakter/${id}/session-zero` : '/charakter/neu/session-zero';
     },
     weltenbauAktiv() {
       const p = this.$route.path || '';
-      return p === '/weltenbau';
+      return p === '/weltenbau' || p.startsWith('/weltenbau/');
     },
     einstellungenAktiv() {
       const p = this.$route.path || '';
@@ -205,8 +202,56 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     wuerfelAudioLautProzent() {
       return Math.round(Math.min(1, Math.max(0, Number(this.wuerfelAudioLautstaerke) || 0)) * 100);
     },
+    aktiverCharakterKontext() {
+      return window.HTBAH && window.HTBAH._aktiverCharakterKontext
+        ? window.HTBAH._aktiverCharakterKontext
+        : null;
+    },
+    aktiveSicherheitsmechanismen() {
+      const fallback = {
+        tabuHtml: '',
+        schleierHtml: '',
+        buttonEmoji: '🚩',
+      };
+      const kontext = this.aktiverCharakterKontext;
+      if (!kontext || typeof kontext.getCharakter !== 'function') {
+        return fallback;
+      }
+      const charakter = kontext.getCharakter();
+      if (!charakter || typeof charakter !== 'object') {
+        return fallback;
+      }
+      if (!charakter.sicherheitsmechanismen || typeof charakter.sicherheitsmechanismen !== 'object') {
+        charakter.sicherheitsmechanismen = { ...fallback };
+        return charakter.sicherheitsmechanismen;
+      }
+      if (typeof charakter.sicherheitsmechanismen.buttonEmoji !== 'string' || !charakter.sicherheitsmechanismen.buttonEmoji.trim()) {
+        charakter.sicherheitsmechanismen.buttonEmoji = '🚩';
+      }
+      if (typeof charakter.sicherheitsmechanismen.tabuHtml !== 'string') {
+        charakter.sicherheitsmechanismen.tabuHtml = '';
+      }
+      if (typeof charakter.sicherheitsmechanismen.schleierHtml !== 'string') {
+        charakter.sicherheitsmechanismen.schleierHtml = '';
+      }
+      return charakter.sicherheitsmechanismen;
+    },
+    sicherheitsButtonEmoji() {
+      return '🚩';
+    },
+    sicherheitsButtonAnzeigen() {
+      return this.zeigeNav && (this.rolle === 'spielleitung' || this.rolle === 'charakter');
+    },
+    sicherheitsmodalNurLesen() {
+      return this.rolle !== 'spielleitung';
+    },
   },
   watch: {
+    '$route.fullPath'() {
+      if (this.sicherheitsmechanismenModalOffen) {
+        this.sicherheitsmechanismenModalOffen = false;
+      }
+    },
     zeigeNav() {
       this.$nextTick(() => this.bindNavReserveObserver());
     },
@@ -258,6 +303,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.ladeDiceFarbwahl();
   },
   beforeUnmount() {
+    this.sicherheitsmechanismenModalOffen = false;
     this.unbindNavReserveObserver();
     document.documentElement.style.removeProperty('--htbah-bottom-nav-reserve');
     document.documentElement.style.removeProperty('--htbah-top-nav-reserve');
@@ -832,6 +878,30 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     atmosphaereBadgeOeffnen() {
       this.wuerfelModalOeffnen('atmosphaere');
     },
+    sicherheitsmechanismenOeffnen() {
+      this.sicherheitsmechanismenModalOffen = true;
+    },
+    sichereSicherheitsmechanismen(neueWerte) {
+      const kontext = this.aktiverCharakterKontext;
+      if (!kontext || typeof kontext.getCharakter !== 'function') {
+        return;
+      }
+      const charakter = kontext.getCharakter();
+      if (!charakter || typeof charakter !== 'object') {
+        return;
+      }
+      charakter.sicherheitsmechanismen = {
+        tabuHtml: typeof neueWerte?.tabuHtml === 'string' ? neueWerte.tabuHtml : '',
+        schleierHtml: typeof neueWerte?.schleierHtml === 'string' ? neueWerte.schleierHtml : '',
+        buttonEmoji:
+          typeof neueWerte?.buttonEmoji === 'string' && neueWerte.buttonEmoji.trim()
+            ? neueWerte.buttonEmoji.trim()
+            : '🚩',
+      };
+      if (typeof kontext.speichern === 'function') {
+        kontext.speichern();
+      }
+    },
     badgeZiehenStart(e) {
       if (e.button != null && e.button !== 0) {
         return;
@@ -1125,7 +1195,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             <template v-if="rolle === 'charakter'">
               <router-link
                 :to="charakterLink"
-                title="Charakter"
+                title="Charakter (Session Zero, aktives Spiel, Nachbereitung)"
                 class="htbah-nav-item"
                 :class="{ 'router-link-active': charakterAktiv }">
                 <span class="htbah-nav-item-emoji" aria-hidden="true">🧙</span>
@@ -1148,14 +1218,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 :class="{ 'router-link-active': presetVerwaltungAktiv }">
                 <span class="htbah-nav-item-emoji" aria-hidden="true">📦</span>
                 <span class="htbah-nav-item-label">Presets</span>
-              </router-link>
-              <router-link
-                to="/zufallstabellen"
-                title="Zufallstabellen"
-                class="htbah-nav-item"
-                :class="{ 'router-link-active': zufallstabellenAktiv }">
-                <span class="htbah-nav-item-emoji" aria-hidden="true">📚</span>
-                <span class="htbah-nav-item-label">Zufallstabellen</span>
               </router-link>
               <router-link
                 to="/weltenbau"
@@ -1199,7 +1261,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </router-link>
             <router-link
               :to="charakterLink"
-              title="Charakter"
+              title="Charakter (Session Zero, aktives Spiel, Nachbereitung)"
               :class="{ 'router-link-active': charakterAktiv }">
               🧙
             </router-link>
@@ -1224,12 +1286,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               📦
             </router-link>
             <router-link
-              to="/zufallstabellen"
-              title="Zufallstabellen"
-              :class="{ 'router-link-active': zufallstabellenAktiv }">
-              📚
-            </router-link>
-            <router-link
               to="/weltenbau"
               title="Weltenbau"
               :class="{ 'router-link-active': weltenbauAktiv }">
@@ -1248,6 +1304,19 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             ⚙️
           </router-link>
         </div>
+      </div>
+    </teleport>
+
+    <teleport to="body">
+      <div v-if="sicherheitsButtonAnzeigen" class="htbah-sicherheits-fab-stack">
+        <button
+          type="button"
+          class="htbah-sicherheits-fab"
+          title="Sicherheitsmechanismen (Session Zero)"
+          aria-label="Sicherheitsmechanismen öffnen"
+          @click="sicherheitsmechanismenOeffnen">
+          {{ sicherheitsButtonEmoji }}
+        </button>
       </div>
     </teleport>
 
@@ -1290,6 +1359,13 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         </button>
       </div>
     </teleport>
+
+    <sicherheitsmechanismen-modal
+      :offen="sicherheitsmechanismenModalOffen"
+      :wert="aktiveSicherheitsmechanismen"
+      :nur-lesen="sicherheitsmodalNurLesen"
+      @update:offen="sicherheitsmechanismenModalOffen = $event"
+      @update:wert="sichereSicherheitsmechanismen" />
 
     <teleport to="body">
       <div
@@ -1698,7 +1774,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 </p>
                 <div v-if="!begegnungHatBegegnungsEintrag" class="alert alert-info mb-0" role="status">
                   Noch keine passenden Einträge. Lege zuerst unter
-                  <router-link to="/zufallstabellen" class="alert-link">Zufallstabellen</router-link>
+                  <router-link to="/weltenbau/zufallstabellen" class="alert-link">Zufallstabellen</router-link>
                   mindestens einen NPC, eine Bestie oder eine Gottheit im Pantheon an — sonst kann hier
                   nichts gezogen werden.
                 </div>

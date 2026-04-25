@@ -85,6 +85,11 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       inventar: [],
       vorNachteilePaare: [],
       journalHtml: '',
+      sicherheitsmechanismen: {
+        tabuHtml: '',
+        schleierHtml: '',
+        buttonEmoji: '🚩',
+      },
       handeln: [],
       wissen: [],
       soziales: [],
@@ -127,6 +132,15 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
             ? zusammengefuehrt.glaube
             : '';
 
+    const sicherheitsmechanismenQuelle =
+      quelle.sicherheitsmechanismen && typeof quelle.sicherheitsmechanismen === 'object'
+        ? quelle.sicherheitsmechanismen
+        : {};
+    const buttonEmojiRoh =
+      typeof sicherheitsmechanismenQuelle.buttonEmoji === 'string'
+        ? sicherheitsmechanismenQuelle.buttonEmoji.trim()
+        : '';
+
     return {
       ...zusammengefuehrt,
       glaube: glaubeAusQuelle,
@@ -151,6 +165,17 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
             nachteilHtml: typeof p.nachteilHtml === 'string' ? p.nachteilHtml : '',
           }))
         : [],
+      sicherheitsmechanismen: {
+        tabuHtml:
+          typeof sicherheitsmechanismenQuelle.tabuHtml === 'string'
+            ? sicherheitsmechanismenQuelle.tabuHtml
+            : '',
+        schleierHtml:
+          typeof sicherheitsmechanismenQuelle.schleierHtml === 'string'
+            ? sicherheitsmechanismenQuelle.schleierHtml
+            : '',
+        buttonEmoji: buttonEmojiRoh || '🚩',
+      },
       geistesblitzVerbleibend,
       lpStatusTot: Boolean(quelle.lpStatusTot),
       lpBewusstlosAusgeblendet: Boolean(quelle.lpBewusstlosAusgeblendet),

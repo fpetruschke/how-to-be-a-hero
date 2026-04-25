@@ -90,6 +90,14 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '🎲',
     buttonLabel: 'Würfelbeutel-Layout & Atmosphäre löschen',
   },
+  sicherheitsmechanismen: {
+    titel: 'Sicherheitsmechanismen löschen?',
+    beschreibung:
+      'Die Session-Zero-Sicherheitsmechanismen (Grenzen, Schleier und Button-Emoji) werden bei allen Charakteren entfernt.',
+    erfolg: 'Sicherheitsmechanismen wurden für alle Charaktere entfernt.',
+    buttonSymbol: '🛑',
+    buttonLabel: 'Sicherheitsmechanismen löschen',
+  },
   wuerfelAudioLoeschen: {
     keys: ['htbah_wuerfel_audio', 'htbah_wuerfel_sound'],
     titel: 'Würfel-Audio löschen?',
@@ -366,6 +374,12 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
       this.statusAnzeigen(`„${name}“ wurde gelöscht.`);
     },
+    charakterBearbeiten(eintrag) {
+      if (!eintrag || !eintrag.id) {
+        return;
+      }
+      this.$router.push(`/charakter/${eintrag.id}`);
+    },
     themeUmschalten() {
       const neuesTheme = this.istHellesTheme ? 'light' : 'dark';
       window.HTBAH.setzeTheme(neuesTheme);
@@ -413,7 +427,24 @@ window.HTBAH_SEITEN.Einstellungen = {
         return;
       }
 
-      if (Array.isArray(bereich.keys)) {
+      if (this.zuLoeschenderBereich === 'sicherheitsmechanismen') {
+        const sammlung = window.HTBAH.ladeCharakterSammlung();
+        const aktiveIdVorher = window.HTBAH.ladeAktivenCharakterId();
+        (sammlung.charaktere || []).forEach((eintrag) => {
+          window.HTBAH.importiereOderAktualisiereCharakterEintrag({
+            ...eintrag,
+            charakter: {
+              ...(eintrag.charakter || {}),
+              sicherheitsmechanismen: {
+                tabuHtml: '',
+                schleierHtml: '',
+                buttonEmoji: '🚩',
+              },
+            },
+          });
+        });
+        window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
+      } else if (Array.isArray(bereich.keys)) {
         window.HTBAH.speicher.loescheKeys(bereich.keys);
       } else {
         window.HTBAH.speicher.loescheKey(bereich.key);
@@ -754,14 +785,23 @@ window.HTBAH_SEITEN.Einstellungen = {
             Keine gespeicherten Charaktere vorhanden.
           </p>
           <div v-else class="d-flex flex-column gap-2">
-            <button
+            <div
               v-for="eintrag in charakterEintraege"
               :key="'del-char-' + eintrag.id"
-              type="button"
-              class="btn btn-outline-danger btn-sm text-start"
-              @click="loescheEinzelCharakter(eintrag)">
-              {{ charakterName(eintrag) }} löschen
-            </button>
+              class="d-flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm text-start flex-grow-1"
+                @click="charakterBearbeiten(eintrag)">
+                {{ charakterName(eintrag) }} bearbeiten
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-danger btn-sm text-start flex-grow-1"
+                @click="loescheEinzelCharakter(eintrag)">
+                {{ charakterName(eintrag) }} löschen
+              </button>
+            </div>
           </div>
         </div>
         <template v-if="appRolle === 'charakter'">
@@ -778,6 +818,13 @@ window.HTBAH_SEITEN.Einstellungen = {
             :symbol="speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonSymbol"
             @click="oeffneLoeschDialog('wuerfelbeutelUndAtmosphaere')">
             {{ speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.sicherheitsmechanismen.buttonSymbol"
+            @click="oeffneLoeschDialog('sicherheitsmechanismen')">
+            {{ speicherBereiche.sicherheitsmechanismen.buttonLabel }}
           </icon-text-button>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
@@ -843,6 +890,13 @@ window.HTBAH_SEITEN.Einstellungen = {
             :symbol="speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonSymbol"
             @click="oeffneLoeschDialog('wuerfelbeutelUndAtmosphaere')">
             {{ speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.sicherheitsmechanismen.buttonSymbol"
+            @click="oeffneLoeschDialog('sicherheitsmechanismen')">
+            {{ speicherBereiche.sicherheitsmechanismen.buttonLabel }}
           </icon-text-button>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"

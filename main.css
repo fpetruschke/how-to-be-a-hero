@@ -402,6 +402,70 @@ input::placeholder {
   border-color: var(--primary-color);
 }
 
+.htbah-weltenbau-pill-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.35rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--card-bg) 92%, var(--bs-tertiary-bg) 8%);
+}
+
+.htbah-weltenbau-pill-tabs .nav-item {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.htbah-weltenbau-pill-tab {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 0.55rem !important;
+  padding: 0.45rem 0.75rem;
+  color: var(--navbar-link);
+  font-weight: 600;
+  background: transparent;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.htbah-weltenbau-pill-tab:hover,
+.htbah-weltenbau-pill-tab:focus-visible {
+  color: var(--heading-color);
+  border-color: color-mix(in srgb, var(--primary-color) 50%, transparent);
+  background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+}
+
+.htbah-weltenbau-pill-tab.active {
+  color: var(--heading-color);
+  border-color: color-mix(in srgb, var(--primary-color) 58%, transparent);
+  background: color-mix(in srgb, var(--primary-color) 22%, transparent);
+  box-shadow: none;
+}
+
+@media (max-width: 575.98px) {
+  .htbah-weltenbau-pill-tabs {
+    gap: 0.35rem;
+    padding: 0.35rem;
+  }
+
+  .htbah-weltenbau-pill-tabs .nav-item {
+    flex-basis: 100%;
+  }
+
+  .htbah-weltenbau-pill-tab {
+    justify-content: flex-start;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
 .htbah-generator-modal-layer {
   z-index: 4060;
 }
@@ -449,6 +513,21 @@ input::placeholder {
     #fff;
   cursor: grab;
   touch-action: none;
+}
+
+.htbah-weltenbau-map-header {
+  gap: 0.5rem;
+}
+
+.htbah-weltenbau-map-title {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.htbah-weltenbau-map-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
 }
 
 .htbah-weltenbau-map-canvas:active {
@@ -586,6 +665,45 @@ input::placeholder {
   pointer-events: auto;
 }
 
+@media (max-width: 768px) {
+  .htbah-weltenbau-map-window {
+    width: 100vw;
+    height: 100dvh;
+    max-width: 100vw;
+    max-height: 100dvh;
+    min-width: 0;
+    min-height: 0;
+    border-radius: 0;
+  }
+
+  .htbah-weltenbau-map-header {
+    cursor: default;
+    touch-action: auto;
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .htbah-weltenbau-map-title {
+    font-size: 0.95rem;
+  }
+
+  .htbah-weltenbau-map-actions {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.2rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .htbah-weltenbau-map-actions > .btn-group,
+  .htbah-weltenbau-map-actions > .regelwerk-icon-button,
+  .htbah-weltenbau-map-actions > .btn-close {
+    flex: 0 0 auto;
+  }
+}
+
 /* Globale Bildbetrachter-Fenster (Weltenbau u. a.) */
 .htbah-bb-host {
   position: relative;
@@ -652,19 +770,23 @@ input::placeholder {
 }
 
 .htbah-bottom-nav-inner {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  overflow-x: hidden;
   width: 100%;
 }
 
 .htbah-bottom-nav-inner > a,
 .htbah-bottom-nav-inner > button {
-  flex: 1 1 0;
+  flex: 1 1 0%;
+  width: 0;
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: 0.6rem;
+  border: 1px solid transparent;
+  line-height: 1;
 }
 
 .navbar-fixed a {
@@ -686,10 +808,8 @@ input::placeholder {
   color: var(--primary-color);
 }
 
-.htbah-bottom-nav-inner > a {
-  padding: 0.35rem 0.4rem;
-  border-radius: 0.6rem;
-  border: 1px solid transparent;
+.htbah-bottom-nav-inner > a,
+.htbah-bottom-nav-inner > button {
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease,
@@ -700,6 +820,12 @@ input::placeholder {
   color: var(--heading-color);
   background: color-mix(in srgb, var(--primary-color) 22%, transparent);
   border-color: color-mix(in srgb, var(--primary-color) 58%, transparent);
+}
+
+.htbah-bottom-nav-inner > button:hover {
+  color: var(--heading-color);
+  background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+  border-color: color-mix(in srgb, var(--primary-color) 50%, transparent);
 }
 
 .navbar-fixed button:hover {
@@ -1023,16 +1149,33 @@ input::placeholder {
   border-color: var(--border-color);
 }
 
+/* Mobile: Modale starten einheitlich in voller Bildschirmbreite */
+@media (max-width: 767.98px) {
+  .modal .modal-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    margin: 0;
+  }
+
+  .modal .modal-content {
+    width: 100%;
+  }
+
+  .regelwerk-modal-window {
+    width: 100vw;
+    max-width: 100vw;
+    min-width: 0;
+    left: 0 !important;
+  }
+}
+
 /* Lokaler-Speicher-Hinweis: auf schmalen Viewports zentrieren, Inhalt bei Bedarf scrollen */
 @media (max-width: 575.98px) {
   #htbahLokalerSpeicherHinweisModal.modal.show {
     display: flex !important;
     align-items: center;
     justify-content: center;
-    padding: 1rem;
-    padding-left: max(1rem, env(safe-area-inset-left));
-    padding-right: max(1rem, env(safe-area-inset-right));
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    padding: 0;
   }
 
   #htbahLokalerSpeicherHinweisModal .modal-dialog {
@@ -1048,7 +1191,7 @@ input::placeholder {
   }
 
   #htbahLokalerSpeicherHinweisModal .modal-content {
-    max-height: min(90dvh, calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+    max-height: min(100dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -1750,9 +1893,64 @@ input::placeholder {
   max-width: none;
 }
 
+.htbah-charakter-stammdaten-row .charakterbild-vorschau-klein,
+.htbah-charakter-stammdaten-row .charakterbild-platzhalter-klein {
+  border: none;
+}
+
 @media (min-width: 992px) {
-  .htbah-charakterbild-status-wrap {
-    width: 100%;
+  .htbah-charakter-stammdaten-row .htbah-charakterbild-spalte {
+    --htbah-charakterbild-hoehe: 345px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .htbah-charakter-stammdaten-row .htbah-charakterbild-einheit {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .htbah-charakter-stammdaten-row .htbah-charakterbild-vorschau-wrap {
+    height: auto;
+    max-height: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .htbah-charakter-stammdaten-row .htbah-charakterbild-status-wrap {
+    width: auto;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .htbah-charakter-stammdaten-row .charakterbild-vorschau-klein,
+  .htbah-charakter-stammdaten-row .charakterbild-platzhalter-klein {
+    width: auto;
+    height: var(--htbah-charakterbild-hoehe);
+    max-width: min(42vw, 390px);
+    max-height: var(--htbah-charakterbild-hoehe);
+    aspect-ratio: 3 / 4;
+    margin-left: 0;
+    margin-right: 0;
+    border: none;
+  }
+
+  .htbah-charakter-stammdaten-row .charakterbild-vorschau-klein {
+    object-fit: contain;
+    object-position: center;
+  }
+
+  .htbah-charakter-stammdaten-row .htbah-charakterbild-einheit > .btn {
+    width: 100% !important;
   }
 }
 
@@ -1804,6 +2002,52 @@ input::placeholder {
   font-weight: 400;
 }
 
+.htbah-pdf-export-gruppe {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.htbah-pdf-export-gruppe-btn,
+.htbah-pdf-export-gruppe-select {
+  width: 100%;
+}
+
+@media (max-width: 767.98px) {
+  .htbah-pdf-export-gruppe {
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    background: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  }
+}
+
+@media (min-width: 768px) {
+  .htbah-pdf-export-gruppe {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .htbah-pdf-export-gruppe-btn {
+    flex: 1 1 auto;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .htbah-pdf-export-gruppe-theme-wrap {
+    flex: 0 0 220px;
+    max-width: 220px;
+  }
+
+  .htbah-pdf-export-gruppe-select {
+    flex: 0 0 220px;
+    max-width: 220px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+}
+
 /* Wetter-Badge (schwebend, über der Bottom-Nav) */
 .htbah-atmosphaere-badge {
   position: fixed;
@@ -1823,6 +2067,51 @@ input::placeholder {
   background: color-mix(in srgb, var(--bs-body-bg) 92%, var(--atmosphaere-akzent, var(--primary-color)) 8%);
   touch-action: manipulation;
 }
+
+.htbah-sicherheits-fab-stack {
+  position: fixed;
+  top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 0.6rem);
+  left: max(0.6rem, env(safe-area-inset-left, 0px));
+  z-index: 1045;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.htbah-sicherheits-fab {
+  position: relative;
+  z-index: auto;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  border: 4px solid #b91c1c;
+  background: #fff;
+  color: #b91c1c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  box-shadow: 0 8px 18px rgba(127, 29, 29, 0.42);
+}
+
+.htbah-sicherheits-fab:hover,
+.htbah-sicherheits-fab:focus-visible {
+  filter: brightness(1.06);
+}
+
+.htbah-sicherheits-quill {
+  min-height: 12rem;
+}
+
+.htbah-sicherheits-readonly-card {
+  border-radius: 0.4rem;
+}
+
+.htbah-sicherheits-readonly-card .ql-toolbar,
+.htbah-sicherheits-readonly-card .ql-snow .ql-toolbar {
+  display: none !important;
+}
+
 
 .htbah-atmosphaere-badge--custom-pos {
   right: auto;

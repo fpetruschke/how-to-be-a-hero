@@ -51,6 +51,12 @@ function zufallstabellenDateiZuDataUrl(file) {
 }
 
 window.HTBAH_SEITEN.Zufallstabellen = {
+  props: {
+    eingebettet: {
+      type: Boolean,
+      default: false,
+    },
+  },
   components: {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
     ZufallstabellenZeileModal: window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal,
@@ -95,6 +101,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     };
   },
   computed: {
+    rootKlassen() {
+      return this.eingebettet ? '' : 'container content py-3';
+    },
     zeileModalTitel() {
       if (!this.bearbeitung) {
         return '';
@@ -1561,20 +1570,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     this.zeileQuillHostElement = null;
   },
   template: `
-    <div class="container content py-3">
+    <div :class="rootKlassen">
       <weltenbau-bild-import-modal
         ref="zufallstabellenBildImportModal"
         @fertig="onZufallstabellenBildImportFertig"
         @abgebrochen="onZufallstabellenBildImportAbgebrochen"
         @datei-import-fehler="onZufallstabellenBildImportFehler" />
-
-      <h4 class="text-center mb-3 htbah-page-title">
-        <span class="htbah-page-title-emoji" aria-hidden="true">📚</span>
-        <span>Zufallstabellen</span>
-      </h4>
-      <p class="text-secondary text-center small mb-3">
-        Eigene Tabellen für Spielrunden.
-      </p>
 
       <div class="mb-4">
         <div class="input-group">

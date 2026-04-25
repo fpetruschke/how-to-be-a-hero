@@ -160,6 +160,7 @@ window.HTBAH_SEITEN.Weltenbau = {
   components: {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
     WeltenbauUebersichtModal: window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal,
+    ZufallstabellenSeite: window.HTBAH_SEITEN.Zufallstabellen,
   },
   data() {
     const zustandRoh = window.HTBAH.ladeWeltenbauZustand();
@@ -261,8 +262,29 @@ window.HTBAH_SEITEN.Weltenbau = {
     generatorVollbildLabel() {
       return this.generatorModal.istVollbild ? 'Vollbild beenden' : 'Vollbild';
     },
+    aktiveWeltenbauTab() {
+      const pfad = this.$route && this.$route.path ? this.$route.path : '';
+      if (pfad === '/weltenbau/zufallstabellen') {
+        return 'zufallstabellen';
+      }
+      if (pfad === '/weltenbau/generatoren') {
+        return 'generatoren';
+      }
+      return 'welt';
+    },
   },
   methods: {
+    wechsleWeltenbauTab(tabId) {
+      const routeByTab = {
+        welt: '/weltenbau/welt',
+        zufallstabellen: '/weltenbau/zufallstabellen',
+        generatoren: '/weltenbau/generatoren',
+      };
+      const ziel = routeByTab[tabId] || routeByTab.welt;
+      if (ziel !== this.$route.path) {
+        this.$router.push(ziel);
+      }
+    },
     onWeltenbauMapModalSchliessen() {
       this.weltenbauMapModalOffen = false;
     },
@@ -764,14 +786,40 @@ window.HTBAH_SEITEN.Weltenbau = {
         <span>Weltenbau</span>
       </h4>
       <p class="small text-body-secondary text-center mb-3">
-        Externe Generatoren (u. a. Karten, Gebäude, Dungeons) mit Export als PNG/JSON.
+        Welt, Zufallstabellen und Generatoren zentral in einer Navigation.
       </p>
+
+      <ul class="nav htbah-weltenbau-pill-tabs mb-3" role="tablist" aria-label="Weltenbau Unterseiten">
+        <li class="nav-item" role="presentation">
+          <button type="button" class="nav-link htbah-weltenbau-pill-tab" :class="{ active: aktiveWeltenbauTab === 'zufallstabellen' }" @click="wechsleWeltenbauTab('zufallstabellen')">
+            <span aria-hidden="true">📚</span>
+            <span>Zufallstabellen</span>
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button type="button" class="nav-link htbah-weltenbau-pill-tab" :class="{ active: aktiveWeltenbauTab === 'welt' }" @click="wechsleWeltenbauTab('welt')">
+            <span aria-hidden="true">🗺️</span>
+            <span>Welt</span>
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button type="button" class="nav-link htbah-weltenbau-pill-tab" :class="{ active: aktiveWeltenbauTab === 'generatoren' }" @click="wechsleWeltenbauTab('generatoren')">
+            <span aria-hidden="true">🛠️</span>
+            <span>Generatoren</span>
+          </button>
+        </li>
+      </ul>
+
+      <template v-if="aktiveWeltenbauTab === 'welt'">
+      <div class="alert alert-info py-2 px-3 small mb-2" role="note">
+        Wähle eine Gruppe, öffne die interaktive Welt und verwalte darunter deine importierten Bilder.
+      </div>
 
       <div class="card p-3 mb-3">
         <div class="row">
           <div class="col-12">
             <p class="small text-body-secondary mb-3">
-              Im interaktiven Weltenbau-Übersichts-Modal siehst du alle NPCs, Orte, Fraktionen, Bestien usw.<br>
+              In der interaktiven Welt siehst du alle NPCs, Orte, Fraktionen, Bestien usw.<br>
               Dafür musst du zuerst eine Gruppe von Spielenden auswählen.
             </p>
           </div>          
@@ -789,7 +837,7 @@ window.HTBAH_SEITEN.Weltenbau = {
           </div>
           <div class="col-12 col-md-4 d-grid">
             <button type="button" class="btn btn-primary" :disabled="!ausgewaehlteGruppeId" @click="weltenbauMapModalOffen = true">
-              Interaktive Übersicht öffnen
+              Interaktive Welt öffnen
             </button>
           </div>
         </div>
@@ -895,59 +943,72 @@ window.HTBAH_SEITEN.Weltenbau = {
         </div>
       </div>
 
-      <div class="card p-3 mb-3">
-        <h6 class="mb-2">Generatoren (extern)</h6>
-        <div class="alert alert-warning py-2 small mb-3" role="alert">
-          Diese Generatoren stammen von Watabou und werden hier nur eingebettet. JSON-Exporte kannst du
-          in den Generatoren selbst sichern und später wieder laden. Die zuletzt bekannte Generator-URL
-          (inkl. Query-Parametern, soweit vom Browser zugänglich) wird lokal gespeichert und beim nächsten Öffnen wiederverwendet.
+      </template>
+
+      <template v-else-if="aktiveWeltenbauTab === 'zufallstabellen'">
+        <div class="alert alert-info py-2 px-3 small mb-2" role="note">
+          Nutze die Tabellen für schnelle Ideen und spontane Ereignisse. Die Inhalte werden in der Interaktiven Welt verfügbar.
         </div>
-        <div class="row g-2">
-          <div
-            v-for="generator in generatoren"
-            :key="generator.id"
-            class="col-12 col-sm-6 col-lg-4">
-            <component
-              :is="generator.nurExternerTab ? 'a' : 'button'"
-              v-bind="
-                generator.nurExternerTab
-                  ? { href: generator.startUrl, target: '_blank', rel: 'noopener noreferrer' }
-                  : { type: 'button' }
-              "
-              class="card shadow-sm w-100 h-100 text-start htbah-weltenbau-generator-card"
-              :class="{ 'text-decoration-none text-body': generator.nurExternerTab }"
-              @click="onWeltenbauGeneratorKarteKlick(generator)">
-              <div class="card-body py-2 px-3">
-                <div class="fw-semibold mb-1 d-flex align-items-center flex-wrap gap-1">
-                  <span>{{ generator.titel }}</span>
-                  <template v-if="generator.nurExternerTab">
-                    <span class="text-body-secondary" aria-hidden="true">(</span>
-                    <span
-                      class="material-symbols-outlined htbah-weltenbau-extern-tab-icon"
-                      aria-hidden="true">open_in_new</span>
-                    <span class="text-body-secondary" aria-hidden="true">)</span>
-                  </template>
+        <zufallstabellen-seite eingebettet />
+      </template>
+
+      <template v-else>
+        <div class="alert alert-info py-2 px-3 small mb-2" role="note">
+          Nutze externe Werkzeuge, um dort z. B. Bilddateien herunterzuladen und in den anderen Bereichen hochzuladen.
+        </div>
+        <div class="card p-3 mb-3">
+          <div class="alert alert-warning py-2 small mb-3" role="alert">
+            Diese Generatoren stammen von Watabou und werden hier nur eingebettet. JSON-Exporte kannst du
+            in den Generatoren selbst sichern und später wieder laden. Die zuletzt bekannte Generator-URL
+            (inkl. Query-Parametern, soweit vom Browser zugänglich) wird lokal gespeichert und beim nächsten Öffnen wiederverwendet.
+          </div>
+          <div class="row g-2">
+            <div
+              v-for="generator in generatoren"
+              :key="generator.id"
+              class="col-12 col-sm-6 col-lg-4">
+              <component
+                :is="generator.nurExternerTab ? 'a' : 'button'"
+                v-bind="
+                  generator.nurExternerTab
+                    ? { href: generator.startUrl, target: '_blank', rel: 'noopener noreferrer' }
+                    : { type: 'button' }
+                "
+                class="card shadow-sm w-100 h-100 text-start htbah-weltenbau-generator-card"
+                :class="{ 'text-decoration-none text-body': generator.nurExternerTab }"
+                @click="onWeltenbauGeneratorKarteKlick(generator)">
+                <div class="card-body py-2 px-3">
+                  <div class="fw-semibold mb-1 d-flex align-items-center flex-wrap gap-1">
+                    <span>{{ generator.titel }}</span>
+                    <template v-if="generator.nurExternerTab">
+                      <span class="text-body-secondary" aria-hidden="true">(</span>
+                      <span
+                        class="material-symbols-outlined htbah-weltenbau-extern-tab-icon"
+                        aria-hidden="true">open_in_new</span>
+                      <span class="text-body-secondary" aria-hidden="true">)</span>
+                    </template>
+                  </div>
+                  <div class="small text-body-secondary text-truncate" :title="generator.sourceUrl">
+                    Quelle: {{ generator.sourceUrl }}
+                  </div>
+                  <div
+                    v-if="!generator.nurExternerTab && zustand.generatorUrls && zustand.generatorUrls[generator.id]"
+                    class="small text-body-secondary text-truncate"
+                    :title="zustand.generatorUrls[generator.id]">
+                    Letzte URL: {{ zustand.generatorUrls[generator.id] }}
+                  </div>
+                  <div
+                    v-if="zustand.generatorAufrufe && zustand.generatorAufrufe[generator.id]"
+                    class="small text-body-secondary"
+                    :title="formatGeneratorAufruf(zustand.generatorAufrufe[generator.id])">
+                    Letzter Aufruf: {{ formatGeneratorAufruf(zustand.generatorAufrufe[generator.id]) }}
+                  </div>
                 </div>
-                <div class="small text-body-secondary text-truncate" :title="generator.sourceUrl">
-                  Quelle: {{ generator.sourceUrl }}
-                </div>
-                <div
-                  v-if="!generator.nurExternerTab && zustand.generatorUrls && zustand.generatorUrls[generator.id]"
-                  class="small text-body-secondary text-truncate"
-                  :title="zustand.generatorUrls[generator.id]">
-                  Letzte URL: {{ zustand.generatorUrls[generator.id] }}
-                </div>
-                <div
-                  v-if="zustand.generatorAufrufe && zustand.generatorAufrufe[generator.id]"
-                  class="small text-body-secondary"
-                  :title="formatGeneratorAufruf(zustand.generatorAufrufe[generator.id])">
-                  Letzter Aufruf: {{ formatGeneratorAufruf(zustand.generatorAufrufe[generator.id]) }}
-                </div>
-              </div>
-            </component>
+              </component>
+            </div>
           </div>
         </div>
-      </div>
+      </template>
 
       <div class="abstandshalter" aria-hidden="true"></div>
 

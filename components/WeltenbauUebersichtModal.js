@@ -1,6 +1,9 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
 (function () {
+  const MAP_ZOOM_MIN = 0.01; // 1% (0% ist technisch nicht nutzbar)
+  const MAP_ZOOM_MAX = 10; // 1000%
+
   function formatBytes(n) {
     if (!Number.isFinite(n) || n <= 0) {
       return '';
@@ -73,8 +76,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           panStartY: 0,
           panOffsetStartX: 0,
           panOffsetStartY: 0,
+          touchPointer: {},
+          pinchAktiv: false,
+          pinchStartAbstand: 0,
+          pinchStartScale: 1,
+          pinchWeltX: 0,
+          pinchWeltY: 0,
           stageWidth: 5200,
           stageHeight: 3600,
+        },
+        verlauf: {
+          undoStack: [],
+          redoStack: [],
+          pendingBefore: null,
+          zoomCommitTimer: 0,
         },
         nodeDrag: {
           aktiv: false,
@@ -233,6 +248,22 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       itemScaleProzent() {
         return Math.round(Number(this.map.itemScale) || 100);
       },
+      mapScaleProzent() {
+        return Math.round((Number(this.map.scale) || 1) * 100);
+      },
+      mapScaleLabel() {
+        const prozent = (Number(this.map.scale) || 1) * 100;
+        if (prozent < 10) {
+          return `${prozent.toFixed(1).replace('.', ',')}%`;
+        }
+        return `${Math.round(prozent)}%`;
+      },
+      kannUndo() {
+        return !!(this.verlauf.undoStack && this.verlauf.undoStack.length);
+      },
+      kannRedo() {
+        return !!(this.verlauf.redoStack && this.verlauf.redoStack.length);
+      },
       charakterModalStatus() {
         if (!this.charakterModal.charakter) {
           return { tot: false, bewusstlos: false };
@@ -367,7 +398,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.modal.positionY = Math.min(Math.max(0, this.modal.positionY || 0), maxY);
       },
       starteZiehen(event) {
-        if (this.modal.istVollbild || event.target.closest('button, a, input')) {
+        if (
+          this.modal.istVollbild ||
+          event.target.closest('button, a, input') ||
+          event.target.closest('.htbah-weltenbau-map-actions')
+        ) {
           return;
         }
         if (event.pointerType === 'mouse' && event.button !== 0) {
@@ -1102,6 +1137,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (!node || !node.id) {
           return;
         }
+        this.starteVerlaufAktion();
         this.nodeDrag.aktiv = true;
         this.nodeDrag.nodeId = node.id;
         this.nodeDrag.startClientX = event.clientX;
@@ -1409,10 +1445,246 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         };
         this.oeffneCharakterBearbeitung(node);
       },
+      begrenzeMapScale(wert) {
+        return Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, Number(wert) || 1));
+      },
+      setzeMapScaleMitAnker(neueScale, clientX, clientY) {
+        const scaleAlt = Number(this.map.scale) || 1;
+        const scaleNeu = this.begrenzeMapScale(neueScale);
+        if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+          this.map.scale = scaleNeu;
+          return;
+        }
+        const weltX = (clientX - this.map.offsetX) / scaleAlt;
+        const weltY = (clientY - this.map.offsetY) / scaleAlt;
+        this.map.scale = scaleNeu;
+        this.map.offsetX = clientX - weltX * scaleNeu;
+        this.map.offsetY = clientY - weltY * scaleNeu;
+      },
+      erstelleVerlaufSnapshot() {
+        const nodePositionen = {};
+        (this.graph.nodes || []).forEach((node) => {
+          if (!node || !node.id || !node.position) {
+            return;
+          }
+          nodePositionen[node.id] = {
+            x: Math.round(Number(node.position.x) || 0),
+            y: Math.round(Number(node.position.y) || 0),
+          };
+        });
+        return {
+          gruppeKey: this.graph.gruppeKey || this.gruppeId || 'default',
+          scale: Number(this.map.scale) || 1,
+          offsetX: Number(this.map.offsetX) || 0,
+          offsetY: Number(this.map.offsetY) || 0,
+          nodePositionen,
+        };
+      },
+      snapshotsSindGleich(a, b) {
+        if (!a || !b) {
+          return false;
+        }
+        if (
+          a.gruppeKey !== b.gruppeKey ||
+          a.scale !== b.scale ||
+          a.offsetX !== b.offsetX ||
+          a.offsetY !== b.offsetY
+        ) {
+          return false;
+        }
+        const aKeys = Object.keys(a.nodePositionen || {});
+        const bKeys = Object.keys(b.nodePositionen || {});
+        if (aKeys.length !== bKeys.length) {
+          return false;
+        }
+        return aKeys.every((key) => {
+          const pa = a.nodePositionen[key];
+          const pb = b.nodePositionen[key];
+          return !!pb && pa.x === pb.x && pa.y === pb.y;
+        });
+      },
+      verlaufZuruecksetzen() {
+        if (this.verlauf.zoomCommitTimer) {
+          window.clearTimeout(this.verlauf.zoomCommitTimer);
+          this.verlauf.zoomCommitTimer = 0;
+        }
+        this.verlauf.undoStack = [];
+        this.verlauf.redoStack = [];
+        this.verlauf.pendingBefore = null;
+      },
+      starteVerlaufAktion() {
+        if (!this.verlauf.pendingBefore) {
+          this.verlauf.pendingBefore = this.erstelleVerlaufSnapshot();
+        }
+      },
+      bestaetigeVerlaufAktion() {
+        if (!this.verlauf.pendingBefore) {
+          return;
+        }
+        const vorher = this.verlauf.pendingBefore;
+        const nachher = this.erstelleVerlaufSnapshot();
+        this.verlauf.pendingBefore = null;
+        if (this.snapshotsSindGleich(vorher, nachher)) {
+          return;
+        }
+        this.verlauf.undoStack.push(vorher);
+        if (this.verlauf.undoStack.length > 120) {
+          this.verlauf.undoStack.splice(0, this.verlauf.undoStack.length - 120);
+        }
+        this.verlauf.redoStack = [];
+      },
+      planeZoomVerlaufCommit() {
+        if (this.verlauf.zoomCommitTimer) {
+          window.clearTimeout(this.verlauf.zoomCommitTimer);
+        }
+        this.verlauf.zoomCommitTimer = window.setTimeout(() => {
+          this.verlauf.zoomCommitTimer = 0;
+          this.bestaetigeVerlaufAktion();
+        }, 220);
+      },
+      wendeSnapshotAn(snapshot) {
+        if (!snapshot || typeof snapshot !== 'object') {
+          return;
+        }
+        this.map.scale = this.begrenzeMapScale(snapshot.scale);
+        this.map.offsetX = Number(snapshot.offsetX) || 0;
+        this.map.offsetY = Number(snapshot.offsetY) || 0;
+        (this.graph.nodes || []).forEach((node) => {
+          const pos = snapshot.nodePositionen && snapshot.nodePositionen[node.id];
+          if (!pos) {
+            return;
+          }
+          node.position = {
+            x: Math.round(Number(pos.x) || 0),
+            y: Math.round(Number(pos.y) || 0),
+          };
+        });
+        const gruppeKey = snapshot.gruppeKey || this.graph.gruppeKey || this.gruppeId || 'default';
+        const aktuelleLayouts = this.ladeLayouts();
+        const next = { ...aktuelleLayouts };
+        const gruppeLayout = { ...(next[gruppeKey] || {}) };
+        Object.keys(snapshot.nodePositionen || {}).forEach((nodeId) => {
+          const pos = snapshot.nodePositionen[nodeId];
+          gruppeLayout[nodeId] = {
+            x: Math.round(Number(pos.x) || 0),
+            y: Math.round(Number(pos.y) || 0),
+          };
+        });
+        next[gruppeKey] = gruppeLayout;
+        this.speichereLayout(next);
+        this.graph.layoutAlle = next;
+      },
+      verlaufUndo() {
+        if (!this.kannUndo) {
+          return;
+        }
+        const vorher = this.verlauf.undoStack.pop();
+        const jetzt = this.erstelleVerlaufSnapshot();
+        this.verlauf.redoStack.push(jetzt);
+        this.wendeSnapshotAn(vorher);
+      },
+      verlaufRedo() {
+        if (!this.kannRedo) {
+          return;
+        }
+        const nachher = this.verlauf.redoStack.pop();
+        const jetzt = this.erstelleVerlaufSnapshot();
+        this.verlauf.undoStack.push(jetzt);
+        this.wendeSnapshotAn(nachher);
+      },
+      mapViewportMitteClient() {
+        const canvas = this.$el && this.$el.querySelector ? this.$el.querySelector('.htbah-weltenbau-map-canvas') : null;
+        if (!canvas || typeof canvas.getBoundingClientRect !== 'function') {
+          return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        }
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        };
+      },
+      mapZoomIn() {
+        this.starteVerlaufAktion();
+        const mitte = this.mapViewportMitteClient();
+        this.setzeMapScaleMitAnker((Number(this.map.scale) || 1) * 1.12, mitte.x, mitte.y);
+        this.bestaetigeVerlaufAktion();
+      },
+      mapZoomOut() {
+        this.starteVerlaufAktion();
+        const mitte = this.mapViewportMitteClient();
+        this.setzeMapScaleMitAnker((Number(this.map.scale) || 1) / 1.12, mitte.x, mitte.y);
+        this.bestaetigeVerlaufAktion();
+      },
+      mapZoomReset() {
+        this.starteVerlaufAktion();
+        const mitte = this.mapViewportMitteClient();
+        this.setzeMapScaleMitAnker(1, mitte.x, mitte.y);
+        this.bestaetigeVerlaufAktion();
+      },
+      speichereTouchPointer(event) {
+        if (!event || !Number.isFinite(event.pointerId)) {
+          return;
+        }
+        this.map.touchPointer[event.pointerId] = { x: event.clientX, y: event.clientY };
+      },
+      entferneTouchPointer(event) {
+        if (!event || !Number.isFinite(event.pointerId)) {
+          return;
+        }
+        delete this.map.touchPointer[event.pointerId];
+      },
+      touchPointerListe() {
+        return Object.values(this.map.touchPointer || {});
+      },
+      berechnePinchMitte(pointerListe) {
+        const a = pointerListe && pointerListe[0];
+        const b = pointerListe && pointerListe[1];
+        if (!a || !b) {
+          return null;
+        }
+        return {
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2,
+        };
+      },
+      berechnePinchAbstand(pointerListe) {
+        const a = pointerListe && pointerListe[0];
+        const b = pointerListe && pointerListe[1];
+        if (!a || !b) {
+          return 0;
+        }
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        return Math.sqrt(dx * dx + dy * dy);
+      },
+      startePinch(pointerListe) {
+        const mitte = this.berechnePinchMitte(pointerListe);
+        const distanz = this.berechnePinchAbstand(pointerListe);
+        if (!mitte || distanz <= 0) {
+          return;
+        }
+        this.starteVerlaufAktion();
+        this.map.pinchAktiv = true;
+        this.map.panning = false;
+        this.map.pinchStartAbstand = distanz;
+        this.map.pinchStartScale = Number(this.map.scale) || 1;
+        this.map.pinchWeltX = (mitte.x - this.map.offsetX) / this.map.pinchStartScale;
+        this.map.pinchWeltY = (mitte.y - this.map.offsetY) / this.map.pinchStartScale;
+      },
       startePan(event) {
         if (event.target && typeof event.target.closest === 'function' && event.target.closest('.htbah-map-node')) {
           return;
         }
+        if (event.pointerType === 'touch') {
+          this.speichereTouchPointer(event);
+          const pointerListe = this.touchPointerListe();
+          if (pointerListe.length >= 2) {
+            this.startePinch(pointerListe);
+            event.preventDefault();
+            return;
+          }
+        }
+        this.starteVerlaufAktion();
         this.map.panning = true;
         this.map.panStartX = event.clientX;
         this.map.panStartY = event.clientY;
@@ -1420,6 +1692,23 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.map.panOffsetStartY = this.map.offsetY;
       },
       onMapPointerMove(event) {
+        if (event.pointerType === 'touch') {
+          this.speichereTouchPointer(event);
+          if (this.map.pinchAktiv) {
+            const pointerListe = this.touchPointerListe();
+            if (pointerListe.length >= 2 && this.map.pinchStartAbstand > 0) {
+              const mitte = this.berechnePinchMitte(pointerListe);
+              const distanz = this.berechnePinchAbstand(pointerListe);
+              const faktor = distanz / this.map.pinchStartAbstand;
+              const scaleNeu = this.begrenzeMapScale(this.map.pinchStartScale * faktor);
+              this.map.scale = scaleNeu;
+              this.map.offsetX = mitte.x - this.map.pinchWeltX * scaleNeu;
+              this.map.offsetY = mitte.y - this.map.pinchWeltY * scaleNeu;
+              event.preventDefault();
+              return;
+            }
+          }
+        }
         if (this.nodeDrag.aktiv) {
           const node = this.findeNode(this.nodeDrag.nodeId);
           if (!node) {
@@ -1445,6 +1734,24 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.map.offsetY = this.map.panOffsetStartY + (event.clientY - this.map.panStartY);
       },
       onMapPointerUp(event) {
+        if (event.pointerType === 'touch') {
+          this.entferneTouchPointer(event);
+          const pointerListe = this.touchPointerListe();
+          if (this.map.pinchAktiv && pointerListe.length < 2) {
+            this.map.pinchAktiv = false;
+            this.map.pinchStartAbstand = 0;
+            if (pointerListe.length === 1) {
+              const pointer = pointerListe[0];
+              this.map.panning = true;
+              this.map.panStartX = pointer.x;
+              this.map.panStartY = pointer.y;
+              this.map.panOffsetStartX = this.map.offsetX;
+              this.map.panOffsetStartY = this.map.offsetY;
+              return;
+            }
+            this.bestaetigeVerlaufAktion();
+          }
+        }
         if (this.nodeDrag.aktiv) {
           const node = this.findeNode(this.nodeDrag.nodeId);
           if (node) {
@@ -1483,10 +1790,44 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.nodeDrag.nodeId = '';
         this.setzeDragHoverZiel('');
         this.map.panning = false;
+        this.bestaetigeVerlaufAktion();
       },
       onMapWheel(event) {
-        const delta = event.deltaY < 0 ? 0.08 : -0.08;
-        this.map.scale = Math.min(2.2, Math.max(0.35, this.map.scale + delta));
+        this.starteVerlaufAktion();
+        const faktor = Math.exp(-event.deltaY * 0.0015);
+        this.setzeMapScaleMitAnker((Number(this.map.scale) || 1) * faktor, event.clientX, event.clientY);
+        this.planeZoomVerlaufCommit();
+      },
+      istEditierbaresElement(el) {
+        if (!el || typeof el.closest !== 'function') {
+          return false;
+        }
+        return !!el.closest('input, textarea, select, [contenteditable="true"], .ql-editor');
+      },
+      onGlobalKeydown(event) {
+        if (!this.offen || !event) {
+          return;
+        }
+        if (!(event.ctrlKey || event.metaKey)) {
+          return;
+        }
+        if (this.istEditierbaresElement(event.target)) {
+          return;
+        }
+        const key = String(event.key || '').toLowerCase();
+        if (key === 'z') {
+          event.preventDefault();
+          if (event.shiftKey) {
+            this.verlaufRedo();
+          } else {
+            this.verlaufUndo();
+          }
+          return;
+        }
+        if (key === 'y') {
+          event.preventDefault();
+          this.verlaufRedo();
+        }
       },
       updateAufenthaltsort(entityType, entityId, ortName) {
         const listeName =
@@ -1961,17 +2302,24 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.$nextTick(() => {
             this.initialisierePosition();
             this.refreshGraph();
+            this.verlaufZuruecksetzen();
           });
         } else {
           this.nodeDrag.aktiv = false;
           this.map.panning = false;
+          this.map.pinchAktiv = false;
+          this.map.touchPointer = {};
           this.setzeDragHoverZiel('');
+          this.verlaufZuruecksetzen();
         }
       },
       gruppeId() {
         if (this.offen) {
           this.uebernehmeMapEinstellungen();
-          this.$nextTick(() => this.refreshGraph());
+          this.$nextTick(() => {
+            this.refreshGraph();
+            this.verlaufZuruecksetzen();
+          });
         }
       },
       'map.edgeColor'(neu) {
@@ -2007,12 +2355,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       window.addEventListener('pointermove', this.onMapPointerMove);
       window.addEventListener('pointerup', this.onMapPointerUp);
       window.addEventListener('pointercancel', this.onMapPointerUp);
+      window.addEventListener('keydown', this.onGlobalKeydown);
     },
     beforeUnmount() {
+      this.verlaufZuruecksetzen();
       window.removeEventListener('resize', this.onResize);
       window.removeEventListener('pointermove', this.onMapPointerMove);
       window.removeEventListener('pointerup', this.onMapPointerUp);
       window.removeEventListener('pointercancel', this.onMapPointerUp);
+      window.removeEventListener('keydown', this.onGlobalKeydown);
     },
     template: `
       <div v-if="offen" class="regelwerk-modal-layer htbah-weltenbau-map-layer">
@@ -2021,9 +2372,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           class="regelwerk-modal-window card shadow htbah-weltenbau-map-window"
           :class="{ 'regelwerk-modal-window-fullscreen': modal.istVollbild }"
           :style="fensterStil">
-          <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2" @pointerdown="starteZiehen($event)">
-            <h6 class="mb-0">Interaktive Weltenbau-Uebersicht</h6>
-            <div class="d-flex align-items-center gap-1">
+          <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2 htbah-weltenbau-map-header" @pointerdown="starteZiehen($event)">
+            <h6 class="mb-0 htbah-weltenbau-map-title">Interaktive Weltenbau-Uebersicht</h6>
+            <div class="d-flex align-items-center gap-1 htbah-weltenbau-map-actions">
               <div class="btn-group">
                 <button
                   type="button"
@@ -2113,6 +2464,35 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     </label>
                   </div>
                 </div>
+              </div>
+              <div class="btn-group">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-secondary"
+                  :disabled="!kannUndo"
+                  @click="verlaufUndo"
+                  aria-label="Rückgängig">
+                  ↶
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-secondary"
+                  :disabled="!kannRedo"
+                  @click="verlaufRedo"
+                  aria-label="Wiederholen">
+                  ↷
+                </button>
+              </div>
+              <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-secondary" @click="mapZoomOut" aria-label="Zoom verkleinern">
+                  −
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @click="mapZoomReset" :title="'Aktueller Zoom: ' + mapScaleLabel">
+                  {{ mapScaleLabel }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @click="mapZoomIn" aria-label="Zoom vergrößern">
+                  +
+                </button>
               </div>
               <div class="btn-group">
                 <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">

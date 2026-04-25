@@ -1588,11 +1588,17 @@ const routes = [
     path: '/charakter',
     redirect: () => {
       const aktiveId = window.HTBAH.ladeAktivenCharakterId();
-      return aktiveId ? `/charakter/${aktiveId}` : '/charakter/neu';
+      return aktiveId ? `/charakter/${aktiveId}/session-zero` : '/charakter/neu/session-zero';
     },
   },
-  { path: '/charakter/neu', component: window.HTBAH_SEITEN.Charakter },
-  { path: '/charakter/:id', component: window.HTBAH_SEITEN.Charakter },
+  { path: '/charakter/neu', redirect: '/charakter/neu/session-zero' },
+  { path: '/charakter/neu/session-zero', component: window.HTBAH_SEITEN.Charakter },
+  { path: '/charakter/neu/aktives-spiel', component: window.HTBAH_SEITEN.Charakter },
+  { path: '/charakter/neu/nachbereitung', component: window.HTBAH_SEITEN.Charakter },
+  { path: '/charakter/:id', redirect: (to) => `/charakter/${to.params.id}/session-zero` },
+  { path: '/charakter/:id/session-zero', component: window.HTBAH_SEITEN.Charakter },
+  { path: '/charakter/:id/aktives-spiel', component: window.HTBAH_SEITEN.Charakter },
+  { path: '/charakter/:id/nachbereitung', component: window.HTBAH_SEITEN.Charakter },
   { path: '/charakter-erstellung', redirect: '/charakter/neu' },
   { path: '/faehigkeiten-presets', component: window.HTBAH_SEITEN.PresetVerwaltung },
   { path: '/faehigkeiten-preset-bearbeiten', component: window.HTBAH_SEITEN.PresetEditor },
@@ -1600,8 +1606,10 @@ const routes = [
   { path: '/einstellungen', component: window.HTBAH_SEITEN.Einstellungen },
   { path: '/spielleiter', component: window.HTBAH_SEITEN.SpielleiterGruppenUebersicht },
   { path: '/spielleiter/gruppe/:gruppeId', component: window.HTBAH_SEITEN.SpielleiterGruppe },
-  { path: '/zufallstabellen', component: window.HTBAH_SEITEN.Zufallstabellen },
-  { path: '/weltenbau', component: window.HTBAH_SEITEN.Weltenbau },
+  { path: '/weltenbau', redirect: '/weltenbau/welt' },
+  { path: '/weltenbau/welt', component: window.HTBAH_SEITEN.Weltenbau },
+  { path: '/weltenbau/zufallstabellen', component: window.HTBAH_SEITEN.Weltenbau },
+  { path: '/weltenbau/generatoren', component: window.HTBAH_SEITEN.Weltenbau },
   { path: '/create', redirect: '/charakter/neu' },
   { path: '/presets', redirect: '/faehigkeiten-presets' },
   { path: '/presets/form', redirect: '/faehigkeiten-preset-bearbeiten' },
@@ -1619,14 +1627,17 @@ const router = VueRouter.createRouter({
 });
 
 function istNurCharakterRoute(pfad) {
-  if (pfad === '/charakter' || pfad === '/charakter/neu') {
+  if (pfad === '/charakter' || pfad === '/charakter/neu' || pfad.startsWith('/charakter/neu/')) {
     return true;
   }
-  return /^\/charakter\/[^/]+$/.test(pfad);
+  return /^\/charakter\/[^/]+(?:\/[^/]+)?$/.test(pfad);
 }
 
 function istNurSpielleitungRoute(pfad) {
-  if (pfad === '/spielleiter' || pfad === '/zufallstabellen' || pfad === '/weltenbau') {
+  if (pfad === '/spielleiter' || pfad === '/weltenbau') {
+    return true;
+  }
+  if (pfad.startsWith('/weltenbau/')) {
     return true;
   }
   if (pfad.startsWith('/spielleiter/gruppe/')) {
@@ -1655,19 +1666,19 @@ router.beforeEach((to) => {
 
   if (rolle === 'charakter' && istNurSpielleitungRoute(ziel)) {
     const aktiveId = window.HTBAH.ladeAktivenCharakterId();
-    return { path: aktiveId ? `/charakter/${aktiveId}` : '/charakter/neu' };
+    return { path: aktiveId ? `/charakter/${aktiveId}/session-zero` : '/charakter/neu/session-zero' };
   }
 
   if (rolle === 'spielleitung' && istNurCharakterRoute(ziel)) {
     return { path: '/spielleiter' };
   }
 
-  if (/^\/charakter\/[^/]+$/.test(ziel) && ziel !== '/charakter/neu') {
+  if (/^\/charakter\/[^/]+(?:\/[^/]+)?$/.test(ziel) && !ziel.startsWith('/charakter/neu')) {
     const charakterId = to.params && typeof to.params.id === 'string' ? to.params.id : '';
     if (charakterId) {
       const eintrag = window.HTBAH.ladeCharakterEintrag(charakterId);
       if (!eintrag) {
-        return { path: '/charakter/neu' };
+        return { path: '/charakter/neu/session-zero' };
       }
       window.HTBAH.setzeAktivenCharakterId(charakterId);
     }
@@ -1749,7 +1760,7 @@ router.afterEach((to) => {
   if (to.path.startsWith('/spielleiter/gruppe/')) {
     return;
   }
-  if (to.path === '/charakter/neu') {
+  if (to.path.startsWith('/charakter/neu')) {
     syncLebenspunkteStatusFromCharakter(null);
     return;
   }
@@ -1758,6 +1769,7 @@ router.afterEach((to) => {
 });
 app.component('regelwerk-modal', window.HTBAH_KOMPONENTEN.RegelwerkModal);
 app.component('abenteuerbuch-modal', window.HTBAH_KOMPONENTEN.AbenteuerbuchModal);
+app.component('sicherheitsmechanismen-modal', window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal);
 app.component(
   'lokaler-speicher-hinweis-modal',
   window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal,

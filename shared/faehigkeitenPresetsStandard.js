@@ -25,7 +25,7 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Religion', value: null },
       { name: 'Physik & Mechanik', value: null },
       { name: 'Alte Sprachen', value: null },
-      { name: 'Tierkunde', value: null },
+      { name: 'Tierkunde & -dressur', value: null },
       { name: 'Geografie', value: null },
       { name: 'Überleben (Wildnis)', value: null },
     ],
