@@ -959,23 +959,6 @@ window.HTBAH_SEITEN.Charakter = {
         rohName.replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 64) || 'charakter';
       window.HTBAH.dateiHerunterladenJson(paket, `htbah-charakter-${sicher}.json`);
     },
-    sicherheitsmechanismenExportieren() {
-      const daten = this.charakter?.sicherheitsmechanismen || {};
-      const paket = {
-        htbahExportVersion: 1,
-        typ: 'sicherheitsmechanismen',
-        exportiertAm: new Date().toISOString(),
-        sicherheitsmechanismen: {
-          tabuHtml: typeof daten.tabuHtml === 'string' ? daten.tabuHtml : '',
-          schleierHtml: typeof daten.schleierHtml === 'string' ? daten.schleierHtml : '',
-          buttonEmoji:
-            typeof daten.buttonEmoji === 'string' && daten.buttonEmoji.trim()
-              ? daten.buttonEmoji.trim()
-              : '🚩',
-        },
-      };
-      window.HTBAH.dateiHerunterladenJson(paket, 'htbah-sicherheitsmechanismen.json');
-    },
     async sicherheitsmechanismenImportieren(event) {
       const input = event?.target;
       const datei = input?.files?.[0];
