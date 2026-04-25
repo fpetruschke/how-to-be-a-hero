@@ -68,6 +68,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           scale: 1,
           itemScale: 100,
           edgeColor: '#5c636a',
+          edgeWidth: 4,
           dragHoverNodeId: '',
           offsetX: 0,
           offsetY: 0,
@@ -517,6 +518,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             typeof gruppe.edgeColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(gruppe.edgeColor)
               ? gruppe.edgeColor
               : '#5c636a',
+          edgeWidth: Number.isFinite(Number(gruppe.edgeWidth))
+            ? Math.max(1, Math.min(16, Math.round(Number(gruppe.edgeWidth))))
+            : 4,
           sichtbarkeitsFilter: {
             toteNpcsAnzeigen: filter.toteNpcsAnzeigen !== false,
             toteBestienAnzeigen: filter.toteBestienAnzeigen !== false,
@@ -528,6 +532,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const einstellungen = this.ladeMapEinstellungen();
         this.map.itemScale = einstellungen.itemScale;
         this.map.edgeColor = einstellungen.edgeColor;
+        this.map.edgeWidth = einstellungen.edgeWidth;
         this.sichtbarkeitsFilter = {
           ...this.sichtbarkeitsFilter,
           ...einstellungen.sichtbarkeitsFilter,
@@ -2349,6 +2354,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.$nextTick(() => this.refreshGraph());
         }
       },
+      'map.edgeWidth'(neu) {
+        if (!Number.isFinite(Number(neu))) {
+          return;
+        }
+        const normalisiert = Math.max(1, Math.min(16, Math.round(Number(neu))));
+        if (normalisiert !== neu) {
+          this.map.edgeWidth = normalisiert;
+          return;
+        }
+        this.speichereMapEinstellung('edgeWidth', normalisiert);
+      },
     },
     mounted() {
       window.addEventListener('resize', this.onResize);
@@ -2373,7 +2389,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           :class="{ 'regelwerk-modal-window-fullscreen': modal.istVollbild }"
           :style="fensterStil">
           <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2 htbah-weltenbau-map-header" @pointerdown="starteZiehen($event)">
-            <h6 class="mb-0 htbah-weltenbau-map-title">Interaktive Weltenbau-Uebersicht</h6>
+            <h6 class="mb-0 htbah-weltenbau-map-title">Interaktive Welt</h6>
             <div class="d-flex align-items-center gap-1 htbah-weltenbau-map-actions">
               <div class="btn-group">
                 <button
@@ -2429,6 +2445,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     class="form-control form-control-color w-100 mb-2"
                     type="color"
                     v-model="map.edgeColor" />
+                  <label class="form-label small text-secondary mb-1" for="wb-edge-width">
+                    Linien-Dicke: {{ map.edgeWidth }} px
+                  </label>
+                  <input
+                    id="wb-edge-width"
+                    class="form-range mb-2"
+                    type="range"
+                    min="1"
+                    max="16"
+                    step="1"
+                    v-model.number="map.edgeWidth" />
                   <hr class="my-2" />
                   <div class="form-check form-switch mb-2">
                     <input
@@ -2561,7 +2588,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     :y2="kante.y2"
                     :stroke="map.edgeColor"
                     stroke-opacity="0.8"
-                    stroke-width="4" />
+                    :stroke-width="map.edgeWidth" />
                 </svg>
                 <button
                   v-for="node in graph.nodes"
