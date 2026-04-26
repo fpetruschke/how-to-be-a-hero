@@ -233,6 +233,43 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       this.anlage.zeile.fraktionen = liste;
     },
+    berechneHandelnFuerInitiative() {
+      if (!this.anlage || !this.anlage.zeile) {
+        return 0;
+      }
+      const handeln = Math.round(Number(this.anlage.zeile.handeln) || 0);
+      return Math.max(0, Math.min(40, handeln));
+    },
+    initiativeWuerfelnFuerZeile() {
+      if (!this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      const handeln = this.berechneHandelnFuerInitiative();
+      const gesamt = window.HTBAH.wuerfelW10() + handeln;
+      window.HTBAH.spieleWuerfelSounds(1);
+      const max = 10 + handeln;
+      this.anlage.zeile.initiative = String(Math.max(1, Math.min(max, gesamt)));
+    },
+    async initiativeZuruecksetzen() {
+      if (!this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      const hatWert = String(this.anlage.zeile.initiative || '').trim();
+      if (!hatWert) {
+        return;
+      }
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Initiative zurücksetzen?',
+        beschreibung: 'Ist der Kampf wirklich schon vorbei?',
+        bestaetigenText: 'Zurücksetzen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: false,
+      });
+      if (!bestaetigt) {
+        return;
+      }
+      this.anlage.zeile.initiative = '';
+    },
   },
   template: `
     <div v-if="anlage.offen && anlage.zeile" class="regelwerk-modal-layer">
@@ -295,10 +332,16 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   autocomplete="off" />
                 <button
                   type="button"
+                  class="btn btn-outline-primary"
+                  @click="initiativeWuerfelnFuerZeile">
+                  🎲
+                </button>
+                <button
+                  type="button"
                   class="btn btn-outline-secondary"
                   :disabled="!String(anlage.zeile.initiative || '').trim()"
-                  @click="anlage.zeile.initiative = ''">
-                  Leeren
+                  @click="initiativeZuruecksetzen">
+                  Reset
                 </button>
               </div>
               <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
@@ -457,10 +500,16 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   autocomplete="off" />
                 <button
                   type="button"
+                  class="btn btn-outline-primary"
+                  @click="initiativeWuerfelnFuerZeile">
+                  🎲
+                </button>
+                <button
+                  type="button"
                   class="btn btn-outline-secondary"
                   :disabled="!String(anlage.zeile.initiative || '').trim()"
-                  @click="anlage.zeile.initiative = ''">
-                  Leeren
+                  @click="initiativeZuruecksetzen">
+                  Reset
                 </button>
               </div>
               <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>

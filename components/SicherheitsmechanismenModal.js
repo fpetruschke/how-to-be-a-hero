@@ -155,40 +155,6 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
       };
       window.HTBAH.dateiHerunterladenJson(paket, 'htbah-sicherheitsmechanismen.json');
     },
-    dateiImportieren(event) {
-      const input = event?.target;
-      const datei = input?.files?.[0];
-      if (!datei) {
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const roh = JSON.parse(String(reader.result || ''));
-          const daten = roh?.typ === 'sicherheitsmechanismen'
-            ? roh.sicherheitsmechanismen
-            : roh;
-          const tabuHtml = typeof daten?.tabuHtml === 'string' ? daten.tabuHtml : '';
-          const schleierHtml = typeof daten?.schleierHtml === 'string' ? daten.schleierHtml : '';
-          const buttonEmoji = typeof daten?.buttonEmoji === 'string' && daten.buttonEmoji.trim()
-            ? daten.buttonEmoji.trim()
-            : this.lokaleDaten.buttonEmoji || '🚩';
-          this.lokaleDaten = { tabuHtml, schleierHtml, buttonEmoji };
-          this.syncEditorInhalte();
-          this.emittiereAenderung();
-        } catch {
-          await window.HTBAH.ui.alert({
-            titel: 'Import fehlgeschlagen',
-            beschreibung: 'Die Datei enthält keine gültigen Sicherheitsmechanismen.',
-          });
-        } finally {
-          if (input) {
-            input.value = '';
-          }
-        }
-      };
-      reader.readAsText(datei);
-    },
   },
   template: `
     <div
@@ -244,12 +210,13 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
             </div>
           </div>
           <div class="modal-footer d-flex justify-content-between">
-            <div v-if="!nurLesen" class="d-flex gap-2">
-              <button type="button" class="btn btn-outline-secondary" @click="exportiereSeparat">Separat exportieren</button>
-              <label class="btn btn-outline-secondary mb-0">
-                Separat importieren
-                <input type="file" class="d-none" accept=".json,application/json" @change="dateiImportieren" />
-              </label>
+            <div v-if="!nurLesen" class="d-flex flex-column gap-2 text-start">
+              <p class="small text-body-secondary mb-0">
+                Bitte stelle den Spielenden die Export-Datei für den Import zur Verfügung, damit jeder jederzeit Zugriff auf die vereinbarten Grenzen und Schleier hat.
+              </p>
+              <div>
+                <button type="button" class="btn btn-outline-secondary" @click="exportiereSeparat">Export</button>
+              </div>
             </div>
             <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Schließen</button>
           </div>

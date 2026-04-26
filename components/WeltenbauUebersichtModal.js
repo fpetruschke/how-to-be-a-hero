@@ -1311,6 +1311,41 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const max = Math.max(1, 10 + this.normalisiereBegabungswert(begabungswertHandeln));
         return String(Math.max(1, Math.min(max, parsed)));
       },
+      charakterInitiativeWuerfeln() {
+        if (!this.charakterModal.charakter) {
+          return;
+        }
+        const handelnSumme = Array.isArray(this.charakterModal.charakter.handeln)
+          ? this.charakterModal.charakter.handeln.reduce(
+              (sum, eintrag) => sum + (Number(eintrag && eintrag.value) || 0),
+              0,
+            )
+          : 0;
+        const handelnBegabungswert = Math.max(0, Math.round(handelnSumme / 10));
+        const wurf = window.HTBAH.wuerfelW10();
+        window.HTBAH.spieleWuerfelSounds(1);
+        const gesamt = wurf + handelnBegabungswert;
+        this.charakterModal.charakter.initiative = this.normalisiereInitiativeWert(
+          gesamt,
+          handelnBegabungswert,
+        );
+      },
+      async charakterInitiativeZuruecksetzen() {
+        if (!this.charakterModal.charakter) {
+          return;
+        }
+        const bestaetigt = await window.HTBAH.ui.confirm({
+          titel: 'Initiative zurücksetzen?',
+          beschreibung: 'Ist der Kampf wirklich schon vorbei?',
+          bestaetigenText: 'Zurücksetzen',
+          bestaetigenButtonClass: 'btn-danger',
+          warnhinweisAnzeigen: false,
+        });
+        if (!bestaetigt) {
+          return;
+        }
+        this.charakterModal.charakter.initiative = '';
+      },
       initiativeBadgeText(wert) {
         const t = typeof wert === 'string' ? wert.trim() : '';
         return t;
@@ -2783,10 +2818,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     autocomplete="off" />
                   <button
                     type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    @click="charakterInitiativeWuerfeln">
+                    🎲
+                  </button>
+                  <button
+                    type="button"
                     class="btn btn-sm btn-outline-secondary"
                     :disabled="!String(charakterModal.charakter.initiative || '').trim()"
-                    @click="charakterModal.charakter.initiative = ''">
-                    Leeren
+                    @click="charakterInitiativeZuruecksetzen">
+                    Reset
                   </button>
                 </div>
               </div>

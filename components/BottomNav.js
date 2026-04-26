@@ -35,18 +35,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       begegnungZiehung: null,
       diceBox: null,
       diceReady: false,
-      dice3dAktiv: true,
+      dice3dAktiv: window.HTBAH.ladeWuerfelAnzeigeProfil().enabled,
       diceInitPromise: null,
       diceModulLadenPromise: null,
       diceFehler: '',
-      diceThemeColor: '#509b4a',
-      ...(() => {
-        const p = window.HTBAH.ladeWuerfelAudioProfil();
-        return {
-          wuerfelAudioStumm: p.stumm,
-          wuerfelAudioLautstaerke: p.lautstaerke,
-        };
-      })(),
+      diceThemeColor: window.HTBAH.ladeWuerfelAnzeigeProfil().theme,
+      wuerfelnLaeuft: false,
       wuerfelBeutelOffen: false,
       wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       sicherheitsmechanismenModalOffen: false,
@@ -202,8 +196,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     wuerfelBeutelFensterStil() {
       return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this.wuerfelBeutelFenster);
     },
-    wuerfelAudioLautProzent() {
-      return Math.round(Math.min(1, Math.max(0, Number(this.wuerfelAudioLautstaerke) || 0)) * 100);
+    wuerfelErgebnisChipStil() {
+      return {
+        background: `color-mix(in srgb, ${this.diceThemeColor} 20%, transparent)`,
+        borderColor: `color-mix(in srgb, ${this.diceThemeColor} 60%, transparent)`,
+      };
     },
     aktiverCharakterKontext() {
       return window.HTBAH && window.HTBAH._aktiverCharakterKontext
@@ -304,6 +301,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this._navReserveObserver = null;
     this.$nextTick(() => this.bindNavReserveObserver());
     this.ladeDiceFarbwahl();
+    window.addEventListener('htbah:wuerfel-einstellungen-geaendert', this.onWuerfelEinstellungenGlobalGeaendert);
   },
   beforeUnmount() {
     this.sicherheitsmechanismenModalOffen = false;
@@ -315,6 +313,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.diceInitPromise = null;
     this.diceModulLadenPromise = null;
     window.removeEventListener('resize', this.wuerfelBeutelBeiViewportResize);
+    window.removeEventListener(
+      'htbah:wuerfel-einstellungen-geaendert',
+      this.onWuerfelEinstellungenGlobalGeaendert,
+    );
     this.speichereWuerfelBeutelFenster();
     this.wuerfelBeutelBeendeZiehen();
     this.wuerfelBeutelBeendeResize();
@@ -326,39 +328,18 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       });
     },
     ladeDiceFarbwahl() {
-      try {
-        const key = window.HTBAH?.speicherKeys?.diceColors || 'htbah_dice_colors';
-        const raw = window.HTBAH?.speicher?.leseText(key, null);
-        if (!raw) {
-          return;
-        }
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          if (typeof parsed.enabled === 'boolean') {
-            this.dice3dAktiv = parsed.enabled;
-          }
-          const theme = typeof parsed.theme === 'string' ? parsed.theme.trim() : '';
-          if (/^#[0-9a-fA-F]{6}$/.test(theme)) {
-            this.diceThemeColor = theme;
-          }
-        }
-      } catch {
-        // Optional: Farbwahl aus LocalStorage ist defekt.
-      }
+      const profil = window.HTBAH.ladeWuerfelAnzeigeProfil();
+      this.dice3dAktiv = profil.enabled;
+      this.diceThemeColor = profil.theme;
+    },
+    onWuerfelEinstellungenGlobalGeaendert() {
+      this.ladeDiceFarbwahl();
     },
     speichereDiceFarbwahl() {
-      try {
-        const key = window.HTBAH?.speicherKeys?.diceColors || 'htbah_dice_colors';
-        window.HTBAH?.speicher?.schreibeText(
-          key,
-          JSON.stringify({
-            enabled: this.dice3dAktiv,
-            theme: this.diceThemeColor,
-          }),
-        );
-      } catch {
-        // Optional: Speicher evtl. gesperrt.
-      }
+      window.HTBAH.setzeWuerfelAnzeigeProfil({
+        enabled: this.dice3dAktiv,
+        theme: this.diceThemeColor,
+      });
     },
     async ladeDiceBoxKlasse() {
       if (window.HTBAH_DICE_BOX_KLASSE) {
@@ -707,6 +688,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         tab === 'atmosphaere' || tab === 'begegnung' || tab === 'wuerfel' ? tab : 'wuerfel';
       const gmTab = zielTab === 'atmosphaere' || zielTab === 'begegnung';
       this.wuerfelModalTab = !this.istSpielleitung && gmTab ? 'wuerfel' : zielTab;
+      this.ladeDiceFarbwahl();
       this.wuerfelBeutelOffen = true;
       this.$nextTick(() => {
         this.wuerfelBeutelInitialisierePosition();
@@ -975,29 +957,54 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.wuerfelModus = modus === 'w100' ? 'w100' : 'w10';
       this.ergebnisse = [];
     },
-    wuerfelAudioPersistiere() {
-      window.HTBAH.setzeWuerfelAudioProfil({
-        stumm: this.wuerfelAudioStumm,
-        lautstaerke: this.wuerfelAudioLautstaerke,
-      });
-    },
-    wuerfelAudioStummToggle() {
-      this.wuerfelAudioStumm = !this.wuerfelAudioStumm;
-      this.wuerfelAudioPersistiere();
-    },
-    wuerfelAudioSetzeLautstaerkeProzent(istRoh) {
-      const n = Math.max(0, Math.min(100, Math.round(Number(istRoh) || 0)));
-      this.wuerfelAudioLautstaerke = n / 100;
-      this.wuerfelAudioPersistiere();
-    },
     async wuerfeln() {
+      if (this.wuerfelnLaeuft) {
+        return;
+      }
+      this.wuerfelnLaeuft = true;
+      this.ladeDiceFarbwahl();
       const notation = this.baueDiceNotation();
       const wuerfelAnzahl =
         this.wuerfelModus === 'w100'
           ? Math.max(1, Math.min(50, Number(this.anzahlW100) || 1))
           : Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
-      if (!this.dice3dAktiv) {
-        this.diceFehler = '';
+      try {
+        if (!this.dice3dAktiv) {
+          this.diceFehler = '';
+          if (this.wuerfelModus === 'w100') {
+            const anzahl100 = Math.max(1, Math.min(50, Number(this.anzahlW100) || 1));
+            this.anzahlW100 = anzahl100;
+            this.ergebnisse = Array.from({ length: anzahl100 }, () => window.HTBAH.wuerfelW100());
+          } else {
+            const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
+            this.anzahlW10 = anzahl10;
+            this.ergebnisse = Array.from({ length: anzahl10 }, () => window.HTBAH.wuerfelW10());
+          }
+          window.HTBAH.spieleWuerfelSounds(this.ergebnisse.length);
+          return;
+        }
+        window.HTBAH.spieleWuerfelSounds(wuerfelAnzahl);
+        const box = await Promise.race([
+          this.stelleDiceBoxBereit(),
+          this.warte(HTBAH_DICE_INIT_TIMEOUT_MS).then(() => '__timeout__'),
+        ]);
+        if (box === '__timeout__') {
+          this.diceFehler = '3D-Würfel initialisieren zu langsam. Standard-Wurf bleibt aktiv.';
+        }
+        if (box && this.diceReady && typeof box.roll === 'function') {
+          try {
+            const rolled = await box.roll(notation, {
+              themeColor: this.diceThemeColor,
+            });
+            const extrahiert = this.ergebnisseAusDiceRoll(rolled);
+            if (extrahiert.length > 0) {
+              this.ergebnisse = extrahiert;
+              return;
+            }
+          } catch {
+            // Fallback unten bleibt aktiv.
+          }
+        }
         if (this.wuerfelModus === 'w100') {
           const anzahl100 = Math.max(1, Math.min(50, Number(this.anzahlW100) || 1));
           this.anzahlW100 = anzahl100;
@@ -1007,39 +1014,8 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           this.anzahlW10 = anzahl10;
           this.ergebnisse = Array.from({ length: anzahl10 }, () => window.HTBAH.wuerfelW10());
         }
-        window.HTBAH.spieleWuerfelSounds(this.ergebnisse.length);
-        return;
-      }
-      window.HTBAH.spieleWuerfelSounds(wuerfelAnzahl);
-      const box = await Promise.race([
-        this.stelleDiceBoxBereit(),
-        this.warte(HTBAH_DICE_INIT_TIMEOUT_MS).then(() => '__timeout__'),
-      ]);
-      if (box === '__timeout__') {
-        this.diceFehler = '3D-Würfel initialisieren zu langsam. Standard-Wurf bleibt aktiv.';
-      }
-      if (box && this.diceReady && typeof box.roll === 'function') {
-        try {
-          const rolled = await box.roll(notation, {
-            themeColor: this.diceThemeColor,
-          });
-          const extrahiert = this.ergebnisseAusDiceRoll(rolled);
-          if (extrahiert.length > 0) {
-            this.ergebnisse = extrahiert;
-            return;
-          }
-        } catch {
-          // Fallback unten bleibt aktiv.
-        }
-      }
-      if (this.wuerfelModus === 'w100') {
-        const anzahl100 = Math.max(1, Math.min(50, Number(this.anzahlW100) || 1));
-        this.anzahlW100 = anzahl100;
-        this.ergebnisse = Array.from({ length: anzahl100 }, () => window.HTBAH.wuerfelW100());
-      } else {
-        const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
-        this.anzahlW10 = anzahl10;
-        this.ergebnisse = Array.from({ length: anzahl10 }, () => window.HTBAH.wuerfelW10());
+      } finally {
+        this.wuerfelnLaeuft = false;
       }
     },
     begegnungMediumIstBild(medium) {
@@ -1454,75 +1430,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     @click="setzeWuerfelModus('w100')">
                     1x W100
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-outline-secondary d-flex align-items-center justify-content-center gap-1"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#htbah-wuerfel-einstellungen"
-                    aria-expanded="false"
-                    aria-controls="htbah-wuerfel-einstellungen">
-                    <span class="material-symbols-outlined" aria-hidden="true">tune</span>
-                    Einstellungen
-                  </button>
-                </div>
-                <div class="collapse mb-3" id="htbah-wuerfel-einstellungen">
-                  <div class="card border-0 bg-body-tertiary">
-                    <div class="card-body py-2">
-                      <div class="form-check form-switch mb-3">
-                        <input
-                          id="htbah-dice-3d-toggle"
-                          class="form-check-input"
-                          type="checkbox"
-                          role="switch"
-                          v-model="dice3dAktiv" />
-                        <label class="form-check-label" for="htbah-dice-3d-toggle">
-                          3D Würfel anzeigen
-                        </label>
-                      </div>
-                      <div class="d-flex align-items-center gap-2 flex-wrap pt-2 border-top border-secondary border-opacity-25">
-                        <span class="small text-secondary text-nowrap">Klang</span>
-                        <input
-                          type="range"
-                          class="form-range flex-grow-1 m-0 htbah-wuerfel-audio-range"
-                          min="0"
-                          max="100"
-                          step="1"
-                          :disabled="wuerfelAudioStumm"
-                          :value="wuerfelAudioLautProzent"
-                          @input="wuerfelAudioSetzeLautstaerkeProzent($event.target.value)"
-                          :aria-valuenow="wuerfelAudioLautProzent"
-                          aria-valuemin="0"
-                          aria-valuemax="100"
-                          aria-label="Würfelklang Lautstärke" />
-                        <span class="small text-secondary tabular-nums text-nowrap" style="min-width: 2.5rem">
-                          {{ wuerfelAudioLautProzent }}%
-                        </span>
-                        <button
-                          type="button"
-                          class="btn btn-outline-secondary btn-sm px-2 py-0 flex-shrink-0"
-                          :title="wuerfelAudioStumm ? 'Ton an' : 'Stumm'"
-                          :aria-pressed="wuerfelAudioStumm ? 'true' : 'false'"
-                          :aria-label="wuerfelAudioStumm ? 'Ton einschalten' : 'Stumm schalten'"
-                          @click="wuerfelAudioStummToggle">
-                          <span
-                            class="material-symbols-outlined htbah-wuerfel-audio-mute-ico"
-                            aria-hidden="true">
-                            {{ wuerfelAudioStumm ? 'volume_off' : 'volume_up' }}
-                          </span>
-                        </button>
-                      </div>
-                      <div class="row g-2" v-if="dice3dAktiv">
-                        <div class="col-12">
-                          <label class="form-label small mb-1" for="htbah-dice-color">Würfelfarbe</label>
-                          <input
-                            id="htbah-dice-color"
-                            type="color"
-                            class="form-control form-control-color w-100 htbah-dice-color-input"
-                            v-model="diceThemeColor" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 <div class="mb-3" v-if="wuerfelModus === 'w10'">
@@ -1556,8 +1463,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     type="button"
                     class="btn btn-primary w-100 htbah-wuerfeln-btn"
                     icon="casino"
+                    :disabled="wuerfelnLaeuft"
                     @click="wuerfeln">
-                    Würfeln
+                    {{ wuerfelnLaeuft ? 'Würfelt …' : 'Würfeln' }}
                   </icon-text-button>
                 </div>
 
@@ -1579,6 +1487,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     <span
                       class="wuerfel-ergebnis-chip"
                       :class="wuerfelModus === 'w10' ? 'wuerfel-ergebnis-chip-w10' : 'wuerfel-ergebnis-chip-w100'"
+                      :style="wuerfelErgebnisChipStil"
                       v-for="(wert, index) in ergebnisse"
                       :key="wuerfelModus + '-' + index">
                       <template v-if="wuerfelModus === 'w10'">

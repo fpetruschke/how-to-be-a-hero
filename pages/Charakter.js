@@ -79,7 +79,7 @@ window.HTBAH_SEITEN.Charakter = {
       charakterId: null,
       aktiveInfo: null,
       aktiveKategorieInfo: null,
-      zeigePresetAktionen: false,
+      zeigePresetAktionen: true,
       neueFaehigkeit: { name: '', value: 0, type: 'handeln' },
       bearbeitungEntwurf: { name: '', value: 0, type: 'handeln' },
       bearbeitungReferenz: null,
@@ -98,6 +98,7 @@ window.HTBAH_SEITEN.Charakter = {
       importKandidaten: [],
       importAuswahlIndex: '',
       importDateiname: '',
+      importAuswahlModalInstanz: null,
       importHinweis: '',
       fraktionInfoOffen: false,
       autosaveHinweis: '',
@@ -257,6 +258,7 @@ window.HTBAH_SEITEN.Charakter = {
       if (!this.spielleiterMitglied) {
         this.initialisiereCharakterAusRoute();
       }
+      this.zeigePresetAktionen = !this.spielleiterMitglied && this.istSetupTabAktiv;
     },
     charakter: {
       deep: true,
@@ -377,6 +379,7 @@ window.HTBAH_SEITEN.Charakter = {
         this.charakterId = null;
         this.charakterLokal = M.charakterMitDefaults(M.leererCharakter());
         this.charakterBildLokal = '';
+        this.zeigePresetAktionen = true;
         this.initialisiereGeistesblitzVerbleibend();
         this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
         this._prevLpSnapshot = this.normalisiereLp(this.charakterLokal.lebenspunkte);
@@ -402,6 +405,7 @@ window.HTBAH_SEITEN.Charakter = {
       this.charakterId = eintrag.id;
       this.charakterLokal = M.charakterMitDefaults(eintrag.charakter);
       this.charakterBildLokal = eintrag.charakterBild || '';
+      this.zeigePresetAktionen = pfad.endsWith('/session-zero');
       window.HTBAH.setzeAktivenCharakterId(eintrag.id);
       this.initialisiereGeistesblitzVerbleibend();
       this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
@@ -559,6 +563,8 @@ window.HTBAH_SEITEN.Charakter = {
           this.importAuswahlIndex = kandidaten.length > 1 ? '' : '0';
           if (kandidaten.length === 1) {
             this.importAuswahlUebernehmen();
+          } else {
+            this.oeffneImportAuswahlModal();
           }
         } catch {
           await window.HTBAH.ui.alert({
@@ -585,6 +591,16 @@ window.HTBAH_SEITEN.Charakter = {
       const titel = name || `Charakter ${index + 1}`;
       return `${titel} (${kandidat.quelle || 'Import'})`;
     },
+    oeffneImportAuswahlModal() {
+      this.$nextTick(() => {
+        const el = this.$refs.importAuswahlModalElement;
+        if (!el || !window.bootstrap) {
+          return;
+        }
+        this.importAuswahlModalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
+        this.importAuswahlModalInstanz.show();
+      });
+    },
     importAuswahlUebernehmen() {
       if (!this.importKandidaten.length) {
         return;
@@ -605,6 +621,11 @@ window.HTBAH_SEITEN.Charakter = {
         this.importKandidaten.length > 1
           ? 'Charakter aus Auswahl übernommen. Zum Abschließen speichern.'
           : 'Charakter importiert. Zum Abschließen speichern.';
+      if (this.importAuswahlModalInstanz) {
+        this.importAuswahlModalInstanz.hide();
+      }
+      this.importKandidaten = [];
+      this.importAuswahlIndex = '';
     },
     pantheonImportDialogOeffnen() {
       this.$refs.pantheonImportInput?.click();
@@ -792,9 +813,9 @@ window.HTBAH_SEITEN.Charakter = {
       if (!preset) return;
 
       const bestaetigt = await window.HTBAH.ui.confirm({
-        titel: 'Charakter überschreiben?',
-        beschreibung: 'Aktuellen Charakter überschreiben?',
-        bestaetigenText: 'Überschreiben',
+        titel: 'Fähigkeiten ersetzen?',
+        beschreibung: 'Nur die Fähigkeiten (Handeln, Wissen, Soziales) werden ersetzt. Alle anderen Charakterdaten bleiben erhalten.',
+        bestaetigenText: 'Fähigkeiten ersetzen',
         bestaetigenButtonClass: 'btn-danger',
         warnhinweisAnzeigen: false,
       });
@@ -822,9 +843,10 @@ window.HTBAH_SEITEN.Charakter = {
           }
           const titel = preset.name ? `„${preset.name}“` : 'dieses Fähigkeiten-Preset';
           const bestaetigt = await window.HTBAH.ui.confirm({
-            titel: 'Charakter überschreiben?',
-            beschreibung: `Aktuellen Charakter mit ${titel} aus der Datei überschreiben?`,
-            bestaetigenText: 'Überschreiben',
+            titel: 'Fähigkeiten ersetzen?',
+            beschreibung:
+              `Mit ${titel} aus der Datei nur die Fähigkeiten ersetzen? Alle anderen Charakterdaten bleiben erhalten.`,
+            bestaetigenText: 'Fähigkeiten ersetzen',
             bestaetigenButtonClass: 'btn-danger',
             warnhinweisAnzeigen: false,
           });
@@ -1173,13 +1195,6 @@ window.HTBAH_SEITEN.Charakter = {
       <p v-if="!spielleiterMitglied && istEditModus" class="small text-body-secondary text-center mt-n2 mb-2">
         Session Zero, aktives Spiel und Nachbereitung in einem durchgehenden Flow.
       </p>
-      <h5
-        v-if="spielleiterMitglied"
-        class="text-center mb-2 text-body-secondary htbah-page-title">
-        <span class="htbah-page-title-emoji" aria-hidden="true">🧙</span>
-        <span>Spielleitung</span>
-      </h5>
-
       <div
         v-if="spielleiterMitglied && (charakterLebenspunkteStatus.tot || charakterLebenspunkteStatus.bewusstlos)"
         class="htbah-sl-charakter-lp-status-sticky mb-3"
@@ -1221,26 +1236,8 @@ window.HTBAH_SEITEN.Charakter = {
               <label for="ce-char-import">Charakter aus Datei importieren</label>
             </div>
           </div>
-          <div v-if="importAuswahlHatMehrere" class="col-12 col-md-6">
-            <div class="form-floating">
-              <select id="ce-char-import-auswahl" class="form-select" v-model="importAuswahlIndex">
-                <option value="">Charakter auswählen …</option>
-                <option v-for="(kandidat, index) in importKandidaten" :key="'imp-' + index" :value="String(index)">
-                  {{ importAuswahlText(kandidat, index) }}
-                </option>
-              </select>
-              <label for="ce-char-import-auswahl">Aus Datei übernehmen</label>
-            </div>
-          </div>
-          <div v-if="importKandidaten.length" class="col-12">
-            <button
-              type="button"
-              class="btn btn-outline-primary w-100"
-              :disabled="!kannImportAuswahlUebernehmen"
-              @click="importAuswahlUebernehmen">
-              Import-Auswahl übernehmen
-            </button>
-            <p v-if="importDateiname" class="small text-body-secondary mb-0 mt-2">
+          <div v-if="importDateiname" class="col-12">
+            <p class="small text-body-secondary mb-0">
               Datei: {{ importDateiname }}
             </p>
           </div>
@@ -1294,7 +1291,7 @@ window.HTBAH_SEITEN.Charakter = {
           Aktives Spiel: Fähigkeiten, Initiative, Inventar und Notizen laufend aktualisieren (Autosave aktiv).
         </span>
         <span v-else>
-          Nachbereitung: Charakter als JSON/PDF exportieren und den Stand für den nächsten Spielabend sichern.
+          Am besten exportierst Du zum Abschluss jeder Session Deinen Charakter als JSON und als PDF - falls die Kampagne noch weitergeht. Einigt euch in dem Fall am besten mit der Spielleitung, wie ihr die Dateien austauschen könnt, damit die nächste Session nahtlos weitergehen kann.
         </span>
       </div>
       <div
@@ -1596,10 +1593,15 @@ window.HTBAH_SEITEN.Charakter = {
             <button
               v-if="!spielleiterMitglied"
               type="button"
-              class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center"
+              class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
               @click="presetAktionenUmschalten"
-              aria-label="Fähigkeiten-Preset-Aktionen">
-              <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+              :aria-expanded="zeigePresetAktionen ? 'true' : 'false'"
+              aria-controls="ce-preset-karte"
+              aria-label="Fähigkeiten-Preset-Bereich ein- oder ausklappen">
+              <span>Presets</span>
+              <span class="material-symbols-outlined" aria-hidden="true">
+                {{ zeigePresetAktionen ? 'expand_less' : 'expand_more' }}
+              </span>
             </button>
             <button
               type="button"
@@ -1612,8 +1614,12 @@ window.HTBAH_SEITEN.Charakter = {
           </div>
         </div>
 
-        <div v-if="zeigePresetAktionen && !spielleiterMitglied" class="card p-2 mb-2">
-          <h6 class="mb-2">Fähigkeiten-Presets</h6>
+        <div v-if="zeigePresetAktionen && !spielleiterMitglied" id="ce-preset-karte" class="card p-2 mb-2">
+          <h6 class="mb-1">Fähigkeiten-Presets importieren</h6>
+          <p class="small text-body-secondary mb-2">
+            Die Spielleitung kann Dir ein Fähigkeiten-Preset als .json-Datei zukommen lassen.
+            Dieses kannst Du dann hier importieren, um es als Basis zu nutzen.
+          </p>
           <div class="form-floating mb-2">
             <select id="ce-preset-wahl" class="form-select" v-model="ausgewaehltesPreset">
               <option value="">Fähigkeiten-Preset wählen …</option>
@@ -1626,9 +1632,6 @@ window.HTBAH_SEITEN.Charakter = {
           <button class="btn btn-primary w-100 mb-2" @click="presetAnwenden">
             Fähigkeiten-Preset anwenden
           </button>
-          <p class="small text-body-secondary mb-2">
-            Von der Spielleitung erhaltene Datei (.json) kannst du direkt laden — ohne vorheriges Importieren in die App.
-          </p>
           <div class="form-floating mb-0">
             <input
               id="ce-preset-import"
@@ -1876,6 +1879,7 @@ window.HTBAH_SEITEN.Charakter = {
         <div class="row g-2">
           <div v-if="spielleiterMitglied || istSpielTabAktiv" class="col-12">
             <icon-text-button
+              v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
               type="button"
               class="btn btn-outline-primary btn-lg w-100"
               symbol="🎲"
@@ -1920,7 +1924,7 @@ window.HTBAH_SEITEN.Charakter = {
         </icon-text-button>
       </div>
 
-      <div v-if="spielleiterMitglied || (istEditModus && istVerwaltungTabAktiv)" class="card p-3 mb-2">
+      <div v-if="istEditModus && istVerwaltungTabAktiv" class="card p-3 mb-2">
         <h5 class="mb-2">Verwaltung</h5>
         <p v-if="!spielleiterMitglied && istEditModus" class="small text-body-secondary mb-2">
           Im Bearbeiten-Modus speichert das Formular automatisch nach Änderungen.
@@ -1970,6 +1974,58 @@ window.HTBAH_SEITEN.Charakter = {
           @click="charakterJsonExportieren">
           JSON exportieren
         </icon-text-button>
+      </div>
+
+      <div
+        ref="importAuswahlModalElement"
+        class="modal fade"
+        id="charakterImportAuswahlModal"
+        tabindex="-1"
+        aria-labelledby="charakterImportAuswahlLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content shadow">
+            <div class="modal-header">
+              <h5 class="modal-title" id="charakterImportAuswahlLabel">
+                Import-Inhalt auswählen
+              </h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+              <p class="small text-body-secondary mb-2">
+                Die Datei enthält mehrere importierbare Inhalte. Wähle aus, was übernommen werden soll.
+              </p>
+              <div class="form-floating">
+                <select id="ce-char-import-auswahl" class="form-select" v-model="importAuswahlIndex">
+                  <option value="">Inhalt auswählen …</option>
+                  <option v-for="(kandidat, index) in importKandidaten" :key="'imp-' + index" :value="String(index)">
+                    {{ importAuswahlText(kandidat, index) }}
+                  </option>
+                </select>
+                <label for="ce-char-import-auswahl">Importauswahl</label>
+              </div>
+              <p v-if="importDateiname" class="small text-body-secondary mb-0 mt-2">
+                Datei: {{ importDateiname }}
+              </p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="!kannImportAuswahlUebernehmen"
+                @click="importAuswahlUebernehmen">
+                Auswahl importieren
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div

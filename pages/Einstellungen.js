@@ -148,14 +148,19 @@ const DATEN_EXPORT_BEREICHE = [
     label: 'Aktiver Charakter',
   },
   {
+    id: 'sicherheitsmechanismen',
+    key: 'htbah_sicherheitsmechanismen_bundle',
+    label: 'Sicherheitsmechanismen (Grenzen, Schleier, Emoji)',
+  },
+  {
     id: 'presets',
     key: 'htbah_presets',
     label: 'Fähigkeiten-Presets',
   },
   {
-    id: 'spielleiter',
+    id: 'gruppen',
     key: 'htbah_spielleiter_gruppen',
-    label: 'Spielleiter-Gruppen',
+    label: 'Gruppen',
   },
   {
     id: 'zufallstabellen',
@@ -241,6 +246,10 @@ window.HTBAH_SEITEN.Einstellungen = {
       importDateiname: '',
       exportModalInstanz: null,
       importModalInstanz: null,
+      wuerfel3dAktiv: true,
+      wuerfelFarbe: '#509b4a',
+      wuerfelAudioStumm: false,
+      wuerfelAudioLautstaerke: 0.88,
     };
   },
   computed: {
@@ -296,6 +305,9 @@ window.HTBAH_SEITEN.Einstellungen = {
         return 'bg-warning text-dark';
       }
       return 'bg-success';
+    },
+    wuerfelAudioLautProzent() {
+      return Math.round(Math.min(1, Math.max(0, Number(this.wuerfelAudioLautstaerke) || 0)) * 100);
     },
     hatExportAuswahl() {
       return this.exportBereicheMitCharakteren.some((b) => this.exportAuswahl[b.id]);
@@ -378,6 +390,37 @@ window.HTBAH_SEITEN.Einstellungen = {
     themeUmschalten() {
       const neuesTheme = this.istHellesTheme ? 'light' : 'dark';
       window.HTBAH.setzeTheme(neuesTheme);
+    },
+    wuerfelEinstellungenLaden() {
+      const anzeige = window.HTBAH.ladeWuerfelAnzeigeProfil();
+      const audio = window.HTBAH.ladeWuerfelAudioProfil();
+      this.wuerfel3dAktiv = anzeige.enabled;
+      this.wuerfelFarbe = anzeige.theme;
+      this.wuerfelAudioStumm = audio.stumm;
+      this.wuerfelAudioLautstaerke = audio.lautstaerke;
+    },
+    speichereWuerfelAnzeigeEinstellungen() {
+      window.HTBAH.setzeWuerfelAnzeigeProfil({
+        enabled: this.wuerfel3dAktiv,
+        theme: this.wuerfelFarbe,
+      });
+      window.dispatchEvent(new CustomEvent('htbah:wuerfel-einstellungen-geaendert'));
+    },
+    wuerfelAudioPersistiere() {
+      window.HTBAH.setzeWuerfelAudioProfil({
+        stumm: this.wuerfelAudioStumm,
+        lautstaerke: this.wuerfelAudioLautstaerke,
+      });
+      window.dispatchEvent(new CustomEvent('htbah:wuerfel-einstellungen-geaendert'));
+    },
+    wuerfelAudioStummToggle() {
+      this.wuerfelAudioStumm = !this.wuerfelAudioStumm;
+      this.wuerfelAudioPersistiere();
+    },
+    wuerfelAudioSetzeLautstaerkeProzent(roh) {
+      const n = Math.max(0, Math.min(100, Math.round(Number(roh) || 0)));
+      this.wuerfelAudioLautstaerke = n / 100;
+      this.wuerfelAudioPersistiere();
     },
     async speicherSchaetzungLaden() {
       this.browserSpeicherFehler = '';
@@ -481,6 +524,37 @@ window.HTBAH_SEITEN.Einstellungen = {
         return null;
       }
       const daten = ausgewaehlteBereiche.map((bereich) => {
+        if (bereich.key === 'htbah_sicherheitsmechanismen_bundle') {
+          const sammlung = window.HTBAH.ladeCharakterSammlung();
+          const map = {};
+          (sammlung.charaktere || []).forEach((eintrag) => {
+            if (!eintrag || !eintrag.id) {
+              return;
+            }
+            const sicher = eintrag.charakter && eintrag.charakter.sicherheitsmechanismen
+              ? eintrag.charakter.sicherheitsmechanismen
+              : {};
+            map[eintrag.id] = {
+              tabuHtml: typeof sicher.tabuHtml === 'string' ? sicher.tabuHtml : '',
+              schleierHtml: typeof sicher.schleierHtml === 'string' ? sicher.schleierHtml : '',
+              buttonEmoji:
+                typeof sicher.buttonEmoji === 'string' && sicher.buttonEmoji.trim()
+                  ? sicher.buttonEmoji.trim()
+                  : '🚩',
+            };
+          });
+          return {
+            id: bereich.id,
+            key: bereich.key,
+            label: bereich.label,
+            vorhanden: true,
+            wert: JSON.stringify({
+              typ: 'sicherheitsmechanismen-bundle',
+              version: 1,
+              eintraege: map,
+            }),
+          };
+        }
         if (bereich.key.startsWith('htbah_character_entry:')) {
           const charakterId = bereich.key.slice('htbah_character_entry:'.length);
           const eintrag = window.HTBAH.ladeCharakterEintrag(charakterId);
@@ -629,6 +703,56 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
 
       ausgewaehlteBereiche.forEach((bereich) => {
+        if (bereich.key === 'htbah_sicherheitsmechanismen_bundle') {
+          if (bereich.vorhanden && typeof bereich.wert === 'string') {
+            try {
+              const payload = JSON.parse(bereich.wert);
+              const eintraege = payload && payload.typ === 'sicherheitsmechanismen-bundle' && payload.eintraege
+                ? payload.eintraege
+                : {};
+              const sammlung = window.HTBAH.ladeCharakterSammlung();
+              const aktiveIdVorher = window.HTBAH.ladeAktivenCharakterId();
+              (sammlung.charaktere || []).forEach((eintrag) => {
+                const imported = eintraege[eintrag.id] || {};
+                window.HTBAH.importiereOderAktualisiereCharakterEintrag({
+                  ...eintrag,
+                  charakter: {
+                    ...(eintrag.charakter || {}),
+                    sicherheitsmechanismen: {
+                      tabuHtml: typeof imported.tabuHtml === 'string' ? imported.tabuHtml : '',
+                      schleierHtml: typeof imported.schleierHtml === 'string' ? imported.schleierHtml : '',
+                      buttonEmoji:
+                        typeof imported.buttonEmoji === 'string' && imported.buttonEmoji.trim()
+                          ? imported.buttonEmoji.trim()
+                          : '🚩',
+                    },
+                  },
+                });
+              });
+              window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
+            } catch {
+              // defekten Import ignorieren
+            }
+          } else {
+            const sammlung = window.HTBAH.ladeCharakterSammlung();
+            const aktiveIdVorher = window.HTBAH.ladeAktivenCharakterId();
+            (sammlung.charaktere || []).forEach((eintrag) => {
+              window.HTBAH.importiereOderAktualisiereCharakterEintrag({
+                ...eintrag,
+                charakter: {
+                  ...(eintrag.charakter || {}),
+                  sicherheitsmechanismen: {
+                    tabuHtml: '',
+                    schleierHtml: '',
+                    buttonEmoji: '🚩',
+                  },
+                },
+              });
+            });
+            window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
+          }
+          return;
+        }
         if (bereich.key.startsWith('htbah_character_entry:')) {
           const charakterId = bereich.key.slice('htbah_character_entry:'.length);
           if (bereich.vorhanden && typeof bereich.wert === 'string') {
@@ -666,6 +790,7 @@ window.HTBAH_SEITEN.Einstellungen = {
     },
   },
   mounted() {
+    this.wuerfelEinstellungenLaden();
     this.speicherSchaetzungLaden();
   },
   template: `
@@ -693,6 +818,65 @@ window.HTBAH_SEITEN.Einstellungen = {
               v-model="istHellesTheme"
               @change="themeUmschalten" />
           </div>
+        </div>
+      </div>
+
+      <h5 class="text-start mb-2">Würfel</h5>
+      <div class="card p-3 mb-3 text-start">
+        <div class="form-check form-switch mb-3">
+          <input
+            id="settings-wuerfel-3d"
+            class="form-check-input"
+            type="checkbox"
+            role="switch"
+            v-model="wuerfel3dAktiv"
+            @change="speichereWuerfelAnzeigeEinstellungen" />
+          <label class="form-check-label" for="settings-wuerfel-3d">
+            Anzeige 3D-Würfel
+          </label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-body-secondary mb-1" for="settings-wuerfel-farbe">
+            Würfelfarbe
+          </label>
+          <input
+            id="settings-wuerfel-farbe"
+            type="color"
+            class="form-control form-control-color w-100 htbah-dice-color-input"
+            v-model="wuerfelFarbe"
+            @change="speichereWuerfelAnzeigeEinstellungen" />
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap pt-2 border-top border-secondary border-opacity-25">
+          <span class="small text-body-secondary text-nowrap">Würfelsound</span>
+          <input
+            type="range"
+            class="form-range flex-grow-1 m-0 htbah-wuerfel-audio-range"
+            min="0"
+            max="100"
+            step="1"
+            :disabled="wuerfelAudioStumm"
+            :value="wuerfelAudioLautProzent"
+            @input="wuerfelAudioSetzeLautstaerkeProzent($event.target.value)"
+            :aria-valuenow="wuerfelAudioLautProzent"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label="Würfelklang Lautstärke" />
+          <span class="small text-body-secondary tabular-nums text-nowrap" style="min-width: 2.5rem">
+            {{ wuerfelAudioLautProzent }}%
+          </span>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm px-2 py-0 flex-shrink-0"
+            :title="wuerfelAudioStumm ? 'Ton an' : 'Stumm'"
+            :aria-pressed="wuerfelAudioStumm ? 'true' : 'false'"
+            :aria-label="wuerfelAudioStumm ? 'Ton einschalten' : 'Stumm schalten'"
+            @click="wuerfelAudioStummToggle">
+            <span
+              class="material-symbols-outlined htbah-wuerfel-audio-mute-ico"
+              aria-hidden="true">
+              {{ wuerfelAudioStumm ? 'volume_off' : 'volume_up' }}
+            </span>
+          </button>
         </div>
       </div>
 

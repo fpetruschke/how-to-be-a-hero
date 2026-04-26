@@ -90,6 +90,49 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       const n = m && m.charakter && typeof m.charakter.name === 'string' ? m.charakter.name : '';
       return n.trim() || 'Ohne Namen';
     },
+    charakterBild(m) {
+      return m && typeof m.charakterBild === 'string' ? m.charakterBild : '';
+    },
+    charakterZustandStatus(m) {
+      const berechne =
+        window.HTBAH && typeof window.HTBAH.berechneLebenspunkteStatus === 'function'
+          ? window.HTBAH.berechneLebenspunkteStatus
+          : null;
+      if (!berechne) {
+        return { tot: false, bewusstlos: false };
+      }
+      return berechne(m && m.charakter ? m.charakter : null);
+    },
+    charakterZustandEmoji(m) {
+      const status = this.charakterZustandStatus(m);
+      if (status.tot) {
+        return '💀';
+      }
+      if (status.bewusstlos) {
+        return '😵';
+      }
+      return '';
+    },
+    charakterZustandLabel(m) {
+      const status = this.charakterZustandStatus(m);
+      if (status.tot) {
+        return 'Charakter ist tot';
+      }
+      if (status.bewusstlos) {
+        return 'Charakter ist bewusstlos';
+      }
+      return '';
+    },
+    charakterStatusPillKlasse(m) {
+      const status = this.charakterZustandStatus(m);
+      if (status.tot) {
+        return 'htbah-sl-pill-status-tot';
+      }
+      if (status.bewusstlos) {
+        return 'htbah-sl-pill-status-bewusstlos';
+      }
+      return '';
+    },
     beiGruppenwechsel() {
       const g = this.aktiveGruppe;
       if (!g || !g.mitglieder.length) {
@@ -129,10 +172,39 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       if (!bestaetigt) {
         return;
       }
+      const alterIndex = g.mitglieder.findIndex((x) => x.id === m.id);
       g.mitglieder = g.mitglieder.filter((x) => x.id !== m.id);
-      this.beiGruppenwechsel();
+      if (g.mitglieder.length) {
+        const nextIndex = Math.min(Math.max(0, alterIndex), g.mitglieder.length - 1);
+        const naechstes = g.mitglieder[nextIndex] || g.mitglieder[0];
+        this.aktivesMitgliedId = naechstes ? naechstes.id : null;
+        if (this.aktivesMitgliedId) {
+          this.zustand.mitgliedWahlProGruppe[g.id] = this.aktivesMitgliedId;
+        }
+        this.persist();
+        this.zeigeStatus('Charakter entfernt.');
+        return;
+      }
+      this.aktivesMitgliedId = null;
+      delete this.zustand.mitgliedWahlProGruppe[g.id];
       this.persist();
-      this.zeigeStatus('Charakter entfernt.');
+      const gruppeLoeschen = await window.HTBAH.ui.confirm({
+        titel: 'Letztes Mitglied entfernt',
+        beschreibung:
+          `In der Gruppe „${g.name}“ sind keine Mitglieder mehr. Soll die Gruppe ebenfalls gelöscht werden?`,
+        bestaetigenText: 'Gruppe löschen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!gruppeLoeschen) {
+        this.zeigeStatus('Charakter entfernt. Die Gruppe bleibt leer bestehen.');
+        return;
+      }
+      this.zustand.gruppen = this.zustand.gruppen.filter((eintrag) => eintrag.id !== g.id);
+      delete this.zustand.mitgliedWahlProGruppe[g.id];
+      this.persist();
+      this.zeigeStatus('Letztes Mitglied entfernt und Gruppe gelöscht.');
+      this.$router.replace('/spielleiter');
     },
     oeffneVerschiebenModal() {
       if (!this.aktivesMitglied || this.andereGruppen.length === 0 || !window.bootstrap) {
@@ -257,25 +329,6 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         );
       }
     },
-    exportGruppeJson() {
-      const g = this.aktiveGruppe;
-      if (!g || !g.mitglieder.length) {
-        return;
-      }
-      const payload = {
-        htbahExportVersion: 1,
-        typ: 'spielleiter_gruppe',
-        exportiertAm: new Date().toISOString(),
-        name: g.name,
-        mitglieder: g.mitglieder.map((m) => ({
-          id: m.id,
-          charakter: JSON.parse(JSON.stringify(m.charakter)),
-          charakterBild: m.charakterBild || '',
-        })),
-      };
-      const sicher = g.name.replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 64) || 'gruppe';
-      window.HTBAH.dateiHerunterladenJson(payload, `htbah-gruppe-${sicher}.json`);
-    },
   },
   template: `
     <div class="container content py-3">
@@ -295,65 +348,82 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         Charaktere per JSON importieren (Export vom Spieler), zwischen Helden wechseln und Werte bearbeiten.
       </p>
 
-      <div class="card p-3 mb-3">
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-          <button
-            type="button"
-            class="btn btn-outline-primary btn-sm"
-            :disabled="!aktiveGruppe.mitglieder.length"
-            @click="exportGruppeJson">
-            Gruppe als JSON exportieren
-          </button>
-          <label class="btn btn-sm btn-success mb-0">
-            Charakterblätter importieren
-            <input
-              type="file"
-              accept="application/json,.json"
-              multiple
-              class="d-none"
-              @change="importJsonDateien" />
-          </label>
+      <div class="alert alert-info mb-3">
+        <p class="small mb-2">
+          Charakterblätter als JSON importieren (Einzel-Export oder Komplett-Export).
+        </p>
+        <div class="form-floating">
+          <input
+            id="sl-gruppe-import"
+            type="file"
+            accept="application/json,.json"
+            multiple
+            class="form-control"
+            @change="importJsonDateien" />
+          <label for="sl-gruppe-import">Charakterblätter importieren</label>
         </div>
       </div>
 
       <div class="card p-3 mb-3">
         <h6 class="mb-2">Charaktere in dieser Gruppe</h6>
-
-        <div
+        <ul
           v-if="aktiveGruppe.mitglieder.length"
-          class="htbah-sl-chips d-flex flex-nowrap gap-2 overflow-auto pb-1 mb-2"
+          class="nav htbah-weltenbau-pill-tabs mb-2"
           role="tablist"
           aria-label="Charakter wählen">
-          <button
+          <li
             v-for="m in aktiveGruppe.mitglieder"
             :key="m.id"
-            type="button"
-            class="btn btn-sm rounded-pill text-nowrap flex-shrink-0"
-            :class="aktivesMitgliedId === m.id ? 'btn-primary' : 'btn-outline-primary'"
-            role="tab"
-            :aria-selected="aktivesMitgliedId === m.id"
-            @click="waehleMitglied(m.id)">
-            {{ charakterName(m) }}
-          </button>
-        </div>
+            class="nav-item"
+            role="presentation">
+            <button
+              type="button"
+              class="nav-link htbah-weltenbau-pill-tab"
+              :class="[{ active: aktivesMitgliedId === m.id }, charakterStatusPillKlasse(m)]"
+              role="tab"
+              :aria-selected="aktivesMitgliedId === m.id"
+              @click="waehleMitglied(m.id)">
+              <span class="htbah-pill-avatar-wrap">
+                <img
+                  v-if="charakterBild(m)"
+                  :src="charakterBild(m)"
+                  :alt="'Profilbild ' + charakterName(m)"
+                  class="rounded-circle border"
+                  style="width: 1rem; height: 1rem; object-fit: cover;" />
+                <span v-else aria-hidden="true">🧙</span>
+                <span
+                  v-if="charakterZustandEmoji(m)"
+                  class="htbah-charakter-zustand-overlay htbah-charakter-zustand-overlay--mini"
+                  :aria-label="charakterZustandLabel(m)"
+                  role="img">
+                  {{ charakterZustandEmoji(m) }}
+                </span>
+              </span>
+              <span>{{ charakterName(m) }}</span>
+            </button>
+          </li>
+        </ul>
+
         <p v-else class="small text-body-secondary mb-0">
           Noch keine Charaktere — nutze „Charakterblätter importieren“ (vom Spieler exportierte Datei).
         </p>
 
-        <button
-          v-if="aktivesMitglied && andereGruppen.length"
-          type="button"
-          class="btn btn-outline-primary btn-sm me-2"
-          @click="oeffneVerschiebenModal">
-          In andere Gruppe verschieben
-        </button>
-        <button
-          v-if="aktivesMitglied"
-          type="button"
-          class="btn btn-outline-danger btn-sm"
-          @click="mitgliedEntfernen">
-          Aus Gruppe entfernen
-        </button>
+        <div class="d-flex flex-wrap gap-2">
+          <button
+            v-if="aktivesMitglied && andereGruppen.length"
+            type="button"
+            class="btn btn-outline-primary btn-sm"
+            @click="oeffneVerschiebenModal">
+            In andere Gruppe verschieben
+          </button>
+          <button
+            v-if="aktivesMitglied"
+            type="button"
+            class="btn btn-outline-danger btn-sm"
+            @click="mitgliedEntfernen">
+            Aus Gruppe entfernen
+          </button>
+        </div>
       </div>
 
       <charakter

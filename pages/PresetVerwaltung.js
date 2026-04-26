@@ -1,5 +1,30 @@
 window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
 
+function normalisierePresetFaehigkeiten(roh) {
+  if (!roh || typeof roh !== 'object') return null;
+  const kategorien = ['handeln', 'wissen', 'soziales'];
+  const out = { name: typeof roh.name === 'string' ? roh.name.trim() : '' };
+  for (const k of kategorien) {
+    if (!Array.isArray(roh[k])) return null;
+    const arr = [];
+    for (const eintrag of roh[k]) {
+      if (!eintrag || typeof eintrag !== 'object') continue;
+      const name = typeof eintrag.name === 'string' ? eintrag.name.trim() : '';
+      if (!name) continue;
+      const rohWert = eintrag.value;
+      if (rohWert === null || rohWert === undefined || rohWert === '') {
+        arr.push({ name, value: null });
+        continue;
+      }
+      const value = Number(rohWert);
+      if (Number.isNaN(value) || value < 1 || value > 100) continue;
+      arr.push({ name, value });
+    }
+    out[k] = arr;
+  }
+  return out;
+}
+
 window.HTBAH_SEITEN.PresetVerwaltung = {
   data() {
     return {
@@ -27,7 +52,15 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
       window.HTBAH.speicherePresets(this.presets);
     },
     presetExportieren(preset) {
-      const blob = new Blob([JSON.stringify(preset, null, 2)], {
+      const exportPreset = normalisierePresetFaehigkeiten(preset);
+      if (!exportPreset) {
+        window.HTBAH.ui.notify({
+          text: 'Preset ist ungültig und konnte nicht exportiert werden.',
+          typ: 'danger',
+        });
+        return;
+      }
+      const blob = new Blob([JSON.stringify(exportPreset, null, 2)], {
         type: 'application/json',
       });
       const url = URL.createObjectURL(blob);
@@ -50,10 +83,16 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
       reader.onload = async () => {
         try {
           const json = JSON.parse(reader.result);
-          if (json && typeof json === 'object' && json.htbahPresetId) {
-            delete json.htbahPresetId;
+          const preset = normalisierePresetFaehigkeiten(json);
+          if (!preset) {
+            await window.HTBAH.ui.alert({
+              titel: 'Import fehlgeschlagen',
+              beschreibung:
+                'Ungültige Datei. Erlaubt sind nur Fähigkeiten-Presets mit handeln, wissen und soziales.',
+            });
+            return;
           }
-          this.presets.push(json);
+          this.presets.push(preset);
           window.HTBAH.speicherePresets(this.presets);
         } catch {
           await window.HTBAH.ui.alert({

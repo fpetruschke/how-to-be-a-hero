@@ -1268,6 +1268,11 @@ input::placeholder {
   flex-shrink: 0;
 }
 
+/* Kleine Utility-Klasse, wird in Startseiten-Karten verwendet */
+.min-w-0 {
+  min-width: 0;
+}
+
 .charakterbild-vorschau {
   width: 100%;
   aspect-ratio: 3 / 4;
@@ -1862,6 +1867,24 @@ input::placeholder {
   .htbah-start-hero-subtitle {
     font-size: 0.86rem;
   }
+
+  /* Startseiten-Karten: auf Mobile nie überlagern, stattdessen sauber umbrechen */
+  .action-card .text-truncate {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
+
+  .action-card .htbah-start-card-charaktername {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.28;
+  }
+
+  .action-card .action-card-arrow {
+    align-self: flex-start;
+    margin-top: 0.1rem;
+  }
 }
 
 /* Startseite: Charaktername auf der Aktionskarte */
@@ -1944,7 +1967,7 @@ input::placeholder {
 
 @media (min-width: 992px) {
   .htbah-charakter-stammdaten-row .htbah-charakterbild-spalte {
-    --htbah-charakterbild-hoehe: 345px;
+    --htbah-charakterbild-hoehe: 233px;
     display: flex;
     justify-content: center;
   }
@@ -2021,6 +2044,47 @@ input::placeholder {
   font-size: 1.35rem;
   top: 0.4rem;
   right: 0.4rem;
+}
+
+.htbah-charakter-zustand-overlay--mini {
+  width: 0.75rem;
+  height: 0.75rem;
+  font-size: 0.5rem;
+  top: -0.32rem;
+  right: -0.32rem;
+  border-width: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.htbah-pill-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Spielleiter-Gruppe: Statusfarbgebung für Charakter-Pills */
+.htbah-weltenbau-pill-tab.htbah-sl-pill-status-bewusstlos {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.htbah-weltenbau-pill-tab.htbah-sl-pill-status-bewusstlos.active {
+  border-color: rgba(245, 158, 11, 0.78);
+  background: rgba(245, 158, 11, 0.28);
+}
+
+.htbah-weltenbau-pill-tab.htbah-sl-pill-status-tot {
+  border-color: rgba(220, 38, 38, 0.5);
+  background: rgba(220, 38, 38, 0.14);
+}
+
+.htbah-weltenbau-pill-tab.htbah-sl-pill-status-tot.active {
+  border-color: rgba(220, 38, 38, 0.8);
+  background: rgba(220, 38, 38, 0.28);
 }
 
 /* Charakter-Seite: prominenter Name */
@@ -2127,8 +2191,12 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 }
 
 @media (max-width: 767.98px) {
+  .htbah-sicherheits-fab-stack {
+    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 3.75rem);
+  }
+
   body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
-    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 5.95rem);
+    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 7.1rem);
   }
 }
 

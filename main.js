@@ -1208,6 +1208,44 @@ function setzeWuerfelAudioProfil(teil) {
 }
 
 /**
+ * @returns {{ enabled: boolean, theme: string }}
+ */
+function ladeWuerfelAnzeigeProfil() {
+  const defaults = { enabled: true, theme: '#509b4a' };
+  try {
+    const roh = htbahSpeicher.leseText(SPEICHER_KEY_DICE_COLORS, null);
+    if (!roh) {
+      return defaults;
+    }
+    const parsed = JSON.parse(roh);
+    if (!parsed || typeof parsed !== 'object') {
+      return defaults;
+    }
+    const themeRaw = typeof parsed.theme === 'string' ? parsed.theme.trim() : '';
+    return {
+      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : defaults.enabled,
+      theme: /^#[0-9a-fA-F]{6}$/.test(themeRaw) ? themeRaw : defaults.theme,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+/**
+ * @param {{ enabled?: boolean, theme?: string }} teil
+ */
+function setzeWuerfelAnzeigeProfil(teil) {
+  const aktuell = ladeWuerfelAnzeigeProfil();
+  const themeRaw = typeof teil?.theme === 'string' ? teil.theme.trim() : '';
+  const neu = {
+    enabled: teil?.enabled !== undefined ? Boolean(teil.enabled) : aktuell.enabled,
+    theme: /^#[0-9a-fA-F]{6}$/.test(themeRaw) ? themeRaw : aktuell.theme,
+  };
+  htbahSpeicher.schreibeText(SPEICHER_KEY_DICE_COLORS, JSON.stringify(neu));
+  return neu;
+}
+
+/**
  * Spielt den Würfel-Klang einmal pro Würfel. Erster Klang bei delay 0 ms (Klickfeedback);
  * weitere leicht zufällig gestaffelt (wirkt natürlicher als fester Abstand).
  * @param {number} anzahl
@@ -1441,6 +1479,8 @@ window.HTBAH = {
   wuerfelW100,
   ladeWuerfelAudioProfil,
   setzeWuerfelAudioProfil,
+  ladeWuerfelAnzeigeProfil,
+  setzeWuerfelAnzeigeProfil,
   spieleWuerfelSounds,
   berechneProbeAuswertung,
   ermittleAssetUrl,
