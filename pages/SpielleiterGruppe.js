@@ -1,6 +1,9 @@
 window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
 
 window.HTBAH_SEITEN.SpielleiterGruppe = {
+  props: {
+    eingebettet: { type: Boolean, default: false },
+  },
   components: {
     Charakter: window.HTBAH_SEITEN.Charakter,
   },
@@ -8,31 +11,44 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
     return {
       zustand: window.HTBAH.ladeSpielleiterZustand(),
       aktivesMitgliedId: null,
-      zielGruppeId: '',
+      zielKampagneId: '',
       verschiebeModalInstanz: null,
     };
   },
   computed: {
-    gruppeId() {
-      return this.$route.params.gruppeId || '';
+    kampagneId() {
+      const routeId = this.$route.params.kampagneId || '';
+      if (routeId) {
+        return routeId;
+      }
+      const ausZustand = this.zustand && typeof this.zustand.aktiveKampagneId === 'string'
+        ? this.zustand.aktiveKampagneId
+        : '';
+      if (ausZustand) {
+        return ausZustand;
+      }
+      const ersteKampagne = Array.isArray(this.zustand && this.zustand.kampagnen)
+        ? this.zustand.kampagnen[0]
+        : null;
+      return ersteKampagne && typeof ersteKampagne.id === 'string' ? ersteKampagne.id : '';
     },
-    aktiveGruppe() {
-      return this.zustand.gruppen.find((g) => g.id === this.gruppeId) || null;
+    aktiveKampagne() {
+      return this.zustand.kampagnen.find((g) => g.id === this.kampagneId) || null;
     },
     aktivesMitglied() {
-      const g = this.aktiveGruppe;
+      const g = this.aktiveKampagne;
       if (!g || !this.aktivesMitgliedId) {
         return null;
       }
       return g.mitglieder.find((m) => m.id === this.aktivesMitgliedId) || null;
     },
-    andereGruppen() {
-      const aktiveId = this.gruppeId;
-      return this.zustand.gruppen.filter((g) => g.id !== aktiveId);
+    andereKampagnen() {
+      const aktiveId = this.kampagneId;
+      return this.zustand.kampagnen.filter((g) => g.id !== aktiveId);
     },
   },
   watch: {
-    gruppeId: {
+    kampagneId: {
       immediate: true,
       handler() {
         this.syncAusRoute();
@@ -63,18 +79,22 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
   },
   methods: {
     syncAusRoute() {
-      const gid = this.gruppeId;
+      const routeKampagneId = this.$route.params.kampagneId || '';
       const z = window.HTBAH.ladeSpielleiterZustand();
-      if (!gid || !z.gruppen.some((g) => g.id === gid)) {
+      const fallbackKampagneId =
+        (typeof z.aktiveKampagneId === 'string' && z.aktiveKampagneId) ||
+        ((z.kampagnen && z.kampagnen[0] && z.kampagnen[0].id) || '');
+      const gid = routeKampagneId || fallbackKampagneId;
+      if (!gid || !z.kampagnen.some((g) => g.id === gid)) {
         this.$router.replace('/spielleiter');
         return;
       }
-      z.aktiveGruppeId = gid;
+      z.aktiveKampagneId = gid;
       this.zustand = z;
-      const ag = z.gruppen.find((g) => g.id === gid);
+      const ag = z.kampagnen.find((g) => g.id === gid);
       let aktivesMitgliedId = null;
       if (ag && ag.mitglieder.length) {
-        const mid = z.mitgliedWahlProGruppe[gid];
+        const mid = z.mitgliedWahlProKampagne[gid];
         aktivesMitgliedId =
           mid && ag.mitglieder.some((m) => m.id === mid) ? mid : ag.mitglieder[0].id;
       }
@@ -134,37 +154,37 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       return '';
     },
     beiGruppenwechsel() {
-      const g = this.aktiveGruppe;
+      const g = this.aktiveKampagne;
       if (!g || !g.mitglieder.length) {
         this.aktivesMitgliedId = null;
         this.persist();
         return;
       }
-      const mid = this.zustand.mitgliedWahlProGruppe[g.id];
+      const mid = this.zustand.mitgliedWahlProKampagne[g.id];
       if (mid && g.mitglieder.some((m) => m.id === mid)) {
         this.aktivesMitgliedId = mid;
       } else {
         this.aktivesMitgliedId = g.mitglieder[0].id;
-        this.zustand.mitgliedWahlProGruppe[g.id] = this.aktivesMitgliedId;
+        this.zustand.mitgliedWahlProKampagne[g.id] = this.aktivesMitgliedId;
       }
       this.persist();
     },
     waehleMitglied(id) {
       this.aktivesMitgliedId = id;
-      if (this.aktiveGruppe) {
-        this.zustand.mitgliedWahlProGruppe[this.aktiveGruppe.id] = id;
+      if (this.aktiveKampagne) {
+        this.zustand.mitgliedWahlProKampagne[this.aktiveKampagne.id] = id;
       }
       this.persist();
     },
     async mitgliedEntfernen() {
-      const g = this.aktiveGruppe;
+      const g = this.aktiveKampagne;
       const m = this.aktivesMitglied;
       if (!g || !m) {
         return;
       }
       const bestaetigt = await window.HTBAH.ui.confirm({
         titel: 'Mitglied entfernen?',
-        beschreibung: `„${this.charakterName(m)}“ aus dieser Gruppe entfernen?`,
+        beschreibung: `„${this.charakterName(m)}“ aus dieser Kampagne entfernen?`,
         bestaetigenText: 'Entfernen',
         bestaetigenButtonClass: 'btn-danger',
         warnhinweisAnzeigen: true,
@@ -179,38 +199,38 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         const naechstes = g.mitglieder[nextIndex] || g.mitglieder[0];
         this.aktivesMitgliedId = naechstes ? naechstes.id : null;
         if (this.aktivesMitgliedId) {
-          this.zustand.mitgliedWahlProGruppe[g.id] = this.aktivesMitgliedId;
+          this.zustand.mitgliedWahlProKampagne[g.id] = this.aktivesMitgliedId;
         }
         this.persist();
         this.zeigeStatus('Charakter entfernt.');
         return;
       }
       this.aktivesMitgliedId = null;
-      delete this.zustand.mitgliedWahlProGruppe[g.id];
+      delete this.zustand.mitgliedWahlProKampagne[g.id];
       this.persist();
       const gruppeLoeschen = await window.HTBAH.ui.confirm({
         titel: 'Letztes Mitglied entfernt',
         beschreibung:
-          `In der Gruppe „${g.name}“ sind keine Mitglieder mehr. Soll die Gruppe ebenfalls gelöscht werden?`,
-        bestaetigenText: 'Gruppe löschen',
+          `In der Kampagne „${g.name}“ sind keine Mitglieder mehr. Soll die Kampagne ebenfalls gelöscht werden?`,
+        bestaetigenText: 'Kampagne löschen',
         bestaetigenButtonClass: 'btn-danger',
         warnhinweisAnzeigen: true,
       });
       if (!gruppeLoeschen) {
-        this.zeigeStatus('Charakter entfernt. Die Gruppe bleibt leer bestehen.');
+        this.zeigeStatus('Charakter entfernt. Die Kampagne bleibt leer bestehen.');
         return;
       }
-      this.zustand.gruppen = this.zustand.gruppen.filter((eintrag) => eintrag.id !== g.id);
-      delete this.zustand.mitgliedWahlProGruppe[g.id];
+      this.zustand.kampagnen = this.zustand.kampagnen.filter((eintrag) => eintrag.id !== g.id);
+      delete this.zustand.mitgliedWahlProKampagne[g.id];
       this.persist();
-      this.zeigeStatus('Letztes Mitglied entfernt und Gruppe gelöscht.');
+      this.zeigeStatus('Letztes Mitglied entfernt und Kampagne gelöscht.');
       this.$router.replace('/spielleiter');
     },
     oeffneVerschiebenModal() {
-      if (!this.aktivesMitglied || this.andereGruppen.length === 0 || !window.bootstrap) {
+      if (!this.aktivesMitglied || this.andereKampagnen.length === 0 || !window.bootstrap) {
         return;
       }
-      this.zielGruppeId = this.andereGruppen[0].id;
+      this.zielKampagneId = this.andereKampagnen[0].id;
       this.$nextTick(() => {
         const el = this.$refs.verschiebeModalElement;
         if (!el) {
@@ -220,20 +240,20 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         this.verschiebeModalInstanz.show();
       });
     },
-    verschiebeMitgliedInAndereGruppe() {
-      const quellGruppe = this.aktiveGruppe;
+    verschiebeMitgliedInAndereKampagne() {
+      const quellGruppe = this.aktiveKampagne;
       const m = this.aktivesMitglied;
       if (!quellGruppe || !m) {
         return;
       }
-      const zielGruppe = this.andereGruppen.find((g) => g.id === this.zielGruppeId) || null;
+      const zielGruppe = this.andereKampagnen.find((g) => g.id === this.zielKampagneId) || null;
       if (!zielGruppe) {
         return;
       }
 
       quellGruppe.mitglieder = quellGruppe.mitglieder.filter((x) => x.id !== m.id);
       zielGruppe.mitglieder.push(m);
-      this.zustand.mitgliedWahlProGruppe[zielGruppe.id] = m.id;
+      this.zustand.mitgliedWahlProKampagne[zielGruppe.id] = m.id;
 
       const name = this.charakterName(m);
       this.beiGruppenwechsel();
@@ -245,7 +265,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       this.zeigeStatus(`„${name}“ wurde verschoben.`);
     },
     fuegeMitgliedHinzu(charakter, charakterBild) {
-      const g = this.aktiveGruppe;
+      const g = this.aktiveKampagne;
       if (!g) {
         return;
       }
@@ -256,7 +276,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       };
       g.mitglieder.push(mitglied);
       this.aktivesMitgliedId = mitglied.id;
-      this.zustand.mitgliedWahlProGruppe[g.id] = mitglied.id;
+      this.zustand.mitgliedWahlProKampagne[g.id] = mitglied.id;
     },
     async importJsonDateien(event) {
       const input = event.target;
@@ -289,7 +309,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         }
         if (
           json &&
-          json.typ === 'spielleiter_gruppe' &&
+          json.typ === 'spielleiter_kampagne' &&
           Array.isArray(json.mitglieder)
         ) {
           for (let k = 0; k < json.mitglieder.length; k++) {
@@ -331,48 +351,40 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
     },
   },
   template: `
-    <div class="container content py-3">
-      <nav class="mb-2" aria-label="Brotkrumen">
+    <div :class="eingebettet ? 'py-3' : 'container content py-3'">
+      <nav v-if="!eingebettet" class="mb-2" aria-label="Brotkrumen">
         <router-link to="/spielleiter" class="htbah-back-link">
           <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
           <span>Zurück zur Übersicht</span>
         </router-link>
       </nav>
 
-      <template v-if="aktiveGruppe">
-      <h4 class="text-center mb-1 htbah-page-title">
-        <span class="htbah-page-title-emoji" aria-hidden="true">👥</span>
-        <span>{{ aktiveGruppe.name }}</span>
-      </h4>
-      <p class="small text-body-secondary text-center mb-3">
-        Charaktere per JSON importieren (Export vom Spieler), zwischen Helden wechseln und Werte bearbeiten.
-      </p>
-
-      <div class="alert alert-info mb-3">
+      <template v-if="aktiveKampagne">
+      <div class="card p-3 mb-3">
         <p class="small mb-2">
           Charakterblätter als JSON importieren (Einzel-Export oder Komplett-Export).
         </p>
         <div class="form-floating">
           <input
-            id="sl-gruppe-import"
+            id="sl-kampagne-import"
             type="file"
             accept="application/json,.json"
             multiple
             class="form-control"
             @change="importJsonDateien" />
-          <label for="sl-gruppe-import">Charakterblätter importieren</label>
+          <label for="sl-kampagne-import">Charakterblätter importieren</label>
         </div>
       </div>
 
       <div class="card p-3 mb-3">
-        <h6 class="mb-2">Charaktere in dieser Gruppe</h6>
+        <h6 class="mb-2">Charaktere in dieser Kampagne</h6>
         <ul
-          v-if="aktiveGruppe.mitglieder.length"
+          v-if="aktiveKampagne.mitglieder.length"
           class="nav htbah-weltenbau-pill-tabs mb-2"
           role="tablist"
           aria-label="Charakter wählen">
           <li
-            v-for="m in aktiveGruppe.mitglieder"
+            v-for="m in aktiveKampagne.mitglieder"
             :key="m.id"
             class="nav-item"
             role="presentation">
@@ -410,18 +422,18 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
 
         <div class="d-flex flex-wrap gap-2">
           <button
-            v-if="aktivesMitglied && andereGruppen.length"
+            v-if="aktivesMitglied && andereKampagnen.length"
             type="button"
             class="btn btn-outline-primary btn-sm"
             @click="oeffneVerschiebenModal">
-            In andere Gruppe verschieben
+            In andere Kampagne verschieben
           </button>
           <button
             v-if="aktivesMitglied"
             type="button"
             class="btn btn-outline-danger btn-sm"
             @click="mitgliedEntfernen">
-            Aus Gruppe entfernen
+            Aus Kampagne entfernen
           </button>
         </div>
       </div>
@@ -433,11 +445,6 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         :on-spielleiter-persist="persist"
       />
 
-      <div
-        v-else-if="!aktiveGruppe.mitglieder.length"
-        class="alert alert-secondary">
-        Importiere einen Charakter, um das Blatt zu bearbeiten.
-      </div>
       </template>
 
       <div v-if="!aktivesMitglied" class="abstandshalter" aria-hidden="true"></div>
@@ -454,7 +461,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
             <div class="modal-content shadow">
               <div class="modal-header">
                 <h5 class="modal-title" id="spielleiterVerschiebenModalLabel">
-                  In andere Gruppe verschieben
+                  In andere Kampagne verschieben
                 </h5>
                 <button
                   type="button"
@@ -463,20 +470,20 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
                   aria-label="Schließen"></button>
               </div>
               <div class="modal-body">
-                <label for="spielleiter-ziel-gruppe" class="form-label">
-                  Zielgruppe auswählen
+                <label for="spielleiter-ziel-kampagne" class="form-label">
+                  Zielkampagne auswählen
                 </label>
                 <select
-                  id="spielleiter-ziel-gruppe"
+                  id="spielleiter-ziel-kampagne"
                   class="form-select"
-                  v-model="zielGruppeId">
-                  <option v-for="g in andereGruppen" :key="g.id" :value="g.id">
+                  v-model="zielKampagneId">
+                  <option v-for="g in andereKampagnen" :key="g.id" :value="g.id">
                     {{ g.name }}
                   </option>
                 </select>
                 <p class="small text-body-secondary mb-0 mt-2">
                   „{{ aktivesMitglied ? charakterName(aktivesMitglied) : '' }}“ nach
-                  „{{ (andereGruppen.find((g) => g.id === zielGruppeId) || {}).name || '' }}“
+                  „{{ (andereKampagnen.find((g) => g.id === zielKampagneId) || {}).name || '' }}“
                   verschieben?
                 </p>
               </div>
@@ -490,8 +497,8 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
                 <button
                   type="button"
                   class="btn btn-primary"
-                  :disabled="!zielGruppeId"
-                  @click="verschiebeMitgliedInAndereGruppe">
+                  :disabled="!zielKampagneId"
+                  @click="verschiebeMitgliedInAndereKampagne">
                   Verschieben
                 </button>
               </div>

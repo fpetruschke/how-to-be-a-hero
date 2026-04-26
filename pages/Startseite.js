@@ -4,6 +4,8 @@ window.HTBAH_SEITEN.Startseite = {
   data() {
     return {
       charakterEintraege: [],
+      penPaperModalInstanz: null,
+      penPaperModalOffen: false,
     };
   },
   computed: {
@@ -104,9 +106,30 @@ window.HTBAH_SEITEN.Startseite = {
       window.HTBAH.speichereAppRolle('spielleitung');
       this.$router.push('/spielleiter');
     },
+    penPaperInfoOeffnen() {
+      this.penPaperModalOffen = true;
+      this.$nextTick(() => {
+        const el = this.$refs.penPaperModalElement;
+        if (!el || !window.bootstrap) {
+          return;
+        }
+        this.penPaperModalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
+        this.penPaperModalInstanz.show();
+      });
+    },
+    onPenPaperModalHidden() {
+      this.penPaperModalInstanz = null;
+      this.penPaperModalOffen = false;
+    },
   },
   mounted() {
     this.aktualisiereCharakterListe();
+  },
+  beforeUnmount() {
+    if (this.penPaperModalInstanz) {
+      this.penPaperModalInstanz.hide();
+      this.penPaperModalInstanz = null;
+    }
   },
   template: `
     <div class="container content py-3 text-center">
@@ -141,6 +164,31 @@ window.HTBAH_SEITEN.Startseite = {
             </p>
             <h5 class="mb-1 text-truncate htbah-start-card-charaktername">{{ projektTitel }}</h5>
             <p class="mb-0 small text-body-secondary">{{ projektUntertitel }}</p>
+          </div>
+          <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
+            chevron_right
+          </span>
+        </div>
+      </div>
+
+      <div
+        class="card action-card text-start mb-3 cursor-pointer"
+        role="button"
+        tabindex="0"
+        aria-label="Pen und Paper Hilfe öffnen"
+        @click="penPaperInfoOeffnen"
+        @keydown.enter.prevent="penPaperInfoOeffnen"
+        @keydown.space.prevent="penPaperInfoOeffnen">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <div class="htbah-start-card-avatar flex-shrink-0">
+            <span class="htbah-start-card-avatar-emoji" aria-hidden="true">🎲</span>
+          </div>
+          <div class="min-w-0 flex-grow-1">
+            <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
+              Pen &amp; Paper
+            </p>
+            <h5 class="mb-1 text-truncate htbah-start-card-charaktername">Wie funktioniert eigentlich Pen &amp; Paper?</h5>
+            <p class="mb-0 small text-body-secondary">Ein schneller Einstieg für Neulinge.</p>
           </div>
           <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
             chevron_right
@@ -251,6 +299,67 @@ window.HTBAH_SEITEN.Startseite = {
       </div>
 
       <div class="abstandshalter" aria-hidden="true"></div>
+
+      <div
+        ref="penPaperModalElement"
+        class="modal fade"
+        tabindex="-1"
+        aria-labelledby="htbahPenPaperModalTitel"
+        aria-hidden="true"
+        @hidden.bs.modal="onPenPaperModalHidden">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content shadow">
+            <div class="modal-header">
+              <h5 class="modal-title" id="htbahPenPaperModalTitel">Pen &amp; Paper - Einstieg</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body text-start">
+              <div class="card p-3 mb-3">
+                <h6 class="mb-2">Wie wird gespielt?</h6>
+                <p class="mb-0 small text-body-secondary">
+                  Entweder analog vor Ort (Tisch, Würfel, Notizen) oder digital über Voice-/Video-Chat und
+                  gemeinsame Tools. Wichtig ist nur: Ihr einigt euch vorab auf Hilfsmittel und Ablauf.
+                </p>
+              </div>
+              <div class="card p-3 mb-3">
+                <h6 class="mb-2">Die Spielenden</h6>
+                <p class="mb-0 small text-body-secondary">
+                  Jede Person steuert einen eigenen Charakter und beschreibt aus der Ich-Perspektive, was sie tun will.
+                  Die Umgebung, Sinneseindrücke und Szenerie beschreibt die Spielleitung. Spielende können also nicht
+                  einfach etwas in die Szene "hineinerzählen" und damit festlegen, dass es existiert.
+                </p>
+              </div>
+              <div class="card p-3 mb-3">
+                <h6 class="mb-2">Die Spielleitung</h6>
+                <p class="mb-0 small text-body-secondary">
+                  Die Spielleitung beschreibt Welt, NSCs und Situationen, moderiert Regeln und sorgt dafür,
+                  dass alle eingebunden sind. Sie führt die Runde, spielt aber nicht <em>gegen</em> die Gruppe,
+                  sondern gemeinsam <em>mit</em> ihr.
+                </p>
+              </div>
+              <div class="card p-3 mb-3">
+                <h6 class="mb-2">Session Zero</h6>
+                <p class="mb-0 small text-body-secondary">
+                  Vor dem ersten Abenteuer besprecht ihr Regelwerk, Setting, Spielstil, Grenzen und Schleier.
+                  Oft entstehen dabei schon erste Charakterideen und gemeinsame Verbindungen zwischen den Figuren.
+                  Vielleicht erarbeitet ihr schon gemeinsam eure Charaktere. Das kann aber auch später noch passieren.
+                </p>
+              </div>
+              <div class="card p-3">
+                <h6 class="mb-2">Weitere Hinweise für eine gute Zeit</h6>
+                <p class="mb-0 small text-body-secondary">
+                  Sprecht offen über Erwartungen, gebt einander Raum und respektiert Stoppsignale.
+                  Macht bei längeren Sessions Pausen und gebt nach der Runde kurzes Feedback:
+                  Was war gut, was soll beim nächsten Mal anders laufen?
+                </p>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   `,
 };

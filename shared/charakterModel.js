@@ -88,7 +88,6 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       sicherheitsmechanismen: {
         tabuHtml: '',
         schleierHtml: '',
-        buttonEmoji: '🚩',
       },
       handeln: [],
       wissen: [],
@@ -136,10 +135,6 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       quelle.sicherheitsmechanismen && typeof quelle.sicherheitsmechanismen === 'object'
         ? quelle.sicherheitsmechanismen
         : {};
-    const buttonEmojiRoh =
-      typeof sicherheitsmechanismenQuelle.buttonEmoji === 'string'
-        ? sicherheitsmechanismenQuelle.buttonEmoji.trim()
-        : '';
 
     return {
       ...zusammengefuehrt,
@@ -174,7 +169,6 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
           typeof sicherheitsmechanismenQuelle.schleierHtml === 'string'
             ? sicherheitsmechanismenQuelle.schleierHtml
             : '',
-        buttonEmoji: buttonEmojiRoh || '🚩',
       },
       geistesblitzVerbleibend,
       lpStatusTot: Boolean(quelle.lpStatusTot),

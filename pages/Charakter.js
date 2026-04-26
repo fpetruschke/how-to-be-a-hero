@@ -330,8 +330,7 @@ window.HTBAH_SEITEN.Charakter = {
       const tabu = typeof sicher.tabuHtml === 'string' ? sicher.tabuHtml.replace(/<[^>]*>/g, '').trim() : '';
       const schleier =
         typeof sicher.schleierHtml === 'string' ? sicher.schleierHtml.replace(/<[^>]*>/g, '').trim() : '';
-      const emoji = typeof sicher.buttonEmoji === 'string' ? sicher.buttonEmoji.trim() : '';
-      return !!tabu || !!schleier || (emoji && emoji !== '🚩');
+      return !!tabu || !!schleier;
     },
     hatMindestensEinAusgefuelltesCharakterfeld(charakter) {
       const c = charakter && typeof charakter === 'object' ? charakter : {};
@@ -1066,10 +1065,6 @@ window.HTBAH_SEITEN.Charakter = {
         this.charakter.sicherheitsmechanismen = {
           tabuHtml: typeof daten?.tabuHtml === 'string' ? daten.tabuHtml : '',
           schleierHtml: typeof daten?.schleierHtml === 'string' ? daten.schleierHtml : '',
-          buttonEmoji:
-            typeof daten?.buttonEmoji === 'string' && daten.buttonEmoji.trim()
-              ? daten.buttonEmoji.trim()
-              : '🚩',
         };
         this.importHinweis = 'Sicherheitsmechanismen importiert.';
       } catch {

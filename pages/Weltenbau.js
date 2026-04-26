@@ -161,6 +161,7 @@ window.HTBAH_SEITEN.Weltenbau = {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
     WeltenbauUebersichtModal: window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal,
     ZufallstabellenSeite: window.HTBAH_SEITEN.Zufallstabellen,
+    SpielleiterGruppe: window.HTBAH_SEITEN.SpielleiterGruppe,
   },
   data() {
     const zustandRoh = window.HTBAH.ladeWeltenbauZustand();
@@ -183,9 +184,9 @@ window.HTBAH_SEITEN.Weltenbau = {
       generatoren: WELTENBAU_GENERATOREN,
       zustand,
       weltenbauMapModalOffen: false,
-      ausgewaehlteGruppeId:
-        (window.HTBAH.ladeSpielleiterZustand().aktiveGruppeId ||
-          ((window.HTBAH.ladeSpielleiterZustand().gruppen || [])[0] || {}).id ||
+      ausgewaehlteKampagneId:
+        (window.HTBAH.ladeSpielleiterZustand().aktiveKampagneId ||
+          ((window.HTBAH.ladeSpielleiterZustand().kampagnen || [])[0] || {}).id ||
           ''),
       importWarteschlange: [],
       zeigeImportHinweis: false,
@@ -212,12 +213,18 @@ window.HTBAH_SEITEN.Weltenbau = {
     };
   },
   computed: {
-    spielleiterGruppen() {
+    spielleiterKampagnen() {
       const sl = window.HTBAH.ladeSpielleiterZustand();
-      return Array.isArray(sl && sl.gruppen) ? sl.gruppen : [];
+      return Array.isArray(sl && sl.kampagnen) ? sl.kampagnen : [];
     },
-    gruppenAuswahlDeaktiviert() {
-      return this.spielleiterGruppen.length <= 1;
+    aktiveKampagne() {
+      return this.spielleiterKampagnen.find((k) => k && k.id === this.ausgewaehlteKampagneId) || null;
+    },
+    seitenTitel() {
+      return (this.aktiveKampagne && this.aktiveKampagne.name) || 'Kampagne';
+    },
+    kampagnenAuswahlDeaktiviert() {
+      return this.spielleiterKampagnen.length <= 1;
     },
     geschaetzteSpeicherGroesseKb() {
       try {
@@ -263,48 +270,82 @@ window.HTBAH_SEITEN.Weltenbau = {
       return this.generatorModal.istVollbild ? 'Vollbild beenden' : 'Vollbild';
     },
     aktiveWeltenbauTab() {
-      const pfad = this.$route && this.$route.path ? this.$route.path : '';
-      if (pfad === '/weltenbau/zufallstabellen') {
-        return 'zufallstabellen';
+      const tab = this.$route && this.$route.params ? this.$route.params.tab : '';
+      if (tab === 'gruppe' || tab === 'welt' || tab === 'zufallstabellen' || tab === 'generatoren') {
+        return tab;
       }
-      if (pfad === '/weltenbau/generatoren') {
-        return 'generatoren';
+      return 'gruppe';
+    },
+  },
+  watch: {
+    '$route.params.kampagneSlug': {
+      immediate: true,
+      handler() {
+        this.syncKampagneAusRoute();
+      },
+    },
+    ausgewaehlteKampagneId(neu) {
+      if (!neu) {
+        return;
       }
-      return 'welt';
+      const z = window.HTBAH.ladeSpielleiterZustand();
+      if (z.aktiveKampagneId === neu) {
+        return;
+      }
+      z.aktiveKampagneId = neu;
+      window.HTBAH.speichereSpielleiterZustand(z);
     },
   },
   methods: {
+    syncKampagneAusRoute() {
+      const slugRaw = this.$route?.params?.kampagneSlug;
+      const slug = typeof slugRaw === 'string' ? decodeURIComponent(slugRaw) : '';
+      const kampagnen = this.spielleiterKampagnen;
+      if (!kampagnen.length) {
+        this.ausgewaehlteKampagneId = '';
+        return;
+      }
+      const gefunden = kampagnen.find((k) => window.HTBAH.kampagnenSlugAusName(k?.name) === slug) || null;
+      if (gefunden && gefunden.id) {
+        this.ausgewaehlteKampagneId = gefunden.id;
+        return;
+      }
+      const fallbackId = this.ausgewaehlteKampagneId || (kampagnen[0] && kampagnen[0].id) || '';
+      if (!fallbackId) {
+        return;
+      }
+      this.ausgewaehlteKampagneId = fallbackId;
+      const ziel = window.HTBAH.kampagnenPfad(this.aktiveWeltenbauTab, fallbackId);
+      if (ziel !== this.$route.path) {
+        this.$router.replace(ziel);
+      }
+    },
     wechsleWeltenbauTab(tabId) {
-      const routeByTab = {
-        welt: '/weltenbau/welt',
-        zufallstabellen: '/weltenbau/zufallstabellen',
-        generatoren: '/weltenbau/generatoren',
-      };
-      const ziel = routeByTab[tabId] || routeByTab.welt;
+      const ziel = window.HTBAH.kampagnenPfad(tabId, this.ausgewaehlteKampagneId);
       if (ziel !== this.$route.path) {
         this.$router.push(ziel);
       }
     },
     onWeltenbauMapModalSchliessen() {
       this.weltenbauMapModalOffen = false;
+      const wb = window.HTBAH.ladeWeltenbauZustand();
+      this.zustand = {
+        ...this.zustand,
+        mapLayouts: wb && wb.mapLayouts && typeof wb.mapLayouts === 'object' ? wb.mapLayouts : {},
+        mapHintergruende: wb && wb.mapHintergruende && typeof wb.mapHintergruende === 'object' ? wb.mapHintergruende : {},
+        mapEinstellungen: wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {},
+      };
     },
     persist() {
       const aktuell = window.HTBAH.ladeWeltenbauZustand();
       window.HTBAH.speichereWeltenbauZustand({
         ...aktuell,
         ...this.zustand,
-        mapLayouts:
-          this.zustand && this.zustand.mapLayouts && typeof this.zustand.mapLayouts === 'object'
-            ? this.zustand.mapLayouts
-            : aktuell.mapLayouts || {},
-        mapHintergruende:
-          this.zustand && this.zustand.mapHintergruende && typeof this.zustand.mapHintergruende === 'object'
-            ? this.zustand.mapHintergruende
-            : aktuell.mapHintergruende || {},
-        mapEinstellungen:
-          this.zustand && this.zustand.mapEinstellungen && typeof this.zustand.mapEinstellungen === 'object'
-            ? this.zustand.mapEinstellungen
-            : aktuell.mapEinstellungen || {},
+        // Diese Felder werden direkt im Interaktive-Welt-Modal gepflegt.
+        // Hier nie mit möglicherweise stale Daten überschreiben.
+        mapLayouts: aktuell.mapLayouts || {},
+        mapHintergruende: aktuell.mapHintergruende || {},
+        mapEinstellungen: aktuell.mapEinstellungen || {},
       });
     },
     zeigeStatus(text, typ = 'success') {
@@ -773,7 +814,7 @@ window.HTBAH_SEITEN.Weltenbau = {
     <div class="container content py-3">
       <weltenbau-uebersicht-modal
         :offen="weltenbauMapModalOffen"
-        :gruppe-id="ausgewaehlteGruppeId"
+        :gruppe-id="ausgewaehlteKampagneId"
         @schliessen="onWeltenbauMapModalSchliessen" />
       <weltenbau-bild-import-modal
         ref="weltenbauImportModal"
@@ -782,14 +823,20 @@ window.HTBAH_SEITEN.Weltenbau = {
         @datei-import-fehler="onWeltenbauDateiImportFehler" />
 
       <h4 class="text-center mb-1 htbah-page-title">
-        <span class="htbah-page-title-emoji" aria-hidden="true">🗺️</span>
-        <span>Weltenbau</span>
+        <span class="htbah-page-title-emoji" aria-hidden="true">📖</span>
+        <span>{{ seitenTitel }}</span>
       </h4>
       <p class="small text-body-secondary text-center mb-3">
-        Welt, Zufallstabellen und Generatoren zentral in einer Navigation.
+        Weltenbau mit Fokus auf Interaktive Welt, Tabellen, Generatoren und Gruppenverwaltung.
       </p>
 
       <ul class="nav htbah-weltenbau-pill-tabs mb-3" role="tablist" aria-label="Weltenbau Unterseiten">
+        <li class="nav-item" role="presentation">
+          <button type="button" class="nav-link htbah-weltenbau-pill-tab" :class="{ active: aktiveWeltenbauTab === 'gruppe' }" @click="wechsleWeltenbauTab('gruppe')">
+            <span aria-hidden="true">👥</span>
+            <span>Gruppe</span>
+          </button>
+        </li>
         <li class="nav-item" role="presentation">
           <button type="button" class="nav-link htbah-weltenbau-pill-tab" :class="{ active: aktiveWeltenbauTab === 'zufallstabellen' }" @click="wechsleWeltenbauTab('zufallstabellen')">
             <span aria-hidden="true">📚</span>
@@ -812,34 +859,19 @@ window.HTBAH_SEITEN.Weltenbau = {
 
       <template v-if="aktiveWeltenbauTab === 'welt'">
       <div class="alert alert-info py-2 px-3 small mb-2" role="note">
-        Wähle eine Gruppe, öffne die interaktive Welt und verwalte darunter deine importierten Bilder.
+        Öffne die interaktive Welt deiner aktiven Kampagne und verwalte darunter deine importierten Bilder.
       </div>
 
       <div class="card p-3 mb-3">
-        <div class="row">
-          <div class="col-12">
-            <p class="small text-body-secondary mb-3">
-              In der interaktiven Welt siehst du alle NPCs, Orte, Fraktionen, Bestien usw.<br>
-              Dafür musst du zuerst eine Gruppe von Spielenden auswählen.
-            </p>
-          </div>          
-        </div>
-        <div class="row g-2 align-items-end">
-          <div class="col-12 col-md-8">
-            <label class="form-label small text-secondary mb-1" for="weltenbau-gruppe-select">Gruppe</label>
-            <select
-              id="weltenbau-gruppe-select"
-              class="form-select"
-              v-model="ausgewaehlteGruppeId"
-              :disabled="gruppenAuswahlDeaktiviert">
-              <option v-for="g in spielleiterGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-4 d-grid">
-            <button type="button" class="btn btn-primary" :disabled="!ausgewaehlteGruppeId" @click="weltenbauMapModalOffen = true">
-              Interaktive Welt öffnen
-            </button>
-          </div>
+        <h6 class="mb-2">Interaktive Welt</h6>
+        <p class="small text-body-secondary mb-3">
+          In der interaktiven Welt siehst du alle NPCs, Orte, Fraktionen, Bestien usw.
+          Die aktuell aktive Kampagne wird automatisch verwendet.
+        </p>
+        <div class="d-grid">
+          <button type="button" class="btn btn-primary py-2 fw-semibold" :disabled="!ausgewaehlteKampagneId" @click="weltenbauMapModalOffen = true">
+            ✨ Interaktive Welt öffnen
+          </button>
         </div>
       </div>
 
@@ -860,6 +892,9 @@ window.HTBAH_SEITEN.Weltenbau = {
             </button>
           </div>
         </div>
+        <p class="small text-body-secondary mb-3">
+          Für Bilder, die sonst nirgendwo richtig hin passen.
+        </p>
         <div v-if="zeigeImportHinweis" class="alert alert-info py-2 small mb-3" role="note">
           Unterstützt: gängige Bildformate (PNG, JPEG, WebP, GIF, BMP, …). Rohdateien bis
           {{ maxRohDateiHuman }} — danach öffnet sich ein Zuschnitt mit Cropper;
@@ -952,7 +987,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         <zufallstabellen-seite eingebettet />
       </template>
 
-      <template v-else>
+      <template v-else-if="aktiveWeltenbauTab === 'generatoren'">
         <div class="alert alert-info py-2 px-3 small mb-2" role="note">
           Nutze externe Werkzeuge, um dort z. B. Bilddateien herunterzuladen und in den anderen Bereichen hochzuladen.
         </div>
@@ -1008,6 +1043,12 @@ window.HTBAH_SEITEN.Weltenbau = {
             </div>
           </div>
         </div>
+      </template>
+      <template v-else>
+        <div class="alert alert-info py-2 px-3 small mb-2" role="note">
+          Hier bearbeitest du die aktuell gewählte Kampagne und ihre Charaktere.
+        </div>
+        <spielleiter-gruppe eingebettet />
       </template>
 
       <div class="abstandshalter" aria-hidden="true"></div>

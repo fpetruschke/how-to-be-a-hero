@@ -25,7 +25,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     return {
       wuerfelModus: 'w10',
       anzahlW10: 1,
-      anzahlW100: 1,
       ergebnisse: [],
       wuerfelModalTab: 'wuerfel',
       atmosphaereFormularOffen: false,
@@ -147,9 +146,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const p = this.$route.path || '';
       return p === '/';
     },
-    spielleiterGruppenAktiv() {
+    spielleiterKampagnenAktiv() {
       const p = this.$route.path || '';
-      return p === '/spielleiter' || p.startsWith('/spielleiter/gruppe/');
+      return p === '/spielleiter' || p.startsWith('/spielleiter/kampagne/');
     },
     presetVerwaltungAktiv() {
       const p = this.$route.path || '';
@@ -166,10 +165,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     charakterLink() {
       const id = window.HTBAH.ladeAktivenCharakterId();
       return id ? `/charakter/${id}/session-zero` : '/charakter/neu/session-zero';
-    },
-    weltenbauAktiv() {
-      const p = this.$route.path || '';
-      return p === '/weltenbau' || p.startsWith('/weltenbau/');
     },
     einstellungenAktiv() {
       const p = this.$route.path || '';
@@ -211,7 +206,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const fallback = {
         tabuHtml: '',
         schleierHtml: '',
-        buttonEmoji: '🚩',
       };
       const kontext = this.aktiverCharakterKontext;
       if (!kontext || typeof kontext.getCharakter !== 'function') {
@@ -225,19 +219,14 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         charakter.sicherheitsmechanismen = { ...fallback };
         return charakter.sicherheitsmechanismen;
       }
-      if (typeof charakter.sicherheitsmechanismen.buttonEmoji !== 'string' || !charakter.sicherheitsmechanismen.buttonEmoji.trim()) {
-        charakter.sicherheitsmechanismen.buttonEmoji = '🚩';
-      }
       if (typeof charakter.sicherheitsmechanismen.tabuHtml !== 'string') {
         charakter.sicherheitsmechanismen.tabuHtml = '';
       }
       if (typeof charakter.sicherheitsmechanismen.schleierHtml !== 'string') {
         charakter.sicherheitsmechanismen.schleierHtml = '';
       }
+      delete charakter.sicherheitsmechanismen.buttonEmoji;
       return charakter.sicherheitsmechanismen;
-    },
-    sicherheitsButtonEmoji() {
-      return '🚩';
     },
     sicherheitsButtonAnzeigen() {
       return this.zeigeNav && (this.rolle === 'spielleitung' || this.rolle === 'charakter');
@@ -422,9 +411,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     baueDiceNotation() {
       if (this.wuerfelModus === 'w100') {
-        const anzahl100 = Math.max(1, Math.min(50, Number(this.anzahlW100) || 1));
-        this.anzahlW100 = anzahl100;
-        return `${anzahl100}d100`;
+        return '1d100';
       }
       const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
       this.anzahlW10 = anzahl10;
@@ -712,8 +699,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       if (!fenster) {
         return;
       }
+      const v = this.wuerfelBeutelErmittleViewport();
+      const istDesktop = v.viewportBreite >= 992;
       if (this.wuerfelBeutelFenster.breite == null || this.wuerfelBeutelFenster.hoehe == null) {
-        const groesse = this.wuerfelBeutelBegrenzeGroesse(fenster.offsetWidth, fenster.offsetHeight);
+        const initialBreite = istDesktop ? fenster.offsetWidth : Math.max(300, v.viewportBreite - 16);
+        const initialHoehe = istDesktop ? 650 : fenster.offsetHeight;
+        const groesse = this.wuerfelBeutelBegrenzeGroesse(initialBreite, initialHoehe);
         this.wuerfelBeutelFenster.breite = groesse.breite;
         this.wuerfelBeutelFenster.hoehe = groesse.hoehe;
       } else {
@@ -725,7 +716,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.wuerfelBeutelFenster.hoehe = groesse.hoehe;
       }
       if (this.wuerfelBeutelFenster.positionX == null || this.wuerfelBeutelFenster.positionY == null) {
-        const v = this.wuerfelBeutelErmittleViewport();
         this.wuerfelBeutelFenster.positionX = Math.max(
           0,
           Math.round((v.viewportBreite - this.wuerfelBeutelFenster.breite) / 2),
@@ -878,10 +868,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       charakter.sicherheitsmechanismen = {
         tabuHtml: typeof neueWerte?.tabuHtml === 'string' ? neueWerte.tabuHtml : '',
         schleierHtml: typeof neueWerte?.schleierHtml === 'string' ? neueWerte.schleierHtml : '',
-        buttonEmoji:
-          typeof neueWerte?.buttonEmoji === 'string' && neueWerte.buttonEmoji.trim()
-            ? neueWerte.buttonEmoji.trim()
-            : '🚩',
       };
       if (typeof kontext.speichern === 'function') {
         kontext.speichern();
@@ -965,16 +951,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.ladeDiceFarbwahl();
       const notation = this.baueDiceNotation();
       const wuerfelAnzahl =
-        this.wuerfelModus === 'w100'
-          ? Math.max(1, Math.min(50, Number(this.anzahlW100) || 1))
-          : Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
+        this.wuerfelModus === 'w100' ? 1 : Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
       try {
         if (!this.dice3dAktiv) {
           this.diceFehler = '';
           if (this.wuerfelModus === 'w100') {
-            const anzahl100 = Math.max(1, Math.min(50, Number(this.anzahlW100) || 1));
-            this.anzahlW100 = anzahl100;
-            this.ergebnisse = Array.from({ length: anzahl100 }, () => window.HTBAH.wuerfelW100());
+            this.ergebnisse = [window.HTBAH.wuerfelW100()];
           } else {
             const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
             this.anzahlW10 = anzahl10;
@@ -1006,9 +988,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           }
         }
         if (this.wuerfelModus === 'w100') {
-          const anzahl100 = Math.max(1, Math.min(50, Number(this.anzahlW100) || 1));
-          this.anzahlW100 = anzahl100;
-          this.ergebnisse = Array.from({ length: anzahl100 }, () => window.HTBAH.wuerfelW100());
+          this.ergebnisse = [window.HTBAH.wuerfelW100()];
         } else {
           const anzahl10 = Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
           this.anzahlW10 = anzahl10;
@@ -1184,11 +1164,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             <template v-else-if="rolle === 'spielleitung'">
               <router-link
                 to="/spielleiter"
-                title="Gruppen"
+                title="Kampagnen"
                 class="htbah-nav-item"
-                :class="{ 'router-link-active': spielleiterGruppenAktiv }">
-                <span class="htbah-nav-item-emoji" aria-hidden="true">👥</span>
-                <span class="htbah-nav-item-label">Gruppen</span>
+                :class="{ 'router-link-active': spielleiterKampagnenAktiv }">
+                <span class="htbah-nav-item-emoji" aria-hidden="true">🗂️</span>
+                <span class="htbah-nav-item-label">Kampagnen</span>
               </router-link>
               <router-link
                 to="/faehigkeiten-presets"
@@ -1197,14 +1177,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 :class="{ 'router-link-active': presetVerwaltungAktiv }">
                 <span class="htbah-nav-item-emoji" aria-hidden="true">📦</span>
                 <span class="htbah-nav-item-label">Presets</span>
-              </router-link>
-              <router-link
-                to="/weltenbau"
-                title="Weltenbau"
-                class="htbah-nav-item"
-                :class="{ 'router-link-active': weltenbauAktiv }">
-                <span class="htbah-nav-item-emoji" aria-hidden="true">🗺️</span>
-                <span class="htbah-nav-item-label">Weltenbau</span>
               </router-link>
               <button type="button" title="Abenteuerbuch" class="htbah-nav-item" @click="abenteuerbuchOeffnen">
                 <span class="htbah-nav-item-emoji" aria-hidden="true">📔</span>
@@ -1259,21 +1231,15 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </router-link>
             <router-link
               to="/spielleiter"
-              title="Gruppen"
-              :class="{ 'router-link-active': spielleiterGruppenAktiv }">
-              👥
+              title="Kampagnen"
+              :class="{ 'router-link-active': spielleiterKampagnenAktiv }">
+              🗂️
             </router-link>
             <router-link
               to="/faehigkeiten-presets"
               title="Fähigkeiten-Presets"
               :class="{ 'router-link-active': presetVerwaltungAktiv }">
               📦
-            </router-link>
-            <router-link
-              to="/weltenbau"
-              title="Weltenbau"
-              :class="{ 'router-link-active': weltenbauAktiv }">
-              🗺️
             </router-link>
             <button type="button" title="Abenteuerbuch" @click="abenteuerbuchOeffnen">
               📔
@@ -1305,7 +1271,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           title="Sicherheitsmechanismen (Session Zero)"
           aria-label="Sicherheitsmechanismen öffnen"
           @click="sicherheitsmechanismenOeffnen">
-          {{ sicherheitsButtonEmoji }}
+          🚩
         </button>
       </div>
     </teleport>
@@ -1443,19 +1409,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                       v-model.number="anzahlW10"
                       placeholder=" " />
                     <label for="nav-anzahl-w10">Anzahl W10</label>
-                  </div>
-                </div>
-                <div class="mb-3" v-else>
-                  <div class="form-floating">
-                    <input
-                      id="nav-anzahl-w100"
-                      type="number"
-                      class="form-control"
-                      min="1"
-                      max="50"
-                      v-model.number="anzahlW100"
-                      placeholder=" " />
-                    <label for="nav-anzahl-w100">Anzahl W100</label>
                   </div>
                 </div>
                 <div class="mb-3">

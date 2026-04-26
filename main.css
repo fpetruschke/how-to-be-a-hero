@@ -1008,12 +1008,6 @@ input::placeholder {
   height: 10vh;
 }
 
-/* Spielleiter: horizontale Charakter-Chips (Touch-Scroll) */
-.htbah-sl-chips {
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-}
-
 .navbar-fixed {
   min-height: 50px;
 }
@@ -1266,6 +1260,7 @@ input::placeholder {
   color: var(--primary-color);
   font-size: 28px;
   flex-shrink: 0;
+  align-self: center;
 }
 
 /* Kleine Utility-Klasse, wird in Startseiten-Karten verwendet */
@@ -1882,8 +1877,8 @@ input::placeholder {
   }
 
   .action-card .action-card-arrow {
-    align-self: flex-start;
-    margin-top: 0.1rem;
+    align-self: center;
+    margin-top: 0;
   }
 }
 
@@ -2231,6 +2226,11 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 
 .htbah-sicherheits-readonly-card .ql-toolbar,
 .htbah-sicherheits-readonly-card .ql-snow .ql-toolbar {
+  display: none !important;
+}
+
+.htbah-sicherheits-readonly .ql-toolbar,
+.htbah-sicherheits-readonly .ql-snow .ql-toolbar {
   display: none !important;
 }
 

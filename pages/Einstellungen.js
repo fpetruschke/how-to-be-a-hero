@@ -88,69 +88,121 @@ const SPEICHER_BEREICHE = {
       '3D-Würfel (Aktivierung und Farbe), gespeicherte Größe und Position des Würfelbeutel-Fensters sowie die im Würfelbeutel gespeicherte Atmosphäre inklusive Badge-Position werden entfernt.',
     erfolg: 'Würfelbeutel-Layout und Atmosphäre wurden gelöscht.',
     buttonSymbol: '🎲',
-    buttonLabel: 'Würfelbeutel-Layout & Atmosphäre löschen',
+    buttonLabel: 'Würfelbecher-Einstellungen löschen',
   },
   sicherheitsmechanismen: {
     titel: 'Sicherheitsmechanismen löschen?',
     beschreibung:
-      'Die Session-Zero-Sicherheitsmechanismen (Grenzen, Schleier und Button-Emoji) werden bei allen Charakteren entfernt.',
+      'Die Session-Zero-Sicherheitsmechanismen (Grenzen, Schleier) werden bei allen Charakteren entfernt.',
     erfolg: 'Sicherheitsmechanismen wurden für alle Charaktere entfernt.',
     buttonSymbol: '🛑',
     buttonLabel: 'Sicherheitsmechanismen löschen',
   },
   spielleiter: {
-    key: 'htbah_spielleiter_gruppen',
-    titel: 'Spielleiter-Gruppen löschen?',
+    key: 'htbah_spielleiter_kampagnen',
+    titel: 'Spielleiter-Kampagnen löschen?',
     beschreibung:
-      'Alle gespeicherten Gruppen und Charaktere in der Spielleiter-Ansicht werden entfernt.',
-    erfolg: 'Spielleiter-Gruppen wurden gelöscht.',
+      'Alle gespeicherten Kampagnen und Charaktere in der Spielleiter-Ansicht werden entfernt.',
+    erfolg: 'Spielleiter-Kampagnen wurden gelöscht.',
     buttonSymbol: '👥',
-    buttonLabel: 'Spielleiter-Gruppen löschen',
+    buttonLabel: 'Spielleiter-Kampagnen löschen',
   },
   alles: {
     keys: [
-      'htbah_characters',
+      'htbah_app_rolle',
       'htbah_active_character_id',
+      'htbah_characters',
       'htbah_character',
       'htbah_character_image',
       'htbah_presets',
       'htbah_theme',
-      'htbah_spielleiter_gruppen',
+      'htbah_spielleiter_kampagnen',
       'htbah_zufallstabellen',
       'htbah_spielleitung_abenteuerbuch',
       'htbah_weltenbau',
-      'htbah_app_rolle',
       'htbah_wuerfel_audio',
       'htbah_wuerfel_sound',
       'htbah_atmosphaere',
       'htbah_atmosphaere_badge_pos',
       'htbah_dice_colors',
       'htbah_wuerfel_beutel_fenster',
+      'htbah_wuerfelbecher_bundle',
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Gruppen, Zufallstabellen, das Abenteuerbuch der Spielleitung, unter „Weltenbau“ gespeicherte Bilder, die gewählte Rolle (Charakter/Spielleitung), deine Theme-Auswahl, die Würfel-Audio-Einstellungen, die Atmosphäre im Würfelbeutel, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Kampagnen, Zufallstabellen, das Abenteuerbuch der Spielleitung, unter „Weltenbau“ gespeicherte Bilder, deine Theme-Auswahl, die Würfel-Audio-Einstellungen, die Atmosphäre im Würfelbeutel, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
   },
 };
 
+const WUERFELBECHER_KEYS = [
+  'htbah_dice_colors',
+  'htbah_wuerfel_beutel_fenster',
+  'htbah_atmosphaere',
+  'htbah_atmosphaere_badge_pos',
+  'htbah_wuerfel_audio',
+  'htbah_wuerfel_sound',
+];
+const WUERFELBECHER_BUNDLE_KEY = 'htbah_wuerfelbecher_bundle';
+
+const IMPORT_IGNORIERE_KEYS = new Set(['htbah_app_rolle', 'htbah_active_character_id']);
+
+function htbahNormalisiereLokalerSpeicherImportDaten(rohDaten) {
+  if (!Array.isArray(rohDaten)) {
+    return [];
+  }
+  const arr = rohDaten.filter((e) => e && typeof e === 'object' && typeof e.key === 'string');
+  const gefiltert = arr.filter((e) => !IMPORT_IGNORIERE_KEYS.has(e.key));
+
+  const bundleSrc = gefiltert.find((e) => e.key === WUERFELBECHER_BUNDLE_KEY);
+  const legacy = gefiltert.filter((e) => WUERFELBECHER_KEYS.includes(e.key));
+  const ohneWuerfel = gefiltert.filter(
+    (e) => e.key !== WUERFELBECHER_BUNDLE_KEY && !WUERFELBECHER_KEYS.includes(e.key),
+  );
+
+  if (!bundleSrc && !legacy.length) {
+    return ohneWuerfel;
+  }
+
+  const eintraege = {};
+  if (bundleSrc && bundleSrc.vorhanden && typeof bundleSrc.wert === 'string') {
+    try {
+      const p = JSON.parse(bundleSrc.wert);
+      if (p && p.typ === 'wuerfelbecher-bundle' && p.eintraege && typeof p.eintraege === 'object') {
+        Object.assign(eintraege, p.eintraege);
+      }
+    } catch {
+      /* ignorieren */
+    }
+  }
+  legacy.forEach((e) => {
+    if (e.vorhanden && typeof e.wert === 'string') {
+      eintraege[e.key] = e.wert;
+    }
+  });
+
+  const bundleVorhanden = Object.keys(eintraege).length > 0;
+  return [
+    ...ohneWuerfel,
+    {
+      id: 'wuerfelbecher',
+      key: WUERFELBECHER_BUNDLE_KEY,
+      label: 'Würfelbecher',
+      vorhanden: bundleVorhanden,
+      wert: bundleVorhanden
+        ? JSON.stringify({ typ: 'wuerfelbecher-bundle', version: 1, eintraege })
+        : null,
+    },
+  ];
+}
+
 const DATEN_EXPORT_BEREICHE = [
-  {
-    id: 'appRolle',
-    key: 'htbah_app_rolle',
-    label: 'App-Rolle (Spieler/Spielleitung)',
-  },
-  {
-    id: 'aktiverCharakter',
-    key: 'htbah_active_character_id',
-    label: 'Aktiver Charakter',
-  },
   {
     id: 'sicherheitsmechanismen',
     key: 'htbah_sicherheitsmechanismen_bundle',
-    label: 'Sicherheitsmechanismen (Grenzen, Schleier, Emoji)',
+    label: 'Sicherheitsmechanismen (Grenzen, Schleier)',
   },
   {
     id: 'presets',
@@ -158,9 +210,9 @@ const DATEN_EXPORT_BEREICHE = [
     label: 'Fähigkeiten-Presets',
   },
   {
-    id: 'gruppen',
-    key: 'htbah_spielleiter_gruppen',
-    label: 'Gruppen',
+    id: 'kampagnen',
+    key: 'htbah_spielleiter_kampagnen',
+    label: 'Kampagnen',
   },
   {
     id: 'zufallstabellen',
@@ -183,34 +235,9 @@ const DATEN_EXPORT_BEREICHE = [
     label: 'Theme-Einstellung',
   },
   {
-    id: 'wuerfelAudio',
-    key: 'htbah_wuerfel_audio',
-    label: 'Würfelbeutel-Audio (Lautstärke, Stumm)',
-  },
-  {
-    id: 'wuerfelSoundLegacy',
-    key: 'htbah_wuerfel_sound',
-    label: 'Würfelton (ältere Einstellung, Migration)',
-  },
-  {
-    id: 'atmosphaere',
-    key: 'htbah_atmosphaere',
-    label: 'Atmosphäre (Würfelbeutel)',
-  },
-  {
-    id: 'atmosphaereBadge',
-    key: 'htbah_atmosphaere_badge_pos',
-    label: 'Atmosphären-Badge-Position',
-  },
-  {
-    id: 'diceColors',
-    key: 'htbah_dice_colors',
-    label: '3D-Würfel (Aktivierung & Farbe)',
-  },
-  {
-    id: 'wuerfelBeutelFenster',
-    key: 'htbah_wuerfel_beutel_fenster',
-    label: 'Würfelbeutel-Fenster (Größe & Position)',
+    id: 'wuerfelbecher',
+    key: WUERFELBECHER_BUNDLE_KEY,
+    label: 'Würfelbecher',
   },
 ];
 
@@ -333,18 +360,13 @@ window.HTBAH_SEITEN.Einstellungen = {
       return window.HTBAH.listeCharaktere();
     },
     exportBereicheMitCharakteren() {
-      const basis = this.datenExportBereiche.filter((bereich) => bereich.id !== 'aktiverCharakter');
+      const basis = this.datenExportBereiche;
       const charakterBereiche = this.charakterEintraege.map((eintrag) => ({
         id: `charakter:${eintrag.id}`,
         key: `htbah_character_entry:${eintrag.id}`,
         label: `Charakter: ${this.charakterName(eintrag)}`,
       }));
-      const aktiveInfo = {
-        id: 'aktiverCharakter',
-        key: 'htbah_active_character_id',
-        label: 'Aktiver Charakter',
-      };
-      return [...charakterBereiche, aktiveInfo, ...basis];
+      return [...charakterBereiche, ...basis];
     },
   },
   methods: {
@@ -476,7 +498,6 @@ window.HTBAH_SEITEN.Einstellungen = {
               sicherheitsmechanismen: {
                 tabuHtml: '',
                 schleierHtml: '',
-                buttonEmoji: '🚩',
               },
             },
           });
@@ -537,10 +558,6 @@ window.HTBAH_SEITEN.Einstellungen = {
             map[eintrag.id] = {
               tabuHtml: typeof sicher.tabuHtml === 'string' ? sicher.tabuHtml : '',
               schleierHtml: typeof sicher.schleierHtml === 'string' ? sicher.schleierHtml : '',
-              buttonEmoji:
-                typeof sicher.buttonEmoji === 'string' && sicher.buttonEmoji.trim()
-                  ? sicher.buttonEmoji.trim()
-                  : '🚩',
             };
           });
           return {
@@ -565,6 +582,25 @@ window.HTBAH_SEITEN.Einstellungen = {
             label: bereich.label,
             vorhanden,
             wert: vorhanden ? JSON.stringify(eintrag) : null,
+          };
+        }
+        if (bereich.key === WUERFELBECHER_BUNDLE_KEY) {
+          const eintraege = {};
+          WUERFELBECHER_KEYS.forEach((k) => {
+            const v = window.HTBAH.speicher.leseText(k, null);
+            if (typeof v === 'string') {
+              eintraege[k] = v;
+            }
+          });
+          return {
+            id: bereich.id,
+            key: bereich.key,
+            label: bereich.label,
+            vorhanden: Object.keys(eintraege).length > 0,
+            wert:
+              Object.keys(eintraege).length > 0
+                ? JSON.stringify({ typ: 'wuerfelbecher-bundle', version: 1, eintraege })
+                : null,
           };
         }
         const wert = window.HTBAH.speicher.leseText(bereich.key, null);
@@ -650,7 +686,8 @@ window.HTBAH_SEITEN.Einstellungen = {
         return false;
       }
       const bekannteBereiche = new Map(this.datenExportBereiche.map((b) => [b.id, b]));
-      const importBereiche = roh.daten
+      const normalisierteDaten = htbahNormalisiereLokalerSpeicherImportDaten(roh.daten);
+      const importBereiche = normalisierteDaten
         .filter((eintrag) => eintrag && typeof eintrag === 'object' && typeof eintrag.key === 'string')
         .map((eintrag, index) => {
           const id =
@@ -701,6 +738,7 @@ window.HTBAH_SEITEN.Einstellungen = {
         this.statusAnzeigen('Bitte wähle mindestens einen Speicherbereich für den Import aus.', 'danger');
         return;
       }
+      const aktiveCharakterIdVorImport = window.HTBAH.ladeAktivenCharakterId();
 
       ausgewaehlteBereiche.forEach((bereich) => {
         if (bereich.key === 'htbah_sicherheitsmechanismen_bundle') {
@@ -721,10 +759,6 @@ window.HTBAH_SEITEN.Einstellungen = {
                     sicherheitsmechanismen: {
                       tabuHtml: typeof imported.tabuHtml === 'string' ? imported.tabuHtml : '',
                       schleierHtml: typeof imported.schleierHtml === 'string' ? imported.schleierHtml : '',
-                      buttonEmoji:
-                        typeof imported.buttonEmoji === 'string' && imported.buttonEmoji.trim()
-                          ? imported.buttonEmoji.trim()
-                          : '🚩',
                     },
                   },
                 });
@@ -744,13 +778,36 @@ window.HTBAH_SEITEN.Einstellungen = {
                   sicherheitsmechanismen: {
                     tabuHtml: '',
                     schleierHtml: '',
-                    buttonEmoji: '🚩',
                   },
                 },
               });
             });
             window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
           }
+          return;
+        }
+        if (bereich.key === WUERFELBECHER_BUNDLE_KEY) {
+          if (bereich.vorhanden && typeof bereich.wert === 'string') {
+            try {
+              const payload = JSON.parse(bereich.wert);
+              const eintraege =
+                payload && payload.typ === 'wuerfelbecher-bundle' && payload.eintraege
+                  ? payload.eintraege
+                  : {};
+              WUERFELBECHER_KEYS.forEach((k) => {
+                if (Object.prototype.hasOwnProperty.call(eintraege, k) && typeof eintraege[k] === 'string') {
+                  window.HTBAH.speicher.schreibeText(k, eintraege[k]);
+                } else {
+                  window.HTBAH.speicher.loescheKey(k);
+                }
+              });
+            } catch {
+              /* defekten Import ignorieren */
+            }
+          } else {
+            WUERFELBECHER_KEYS.forEach((k) => window.HTBAH.speicher.loescheKey(k));
+          }
+          window.dispatchEvent(new CustomEvent('htbah:wuerfel-einstellungen-geaendert'));
           return;
         }
         if (bereich.key.startsWith('htbah_character_entry:')) {
@@ -777,6 +834,13 @@ window.HTBAH_SEITEN.Einstellungen = {
         }
       });
       window.HTBAH.migriereLegacyCharakterSpeicherWennNoetig();
+      // Charakter-Teilimporte sollen nicht stillschweigend den aktiven Charakter wechseln.
+      const aktiveIdNochVorhanden = aktiveCharakterIdVorImport
+        ? window.HTBAH.ladeCharakterEintrag(aktiveCharakterIdVorImport)
+        : null;
+      if (aktiveIdNochVorhanden) {
+        window.HTBAH.setzeAktivenCharakterId(aktiveCharakterIdVorImport);
+      }
 
       if (ausgewaehlteBereiche.some((b) => b.key === 'htbah_theme')) {
         window.HTBAH.setzeTheme(window.HTBAH.ladeTheme());

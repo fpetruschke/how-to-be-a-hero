@@ -5,7 +5,7 @@ const SPEICHER_KEY_AKTIVER_CHARAKTER = 'htbah_active_character_id';
 const SPEICHER_KEY_PRESETS = 'htbah_presets';
 const SPEICHER_KEY_THEME = 'htbah_theme';
 const SPEICHER_KEY_CHARAKTER_BILD_LEGACY = 'htbah_character_image';
-const SPEICHER_KEY_SPIELLEITER = 'htbah_spielleiter_gruppen';
+const SPEICHER_KEY_SPIELLEITER = 'htbah_spielleiter_kampagnen';
 const SPEICHER_KEY_ZUFALLSTABELLEN = 'htbah_zufallstabellen';
 const SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH = 'htbah_spielleitung_abenteuerbuch';
 const SPEICHER_KEY_WELTENBAU = 'htbah_weltenbau';
@@ -159,7 +159,7 @@ function normalisiereSpielleiterMitglied(m) {
   };
 }
 
-function normalisiereSpielleiterGruppe(g) {
+function normalisiereSpielleiterKampagne(g) {
   if (!g || typeof g !== 'object') {
     return null;
   }
@@ -168,7 +168,7 @@ function normalisiereSpielleiterGruppe(g) {
     : [];
   return {
     id: typeof g.id === 'string' && g.id ? g.id : neueEntropieId(),
-    name: typeof g.name === 'string' && g.name.trim() ? g.name.trim() : 'Gruppe',
+    name: typeof g.name === 'string' && g.name.trim() ? g.name.trim() : 'Kampagne',
     mitglieder,
   };
 }
@@ -176,28 +176,76 @@ function normalisiereSpielleiterGruppe(g) {
 function ladeSpielleiterZustand() {
   const roh = htbahSpeicher.leseJson(SPEICHER_KEY_SPIELLEITER, null);
   if (!roh || typeof roh !== 'object') {
-    return { version: 1, gruppen: [], aktiveGruppeId: null, mitgliedWahlProGruppe: {} };
+    return {
+      version: 1,
+      kampagnen: [],
+      aktiveKampagneId: null,
+      mitgliedWahlProKampagne: {},
+      gruppen: [],
+      aktiveGruppeId: null,
+      mitgliedWahlProGruppe: {},
+    };
   }
-  const gruppen = Array.isArray(roh.gruppen)
-    ? roh.gruppen.map(normalisiereSpielleiterGruppe).filter(Boolean)
+  const kampagnen = Array.isArray(roh.kampagnen)
+    ? roh.kampagnen.map(normalisiereSpielleiterKampagne).filter(Boolean)
     : [];
-  let aktiveGruppeId = typeof roh.aktiveGruppeId === 'string' ? roh.aktiveGruppeId : null;
-  if (aktiveGruppeId && !gruppen.some((g) => g.id === aktiveGruppeId)) {
-    aktiveGruppeId = gruppen[0] ? gruppen[0].id : null;
+  let aktiveKampagneId = typeof roh.aktiveKampagneId === 'string' ? roh.aktiveKampagneId : null;
+  if (aktiveKampagneId && !kampagnen.some((g) => g.id === aktiveKampagneId)) {
+    aktiveKampagneId = kampagnen[0] ? kampagnen[0].id : null;
   }
   return {
     version: 1,
-    gruppen,
-    aktiveGruppeId,
+    kampagnen,
+    aktiveKampagneId,
+    mitgliedWahlProKampagne:
+      roh.mitgliedWahlProKampagne && typeof roh.mitgliedWahlProKampagne === 'object'
+        ? roh.mitgliedWahlProKampagne
+        : {},
+    gruppen: kampagnen,
+    aktiveGruppeId: aktiveKampagneId,
     mitgliedWahlProGruppe:
-      roh.mitgliedWahlProGruppe && typeof roh.mitgliedWahlProGruppe === 'object'
-        ? roh.mitgliedWahlProGruppe
+      roh.mitgliedWahlProKampagne && typeof roh.mitgliedWahlProKampagne === 'object'
+        ? roh.mitgliedWahlProKampagne
         : {},
   };
 }
 
 function speichereSpielleiterZustand(zustand) {
   htbahSpeicher.schreibeJson(SPEICHER_KEY_SPIELLEITER, zustand);
+}
+
+function kampagnenSlugAusName(name) {
+  const basis = String(name || '')
+    .toLocaleLowerCase('de')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return basis || 'kampagne';
+}
+
+function kampagnenPfad(tab = 'gruppe', kampagneId = null) {
+  const erlaubt = new Set(['gruppe', 'welt', 'zufallstabellen', 'generatoren']);
+  const zielTab = erlaubt.has(tab) ? tab : 'gruppe';
+  const zustand = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
+  if (!kampagnen.length) {
+    return '/spielleiter';
+  }
+  let aktive = null;
+  if (typeof kampagneId === 'string' && kampagneId) {
+    aktive = kampagnen.find((k) => k && k.id === kampagneId) || null;
+  }
+  if (!aktive && typeof zustand.aktiveKampagneId === 'string' && zustand.aktiveKampagneId) {
+    aktive = kampagnen.find((k) => k && k.id === zustand.aktiveKampagneId) || null;
+  }
+  if (!aktive) {
+    aktive = kampagnen[0] || null;
+  }
+  if (!aktive) {
+    return '/spielleiter';
+  }
+  return `/kampagne/${encodeURIComponent(kampagnenSlugAusName(aktive.name))}/${zielTab}`;
 }
 
 function normalisiereZufallstabellenMedium(eintrag) {
@@ -786,7 +834,7 @@ function parseCharakterImportKandidaten(roh) {
     return kandidaten;
   }
 
-  if (roh.typ === 'spielleiter_gruppe' && Array.isArray(roh.mitglieder)) {
+  if (roh.typ === 'spielleiter_kampagne' && Array.isArray(roh.mitglieder)) {
     roh.mitglieder.forEach((mitglied) => {
       if (!mitglied || typeof mitglied !== 'object') {
         return;
@@ -794,7 +842,7 @@ function parseCharakterImportKandidaten(roh) {
       pushKandidat(
         mitglied.charakter || {},
         mitglied.charakterBild || '',
-        'spielleiter-gruppe',
+        'spielleiter-kampagne',
         typeof mitglied.id === 'string' ? mitglied.id : null,
       );
     });
@@ -854,7 +902,7 @@ function parseCharakterImportPaket(roh) {
     return {
       ok: false,
       fehler:
-        'Unbekanntes Format (HTBAH-Export, Charakterobjekt, Gruppen- oder Komplett-Export erwartet).',
+        'Unbekanntes Format (HTBAH-Export, Charakterobjekt, Kampagnen- oder Komplett-Export erwartet).',
     };
   }
   return {
@@ -1493,6 +1541,8 @@ window.HTBAH = {
   neueEntropieId,
   ladeSpielleiterZustand,
   speichereSpielleiterZustand,
+  kampagnenSlugAusName,
+  kampagnenPfad,
   erstelleCharakterExportPaket,
   parseCharakterImportKandidaten,
   parseCharakterImportPaket,
@@ -1645,11 +1695,11 @@ const routes = [
   { path: '/faehigkeiten-preset-bearbeiten/:id', component: window.HTBAH_SEITEN.PresetEditor },
   { path: '/einstellungen', component: window.HTBAH_SEITEN.Einstellungen },
   { path: '/spielleiter', component: window.HTBAH_SEITEN.SpielleiterGruppenUebersicht },
-  { path: '/spielleiter/gruppe/:gruppeId', component: window.HTBAH_SEITEN.SpielleiterGruppe },
-  { path: '/weltenbau', redirect: '/weltenbau/welt' },
-  { path: '/weltenbau/welt', component: window.HTBAH_SEITEN.Weltenbau },
-  { path: '/weltenbau/zufallstabellen', component: window.HTBAH_SEITEN.Weltenbau },
-  { path: '/weltenbau/generatoren', component: window.HTBAH_SEITEN.Weltenbau },
+  { path: '/spielleiter/kampagne/:kampagneId', component: window.HTBAH_SEITEN.SpielleiterGruppe },
+  { path: '/kampagne/:kampagneSlug', redirect: (to) => `/kampagne/${to.params.kampagneSlug}/gruppe` },
+  { path: '/kampagne/:kampagneSlug/:tab', component: window.HTBAH_SEITEN.Weltenbau },
+  { path: '/weltenbau', redirect: () => window.HTBAH.kampagnenPfad('gruppe') },
+  { path: '/weltenbau/:tab', redirect: (to) => window.HTBAH.kampagnenPfad(to.params.tab) },
   { path: '/create', redirect: '/charakter/neu' },
   { path: '/presets', redirect: '/faehigkeiten-presets' },
   { path: '/presets/form', redirect: '/faehigkeiten-preset-bearbeiten' },
@@ -1680,7 +1730,10 @@ function istNurSpielleitungRoute(pfad) {
   if (pfad.startsWith('/weltenbau/')) {
     return true;
   }
-  if (pfad.startsWith('/spielleiter/gruppe/')) {
+  if (pfad.startsWith('/kampagne/')) {
+    return true;
+  }
+  if (pfad.startsWith('/spielleiter/kampagne/')) {
     return true;
   }
   if (pfad === '/faehigkeiten-presets' || pfad === '/faehigkeiten-preset-bearbeiten') {
@@ -1797,7 +1850,7 @@ const app = Vue.createApp({
 
 app.use(router);
 router.afterEach((to) => {
-  if (to.path.startsWith('/spielleiter/gruppe/')) {
+  if (to.path.startsWith('/spielleiter/kampagne/')) {
     return;
   }
   if (to.path === '/') {

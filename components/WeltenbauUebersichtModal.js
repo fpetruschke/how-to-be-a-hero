@@ -1212,15 +1212,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return;
         }
         const zustand = window.HTBAH.ladeSpielleiterZustand();
-        zustand.aktiveGruppeId = this.gruppeId;
-        zustand.mitgliedWahlProGruppe = {
-          ...(zustand.mitgliedWahlProGruppe || {}),
+        zustand.aktiveKampagneId = this.gruppeId;
+        zustand.mitgliedWahlProKampagne = {
+          ...(zustand.mitgliedWahlProKampagne || {}),
           [this.gruppeId]: mitgliedId,
         };
         window.HTBAH.speichereSpielleiterZustand(zustand);
         this.schliessen();
         if (this.$router && typeof this.$router.push === 'function') {
-          this.$router.push(`/spielleiter/gruppe/${this.gruppeId}`);
+          this.$router.push(`/spielleiter/kampagne/${this.gruppeId}`);
         }
       },
       schliesseCharakterModal() {
@@ -2359,6 +2359,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     watch: {
       offen(neu) {
         if (neu) {
+          this.mapHintergrundTick += 1;
           this.aktualisiereZustand();
           this.uebernehmeMapEinstellungen();
           this.$nextTick(() => {
@@ -2376,6 +2377,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
       },
       gruppeId() {
+        this.mapHintergrundTick += 1;
         if (this.offen) {
           this.uebernehmeMapEinstellungen();
           this.$nextTick(() => {

@@ -15,7 +15,6 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
       lokaleDaten: {
         tabuHtml: '',
         schleierHtml: '',
-        buttonEmoji: '🚩',
       },
     };
   },
@@ -33,9 +32,6 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
         this.lokaleDaten = {
           tabuHtml: typeof neu?.tabuHtml === 'string' ? neu.tabuHtml : '',
           schleierHtml: typeof neu?.schleierHtml === 'string' ? neu.schleierHtml : '',
-          buttonEmoji: typeof neu?.buttonEmoji === 'string' && neu.buttonEmoji.trim()
-            ? neu.buttonEmoji.trim()
-            : '🚩',
         };
         this.syncEditorInhalte();
       },
@@ -45,9 +41,6 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
     this.lokaleDaten = {
       tabuHtml: typeof this.wert?.tabuHtml === 'string' ? this.wert.tabuHtml : '',
       schleierHtml: typeof this.wert?.schleierHtml === 'string' ? this.wert.schleierHtml : '',
-      buttonEmoji: typeof this.wert?.buttonEmoji === 'string' && this.wert.buttonEmoji.trim()
-        ? this.wert.buttonEmoji.trim()
-        : '🚩',
     };
     if (this.offen) {
       this.oeffneModal();
@@ -139,7 +132,6 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
       this.$emit('update:wert', {
         tabuHtml: this.lokaleDaten.tabuHtml || '',
         schleierHtml: this.lokaleDaten.schleierHtml || '',
-        buttonEmoji: this.lokaleDaten.buttonEmoji || '🚩',
       });
     },
     exportiereSeparat() {
@@ -150,7 +142,6 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
         sicherheitsmechanismen: {
           tabuHtml: this.lokaleDaten.tabuHtml || '',
           schleierHtml: this.lokaleDaten.schleierHtml || '',
-          buttonEmoji: this.lokaleDaten.buttonEmoji || '🚩',
         },
       };
       window.HTBAH.dateiHerunterladenJson(paket, 'htbah-sicherheitsmechanismen.json');
@@ -170,7 +161,7 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
             <h5 class="modal-title" id="htbahSicherheitsmechanismenTitel">Sicherheitsmechanismen</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
           </div>
-          <div class="modal-body">
+          <div class="modal-body" :class="{ 'htbah-sicherheits-readonly': nurLesen }">
             <div v-if="nurLesen" class="alert alert-danger border-danger mb-3">
               <strong>Hinweis zur X-Karte:</strong> Wenn jemand die rote X-Karte legt, wird die Szene sofort beendet
               oder übersprungen. Es gibt keine Nachfragen und keine Rechtfertigungspflicht.
@@ -185,40 +176,51 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
               </div>
             </div>
 
-            <div class="mb-3">
+            <div class="card p-3 mb-3">
               <h6 class="mb-2">Diese Inhalte wollen wir nicht:</h6>
               <p v-if="!nurLesen" class="small text-body-secondary mb-2">
                 Formulierungshilfe für die Spielleitung:
                 „Ich stoppe die Szene hier und schneide direkt weiter, damit wir bei unserem vereinbarten Rahmen bleiben.“
               </p>
-              <div v-if="nurLesen" class="card p-2 htbah-sicherheits-readonly-card">
+              <div v-if="nurLesen" class="htbah-sicherheits-readonly-card">
                 <div class="htbah-pdf-html" v-html="lokaleDaten.tabuHtml || '<p>Keine Einträge.</p>'"></div>
               </div>
               <div v-else ref="tabuEditorElement" class="quill-editor-host htbah-sicherheits-quill"></div>
             </div>
 
-            <div class="mb-3">
+            <div class="card p-3 mb-3">
               <h6 class="mb-2">Diese Inhalte sollen verschleiert werden:</h6>
               <p v-if="!nurLesen" class="small text-body-secondary mb-2">
                 Formulierungshilfe für die Spielleitung:
                 „Der Schleier senkt sich über diesen Moment. Am nächsten Morgen trefft ihr euch wieder im Speiseraum.“
               </p>
-              <div v-if="nurLesen" class="card p-2 htbah-sicherheits-readonly-card">
+              <div v-if="nurLesen" class="htbah-sicherheits-readonly-card">
                 <div class="htbah-pdf-html" v-html="lokaleDaten.schleierHtml || '<p>Keine Einträge.</p>'"></div>
               </div>
               <div v-else ref="schleierEditorElement" class="quill-editor-host htbah-sicherheits-quill"></div>
             </div>
-          </div>
-          <div class="modal-footer d-flex justify-content-between">
-            <div v-if="!nurLesen" class="d-flex flex-column gap-2 text-start">
-              <p class="small text-body-secondary mb-0">
-                Bitte stelle den Spielenden die Export-Datei für den Import zur Verfügung, damit jeder jederzeit Zugriff auf die vereinbarten Grenzen und Schleier hat.
-              </p>
-              <div>
-                <button type="button" class="btn btn-outline-secondary" @click="exportiereSeparat">Export</button>
+
+            <div v-if="!nurLesen" class="mb-3">
+              <h6 class="mb-2">Export</h6>
+              <div class="card p-3">
+                <p class="small text-body-secondary mb-3 mb-md-0">
+                  Bitte stelle den Spielenden die Export-Datei im Rahmen der Session-Zero für den Import zur Verfügung.
+                  So haben alle jederzeit Zugriff auf die vereinbarten Grenzen und Schleier.
+                </p>
+                <div class="mt-3">
+                  <button type="button" class="btn btn-outline-secondary" @click="exportiereSeparat">Export</button>
+                </div>
               </div>
             </div>
-            <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Schließen</button>
+          </div>
+          <div class="modal-footer d-flex justify-content-end">
+            <icon-text-button
+              type="button"
+              class="btn btn-outline-success"
+              icon="check"
+              data-bs-dismiss="modal">
+              Schließen
+            </icon-text-button>
           </div>
         </div>
       </div>
