@@ -63,6 +63,19 @@ window.HTBAH = window.HTBAH || {};
     return w10MitMod(4);
   }
 
+  function waffenwerteFuerBestie(kategorie) {
+    if (kategorie === KAT.NORM) {
+      return { nah: w10MitMod(2), fern: Math.random() < 0.25 ? w10MitMod(2) : '' };
+    }
+    if (kategorie === KAT.FANTASY) {
+      return { nah: w10MitMod(3), fern: Math.random() < 0.55 ? w10MitMod(3) : '' };
+    }
+    if (kategorie === KAT.MUTANT) {
+      return { nah: w10MitMod(3), fern: Math.random() < 0.6 ? w10MitMod(3) : '' };
+    }
+    return { nah: w10MitMod(4), fern: Math.random() < 0.7 ? w10MitMod(4) : '' };
+  }
+
   function listenSchluesselFuerName(epoche, kategorie) {
     const ep =
       epoche === E.GEGENWART ? 'GEGENWART' : epoche === E.ZUKUNFT ? 'ZUKUNFT' : 'MITTELALTER';
@@ -175,7 +188,9 @@ window.HTBAH = window.HTBAH || {};
       const lebenspunkte = lebenspunkteWert(kategorie);
       const staerke = optionalText('STAERKEN', 0.72);
       const schwaeche = optionalText('SCHWAECHEN', 0.72);
+      const geheimnis = optionalText('GEHEIMNISSE', 0.8);
       const aggressivitaetSkala = aggressivitaetFuer(kategorie);
+      const waffenwerte = waffenwerteFuerBestie(kategorie);
       const begabung = begabungswerteVerteilen();
       const lebensraum = lebensraumFuer(epoche);
       const katLabels = {
@@ -193,11 +208,15 @@ window.HTBAH = window.HTBAH || {};
         epoche,
         kategorie,
         name,
+        waffe: U.zufaellig(['Klauen', 'Biss', 'Stachel', 'Magischer Stoß', 'Schweifhieb']),
+        schadenswertNahkampf: waffenwerte.nah,
+        schadenswertFernkampf: waffenwerte.fern,
         angriff,
         verteidigung,
         lebenspunkte,
         staerke,
         schwaeche,
+        geheimnis,
         aggressivitaetSkala,
         handeln: begabung.handeln,
         wissen: begabung.wissen,

@@ -30,23 +30,37 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
       if (!datei) {
         return;
       }
-
-      if (!datei.type.startsWith('image/')) {
+      await this.bildDateiVerarbeiten(datei);
+      event.target.value = '';
+    },
+    async oeffnenMitDatei(datei) {
+      this.oeffnen();
+      await this.bildDateiVerarbeiten(datei);
+    },
+    async bildDateiVerarbeiten(datei) {
+      if (!datei || typeof datei !== 'object' || !String(datei.type || '').startsWith('image/')) {
         await window.HTBAH.ui.alert({
           titel: 'Ungültige Datei',
           beschreibung: 'Bitte wähle eine Bilddatei aus.',
         });
-        event.target.value = '';
-        return;
+        return false;
       }
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        this.tempBildQuelle = String(reader.result || '');
-        this.$nextTick(() => this.cropperInitialisieren());
-      };
-
-      reader.readAsDataURL(datei);
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          this.tempBildQuelle = String(reader.result || '');
+          this.$nextTick(() => this.cropperInitialisieren());
+          resolve(true);
+        };
+        reader.onerror = async () => {
+          await window.HTBAH.ui.alert({
+            titel: 'Datei konnte nicht gelesen werden',
+            beschreibung: 'Bitte versuche es erneut oder wähle eine andere Datei.',
+          });
+          resolve(false);
+        };
+        reader.readAsDataURL(datei);
+      });
     },
     cropperInitialisieren() {
       if (this.cropper) {

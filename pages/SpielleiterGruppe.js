@@ -436,14 +436,14 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
             Aus Kampagne entfernen
           </button>
         </div>
+        <div v-if="aktivesMitglied" class="mt-3 pt-3 border-top border-secondary border-opacity-25">
+          <charakter
+            :key="aktivesMitglied.id"
+            :spielleiter-mitglied="aktivesMitglied"
+            :on-spielleiter-persist="persist"
+          />
+        </div>
       </div>
-
-      <charakter
-        v-if="aktivesMitglied"
-        :key="aktivesMitglied.id"
-        :spielleiter-mitglied="aktivesMitglied"
-        :on-spielleiter-persist="persist"
-      />
 
       </template>
 

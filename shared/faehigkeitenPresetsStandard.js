@@ -8,10 +8,10 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
     htbahPresetId: 'htbah-mittelalter-fantasy',
     name: 'Mittelalter-Fantasy-Preset',
     handeln: [
-      { name: 'Schwertkampf', value: null },
+      { name: 'Schlösser knacken', value: null },
       { name: 'Nahkampf (bewaffnet)', value: null },
       { name: 'Nahkampf (unbewaffnet)', value: null },
-      { name: 'Bogenschießen', value: null },
+      { name: 'Fernkampf', value: null },
       { name: 'Reiten', value: null },
       { name: 'Schleichen', value: null },
       { name: 'Klettern', value: null },

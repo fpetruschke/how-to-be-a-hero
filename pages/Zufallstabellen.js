@@ -193,7 +193,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         ];
       }
       if (typ === 'npc') {
-        const kampfart = z && z.kampfart === 'fernkampf' ? 'Fernkampf' : 'Nahkampf';
         return [
           plain('Name', z.name),
           plain('Spitzname', z.spitzname),
@@ -213,8 +212,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           plain('Ziel', z.ziel),
           plain('Stimme', z.stimme),
           plain('Waffe', z.waffe),
-          plain('Schadenswert', z.schadenswert),
-          plain('Kampfart', kampfart),
+          plain('Schadenswert Nahkampf', z.schadenswertNahkampf),
+          plain('Schadenswert Fernkampf', z.schadenswertFernkampf),
           plain('Initiative', z.initiative),
           rich('Notizen', z.notizenHtml),
         ];
@@ -263,6 +262,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           plain('Epoche', this.bestieEpocheLabel(z.epoche)),
           plain('Kategorie', this.bestieKategorieLabel(z.kategorie)),
           plain('Name', z.name),
+          plain('Waffe', z.waffe),
+          plain('Schadenswert Nahkampf', z.schadenswertNahkampf),
+          plain('Schadenswert Fernkampf', z.schadenswertFernkampf),
           plain('Angriff', z.angriff),
           plain('Verteidigung', z.verteidigung),
           plain('Lebenspunkte', z.lebenspunkte),
@@ -340,9 +342,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           'fraktion',
           'aufenthaltsort',
           'ziel',
+          'geheimnis',
           'stimme',
           'waffe',
-          'schadenswert',
+          'schadenswertNahkampf',
+          'schadenswertFernkampf',
           'initiative',
           'notizenHtml',
         ];
@@ -357,7 +361,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       return (this.zustand.gegenstaende || []).filter((row) =>
         this.trifftSucheZu(
           row,
-          ['name', 'schadenswert', 'kampfart', 'aufenthaltsort', 'initiative', 'beschreibungHtml'],
+          [
+            'name',
+            'schadenswertNahkampf',
+            'schadenswertFernkampf',
+            'aufenthaltsort',
+            'initiative',
+            'beschreibungHtml',
+          ],
           q,
           this.gegenstandWaffenWerteText(row),
         ),
@@ -422,6 +433,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             'initiative',
             'staerke',
             'schwaeche',
+            'geheimnis',
             'beschreibungHtml',
           ],
           q,
@@ -476,9 +488,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           'fraktion',
           'aufenthaltsort',
           'ziel',
+          'geheimnis',
           'stimme',
           'waffe',
-          'schadenswert',
+          'schadenswertNahkampf',
+          'schadenswertFernkampf',
           'initiative',
           'notizenHtml',
         ];
@@ -494,7 +508,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       return base.filter((row) =>
         this.trifftSucheZu(
           row,
-          ['name', 'schadenswert', 'kampfart', 'aufenthaltsort', 'initiative', 'beschreibungHtml'],
+          [
+            'name',
+            'schadenswertNahkampf',
+            'schadenswertFernkampf',
+            'aufenthaltsort',
+            'initiative',
+            'beschreibungHtml',
+          ],
           gq,
           this.gegenstandWaffenWerteText(row),
         ),
@@ -546,7 +567,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         const kat = this.bestieKategorieLabel(row.kategorie);
         return this.trifftSucheZu(
           row,
-          ['name', 'angriff', 'verteidigung', 'lebenspunkte', 'handeln', 'wissen', 'soziales', 'aufenthaltsort', 'initiative', 'staerke', 'schwaeche', 'beschreibungHtml'],
+          ['name', 'angriff', 'verteidigung', 'lebenspunkte', 'handeln', 'wissen', 'soziales', 'aufenthaltsort', 'initiative', 'staerke', 'schwaeche', 'geheimnis', 'beschreibungHtml'],
           gq,
           `${ep} ${kat}`,
         );
@@ -682,6 +703,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     medienBilderAusZeile(row) {
       return this.medienAusZeile(row).filter((m) => this.mediumIstBild(m));
     },
+    featuredBildAusZeile(row) {
+      const bilder = this.medienBilderAusZeile(row);
+      if (!bilder.length) {
+        return null;
+      }
+      const primaryId = row && typeof row.primaryMediumId === 'string' ? row.primaryMediumId.trim() : '';
+      if (!primaryId) {
+        return bilder[0];
+      }
+      return bilder.find((bild) => bild.id === primaryId) || bilder[0];
+    },
     medienDateienAusZeile(row) {
       return this.medienAusZeile(row).filter((m) => !this.mediumIstBild(m));
     },
@@ -751,7 +783,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (!Number.isInteger(index) || index < 0 || index >= this.bearbeitung.zeile.medien.length) {
         return;
       }
+      const entfernt = this.bearbeitung.zeile.medien[index];
       this.bearbeitung.zeile.medien.splice(index, 1);
+      const primaryId = String(this.bearbeitung.zeile.primaryMediumId || '').trim();
+      if (!primaryId || !entfernt || primaryId !== entfernt.id) {
+        return;
+      }
+      const fallback = this.medienBilderAusZeile(this.bearbeitung.zeile)[0];
+      this.bearbeitung.zeile.primaryMediumId = fallback && fallback.id ? fallback.id : '';
     },
     mediumZurBearbeitungHinzufuegen(eintrag) {
       if (!this.bearbeitung || !this.bearbeitung.zeile || !eintrag) {
@@ -761,6 +800,26 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         this.bearbeitung.zeile.medien = [];
       }
       this.bearbeitung.zeile.medien.push(eintrag);
+      if (this.mediumIstBild(eintrag)) {
+        const primaryId = String(this.bearbeitung.zeile.primaryMediumId || '').trim();
+        if (!primaryId) {
+          this.bearbeitung.zeile.primaryMediumId = eintrag.id;
+        }
+      }
+    },
+    setzeBearbeitungPrimaryMedium(mediumId) {
+      if (!this.bearbeitung || !this.bearbeitung.zeile || !Array.isArray(this.bearbeitung.zeile.medien)) {
+        return;
+      }
+      const id = typeof mediumId === 'string' ? mediumId.trim() : '';
+      if (!id) {
+        return;
+      }
+      const medium = this.bearbeitung.zeile.medien.find((m) => m && m.id === id);
+      if (!this.mediumIstBild(medium)) {
+        return;
+      }
+      this.bearbeitung.zeile.primaryMediumId = id;
     },
     bildImportNaechstesAusWarteschlange() {
       if (!this.medienImportWarteschlange.length) {
@@ -942,12 +1001,23 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
     },
     npcWaffenWerteText(row) {
-      const schadenswert = String(row && row.schadenswert ? row.schadenswert : '').trim();
-      const kampfart = row && row.kampfart === 'fernkampf' ? 'Fernkampf' : 'Nahkampf';
-      if (!schadenswert) {
+      const schadenswertNahkampf = String(
+        row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '',
+      ).trim();
+      const schadenswertFernkampf = String(
+        row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '',
+      ).trim();
+      const teile = [];
+      if (schadenswertNahkampf) {
+        teile.push(`Nahkampf ${schadenswertNahkampf}`);
+      }
+      if (schadenswertFernkampf) {
+        teile.push(`Fernkampf ${schadenswertFernkampf}`);
+      }
+      if (!teile.length) {
         return '—';
       }
-      return `Schaden ${schadenswert} · ${kampfart}`;
+      return teile.join(' · ');
     },
     bestieEpocheLabel(epoche) {
       if (epoche === 'gegenwart') {
@@ -991,17 +1061,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (!row || !row.istWaffe) {
         return '—';
       }
-      const schadenswert = String(row.schadenswert || '').trim();
-      let kampfLabel = 'Nahkampf';
-      if (row.kampfart === 'fernkampf') {
-        kampfLabel = 'Fernkampf';
-      } else if (row.kampfart === 'sonstiges') {
-        kampfLabel = 'Sonstiges';
+      const schadenswertNahkampf = String(row.schadenswertNahkampf || '').trim();
+      const schadenswertFernkampf = String(row.schadenswertFernkampf || '').trim();
+      const teile = [];
+      if (schadenswertNahkampf) {
+        teile.push(`Nahkampf ${schadenswertNahkampf}`);
       }
-      if (!schadenswert) {
-        return kampfLabel;
+      if (schadenswertFernkampf) {
+        teile.push(`Fernkampf ${schadenswertFernkampf}`);
       }
-      return `Schaden ${schadenswert} · ${kampfLabel}`;
+      return teile.length ? teile.join(' · ') : '—';
     },
     fraktionOrteListe(row) {
       if (!row || typeof row !== 'object') {
@@ -1032,13 +1101,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         gesinnung: '',
         beruf: '',
         ziel: '',
+        geheimnis: '',
         stimme: '',
         lebenspunkte: '',
         lpBewusstlosAusgeblendet: false,
         lpMassenschadenBewusstlos: false,
         waffe: '',
-        schadenswert: '',
-        kampfart: 'nahkampf',
+        schadenswertNahkampf: '',
+        schadenswertFernkampf: '',
         aufenthaltsort: '',
         handeln: 12,
         wissen: 14,
@@ -1048,6 +1118,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         glaube: '',
         notizenHtml: '',
         medien: [],
+        primaryMediumId: '',
       };
     },
     ortLeer() {
@@ -1059,6 +1130,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         zustand: '',
         notizenHtml: '',
         medien: [],
+        primaryMediumId: '',
       };
     },
     gegenstandLeer() {
@@ -1067,8 +1139,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         name: '',
         beschreibungHtml: '',
         istWaffe: false,
-        schadenswert: '',
-        kampfart: 'nahkampf',
+        schadenswertNahkampf: '',
+        schadenswertFernkampf: '',
         aufenthaltsort: '',
         handeln: 16,
         wissen: 8,
@@ -1077,6 +1149,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         lpBewusstlosAusgeblendet: false,
         lpMassenschadenBewusstlos: false,
         medien: [],
+        primaryMediumId: '',
       };
     },
     fraktionLeer() {
@@ -1089,6 +1162,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         orte: [],
         beschreibungHtml: '',
         medien: [],
+        primaryMediumId: '',
       };
     },
     pantheonLeer() {
@@ -1120,6 +1194,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         geloest: false,
         notizenHtml: '',
         medien: [],
+        primaryMediumId: '',
       };
     },
     bestieLeer() {
@@ -1128,6 +1203,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         epoche: 'mittelalter',
         kategorie: 'normales_tier',
         name: '',
+        waffe: '',
+        schadenswertNahkampf: '',
+        schadenswertFernkampf: '',
         angriff: '',
         verteidigung: '',
         lebenspunkte: '',
@@ -1137,9 +1215,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         lpMassenschadenBewusstlos: false,
         staerke: '',
         schwaeche: '',
+        geheimnis: '',
         beschreibungHtml: '',
         aggressivitaetSkala: 5,
         medien: [],
+        primaryMediumId: '',
       };
     },
     zeileQuillOrphanToolbarsInModalBodyEntfernen() {
@@ -1163,6 +1243,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const zeileKopie = JSON.parse(JSON.stringify(zeile));
       if (!Array.isArray(zeileKopie.medien)) {
         zeileKopie.medien = [];
+      }
+      if (typeof zeileKopie.primaryMediumId !== 'string') {
+        zeileKopie.primaryMediumId = '';
       }
       if (typ === 'fraktion') {
         zeileKopie.orte = this.fraktionOrteListe(zeileKopie);
@@ -1692,19 +1775,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </div>
                 <div class="small"><span class="text-secondary">Größe:</span> {{ karteWert(row.groesse) }}</div>
                 <div class="small"><span class="text-secondary">Lage:</span> {{ karteWert(row.lage) }}</div>
-                <div class="small mb-2"><span class="text-secondary">Zustand:</span> {{ karteWert(row.zustand) }}</div>
-                <div
-                  v-if="medienBilderAusZeile(row).length"
+                <div class="small mb-2"><span class="text-secondary">Zustand:</span> {{ karteWert(row.zustand) }}</div>                <div
+                  v-if="featuredBildAusZeile(row)"
                   class="zufallstabellen-mobile-slides mb-2"
                   @click.stop>
                   <button
-                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
-                    :key="'ort-bild-' + row.id + '-' + bild.id"
                     type="button"
                     class="zufallstabellen-mobile-slide"
-                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
-                    @click="mediumImBildbetrachterOeffnen(bild)">
-                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                    aria-label="Titelbild anzeigen"
+                    @click="mediumImBildbetrachterOeffnen(featuredBildAusZeile(row))">
+                    <img :src="featuredBildAusZeile(row).dataUrl" :alt="mediumDateiname(featuredBildAusZeile(row))" loading="lazy" />
                   </button>
                 </div>
                 <div
@@ -1823,19 +1903,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small"><span class="text-secondary">Ziel:</span> {{ karteWert(row.ziel) }}</div>
                 <div class="small mb-2">
                   <span class="text-secondary">Gesinnung:</span> {{ karteWert(row.gesinnungVerhalten) }}
-                </div>
-                <div
-                  v-if="medienBilderAusZeile(row).length"
+                </div>                <div
+                  v-if="featuredBildAusZeile(row)"
                   class="zufallstabellen-mobile-slides mb-2"
                   @click.stop>
                   <button
-                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
-                    :key="'fraktion-bild-' + row.id + '-' + bild.id"
                     type="button"
                     class="zufallstabellen-mobile-slide"
-                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
-                    @click="mediumImBildbetrachterOeffnen(bild)">
-                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                    aria-label="Titelbild anzeigen"
+                    @click="mediumImBildbetrachterOeffnen(featuredBildAusZeile(row))">
+                    <img :src="featuredBildAusZeile(row).dataUrl" :alt="mediumDateiname(featuredBildAusZeile(row))" loading="lazy" />
                   </button>
                 </div>
                 <div
@@ -1993,19 +2070,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small"><span class="text-secondary">Begabungen:</span> {{ begabungswerteKurzText(row) }}</div>
                 <div class="small"><span class="text-secondary">Ort:</span> {{ karteWert(row.aufenthaltsort) }}</div>
                 <div class="small"><span class="text-secondary">Fraktion:</span> {{ karteWert(row.fraktion) }}</div>
-                <div class="small mb-2"><span class="text-secondary">Werte:</span> {{ npcWaffenWerteText(row) }}</div>
-                <div
-                  v-if="medienBilderAusZeile(row).length"
+                <div class="small mb-2"><span class="text-secondary">Werte:</span> {{ npcWaffenWerteText(row) }}</div>                <div
+                  v-if="featuredBildAusZeile(row)"
                   class="zufallstabellen-mobile-slides mb-2"
                   @click.stop>
                   <button
-                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
-                    :key="'npc-bild-' + row.id + '-' + bild.id"
                     type="button"
                     class="zufallstabellen-mobile-slide"
-                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
-                    @click="mediumImBildbetrachterOeffnen(bild)">
-                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                    aria-label="Titelbild anzeigen"
+                    @click="mediumImBildbetrachterOeffnen(featuredBildAusZeile(row))">
+                    <img :src="featuredBildAusZeile(row).dataUrl" :alt="mediumDateiname(featuredBildAusZeile(row))" loading="lazy" />
                   </button>
                 </div>
                 <div
@@ -2118,17 +2192,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small"><span class="text-secondary">Kampfwerte:</span> {{ gegenstandWaffenWerteText(row) }}</div>
                 <div class="small"><span class="text-secondary">Ort:</span> {{ karteWert(row.aufenthaltsort) }}</div>
                 <div
-                  v-if="medienBilderAusZeile(row).length"
+                  v-if="featuredBildAusZeile(row)"
                   class="zufallstabellen-mobile-slides my-2"
                   @click.stop>
                   <button
-                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
-                    :key="'gegenstand-bild-' + row.id + '-' + bild.id"
                     type="button"
                     class="zufallstabellen-mobile-slide"
-                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
-                    @click="mediumImBildbetrachterOeffnen(bild)">
-                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                    aria-label="Titelbild anzeigen"
+                    @click="mediumImBildbetrachterOeffnen(featuredBildAusZeile(row))">
+                    <img :src="featuredBildAusZeile(row).dataUrl" :alt="mediumDateiname(featuredBildAusZeile(row))" loading="lazy" />
                   </button>
                 </div>
                 <div
@@ -2255,19 +2327,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small"><span class="text-secondary">Charakter:</span> {{ karteWert(row.charakter) }}</div>
                 <div class="small mb-2">
                   <span class="text-secondary">Schutzpatronat:</span> {{ karteWert(row.schutzpatronat) }}
-                </div>
-                <div
-                  v-if="medienBilderAusZeile(row).length"
+                </div>                <div
+                  v-if="featuredBildAusZeile(row)"
                   class="zufallstabellen-mobile-slides mb-2"
                   @click.stop>
                   <button
-                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
-                    :key="'pantheon-bild-' + row.id + '-' + bild.id"
                     type="button"
                     class="zufallstabellen-mobile-slide"
-                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
-                    @click="mediumImBildbetrachterOeffnen(bild)">
-                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                    aria-label="Titelbild anzeigen"
+                    @click="mediumImBildbetrachterOeffnen(featuredBildAusZeile(row))">
+                    <img :src="featuredBildAusZeile(row).dataUrl" :alt="mediumDateiname(featuredBildAusZeile(row))" loading="lazy" />
                   </button>
                 </div>
                 <div
@@ -2406,19 +2475,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small"><span class="text-secondary">Ergebnis:</span> {{ karteWert(row.ergebnis) }}</div>
                 <div class="small mb-2">
                   <span class="text-secondary">Schwierigkeit:</span> {{ karteWert(row.schwierigkeit) }}
-                </div>
-                <div
-                  v-if="medienBilderAusZeile(row).length"
+                </div>                <div
+                  v-if="featuredBildAusZeile(row)"
                   class="zufallstabellen-mobile-slides mb-2"
                   @click.stop>
                   <button
-                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
-                    :key="'raetsel-bild-' + row.id + '-' + bild.id"
                     type="button"
                     class="zufallstabellen-mobile-slide"
-                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
-                    @click="mediumImBildbetrachterOeffnen(bild)">
-                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                    aria-label="Titelbild anzeigen"
+                    @click="mediumImBildbetrachterOeffnen(featuredBildAusZeile(row))">
+                    <img :src="featuredBildAusZeile(row).dataUrl" :alt="mediumDateiname(featuredBildAusZeile(row))" loading="lazy" />
                   </button>
                 </div>
                 <div
@@ -2574,19 +2640,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 </div>
                 <div v-if="zeilenWertAlsText(row.schwaeche)" class="small mb-2">
                   <span class="text-secondary">Schwächen:</span> {{ textVorschau(row.schwaeche, 120) }}
-                </div>
-                <div
-                  v-if="medienBilderAusZeile(row).length"
+                </div>                <div
+                  v-if="featuredBildAusZeile(row)"
                   class="zufallstabellen-mobile-slides mb-2"
                   @click.stop>
                   <button
-                    v-for="(bild, bildIndex) in medienBilderAusZeile(row)"
-                    :key="'bestie-bild-' + row.id + '-' + bild.id"
                     type="button"
                     class="zufallstabellen-mobile-slide"
-                    :aria-label="'Bild ' + (bildIndex + 1) + ' anzeigen'"
-                    @click="mediumImBildbetrachterOeffnen(bild)">
-                    <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
+                    aria-label="Titelbild anzeigen"
+                    @click="mediumImBildbetrachterOeffnen(featuredBildAusZeile(row))">
+                    <img :src="featuredBildAusZeile(row).dataUrl" :alt="mediumDateiname(featuredBildAusZeile(row))" loading="lazy" />
                   </button>
                 </div>
                 <div
@@ -2718,6 +2781,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @random="zufallsvorschlagUebernehmen"
         @media-upload="onBearbeitungsMedienDateienGewaehlt"
         @media-remove="mediumAusBearbeitungEntfernen"
+        @media-set-primary="setzeBearbeitungPrimaryMedium"
         @media-open="mediumImBildbetrachterOeffnen"
         @media-download="mediumHerunterladen"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"

@@ -181,7 +181,7 @@ window.HTBAH_SEITEN.Startseite = {
         @keydown.space.prevent="penPaperInfoOeffnen">
         <div class="d-flex align-items-center justify-content-between gap-2">
           <div class="htbah-start-card-avatar flex-shrink-0">
-            <span class="htbah-start-card-avatar-emoji" aria-hidden="true">🎲</span>
+            <span class="htbah-start-card-avatar-emoji" aria-hidden="true">📝</span>
           </div>
           <div class="min-w-0 flex-grow-1">
             <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">

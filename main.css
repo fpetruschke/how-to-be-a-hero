@@ -27,6 +27,13 @@
   --secondary-color: #64748b;
   --modal-backdrop: rgba(2, 6, 23, 0.75);
   --modal-bg: #1e293b;
+  --htbah-z-modal-base: 2000;
+  --htbah-z-modal-wuerfel: 2060;
+  --htbah-z-modal-generator: 4060;
+  --htbah-z-modal-map: 4070;
+  --htbah-z-modal-detail: 4080;
+  --htbah-z-modal-crop-backdrop: 4990;
+  --htbah-z-modal-crop: 5000;
 }
 
 [data-theme='light'] {
@@ -516,7 +523,7 @@ input::placeholder {
 }
 
 .htbah-generator-modal-layer {
-  z-index: 4060;
+  z-index: var(--htbah-z-modal-generator);
 }
 
 .htbah-generator-modal-window {
@@ -535,7 +542,7 @@ input::placeholder {
 }
 
 .htbah-weltenbau-map-layer {
-  z-index: 4070;
+  z-index: var(--htbah-z-modal-map);
 }
 
 .htbah-weltenbau-map-window {
@@ -585,8 +592,8 @@ input::placeholder {
 
 .htbah-weltenbau-map-stage {
   position: relative;
-  width: 5200px;
-  height: 3600px;
+  width: 12000px;
+  height: 9000px;
 }
 
 .htbah-weltenbau-map-hintergrund {
@@ -597,7 +604,8 @@ input::placeholder {
   background-color: #fff;
   background-position: center center;
   background-repeat: no-repeat;
-  background-size: cover;
+  /* Ganzes Bild sichtbar halten; verhindert Abschneiden bei Hoch-/Querformat-Mix. */
+  background-size: contain;
 }
 
 .htbah-weltenbau-map-grid-overlay {
@@ -613,14 +621,14 @@ input::placeholder {
 .htbah-weltenbau-map-edges {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 1;
   pointer-events: none;
   color: #5c636a;
 }
 
 .htbah-map-node {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   min-height: 54px;
   text-align: left;
   border: 2px solid #adb5bd;
@@ -629,6 +637,37 @@ input::placeholder {
   padding: 0.35rem 0.5rem;
   box-shadow: 0 0.1rem 0.25rem rgba(0, 0, 0, 0.12);
   user-select: none;
+}
+
+.htbah-map-ort-bild {
+  position: absolute;
+  z-index: 2;
+  border: 2px solid rgba(108, 117, 125, 0.65);
+  border-radius: 0.45rem;
+  overflow: hidden;
+  box-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.16);
+  background: #fff;
+}
+
+.htbah-map-ort-bild img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  user-select: none;
+  pointer-events: none;
+}
+
+.htbah-map-ort-bild-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  background: linear-gradient(135deg, transparent 0 45%, rgba(13, 110, 253, 0.95) 46% 100%);
+  cursor: nwse-resize;
+  padding: 0;
 }
 
 .htbah-map-node-ort {
@@ -710,7 +749,7 @@ input::placeholder {
   width: min(34rem, calc(100vw - 1.7rem));
   max-height: calc(100vh - 1.7rem);
   overflow: auto;
-  z-index: 4080;
+  z-index: var(--htbah-z-modal-detail);
   pointer-events: auto;
 }
 
@@ -1015,13 +1054,13 @@ input::placeholder {
 .regelwerk-modal-layer {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: var(--htbah-z-modal-base);
   pointer-events: none;
 }
 
 /* Würfelbeutel: schwebend ohne Backdrop, über der unteren Navigation */
 .htbah-wuerfel-beutel-layer {
-  z-index: 2060;
+  z-index: var(--htbah-z-modal-wuerfel);
 }
 
 .htbah-wuerfel-beutel-window.regelwerk-modal-window {
@@ -1301,7 +1340,7 @@ input::placeholder {
 
 .charakterbild-platzhalter-klein {
   width: 100%;
-  border-radius: 10px;
+  border-radius: inherit;
   border: 1px dashed var(--border-color);
   display: flex;
   align-items: center;
@@ -1327,7 +1366,7 @@ input::placeholder {
 }
 
 #weltenbauBildImportModal {
-  z-index: 1095;
+  z-index: var(--htbah-z-modal-crop);
 }
 
 #weltenbauBildImportModal .modal-dialog {
@@ -1677,6 +1716,16 @@ input::placeholder {
   min-height: 6rem;
 }
 
+.inventar-waffen-referenz {
+  font-size: 0.78rem;
+}
+
+.inventar-waffen-referenz-tabelle td {
+  padding: 0.18rem 0.35rem;
+  border-color: color-mix(in srgb, var(--border-color) 70%, transparent);
+  vertical-align: top;
+}
+
 /* Quill Farb-Picker über Bootstrap-Modal legen */
 .modal .ql-snow .ql-picker-options {
   z-index: 1060;
@@ -1797,6 +1846,12 @@ input::placeholder {
   background: rgba(220, 38, 38, 0.28) !important;
   border-color: rgba(220, 38, 38, 0.5) !important;
   color: var(--heading-color);
+}
+
+.parade-ruestung-info-card {
+  background: #ffffff !important;
+  border: 1px solid var(--border-color);
+  color: #1f2937;
 }
 
 .faehigkeiten-probe-wuerfel-btn {
@@ -1953,6 +2008,23 @@ input::placeholder {
   display: block;
   width: 100%;
   max-width: none;
+}
+
+.htbah-charakterbild-status-wrap--leer {
+  border: 1px dashed var(--bs-secondary-color);
+  border-radius: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.htbah-charakterbild-status-wrap--leer:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary-color) 70%, #ffffff 30%);
+  outline-offset: 2px;
+}
+
+.htbah-charakterbild-status-wrap--drop-aktiv {
+  background-color: color-mix(in srgb, var(--primary-color) 16%, transparent);
+  border-color: color-mix(in srgb, var(--primary-color) 55%, var(--bs-secondary-color) 45%);
 }
 
 .htbah-charakter-stammdaten-row .charakterbild-vorschau-klein,

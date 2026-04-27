@@ -281,6 +281,23 @@ function normalisiereZufallstabellenMedienListe(medien) {
   return medien.map(normalisiereZufallstabellenMedium).filter(Boolean);
 }
 
+function normalisiereZufallstabellenPrimaryMediumId(primaryMediumId, medien) {
+  const bilder = Array.isArray(medien)
+    ? medien.filter(
+        (m) =>
+          m &&
+          (m.typ === 'bild' ||
+            (typeof m.mimeType === 'string' && m.mimeType.startsWith('image/')) ||
+            (typeof m.dataUrl === 'string' && m.dataUrl.startsWith('data:image/'))),
+      )
+    : [];
+  const rohId = typeof primaryMediumId === 'string' ? primaryMediumId.trim() : '';
+  if (rohId && bilder.some((m) => m.id === rohId)) {
+    return rohId;
+  }
+  return bilder[0] && typeof bilder[0].id === 'string' ? bilder[0].id : '';
+}
+
 function normalisiereZufallstabellenNpcZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
@@ -288,6 +305,11 @@ function normalisiereZufallstabellenNpcZeile(z) {
   const handeln = Math.max(0, Math.min(40, Math.round(Number(z.handeln) || 0)));
   const wissen = Math.max(0, Math.min(40, Math.round(Number(z.wissen) || 0)));
   const soziales = Math.max(0, Math.min(40, Math.round(Number(z.soziales) || 0)));
+  const medien = normalisiereZufallstabellenMedienListe(z.medien);
+  const schadenswertNahkampf =
+    typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '';
+  const schadenswertFernkampf =
+    typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '';
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     name: typeof z.name === 'string' ? z.name : '',
@@ -299,13 +321,14 @@ function normalisiereZufallstabellenNpcZeile(z) {
     gesinnung: typeof z.gesinnung === 'string' ? z.gesinnung : '',
     beruf: typeof z.beruf === 'string' ? z.beruf : '',
     ziel: typeof z.ziel === 'string' ? z.ziel : '',
+    geheimnis: typeof z.geheimnis === 'string' ? z.geheimnis : '',
     stimme: typeof z.stimme === 'string' ? z.stimme : '',
     waffe: typeof z.waffe === 'string' ? z.waffe : '',
     lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
     lpBewusstlosAusgeblendet: Boolean(z.lpBewusstlosAusgeblendet),
     lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
-    schadenswert: typeof z.schadenswert === 'string' ? z.schadenswert : '',
-    kampfart: z.kampfart === 'fernkampf' ? 'fernkampf' : 'nahkampf',
+    schadenswertNahkampf,
+    schadenswertFernkampf,
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
     handeln,
     wissen,
@@ -314,7 +337,8 @@ function normalisiereZufallstabellenNpcZeile(z) {
     glaube: typeof z.glaube === 'string' ? z.glaube : '',
     initiative: typeof z.initiative === 'string' ? z.initiative : '',
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
-    medien: normalisiereZufallstabellenMedienListe(z.medien),
+    medien,
+    primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
   };
 }
 
@@ -322,6 +346,7 @@ function normalisiereZufallstabellenOrtZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
   }
+  const medien = normalisiereZufallstabellenMedienListe(z.medien);
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     name: typeof z.name === 'string' ? z.name : '',
@@ -329,7 +354,8 @@ function normalisiereZufallstabellenOrtZeile(z) {
     lage: typeof z.lage === 'string' ? z.lage : '',
     zustand: typeof z.zustand === 'string' ? z.zustand : '',
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
-    medien: normalisiereZufallstabellenMedienListe(z.medien),
+    medien,
+    primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
   };
 }
 
@@ -337,15 +363,18 @@ function normalisiereZufallstabellenGegenstandZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
   }
-  const kampfart =
-    z.kampfart === 'fernkampf' || z.kampfart === 'sonstiges' ? z.kampfart : 'nahkampf';
+  const schadenswertNahkampf =
+    typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '';
+  const schadenswertFernkampf =
+    typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '';
+  const medien = normalisiereZufallstabellenMedienListe(z.medien);
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     name: typeof z.name === 'string' ? z.name : '',
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
     istWaffe: !!z.istWaffe,
-    schadenswert: typeof z.schadenswert === 'string' ? z.schadenswert : '',
-    kampfart,
+    schadenswertNahkampf,
+    schadenswertFernkampf,
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
     initiative: typeof z.initiative === 'string' ? z.initiative : '',
     fraktionen: Array.isArray(z.fraktionen)
@@ -353,7 +382,8 @@ function normalisiereZufallstabellenGegenstandZeile(z) {
       : [],
     lpBewusstlosAusgeblendet: Boolean(z.lpBewusstlosAusgeblendet),
     lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
-    medien: normalisiereZufallstabellenMedienListe(z.medien),
+    medien,
+    primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
   };
 }
 
@@ -368,6 +398,7 @@ function normalisiereZufallstabellenFraktionZeile(z) {
     : [];
   const altAufenthaltsort = typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort.trim() : '';
   const orte = orteListe.length ? orteListe : altAufenthaltsort ? [altAufenthaltsort] : [];
+  const medien = normalisiereZufallstabellenMedienListe(z.medien);
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     art: typeof z.art === 'string' ? z.art : '',
@@ -376,7 +407,8 @@ function normalisiereZufallstabellenFraktionZeile(z) {
     gesinnungVerhalten: typeof z.gesinnungVerhalten === 'string' ? z.gesinnungVerhalten : '',
     orte,
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
-    medien: normalisiereZufallstabellenMedienListe(z.medien),
+    medien,
+    primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
   };
 }
 
@@ -384,6 +416,7 @@ function normalisiereZufallstabellenPantheonZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
   }
+  const medien = normalisiereZufallstabellenMedienListe(z.medien);
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     name: typeof z.name === 'string' ? z.name : '',
@@ -396,7 +429,8 @@ function normalisiereZufallstabellenPantheonZeile(z) {
     verlangen: typeof z.verlangen === 'string' ? z.verlangen : '',
     mythosGaben: typeof z.mythosGaben === 'string' ? z.mythosGaben : '',
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
-    medien: normalisiereZufallstabellenMedienListe(z.medien),
+    medien,
+    primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
   };
 }
 
@@ -404,6 +438,7 @@ function normalisiereZufallstabellenRaetselZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
   }
+  const medien = normalisiereZufallstabellenMedienListe(z.medien);
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     art: typeof z.art === 'string' ? z.art : '',
@@ -415,7 +450,8 @@ function normalisiereZufallstabellenRaetselZeile(z) {
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
     geloest: Boolean(z.geloest),
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
-    medien: normalisiereZufallstabellenMedienListe(z.medien),
+    medien,
+    primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
   };
 }
 
@@ -445,11 +481,16 @@ function normalisiereZufallstabellenBestieZeile(z) {
   const handeln = Math.max(0, Math.min(40, Math.round(Number(z.handeln) || 0)));
   const wissen = Math.max(0, Math.min(40, Math.round(Number(z.wissen) || 0)));
   const soziales = Math.max(0, Math.min(40, Math.round(Number(z.soziales) || 0)));
+  const schadenswertNahkampf =
+    typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '';
+  const schadenswertFernkampf =
+    typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '';
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     epoche,
     kategorie,
     name: typeof z.name === 'string' ? z.name : '',
+    waffe: typeof z.waffe === 'string' ? z.waffe : '',
     angriff: typeof z.angriff === 'string' ? z.angriff : '',
     verteidigung: typeof z.verteidigung === 'string' ? z.verteidigung : '',
     lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
@@ -462,8 +503,14 @@ function normalisiereZufallstabellenBestieZeile(z) {
     lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
     staerke: typeof z.staerke === 'string' ? z.staerke : '',
     schwaeche: typeof z.schwaeche === 'string' ? z.schwaeche : '',
+    geheimnis: typeof z.geheimnis === 'string' ? z.geheimnis : '',
+    fraktionen: Array.isArray(z.fraktionen)
+      ? z.fraktionen.map((f) => (typeof f === 'string' ? f.trim() : '')).filter(Boolean)
+      : [],
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
     aggressivitaetSkala: agg,
+    schadenswertNahkampf,
+    schadenswertFernkampf,
     medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
 }
@@ -734,22 +781,61 @@ function normalisiereWeltenbauMapEinstellungen(roh) {
     if (typeof gruppeId !== 'string' || !gruppeId || !einstellungen || typeof einstellungen !== 'object') {
       return;
     }
+    const zoomScaleNum = Number(einstellungen.zoomScale);
+    const zoomScale = Number.isFinite(zoomScaleNum)
+      ? Math.max(0.01, Math.min(10, zoomScaleNum))
+      : 1;
     const itemScaleNum = Number(einstellungen.itemScale);
     const itemScale = Number.isFinite(itemScaleNum) ? Math.max(0, Math.min(500, Math.round(itemScaleNum))) : 100;
+    const edgeWidthNum = Number(einstellungen.edgeWidth);
+    const edgeWidth = Number.isFinite(edgeWidthNum) ? Math.max(1, Math.min(16, Math.round(edgeWidthNum))) : 4;
+    const mapCenterXNum = Number(einstellungen.mapCenterX);
+    const mapCenterYNum = Number(einstellungen.mapCenterY);
+    const mapCenterX = Number.isFinite(mapCenterXNum) ? Math.round(mapCenterXNum) : 2600;
+    const mapCenterY = Number.isFinite(mapCenterYNum) ? Math.round(mapCenterYNum) : 1800;
     const edgeColorRoh = typeof einstellungen.edgeColor === 'string' ? einstellungen.edgeColor.trim() : '';
     const edgeColor = /^#[0-9a-fA-F]{6}$/.test(edgeColorRoh) ? edgeColorRoh : '#5c636a';
     const filter = einstellungen.sichtbarkeitsFilter && typeof einstellungen.sichtbarkeitsFilter === 'object'
       ? einstellungen.sichtbarkeitsFilter
       : {};
     map[gruppeId] = {
+      zoomScale,
       itemScale,
       edgeColor,
+      edgeWidth,
+      mapCenterX,
+      mapCenterY,
       sichtbarkeitsFilter: {
         toteNpcsAnzeigen: filter.toteNpcsAnzeigen !== false,
         toteBestienAnzeigen: filter.toteBestienAnzeigen !== false,
         geloesteRaetselAnzeigen: filter.geloesteRaetselAnzeigen !== false,
       },
     };
+  });
+  return map;
+}
+
+function normalisiereWeltenbauMapBildLayouts(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return {};
+  }
+  const map = {};
+  Object.entries(roh).forEach(([gruppeId, gruppeLayouts]) => {
+    if (typeof gruppeId !== 'string' || !gruppeId || !gruppeLayouts || typeof gruppeLayouts !== 'object') {
+      return;
+    }
+    const gruppeMap = {};
+    Object.entries(gruppeLayouts).forEach(([bildId, layout]) => {
+      if (typeof bildId !== 'string' || !bildId || !layout || typeof layout !== 'object') {
+        return;
+      }
+      const x = Math.round(Number(layout.x) || 0);
+      const y = Math.round(Number(layout.y) || 0);
+      const width = Math.max(1, Math.round(Number(layout.width) || 260));
+      const height = Math.max(1, Math.round(Number(layout.height) || 180));
+      gruppeMap[bildId] = { x, y, width, height };
+    });
+    map[gruppeId] = gruppeMap;
   });
   return map;
 }
@@ -763,6 +849,7 @@ function ladeWeltenbauZustand() {
       generatorUrls: {},
       generatorAufrufe: {},
       mapLayouts: {},
+      mapBildLayouts: {},
       mapHintergruende: {},
       mapEinstellungen: {},
     };
@@ -773,9 +860,19 @@ function ladeWeltenbauZustand() {
   const generatorUrls = normalisiereWeltenbauGeneratorUrls(roh.generatorUrls);
   const generatorAufrufe = roh.generatorAufrufe && typeof roh.generatorAufrufe === 'object' ? roh.generatorAufrufe : {};
   const mapLayouts = roh.mapLayouts && typeof roh.mapLayouts === 'object' ? roh.mapLayouts : {};
+  const mapBildLayouts = normalisiereWeltenbauMapBildLayouts(roh.mapBildLayouts);
   const mapHintergruende = normalisiereWeltenbauMapHintergruende(roh.mapHintergruende);
   const mapEinstellungen = normalisiereWeltenbauMapEinstellungen(roh.mapEinstellungen);
-  return { version: 4, eintraege, generatorUrls, generatorAufrufe, mapLayouts, mapHintergruende, mapEinstellungen };
+  return {
+    version: 4,
+    eintraege,
+    generatorUrls,
+    generatorAufrufe,
+    mapLayouts,
+    mapBildLayouts,
+    mapHintergruende,
+    mapEinstellungen,
+  };
 }
 
 function speichereWeltenbauZustand(zustand) {
@@ -1703,10 +1800,16 @@ const routes = [
   { path: '/create', redirect: '/charakter/neu' },
   { path: '/presets', redirect: '/faehigkeiten-presets' },
   { path: '/presets/form', redirect: '/faehigkeiten-preset-bearbeiten' },
-  { path: '/presets/form/:id', redirect: '/faehigkeiten-preset-bearbeiten/:id' },
+  {
+    path: '/presets/form/:id',
+    redirect: (to) => `/faehigkeiten-preset-bearbeiten/${encodeURIComponent(to.params.id || '')}`,
+  },
   { path: '/preset-verwaltung', redirect: '/faehigkeiten-presets' },
   { path: '/preset-bearbeiten', redirect: '/faehigkeiten-preset-bearbeiten' },
-  { path: '/preset-bearbeiten/:id', redirect: '/faehigkeiten-preset-bearbeiten/:id' },
+  {
+    path: '/preset-bearbeiten/:id',
+    redirect: (to) => `/faehigkeiten-preset-bearbeiten/${encodeURIComponent(to.params.id || '')}`,
+  },
   { path: '/settings', redirect: '/einstellungen' },
   { path: '/gm', redirect: '/spielleiter' },
 ];

@@ -343,4 +343,12 @@ window.HTBAH.ZufallsgeneratorBestienListen = {
     'Junge / brutpflegende Phase',
     'Verletzliche Augen oder Weichteile',
   ],
+  GEHEIMNISSE: [
+    'wird von einer Fraktion heimlich gefüttert und gelenkt',
+    'bewacht instinktiv einen versteckten Zugang',
+    'trägt einen fremden Parasiten in sich',
+    'folgt nachts einem nicht sichtbaren Rufsignal',
+    'war ursprünglich ein gezähmtes Versuchstier',
+    'verhält sich nur in der Paarungszeit extrem aggressiv',
+  ],
 };

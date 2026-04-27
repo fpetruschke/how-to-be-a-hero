@@ -2,6 +2,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
 window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
   name: 'ZufallstabellenZeileModal',
+  components: {
+    ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
+  },
   props: {
     anlage: { type: Object, required: true },
     zeileModalTitel: { type: String, default: '' },
@@ -16,6 +19,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     pantheonNamenListe: { type: Array, default: () => [] },
     fraktionenMitNamen: { type: Array, default: () => [] },
     orteNamenListe: { type: Array, default: () => [] },
+    speicherDeaktiviert: { type: Boolean, default: false },
+    speicherHinweis: { type: String, default: '' },
     zeileQuillSession: { type: Number, default: 0 },
     zeileQuillHostRefFn: { type: Function, required: true },
   },
@@ -25,6 +30,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     'random',
     'media-upload',
     'media-remove',
+    'media-set-primary',
     'media-open',
     'media-download',
     'update:zufallNpcEpoche',
@@ -45,6 +51,9 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     },
     vollbildIcon() {
       return this.modal.istVollbild ? 'close_fullscreen' : 'open_in_full';
+    },
+    entitaetGespeichert() {
+      return !(Number.isInteger(this.anlage && this.anlage.index) && this.anlage.index < 0);
     },
   },
   watch: {
@@ -270,6 +279,18 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       this.anlage.zeile.initiative = '';
     },
+    paradeModalOeffnenFuerZeile() {
+      if (!this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      const basiswert = this.berechneHandelnFuerInitiative();
+      const titelTeil = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
+      this.$refs.paradeModal?.oeffnen({
+        titel: `Parade-Probe (${titelTeil})`,
+        basiswert,
+        ruestungen: [],
+      });
+    },
   },
   template: `
     <div v-if="anlage.offen && anlage.zeile" class="regelwerk-modal-layer">
@@ -344,6 +365,14 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   Reset
                 </button>
               </div>
+              <div class="mt-2">
+                <button
+                  type="button"
+                  class="btn btn-outline-primary btn-sm w-100"
+                  @click="paradeModalOeffnenFuerZeile">
+                  🛡️ Parieren
+                </button>
+              </div>
               <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
             </div>
             <div class="col-12">
@@ -366,12 +395,25 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             </div>
             <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.beruf" placeholder=" " /><label>Beruf</label></div></div>
             <div class="col-md-6"><label class="form-label small text-secondary mb-1">Fraktion</label><select class="form-select" v-model="anlage.zeile.fraktion"><option value="">— keine —</option><option v-for="f in fraktionenMitNamen" :key="f.id" :value="f.name">{{ f.name }}</option></select></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.aufenthaltsort" placeholder=" " autocomplete="off" /><label>Aufenthaltsort</label></div></div>
+            <div class="col-md-6">
+              <label class="form-label small text-secondary mb-1" for="wb-zfn-ort">Aufenthaltsort</label>
+              <input
+                id="wb-zfn-ort"
+                class="form-control"
+                v-model="anlage.zeile.aufenthaltsort"
+                :list="orteNamenListe.length ? 'wb-zfn-ort-datalist' : undefined"
+                placeholder="Ort wählen oder Freitext"
+                autocomplete="off" />
+              <datalist v-if="orteNamenListe.length" id="wb-zfn-ort-datalist">
+                <option v-for="ort in orteNamenListe" :key="'wb-zfn-ort-' + ort" :value="ort"></option>
+              </datalist>
+            </div>
+            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geheimnis" placeholder=" " /><label>Geheimnis</label></div></div>
             <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.ziel" placeholder=" " /><label>Ziel (z. B. Wohlstand, Lebenswandel)</label></div></div>
             <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.stimme" placeholder=" " /><label>Stimme</label></div></div>
             <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.waffe" placeholder=" " /><label>Waffe</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswert" placeholder=" " autocomplete="off" /><label>Schadenswert</label></div></div>
-            <div class="col-md-6"><label class="form-label small text-secondary mb-1">Kampfart</label><select class="form-select" v-model="anlage.zeile.kampfart"><option value="nahkampf">Nahkampf</option><option value="fernkampf">Fernkampf</option></select></div>
+            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Nahkampf</label></div></div>
+            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Fernkampf</label></div></div>
           </div>
         </template>
         <template v-else-if="anlage.typ === 'ort'">
@@ -462,7 +504,19 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           <div class="row g-2">
             <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.art" placeholder=" " /><label>Art (z. B. Licht- & Spiegelpuzzle)</label></div></div>
             <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.titel" placeholder=" " /><label>Titel / Stichwort</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.aufenthaltsort" placeholder=" " autocomplete="off" /><label>Aufenthaltsort (optional)</label></div></div>
+            <div class="col-md-6">
+              <label class="form-label small text-secondary mb-1" for="wb-zr-ort">Aufenthaltsort (optional)</label>
+              <input
+                id="wb-zr-ort"
+                class="form-control"
+                v-model="anlage.zeile.aufenthaltsort"
+                :list="orteNamenListe.length ? 'wb-zr-ort-datalist' : undefined"
+                placeholder="Ort wählen oder Freitext"
+                autocomplete="off" />
+              <datalist v-if="orteNamenListe.length" id="wb-zr-ort-datalist">
+                <option v-for="ort in orteNamenListe" :key="'wb-zr-ort-' + ort" :value="ort"></option>
+              </datalist>
+            </div>
             <div class="col-md-6 d-flex align-items-center">
               <div class="form-check form-switch mt-2">
                 <input class="form-check-input" type="checkbox" role="switch" v-model="anlage.zeile.geloest" id="wb-zr-geloest" />
@@ -483,6 +537,9 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.angriff" placeholder=" " autocomplete="off" /><label>Angriff</label></div></div>
             <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.verteidigung" placeholder=" " autocomplete="off" /><label>Verteidigung</label></div></div>
             <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " autocomplete="off" /><label>Lebenspunkte</label></div></div>
+            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.waffe" placeholder=" " /><label>Waffe</label></div></div>
+            <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schaden NK</label></div></div>
+            <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schaden FK</label></div></div>
             <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
             <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
             <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
@@ -512,6 +569,14 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   Reset
                 </button>
               </div>
+              <div class="mt-2">
+                <button
+                  type="button"
+                  class="btn btn-outline-primary btn-sm w-100"
+                  @click="paradeModalOeffnenFuerZeile">
+                  🛡️ Parieren
+                </button>
+              </div>
               <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
             </div>
             <div class="col-12">
@@ -524,7 +589,20 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                 <label class="form-check-label small" for="wb-bestie-massen">Bewusstlos durch Massenschaden erzwingen</label>
               </div>
             </div>
-            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.aufenthaltsort" placeholder=" " autocomplete="off" /><label>Aufenthaltsort</label></div></div>
+            <div class="col-12">
+              <label class="form-label small text-secondary mb-1" for="wb-zb-ort">Aufenthaltsort</label>
+              <input
+                id="wb-zb-ort"
+                class="form-control"
+                v-model="anlage.zeile.aufenthaltsort"
+                :list="orteNamenListe.length ? 'wb-zb-ort-datalist' : undefined"
+                placeholder="Ort wählen oder Freitext"
+                autocomplete="off" />
+              <datalist v-if="orteNamenListe.length" id="wb-zb-ort-datalist">
+                <option v-for="ort in orteNamenListe" :key="'wb-zb-ort-' + ort" :value="ort"></option>
+              </datalist>
+            </div>
+            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geheimnis" placeholder=" " /><label>Geheimnis</label></div></div>
             <div class="col-12">
               <label class="form-label small text-secondary mb-1">Fraktionen</label>
               <div v-if="fraktionenMitNamen.length" class="d-flex flex-wrap gap-2">
@@ -567,7 +645,17 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <div class="col-md-6"><div class="form-check mt-3"><input class="form-check-input" type="checkbox" :checked="zufallGegenstandKleidung" @change="$emit('update:zufallGegenstandKleidung', $event.target.checked)" id="wb-zg-kleid" /><label class="form-check-label small" for="wb-zg-kleid">Kleidung als Kategorie zulassen</label></div></div>
           </div>
           <div class="form-floating mb-3"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div>
-          <div class="form-floating mb-3"><input class="form-control" v-model="anlage.zeile.aufenthaltsort" placeholder=" " autocomplete="off" /><label>Aufenthaltsort</label></div>
+          <label class="form-label small text-secondary mb-1" for="wb-zg-ort">Aufenthaltsort</label>
+          <input
+            id="wb-zg-ort"
+            class="form-control mb-3"
+            v-model="anlage.zeile.aufenthaltsort"
+            :list="orteNamenListe.length ? 'wb-zg-ort-datalist' : undefined"
+            placeholder="Ort wählen oder Freitext"
+            autocomplete="off" />
+          <datalist v-if="orteNamenListe.length" id="wb-zg-ort-datalist">
+            <option v-for="ort in orteNamenListe" :key="'wb-zg-ort-' + ort" :value="ort"></option>
+          </datalist>
           <label class="form-label small text-secondary mb-1">Initiative</label>
           <div class="input-group mb-3">
             <input
@@ -589,18 +677,21 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           </div>
           <div class="form-check mb-3"><input class="form-check-input" type="checkbox" v-model="anlage.zeile.istWaffe" id="wb-zg-waffe" /><label class="form-check-label" for="wb-zg-waffe">Waffe</label></div>
           <div class="row g-2 mb-1 align-items-end" v-if="anlage.zeile.istWaffe">
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswert" placeholder=" " autocomplete="off" /><label>Schadenswert (z. B. 2W10+1)</label></div></div>
-            <div class="col-md-6"><label class="form-label small text-secondary mb-1">Kampfart</label><select class="form-select" v-model="anlage.zeile.kampfart"><option value="nahkampf">Nahkampf</option><option value="fernkampf">Fernkampf</option><option value="sonstiges">Sonstiges</option></select></div>
+            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Nahkampf (z. B. 2W10+1)</label></div></div>
+            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Fernkampf (z. B. 3W10)</label></div></div>
           </div>
         </template>
 
         <div class="mt-3 mb-3">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-            <label class="form-label mb-0">Medien & Dateien</label>
-            <label class="btn btn-sm btn-outline-secondary mb-0">
+            <label class="form-label mb-0">Medien & Dateien (Schritt 2)</label>
+            <label v-if="entitaetGespeichert" class="btn btn-sm btn-outline-secondary mb-0">
               Hochladen
               <input type="file" class="d-none" multiple @change="$emit('media-upload', $event)" />
             </label>
+          </div>
+          <div v-if="!entitaetGespeichert" class="alert alert-info py-2 small">
+            Schritt 1: Entität zuerst speichern. Schritt 2: Danach kannst Du hier Dateien/Bilder anhängen.
           </div>
           <div v-if="!(anlage.zeile.medien || []).length" class="text-secondary small">Noch keine Medien.</div>
           <div v-else class="row g-2">
@@ -619,6 +710,14 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   <div v-if="Number.isFinite(medium.size)" class="text-secondary">{{ Math.round(medium.size / 1024) }} KiB</div>
                 </div>
                 <div class="d-flex gap-2 mt-2">
+                  <button
+                    v-if="typeof medium.dataUrl === 'string' && medium.dataUrl.startsWith('data:image/')"
+                    type="button"
+                    class="btn btn-sm"
+                    :class="anlage.zeile.primaryMediumId === medium.id ? 'btn-primary' : 'btn-outline-primary'"
+                    @click="$emit('media-set-primary', medium.id)">
+                    {{ anlage.zeile.primaryMediumId === medium.id ? 'Titelbild' : 'Als Titelbild' }}
+                  </button>
                   <button type="button" class="btn btn-sm btn-outline-secondary" @click="$emit('media-download', medium)">Download</button>
                   <button type="button" class="btn btn-sm btn-outline-danger" @click="$emit('media-remove', mediumIndex)">Entfernen</button>
                 </div>
@@ -638,9 +737,11 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
           <button type="button" class="btn btn-sm btn-outline-secondary" @click="$emit('close')">Abbrechen</button>
-          <button type="button" class="btn btn-sm btn-primary" @click="$emit('save')">Speichern</button>
+          <button type="button" class="btn btn-sm btn-primary" :disabled="speicherDeaktiviert" @click="$emit('save')">Speichern</button>
         </div>
+        <div v-if="speicherHinweis" class="form-text text-end mt-1">{{ speicherHinweis }}</div>
         </div>
+        <parade-modal ref="paradeModal" />
         <div
           v-if="!modal.istVollbild"
           class="regelwerk-modal-resize-handle"

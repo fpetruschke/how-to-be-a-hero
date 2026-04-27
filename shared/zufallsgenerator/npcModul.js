@@ -38,6 +38,105 @@ window.HTBAH = window.HTBAH || {};
     return U.gewichtet(L.WAFFE_MITTELALTER.map((w) => ({ wert: w, gewicht: w.gewicht })));
   }
 
+  function geheimnisFuerEpoche(epoche) {
+    if (epoche === E.GEGENWART) {
+      return U.zufaellig(L.GEHEIMNIS_GEGENWART);
+    }
+    if (epoche === E.ZUKUNFT) {
+      return U.zufaellig(L.GEHEIMNIS_ZUKUNFT);
+    }
+    return U.zufaellig(L.GEHEIMNIS_MITTELALTER);
+  }
+
+  function berufsProfil(beruf) {
+    const b = String(beruf || '').toLowerCase();
+    const istWissen = ['gelehrter', 'bibliothekar', 'archivarin', 'wissenschaftler', 'it-administrator', 'programmierer', 'nanomediziner', 'heiler', 'schreiber'].some((s) => b.includes(s));
+    const istSozial = ['händler', 'gastwirt', 'barde', 'anwältin', 'journalistin', 'unterhändlerin', 'influencer', 'advokat', 'kellner'].some((s) => b.includes(s));
+    const istKampf = ['wache', 'soldat', 'sicherheits', 'leibwächter', 'söldner', 'polizist', 'scharfschütze', 'ranger', 'jäger'].some((s) => b.includes(s));
+    if (istWissen) {
+      return { handelnMin: 8, handelnMax: 14, wissenMin: 16, wissenMax: 24, sozialesMin: 6, sozialesMax: 16, fernkampfBonus: 2, nahkampfBonus: -2, schwereWaffenMalus: true };
+    }
+    if (istSozial) {
+      return { handelnMin: 8, handelnMax: 14, wissenMin: 8, wissenMax: 14, sozialesMin: 14, sozialesMax: 24, fernkampfBonus: 0, nahkampfBonus: -2, schwereWaffenMalus: true };
+    }
+    if (istKampf) {
+      return { handelnMin: 16, handelnMax: 24, wissenMin: 4, wissenMax: 12, sozialesMin: 4, sozialesMax: 14, fernkampfBonus: 1, nahkampfBonus: 2, schwereWaffenMalus: false };
+    }
+    return { handelnMin: 10, handelnMax: 18, wissenMin: 6, wissenMax: 16, sozialesMin: 6, sozialesMax: 16, fernkampfBonus: 0, nahkampfBonus: 0, schwereWaffenMalus: false };
+  }
+
+  function staturAusAlterUndBeruf(alter, beruf) {
+    const staturen = [];
+    const alterNum = Number(alter);
+    const profil = berufsProfil(beruf);
+    const basis = L.STATUR || [];
+    for (let i = 0; i < basis.length; i += 1) {
+      const s = basis[i];
+      let gewicht = 1;
+      if (['Athletisch', 'Kräftig', 'Breitschultrig'].indexOf(s) !== -1) {
+        gewicht += profil.nahkampfBonus > 0 ? 2 : 0;
+        if (Number.isFinite(alterNum) && alterNum >= 55) {
+          gewicht -= 1;
+        }
+      }
+      if (['Schwerfällig', 'Hager'].indexOf(s) !== -1 && Number.isFinite(alterNum) && alterNum >= 60) {
+        gewicht += 2;
+      }
+      if (['Zierlich', 'Schlank'].indexOf(s) !== -1 && profil.schwereWaffenMalus) {
+        gewicht += 1;
+      }
+      staturen.push({ wert: s, gewicht: Math.max(1, gewicht) });
+    }
+    return U.gewichtet(staturen);
+  }
+
+  function waffeFuerBerufUndEpoche(beruf, epoche) {
+    const profil = berufsProfil(beruf);
+    let basis = L.WAFFE_MITTELALTER;
+    if (epoche === E.GEGENWART) {
+      basis = L.WAFFE_GEGENWART;
+    } else if (epoche === E.ZUKUNFT) {
+      basis = L.WAFFE_ZUKUNFT;
+    }
+    const gewichtet = basis.map((w) => {
+      let gewicht = Number(w.gewicht) || 1;
+      if (w.kampfart === 'fernkampf') {
+        gewicht += profil.fernkampfBonus;
+      } else {
+        gewicht += profil.nahkampfBonus;
+      }
+      if (profil.schwereWaffenMalus && /^3W10|^4W10/.test(String(w.schadenswert || ''))) {
+        gewicht -= 3;
+      }
+      return { wert: w, gewicht: Math.max(1, gewicht) };
+    });
+    return U.gewichtet(gewichtet);
+  }
+
+  function dualeWaffenwerte(waffe, statur) {
+    const basis = typeof waffe?.schadenswert === 'string' ? waffe.schadenswert : '';
+    let schadenswertNahkampf = typeof waffe?.schadenswertNahkampf === 'string'
+      ? waffe.schadenswertNahkampf
+      : '';
+    let schadenswertFernkampf = typeof waffe?.schadenswertFernkampf === 'string'
+      ? waffe.schadenswertFernkampf
+      : '';
+    if (!schadenswertNahkampf && !schadenswertFernkampf && basis) {
+      if (waffe.kampfart === 'fernkampf') {
+        schadenswertFernkampf = basis;
+      } else {
+        schadenswertNahkampf = basis;
+      }
+    }
+    if (!schadenswertNahkampf && Math.random() < 0.25) {
+      schadenswertNahkampf = waffenloserNahkampfSchaden(statur);
+    }
+    if (!schadenswertFernkampf && Math.random() < 0.2) {
+      schadenswertFernkampf = U.zufaellig(['1W10+2', '2W10', '2W10+1']);
+    }
+    return { schadenswertNahkampf, schadenswertFernkampf };
+  }
+
   /** Schadensnotation wie bei Waffen (z. B. 1W10+2), für Fäuste/Tritte nach Statur abgestuft. */
   function waffenloserNahkampfSchaden(statur) {
     const stark = ['Kräftig', 'Athletisch', 'Breitschultrig', 'Stämmig'];
@@ -102,16 +201,18 @@ window.HTBAH = window.HTBAH || {};
     return U.zufaellig(namen);
   }
 
-  function begabungswerteVerteilen() {
+  function begabungswerteVerteilen(beruf) {
     // Regelwerk: 400 Fähigkeitspunkte gesamt -> max. Begabungswert pro Gruppe 40.
     const gesamt = 40;
-    const handeln = U.zufallsInt(8, 20);
-    const wissen = U.zufallsInt(6, 18);
+    const profil = berufsProfil(beruf);
+    const handeln = U.zufallsInt(profil.handelnMin, profil.handelnMax);
+    const wissen = U.zufallsInt(profil.wissenMin, profil.wissenMax);
     let soziales = gesamt - handeln - wissen;
-    if (soziales < 0) {
-      soziales = 0;
+    if (soziales < profil.sozialesMin) {
+      soziales = profil.sozialesMin;
     }
-    return { handeln, wissen, soziales };
+    soziales = Math.min(profil.sozialesMax, soziales);
+    return { handeln, wissen, soziales: Math.max(0, soziales) };
   }
 
   window.HTBAH.ZufallsgeneratorNpcModul = {
@@ -130,11 +231,13 @@ window.HTBAH = window.HTBAH || {};
       const ziel = zielFuerEpoche(epoche);
       const beruf = berufFuerEpoche(epoche);
       const stimme = U.zufaellig(L.STIMME);
-      const waffe = waffeFuerEpoche(epoche);
-      const statur = U.zufaellig(L.STATUR);
+      const waffe = waffeFuerBerufUndEpoche(beruf, epoche);
+      const statur = staturAusAlterUndBeruf(alter, beruf);
+      const waffenwerte = dualeWaffenwerte(waffe, statur);
+      const geheimnis = geheimnisFuerEpoche(epoche);
       const lebenspunkte = lebenspunkteFuerStaturUndAlter(statur, alter);
       const schadenWaffenlos = waffenloserNahkampfSchaden(statur);
-      const begabung = begabungswerteVerteilen();
+      const begabung = begabungswerteVerteilen(beruf);
 
       const aufenthaltsort = aufenthaltsortAusOrteListe(opts.orteNamen);
       const fraktion = fraktionAusFraktionenListe(opts.fraktionNamen);
@@ -146,9 +249,8 @@ window.HTBAH = window.HTBAH || {};
         `<p><strong>Lebenspunkte:</strong> ${U.htmlEsc(lebenspunkte)}.</p>`,
         `<p><strong>Waffenloser Nahkampf (Fäuste, Tritte):</strong> ${U.htmlEsc(schadenWaffenlos)}.</p>`,
         `<p><strong>Stimme:</strong> ${U.htmlEsc(stimme)}.</p>`,
-        `<p><strong>Waffe:</strong> ${U.htmlEsc(waffe.name)} (${U.htmlEsc(waffe.schadenswert)}, ${U.htmlEsc(
-          waffe.kampfart === 'fernkampf' ? 'Fernkampf' : 'Nahkampf',
-        )}).</p>`,
+        `<p><strong>Geheimnis:</strong> ${U.htmlEsc(geheimnis)}.</p>`,
+        `<p><strong>Waffe:</strong> ${U.htmlEsc(waffe.name)}${waffenwerte.schadenswertNahkampf ? ` · Nahkampf ${U.htmlEsc(waffenwerte.schadenswertNahkampf)}` : ''}${waffenwerte.schadenswertFernkampf ? ` · Fernkampf ${U.htmlEsc(waffenwerte.schadenswertFernkampf)}` : ''}.</p>`,
       ].join('');
 
       return {
@@ -161,10 +263,11 @@ window.HTBAH = window.HTBAH || {};
         gesinnung: U.zufaellig(L.GESINNUNG),
         beruf,
         ziel,
+        geheimnis,
         stimme,
         waffe: waffe.name,
-        schadenswert: waffe.schadenswert,
-        kampfart: waffe.kampfart,
+        schadenswertNahkampf: waffenwerte.schadenswertNahkampf,
+        schadenswertFernkampf: waffenwerte.schadenswertFernkampf,
         lebenspunkte,
         aufenthaltsort,
         handeln: begabung.handeln,

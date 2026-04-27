@@ -20,6 +20,8 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       delete e.rustwert;
       delete e.schadenswert;
       delete e.kampfart;
+      delete e.schadenswertNahkampf;
+      delete e.schadenswertFernkampf;
     } else if (t === 'rustung') {
       e.rustwert =
         e.rustwert == null || e.rustwert === ''
@@ -27,12 +29,19 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
           : String(e.rustwert).trim();
       delete e.schadenswert;
       delete e.kampfart;
+      delete e.schadenswertNahkampf;
+      delete e.schadenswertFernkampf;
     } else if (t === 'waffe') {
-      e.schadenswert =
-        e.schadenswert == null || e.schadenswert === ''
+      e.schadenswertNahkampf =
+        e.schadenswertNahkampf == null || e.schadenswertNahkampf === ''
           ? ''
-          : String(e.schadenswert).trim();
-      e.kampfart = e.kampfart === 'fernkampf' ? 'fernkampf' : 'nahkampf';
+          : String(e.schadenswertNahkampf).trim();
+      e.schadenswertFernkampf =
+        e.schadenswertFernkampf == null || e.schadenswertFernkampf === ''
+          ? ''
+          : String(e.schadenswertFernkampf).trim();
+      delete e.schadenswert;
+      delete e.kampfart;
       delete e.rustwert;
     }
     return e;
@@ -50,6 +59,8 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
           rustwert: item.rustwert,
           schadenswert: item.schadenswert,
           kampfart: item.kampfart,
+          schadenswertNahkampf: item.schadenswertNahkampf,
+          schadenswertFernkampf: item.schadenswertFernkampf,
         };
         return M.inventarEintragNachTypBereinigen(roh);
       });

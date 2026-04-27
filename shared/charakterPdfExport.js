@@ -148,14 +148,20 @@
       return rw ? `Rüstwert ${escapeHtml(rw)}` : '—';
     }
     if (t === 'waffe') {
-      const sd = String(eintrag.schadenswert != null ? eintrag.schadenswert : '').trim();
-      const fern = eintrag.kampfart === 'fernkampf';
+      const sdNah = String(
+        eintrag.schadenswertNahkampf != null ? eintrag.schadenswertNahkampf : '',
+      ).trim();
+      const sdFern = String(
+        eintrag.schadenswertFernkampf != null ? eintrag.schadenswertFernkampf : '',
+      ).trim();
       const teile = [];
-      if (sd) {
-        teile.push(`Schaden ${escapeHtml(sd)}`);
+      if (sdNah) {
+        teile.push(`Nahkampf ${escapeHtml(sdNah)}`);
       }
-      teile.push(fern ? 'Fernkampf' : 'Nahkampf');
-      return teile.join(' · ');
+      if (sdFern) {
+        teile.push(`Fernkampf ${escapeHtml(sdFern)}`);
+      }
+      return teile.length ? teile.join(' · ') : '—';
     }
     return '—';
   }

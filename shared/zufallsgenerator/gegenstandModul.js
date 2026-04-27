@@ -47,24 +47,6 @@ window.HTBAH = window.HTBAH || {};
     return `${wuerfel}W10+${mod}`;
   }
 
-  function kampfartWaffeZufaellig() {
-    return U.gewichtet([
-      { wert: 'nahkampf', gewicht: 45 },
-      { wert: 'fernkampf', gewicht: 40 },
-      { wert: 'sonstiges', gewicht: 15 },
-    ]);
-  }
-
-  function kampfartLabel(k) {
-    if (k === 'fernkampf') {
-      return 'Fernkampf';
-    }
-    if (k === 'sonstiges') {
-      return 'Sonstiges';
-    }
-    return 'Nahkampf';
-  }
-
   function aufenthaltsortAusOrteListe(orteNamen) {
     if (!Array.isArray(orteNamen) || !orteNamen.length) {
       return '';
@@ -100,15 +82,15 @@ window.HTBAH = window.HTBAH || {};
       let basisName;
       let typLabel;
       let istWaffe = false;
-      let schadenswert = '';
-      let kampfart = 'nahkampf';
+      let schadenswertNahkampf = '';
+      let schadenswertFernkampf = '';
 
       if (kategorie === 'waffe') {
         typLabel = 'Waffe';
         basisName = waffeFuerEpoche(epoche);
         istWaffe = true;
-        schadenswert = schadenswertW10Zufaellig();
-        kampfart = kampfartWaffeZufaellig();
+        schadenswertNahkampf = schadenswertW10Zufaellig();
+        schadenswertFernkampf = Math.random() < 0.7 ? schadenswertW10Zufaellig() : '';
       } else if (kategorie === 'kleidung') {
         typLabel = 'Kleidung';
         basisName = kleidungFuerEpoche(epoche);
@@ -127,8 +109,8 @@ window.HTBAH = window.HTBAH || {};
       ];
       if (istWaffe) {
         kopfzeilen.push(
-          `<p><strong>Schadenswert:</strong> ${U.htmlEsc(schadenswert)} · <strong>Kampfart:</strong> ${U.htmlEsc(
-            kampfartLabel(kampfart),
+          `<p><strong>Schadenswert Nahkampf:</strong> ${U.htmlEsc(schadenswertNahkampf || '—')} · <strong>Fernkampf:</strong> ${U.htmlEsc(
+            schadenswertFernkampf || '—',
           )}</p>`,
         );
       }
@@ -139,8 +121,8 @@ window.HTBAH = window.HTBAH || {};
         name: basisName,
         beschreibungHtml,
         istWaffe,
-        schadenswert,
-        kampfart,
+        schadenswertNahkampf,
+        schadenswertFernkampf,
         aufenthaltsort: aufenthaltsortAusOrteListe(opts && opts.orteNamen),
       };
     },

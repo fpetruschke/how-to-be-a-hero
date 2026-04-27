@@ -488,6 +488,33 @@ window.HTBAH.ZufallsgeneratorNpcListen = {
     'Den eigenen Schöpfer finden',
   ],
 
+  GEHEIMNIS_MITTELALTER: [
+    'hat bei einem Überfall den Täter gedeckt',
+    'führt heimlich eine zweite Identität',
+    'schreibt verbotene Briefe an eine verbotene Liebe',
+    'verwahrt ein gestohlenes Relikt',
+    'steht unter dem Schutz eines verbotenen Kults',
+    'hat den Tod eines Rivalen mitverursacht',
+  ],
+
+  GEHEIMNIS_GEGENWART: [
+    'hat in einem früheren Fall Beweise manipuliert',
+    'lebt unter falschem Namen',
+    'finanziert heimlich die Konkurrenz',
+    'hat eine heimliche Beziehung zur Zielperson',
+    'versteckt eine hohe private Verschuldung',
+    'war an einem nie aufgeklärten Unfall beteiligt',
+  ],
+
+  GEHEIMNIS_ZUKUNFT: [
+    'trägt eine gefälschte Bio-Signatur',
+    'schmuggelt verbotene Naniten für eine Untergrundzelle',
+    'hat eine KI unautorisiert freigelassen',
+    'ist ein inaktiver Schläferagent eines Konzerns',
+    'verheimlicht einen fehlerhaften Gedächtnis-Upload',
+    'hält Kontakt zu einer verbotenen außerkolonialen Fraktion',
+  ],
+
   STIMME: [
     'rau und kratzig',
     'ruhig und warm',

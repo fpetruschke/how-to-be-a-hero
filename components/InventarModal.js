@@ -6,6 +6,52 @@ function neueInventarId() {
     : `inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+const INVENTAR_WAFFEN_REFERENZ_REGELWERK = [
+  { kategorie: 'Improvisiert / waffenlos', schaden: '1W10' },
+  { kategorie: 'Stock', schaden: '1W10 +5' },
+  { kategorie: 'Messer / Dolch', schaden: '2W10' },
+  { kategorie: 'Steinschleuder / Wurfwaffen', schaden: '3W10' },
+  { kategorie: 'Axt / Streitkolben / Kriegshammer', schaden: '4W10' },
+  { kategorie: 'Schwert / Machete', schaden: '5W10' },
+  { kategorie: 'Bogen / Armbrust', schaden: '6W10' },
+  { kategorie: 'Pistole', schaden: '7W10' },
+  { kategorie: 'Gewehr', schaden: '8W10' },
+  { kategorie: 'Schrotflinte', schaden: '9W10' },
+  { kategorie: 'Bombe / Granate / Miene', schaden: '10W10' },
+];
+
+const INVENTAR_WAFFEN_REFERENZ_WIKI = [
+  { name: 'Kurzschwert', schaden: '5W10', typ: 'Nahkampf' },
+  { name: 'Langschwert', schaden: '3W10 +8', typ: 'Nahkampf' },
+  { name: 'Axt', schaden: '5W10', typ: 'Nahkampf' },
+  { name: 'Streitkolben', schaden: '3W10 +10', typ: 'Nahkampf' },
+  { name: 'Speer', schaden: '5W10', typ: 'Nahkampf' },
+  { name: 'Lanze', schaden: '4W10 +5', typ: 'Nahkampf' },
+  { name: 'Langbogen', schaden: '5W10', typ: 'Fernkampf' },
+  { name: 'Kurzbogen', schaden: '3W10 +10', typ: 'Fernkampf' },
+  { name: 'Armbrust', schaden: '6W10 +5', typ: 'Fernkampf' },
+  { name: 'Kriegsarmbrust', schaden: '6W10 +10', typ: 'Fernkampf' },
+];
+
+const INVENTAR_WAFFEN_VORSCHLAEGE = [
+  { name: 'Kurzschwert', schadenswertNahkampf: '5W10', alias: ['kurzschwert'] },
+  { name: 'Langschwert', schadenswertNahkampf: '3W10 +8', alias: ['langschwert', 'schwert'] },
+  { name: 'Säbel', schadenswertNahkampf: '4W10 +5', alias: ['saebel', 'säbel'] },
+  { name: 'Axt', schadenswertNahkampf: '5W10', alias: ['axt', 'streitaxt'] },
+  { name: 'Streitkolben', schadenswertNahkampf: '3W10 +10', alias: ['streitkolben', 'kolben'] },
+  { name: 'Speer', schadenswertNahkampf: '5W10', alias: ['speer'] },
+  { name: 'Lanze', schadenswertNahkampf: '4W10 +5', alias: ['lanze'] },
+  { name: 'Messer / Dolch', schadenswertNahkampf: '2W10', alias: ['messer', 'dolch'] },
+  { name: 'Langbogen', schadenswertFernkampf: '5W10', alias: ['langbogen', 'bogen'] },
+  { name: 'Kurzbogen', schadenswertFernkampf: '3W10 +10', alias: ['kurzbogen'] },
+  { name: 'Armbrust', schadenswertFernkampf: '6W10 +5', alias: ['armbrust'] },
+  { name: 'Kriegsarmbrust', schadenswertFernkampf: '6W10 +10', alias: ['kriegsarmbrust'] },
+  { name: 'Pistole', schadenswertFernkampf: '7W10', alias: ['pistole'] },
+  { name: 'Gewehr', schadenswertFernkampf: '8W10', alias: ['gewehr'] },
+  { name: 'Schrotflinte', schadenswertFernkampf: '9W10', alias: ['schrotflinte'] },
+  { name: 'Zauberstab', schadenswertNahkampf: '1W10 +5', schadenswertFernkampf: '4W10', alias: ['zauberstab', 'stab'] },
+];
+
 window.HTBAH_KOMPONENTEN.InventarModal = {
   props: {
     charakter: { type: Object, required: true },
@@ -18,6 +64,9 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
       inventarQuillNachId: {},
       inventarQuillRefFnCache: Object.create(null),
       inventarQuillToolbarCleanup: {},
+      waffenReferenzRegelwerk: INVENTAR_WAFFEN_REFERENZ_REGELWERK,
+      waffenReferenzWiki: INVENTAR_WAFFEN_REFERENZ_WIKI,
+      waffenVorschlaege: INVENTAR_WAFFEN_VORSCHLAEGE,
     };
   },
   methods: {
@@ -52,13 +101,19 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
         return rw ? `Rüstwert ${rw}` : '—';
       }
       if (t === 'waffe') {
-        const sd = String(eintrag.schadenswert != null ? eintrag.schadenswert : '').trim();
-        const fern = eintrag.kampfart === 'fernkampf';
+        const sdNah = String(
+          eintrag.schadenswertNahkampf != null ? eintrag.schadenswertNahkampf : '',
+        ).trim();
+        const sdFern = String(
+          eintrag.schadenswertFernkampf != null ? eintrag.schadenswertFernkampf : '',
+        ).trim();
         const teile = [];
-        if (sd) {
-          teile.push(`Schaden ${sd}`);
+        if (sdNah) {
+          teile.push(`Nahkampf ${sdNah}`);
         }
-        teile.push(fern ? 'Fernkampf' : 'Nahkampf');
+        if (sdFern) {
+          teile.push(`Fernkampf ${sdFern}`);
+        }
         return teile.join(' · ');
       }
       return '—';
@@ -67,6 +122,39 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
       const M = this.inventarModel();
       if (M && typeof M.inventarEintragNachTypBereinigen === 'function') {
         M.inventarEintragNachTypBereinigen(eintrag);
+      }
+    },
+    inventarNormalisiereSuchtext(text) {
+      return String(text || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+    },
+    inventarWaffenVorschlaegeFuerEintrag(eintrag) {
+      if (!eintrag || eintrag.typ !== 'waffe') {
+        return [];
+      }
+      const suchtext = this.inventarNormalisiereSuchtext(eintrag.name);
+      if (!suchtext) {
+        return this.waffenVorschlaege.slice(0, 5);
+      }
+      return this.waffenVorschlaege
+        .filter((v) => {
+          const pool = [v.name, ...(Array.isArray(v.alias) ? v.alias : [])];
+          return pool.some((item) => this.inventarNormalisiereSuchtext(item).includes(suchtext));
+        })
+        .slice(0, 6);
+    },
+    inventarWaffenVorschlagAnwenden(eintrag, vorschlag) {
+      if (!eintrag || !vorschlag) {
+        return;
+      }
+      if (typeof vorschlag.schadenswertNahkampf === 'string') {
+        eintrag.schadenswertNahkampf = vorschlag.schadenswertNahkampf;
+      }
+      if (typeof vorschlag.schadenswertFernkampf === 'string') {
+        eintrag.schadenswertFernkampf = vorschlag.schadenswertFernkampf;
       }
     },
     oeffnen() {
@@ -196,8 +284,8 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
         beschreibungHtml: eintrag.beschreibungHtml,
         typ: eintrag.typ,
         rustwert: eintrag.rustwert,
-        schadenswert: eintrag.schadenswert,
-        kampfart: eintrag.kampfart,
+        schadenswertNahkampf: eintrag.schadenswertNahkampf,
+        schadenswertFernkampf: eintrag.schadenswertFernkampf,
       };
       this.inventarEditId = eintrag.id;
     },
@@ -237,8 +325,8 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
           beschreibungHtml: this.inventarBackup.beschreibungHtml,
           typ: this.inventarBackup.typ,
           rustwert: this.inventarBackup.rustwert,
-          schadenswert: this.inventarBackup.schadenswert,
-          kampfart: this.inventarBackup.kampfart,
+          schadenswertNahkampf: this.inventarBackup.schadenswertNahkampf,
+          schadenswertFernkampf: this.inventarBackup.schadenswertFernkampf,
         });
         this.inventarTypNachAuswahlAnwenden(eintrag);
       }
@@ -277,8 +365,8 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
         beschreibungHtml: '',
         typ: 'gegenstand',
         rustwert: undefined,
-        schadenswert: undefined,
-        kampfart: undefined,
+        schadenswertNahkampf: undefined,
+        schadenswertFernkampf: undefined,
       };
       this.inventarEditId = neu.id;
     },
@@ -424,32 +512,53 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
                         <div v-else-if="eintrag.typ === 'waffe'" class="d-flex flex-column gap-1">
                           <input
                             class="form-control form-control-sm"
-                            v-model="eintrag.schadenswert"
-                            placeholder="Schadenswert"
+                            v-model="eintrag.schadenswertNahkampf"
+                            placeholder="Schadenswert Nahkampf"
                             autocomplete="off" />
-                          <div class="btn-group btn-group-sm" role="group" aria-label="Nah- oder Fernkampf">
-                            <button
-                              type="button"
-                              class="btn"
-                              :class="
-                                eintrag.kampfart === 'nahkampf'
-                                  ? 'btn-primary'
-                                  : 'btn-outline-secondary'
-                              "
-                              @click="eintrag.kampfart = 'nahkampf'">
-                              Nahkampf
-                            </button>
-                            <button
-                              type="button"
-                              class="btn"
-                              :class="
-                                eintrag.kampfart === 'fernkampf'
-                                  ? 'btn-primary'
-                                  : 'btn-outline-secondary'
-                              "
-                              @click="eintrag.kampfart = 'fernkampf'">
-                              Fernkampf
-                            </button>
+                          <input
+                            class="form-control form-control-sm"
+                            v-model="eintrag.schadenswertFernkampf"
+                            placeholder="Schadenswert Fernkampf"
+                            autocomplete="off" />
+                          <div class="inventar-waffen-vorschlaege">
+                            <small class="text-body-secondary d-block mb-1">Vorschläge anhand Waffenname</small>
+                            <div class="d-flex flex-wrap gap-1">
+                              <button
+                                v-for="v in inventarWaffenVorschlaegeFuerEintrag(eintrag)"
+                                :key="'desk-suggest-' + eintrag.id + '-' + v.name"
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                @click="inventarWaffenVorschlagAnwenden(eintrag, v)">
+                                {{ v.name }}<template v-if="v.schadenswertNahkampf"> · NK {{ v.schadenswertNahkampf }}</template><template v-if="v.schadenswertFernkampf"> · FK {{ v.schadenswertFernkampf }}</template>
+                              </button>
+                            </div>
+                          </div>
+                          <div class="inventar-waffen-referenz card border border-warning-subtle bg-warning-subtle bg-opacity-10 mt-1">
+                            <div class="card-body p-2">
+                              <div class="small fw-semibold mb-1">Richtwerte Schaden (Regelwerk)</div>
+                              <div class="table-responsive">
+                                <table class="table table-sm mb-2 inventar-waffen-referenz-tabelle">
+                                  <tbody>
+                                    <tr v-for="ref in waffenReferenzRegelwerk" :key="'rw-' + ref.kategorie">
+                                      <td class="text-body-secondary">{{ ref.kategorie }}</td>
+                                      <td class="fw-semibold text-nowrap">{{ ref.schaden }}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                              <div class="small fw-semibold mb-1">Beispiele aus dem HTBAH-Wiki (Mittelalter)</div>
+                              <div class="table-responsive">
+                                <table class="table table-sm mb-0 inventar-waffen-referenz-tabelle">
+                                  <tbody>
+                                    <tr v-for="ref in waffenReferenzWiki" :key="'wiki-' + ref.name">
+                                      <td class="text-body-secondary">{{ ref.name }}</td>
+                                      <td class="text-nowrap">{{ ref.schaden }}</td>
+                                      <td class="text-body-secondary text-nowrap">{{ ref.typ }}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </template>
@@ -594,32 +703,53 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
                       <div v-else-if="eintrag.typ === 'waffe'" class="d-flex flex-column gap-1 mt-1">
                         <input
                           class="form-control form-control-sm"
-                          v-model="eintrag.schadenswert"
-                          placeholder="Schadenswert"
+                          v-model="eintrag.schadenswertNahkampf"
+                          placeholder="Schadenswert Nahkampf"
                           autocomplete="off" />
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Nah- oder Fernkampf">
-                          <button
-                            type="button"
-                            class="btn"
-                            :class="
-                              eintrag.kampfart === 'nahkampf'
-                                ? 'btn-primary'
-                                : 'btn-outline-secondary'
-                            "
-                            @click="eintrag.kampfart = 'nahkampf'">
-                            Nahkampf
-                          </button>
-                          <button
-                            type="button"
-                            class="btn"
-                            :class="
-                              eintrag.kampfart === 'fernkampf'
-                                ? 'btn-primary'
-                                : 'btn-outline-secondary'
-                            "
-                            @click="eintrag.kampfart = 'fernkampf'">
-                            Fernkampf
-                          </button>
+                        <input
+                          class="form-control form-control-sm"
+                          v-model="eintrag.schadenswertFernkampf"
+                          placeholder="Schadenswert Fernkampf"
+                          autocomplete="off" />
+                        <div class="inventar-waffen-vorschlaege">
+                          <small class="text-body-secondary d-block mb-1">Vorschläge anhand Waffenname</small>
+                          <div class="d-flex flex-wrap gap-1">
+                            <button
+                              v-for="v in inventarWaffenVorschlaegeFuerEintrag(eintrag)"
+                              :key="'mob-suggest-' + eintrag.id + '-' + v.name"
+                              type="button"
+                              class="btn btn-outline-secondary btn-sm"
+                              @click="inventarWaffenVorschlagAnwenden(eintrag, v)">
+                              {{ v.name }}<template v-if="v.schadenswertNahkampf"> · NK {{ v.schadenswertNahkampf }}</template><template v-if="v.schadenswertFernkampf"> · FK {{ v.schadenswertFernkampf }}</template>
+                            </button>
+                          </div>
+                        </div>
+                        <div class="inventar-waffen-referenz card border border-warning-subtle bg-warning-subtle bg-opacity-10 mt-1">
+                          <div class="card-body p-2">
+                            <div class="small fw-semibold mb-1">Richtwerte Schaden (Regelwerk)</div>
+                            <div class="table-responsive">
+                              <table class="table table-sm mb-2 inventar-waffen-referenz-tabelle">
+                                <tbody>
+                                  <tr v-for="ref in waffenReferenzRegelwerk" :key="'mob-rw-' + ref.kategorie">
+                                    <td class="text-body-secondary">{{ ref.kategorie }}</td>
+                                    <td class="fw-semibold text-nowrap">{{ ref.schaden }}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="small fw-semibold mb-1">Beispiele aus dem HTBAH-Wiki (Mittelalter)</div>
+                            <div class="table-responsive">
+                              <table class="table table-sm mb-0 inventar-waffen-referenz-tabelle">
+                                <tbody>
+                                  <tr v-for="ref in waffenReferenzWiki" :key="'mob-wiki-' + ref.name">
+                                    <td class="text-body-secondary">{{ ref.name }}</td>
+                                    <td class="text-nowrap">{{ ref.schaden }}</td>
+                                    <td class="text-body-secondary text-nowrap">{{ ref.typ }}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </template>

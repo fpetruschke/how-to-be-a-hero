@@ -28,6 +28,8 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
       aktuelleDateigroesseBytes: null,
       cropper: null,
       bootstrapModal: null,
+      urspruenglicherElternKnoten: null,
+      urspruenglichesNaechstesGeschwister: null,
       schliessenOhneAbgebrochenEvent: false,
       bildLaedt: false,
       drehungGrad: 0,
@@ -115,14 +117,19 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
     },
     setzeModalEbeneNachOben() {
       const modalElement = this.$refs.modalElement;
+      const rootStyles = window.getComputedStyle(document.documentElement);
+      const cropZ = parseInt(rootStyles.getPropertyValue('--htbah-z-modal-crop'), 10);
+      const backdropZ = parseInt(rootStyles.getPropertyValue('--htbah-z-modal-crop-backdrop'), 10);
       if (modalElement) {
-        modalElement.style.zIndex = '1095';
+        modalElement.style.zIndex = String(Number.isFinite(cropZ) ? cropZ : 5000);
       }
       const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
-      const letzterBackdrop = backdrops.length ? backdrops[backdrops.length - 1] : null;
-      if (letzterBackdrop) {
-        letzterBackdrop.style.zIndex = '1090';
-      }
+      const basisBackdropZ = Number.isFinite(backdropZ) ? backdropZ : 4990;
+      // Alle vorhandenen Backdrops unter dem Crop-Modal halten, damit kein Overlay die Bedienung blockiert.
+      backdrops.forEach((backdrop, index) => {
+        const z = basisBackdropZ - (backdrops.length - 1 - index);
+        backdrop.style.zIndex = String(Math.max(1000, z));
+      });
     },
     drehen(delta) {
       if (!this.cropper) {
@@ -213,6 +220,11 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
   mounted() {
     const el = this.$refs.modalElement;
     if (el) {
+      if (el.parentNode && el.parentNode !== document.body) {
+        this.urspruenglicherElternKnoten = el.parentNode;
+        this.urspruenglichesNaechstesGeschwister = el.nextSibling || null;
+        document.body.appendChild(el);
+      }
       el.addEventListener('hidden.bs.modal', this.beimModalVersteckt);
     }
   },
@@ -220,6 +232,13 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
     const el = this.$refs.modalElement;
     if (el) {
       el.removeEventListener('hidden.bs.modal', this.beimModalVersteckt);
+      if (this.urspruenglicherElternKnoten) {
+        if (this.urspruenglichesNaechstesGeschwister && this.urspruenglichesNaechstesGeschwister.parentNode === this.urspruenglicherElternKnoten) {
+          this.urspruenglicherElternKnoten.insertBefore(el, this.urspruenglichesNaechstesGeschwister);
+        } else {
+          this.urspruenglicherElternKnoten.appendChild(el);
+        }
+      }
     }
     this.cropperAufraeumen();
     this.revokeTempUrl();

@@ -162,6 +162,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const p = this.$route.path || '';
       return p === '/charakter' || p.startsWith('/charakter/');
     },
+    charakterErstellenAktiv() {
+      const p = this.$route.path || '';
+      return p.startsWith('/charakter/neu');
+    },
     charakterLink() {
       const id = window.HTBAH.ladeAktivenCharakterId();
       return id ? `/charakter/${id}/session-zero` : '/charakter/neu/session-zero';
@@ -229,7 +233,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       return charakter.sicherheitsmechanismen;
     },
     sicherheitsButtonAnzeigen() {
-      return this.zeigeNav && (this.rolle === 'spielleitung' || this.rolle === 'charakter');
+      return (
+        this.zeigeNav &&
+        !this.charakterErstellenAktiv &&
+        (this.rolle === 'spielleitung' || this.rolle === 'charakter')
+      );
     },
     sicherheitsmodalNurLesen() {
       return this.rolle !== 'spielleitung';
@@ -1045,12 +1053,16 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       return htbahBegegnungStripHtmlText(inhalt) ? inhalt : '';
     },
     begegnungNpcWaffenWerteText(row) {
-      const schadenswert = String(row && row.schadenswert ? row.schadenswert : '').trim();
-      const kampfart = row && row.kampfart === 'fernkampf' ? 'Fernkampf' : 'Nahkampf';
-      if (!schadenswert) {
-        return '—';
+      const nah = String(row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '').trim();
+      const fern = String(row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '').trim();
+      const teile = [];
+      if (nah) {
+        teile.push(`Nahkampf ${nah}`);
       }
-      return `Schaden ${schadenswert} · ${kampfart}`;
+      if (fern) {
+        teile.push(`Fernkampf ${fern}`);
+      }
+      return teile.length ? teile.join(' · ') : '—';
     },
     begegnungBestieEpocheLabel(epoche) {
       if (epoche === 'gegenwart') {

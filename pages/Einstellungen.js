@@ -215,6 +215,11 @@ const DATEN_EXPORT_BEREICHE = [
     label: 'Kampagnen',
   },
   {
+    id: 'charakterbildLegacy',
+    key: 'htbah_character_image',
+    label: 'Charakterbild (Legacy)',
+  },
+  {
     id: 'zufallstabellen',
     key: 'htbah_zufallstabellen',
     label: 'Zufallstabellen',
@@ -739,8 +744,10 @@ window.HTBAH_SEITEN.Einstellungen = {
         return;
       }
       const aktiveCharakterIdVorImport = window.HTBAH.ladeAktivenCharakterId();
+      const fehlerBereiche = [];
 
       ausgewaehlteBereiche.forEach((bereich) => {
+        try {
         if (bereich.key === 'htbah_sicherheitsmechanismen_bundle') {
           if (bereich.vorhanden && typeof bereich.wert === 'string') {
             try {
@@ -832,6 +839,9 @@ window.HTBAH_SEITEN.Einstellungen = {
         } else {
           window.HTBAH.speicher.loescheKey(bereich.key);
         }
+        } catch {
+          fehlerBereiche.push(bereich.label || bereich.key);
+        }
       });
       window.HTBAH.migriereLegacyCharakterSpeicherWennNoetig();
       // Charakter-Teilimporte sollen nicht stillschweigend den aktiven Charakter wechseln.
@@ -849,7 +859,14 @@ window.HTBAH_SEITEN.Einstellungen = {
       if (this.importModalInstanz) {
         this.importModalInstanz.hide();
       }
-      this.statusAnzeigen('Import abgeschlossen. Ausgewählte Speicherbereiche wurden übernommen.');
+      if (fehlerBereiche.length) {
+        this.statusAnzeigen(
+          `Import teilweise abgeschlossen. Fehler in: ${fehlerBereiche.join(', ')}`,
+          'danger',
+        );
+      } else {
+        this.statusAnzeigen('Import abgeschlossen. Ausgewählte Speicherbereiche wurden übernommen.');
+      }
       this.speicherSchaetzungLaden();
     },
   },

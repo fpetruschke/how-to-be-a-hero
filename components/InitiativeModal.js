@@ -79,7 +79,7 @@ window.HTBAH_KOMPONENTEN.InitiativeModal = {
             </div>
             <icon-text-button
               type="button"
-              class="btn btn-primary w-100"
+              class="btn btn-primary btn-lg w-100"
               icon="casino"
               @click="wuerfeln">
               1W10 würfeln

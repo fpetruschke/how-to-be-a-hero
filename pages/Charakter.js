@@ -63,6 +63,7 @@ window.HTBAH_SEITEN.Charakter = {
     NotizenModal: window.HTBAH_KOMPONENTEN.NotizenModal,
     FaehigkeitFormular: window.HTBAH_KOMPONENTEN.FaehigkeitFormular,
     InitiativeModal: window.HTBAH_KOMPONENTEN.InitiativeModal,
+    ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
     CharakterPdfModal: window.HTBAH_KOMPONENTEN.CharakterPdfModal,
   },
@@ -107,6 +108,7 @@ window.HTBAH_SEITEN.Charakter = {
       _autosaveSnapshot: '',
       _autosaveInitialisiert: false,
       _autosaveTemporarAussetzen: false,
+      charakterbildDropAktiv: false,
     };
   },
   computed: {
@@ -162,6 +164,15 @@ window.HTBAH_SEITEN.Charakter = {
       return this.spielleiterMitglied
         ? this.spielleiterMitglied.charakterBild
         : this.charakterBildLokal;
+    },
+    charakterBildFehlt() {
+      return !this.charakterBild;
+    },
+    hatZuVieleFaehigkeitspunkte() {
+      return this.punkte > 400;
+    },
+    faehigkeitspunkteUeberLimit() {
+      return Math.max(0, this.punkte - 400);
     },
     istNeuModus() {
       return !this.spielleiterMitglied && this.charakterId === null;
@@ -523,7 +534,8 @@ window.HTBAH_SEITEN.Charakter = {
       window.HTBAH.setzeAktivenCharakterId(gespeichert.id);
       this.autosaveSnapshotAktualisieren();
       const nachSpeichern = () => {
-        this.importHinweis = warEditModus ? 'Änderungen gespeichert.' : 'Charakter gespeichert.';
+        const meldung = warEditModus ? 'Änderungen gespeichert.' : 'Charakter gespeichert.';
+        window.HTBAH?.ui?.notify?.({ text: meldung, typ: 'success' });
         if (!warEditModus) {
           this.$nextTick(() => {
             window.requestAnimationFrame(() => {
@@ -802,6 +814,29 @@ window.HTBAH_SEITEN.Charakter = {
       };
       this._prevGeistesblitzMax = { ...m };
     },
+    summeFaehigkeitspunkteAusListen(werte) {
+      if (!Array.isArray(werte)) {
+        return 0;
+      }
+      return werte.reduce((summe, eintrag) => summe + (Number(eintrag?.value) || 0), 0);
+    },
+    summeFaehigkeitspunkteAusPreset(preset) {
+      if (!preset || typeof preset !== 'object') {
+        return 0;
+      }
+      return (
+        this.summeFaehigkeitspunkteAusListen(preset.handeln) +
+        this.summeFaehigkeitspunkteAusListen(preset.wissen) +
+        this.summeFaehigkeitspunkteAusListen(preset.soziales)
+      );
+    },
+    async zeigeFaehigkeitspunkteLimitFehler(gesamtpunkte) {
+      const ueber = Math.max(0, Number(gesamtpunkte) - 400);
+      await window.HTBAH.ui.alert({
+        titel: 'Zu viele Fähigkeitspunkte',
+        beschreibung: `Du würdest das Maximum von 400 Punkten überschreiten (aktuell +${ueber}). Bitte reduziere die Werte.`,
+      });
+    },
     faehigkeitenPresetAufCharakterAnwenden(preset) {
       this.charakter.handeln = JSON.parse(JSON.stringify(preset.handeln));
       this.charakter.wissen = JSON.parse(JSON.stringify(preset.wissen));
@@ -819,6 +854,12 @@ window.HTBAH_SEITEN.Charakter = {
         warnhinweisAnzeigen: false,
       });
       if (!bestaetigt) return;
+
+      const presetPunkte = this.summeFaehigkeitspunkteAusPreset(preset);
+      if (presetPunkte > 400) {
+        await this.zeigeFaehigkeitspunkteLimitFehler(presetPunkte);
+        return;
+      }
 
       this.faehigkeitenPresetAufCharakterAnwenden(preset);
     },
@@ -850,6 +891,11 @@ window.HTBAH_SEITEN.Charakter = {
             warnhinweisAnzeigen: false,
           });
           if (!bestaetigt) {
+            return;
+          }
+          const presetPunkte = this.summeFaehigkeitspunkteAusPreset(preset);
+          if (presetPunkte > 400) {
+            await this.zeigeFaehigkeitspunkteLimitFehler(presetPunkte);
             return;
           }
           this.faehigkeitenPresetAufCharakterAnwenden(preset);
@@ -953,11 +999,9 @@ window.HTBAH_SEITEN.Charakter = {
       }
 
       const punkteOhne = this.punkte - ref.value;
-      if (punkteOhne + wert > 400) {
-        await window.HTBAH.ui.alert({
-          titel: 'Zu wenig Punkte',
-          beschreibung: 'Du hast nicht genug Punkte übrig.',
-        });
+      const punkteNeu = punkteOhne + wert;
+      if (punkteNeu > 400) {
+        await this.zeigeFaehigkeitspunkteLimitFehler(punkteNeu);
         return;
       }
 
@@ -1017,11 +1061,9 @@ window.HTBAH_SEITEN.Charakter = {
         return;
       }
 
-      if (this.punkte + wert > 400) {
-        await window.HTBAH.ui.alert({
-          titel: 'Zu wenig Punkte',
-          beschreibung: 'Du hast nicht genug Punkte übrig.',
-        });
+      const punkteNeu = this.punkte + wert;
+      if (punkteNeu > 400) {
+        await this.zeigeFaehigkeitspunkteLimitFehler(punkteNeu);
         return;
       }
 
@@ -1035,6 +1077,50 @@ window.HTBAH_SEITEN.Charakter = {
     },
     bildVerwaltungOeffnen() {
       this.$refs.charakterBildModal.oeffnen();
+    },
+    charakterbildDateiauswahlOeffnen() {
+      if (!this.charakterBildFehlt) {
+        return;
+      }
+      this.$refs.charakterbildDropInput?.click();
+    },
+    charakterbildDropZoneAktivieren(event) {
+      if (!this.charakterBildFehlt || !event?.dataTransfer) {
+        return;
+      }
+      event.preventDefault();
+      this.charakterbildDropAktiv = true;
+      event.dataTransfer.dropEffect = 'copy';
+    },
+    charakterbildDropZoneVerlassen(event) {
+      if (!this.charakterBildFehlt) {
+        return;
+      }
+      event?.preventDefault?.();
+      this.charakterbildDropAktiv = false;
+    },
+    async charakterbildDropVerarbeiten(event) {
+      if (!this.charakterBildFehlt) {
+        return;
+      }
+      event?.preventDefault?.();
+      this.charakterbildDropAktiv = false;
+      const datei = event?.dataTransfer?.files?.[0];
+      if (!datei) {
+        return;
+      }
+      await this.$refs.charakterBildModal?.oeffnenMitDatei?.(datei);
+    },
+    async charakterbildDateiAusgewaehlt(event) {
+      const input = event?.target;
+      const datei = input?.files?.[0];
+      if (!datei) {
+        return;
+      }
+      await this.$refs.charakterBildModal?.oeffnenMitDatei?.(datei);
+      if (input) {
+        input.value = '';
+      }
     },
     setzeCharakterBild(url) {
       const dataUrl = typeof url === 'string' ? url : '';
@@ -1131,6 +1217,20 @@ window.HTBAH_SEITEN.Charakter = {
     },
     initiativeModalOeffnen() {
       this.$refs.initiativeModal.oeffnen();
+    },
+    paradeModalOeffnen() {
+      const inventar = Array.isArray(this.charakter?.inventar) ? this.charakter.inventar : [];
+      const ruestungen = inventar
+        .filter((eintrag) => eintrag && eintrag.typ === 'rustung')
+        .map((eintrag) => ({
+          name: typeof eintrag.name === 'string' ? eintrag.name : '',
+          rustwert: eintrag.rustwert,
+        }));
+      this.$refs.paradeModal.oeffnen({
+        titel: 'Parade-Probe (Charakter)',
+        basiswert: this.begabungen.handeln,
+        ruestungen,
+      });
     },
     kategorieAnzeige(kategorie) {
       const namen = { handeln: 'Handeln', wissen: 'Wissen', soziales: 'Soziales' };
@@ -1299,7 +1399,22 @@ window.HTBAH_SEITEN.Charakter = {
           <div class="col-12 col-lg-auto order-lg-1 htbah-charakterbild-spalte">
             <div class="htbah-charakterbild-einheit">
               <div class="text-center mb-2 htbah-charakterbild-vorschau-wrap">
-                <div class="htbah-charakterbild-status-wrap">
+                <div
+                  class="htbah-charakterbild-status-wrap"
+                  :class="{
+                    'htbah-charakterbild-status-wrap--leer': charakterBildFehlt,
+                    'htbah-charakterbild-status-wrap--drop-aktiv': charakterBildFehlt && charakterbildDropAktiv,
+                  }"
+                  :role="charakterBildFehlt ? 'button' : null"
+                  :tabindex="charakterBildFehlt ? 0 : null"
+                  :aria-label="charakterBildFehlt ? 'Charakterbild hinzufügen' : null"
+                  @click="charakterbildDateiauswahlOeffnen"
+                  @keydown.enter.prevent="charakterbildDateiauswahlOeffnen"
+                  @keydown.space.prevent="charakterbildDateiauswahlOeffnen"
+                  @dragenter="charakterbildDropZoneAktivieren"
+                  @dragover="charakterbildDropZoneAktivieren"
+                  @dragleave="charakterbildDropZoneVerlassen"
+                  @drop="charakterbildDropVerarbeiten">
                   <img
                     v-if="charakterBild"
                     :src="charakterBild"
@@ -1367,7 +1482,7 @@ window.HTBAH_SEITEN.Charakter = {
         <p class="small text-body-secondary mb-2">
           Legt gemeinsam mit der Spielleitung in der Session Zero Grenzen, Schleier und die Nutzung der X-Karte fest.
           Importiere hier anschließend die gemeinsam vereinbarten Sicherheitsmechanismen.
-          Du kannst den Text dann jederzeit über den Floating-Button mit dem Flaggen-Icon anzeigen lassen.
+          Du kannst den Text dann jederzeit über den Floating-Button mit dem Flaggen-Icon 🚩 anzeigen lassen.
           Im exportierbaren PDF stehen die Daten ebenfalls. Dort findest Du auch eine X-Karte zum Ausdrucken und Ausschneiden.
         </p>
         <label class="btn btn-outline-secondary w-100 mb-0">
@@ -1506,7 +1621,22 @@ window.HTBAH_SEITEN.Charakter = {
           <div class="col-12 col-lg-auto order-lg-1 htbah-charakterbild-spalte">
             <div class="htbah-charakterbild-einheit">
               <div class="text-center mb-2 htbah-charakterbild-vorschau-wrap">
-                <div class="htbah-charakterbild-status-wrap">
+                <div
+                  class="htbah-charakterbild-status-wrap"
+                  :class="{
+                    'htbah-charakterbild-status-wrap--leer': charakterBildFehlt,
+                    'htbah-charakterbild-status-wrap--drop-aktiv': charakterBildFehlt && charakterbildDropAktiv,
+                  }"
+                  :role="charakterBildFehlt ? 'button' : null"
+                  :tabindex="charakterBildFehlt ? 0 : null"
+                  :aria-label="charakterBildFehlt ? 'Charakterbild hinzufügen' : null"
+                  @click="charakterbildDateiauswahlOeffnen"
+                  @keydown.enter.prevent="charakterbildDateiauswahlOeffnen"
+                  @keydown.space.prevent="charakterbildDateiauswahlOeffnen"
+                  @dragenter="charakterbildDropZoneAktivieren"
+                  @dragover="charakterbildDropZoneAktivieren"
+                  @dragleave="charakterbildDropZoneVerlassen"
+                  @drop="charakterbildDropVerarbeiten">
                   <img
                     v-if="charakterBild"
                     :src="charakterBild"
@@ -1640,15 +1770,19 @@ window.HTBAH_SEITEN.Charakter = {
 
         <div class="htbah-faehigkeiten-sticky-scope">
           <div class="htbah-faehigkeiten-punkte-sticky">
+            <div v-if="hatZuVieleFaehigkeitspunkte" class="alert alert-danger py-2 mb-2" role="alert">
+              Zu viele Fähigkeitspunkte verteilt: {{ punkte }} / 400
+              ({{ faehigkeitspunkteUeberLimit }} über dem Maximum). Bitte Punkte reduzieren.
+            </div>
             <p
-              v-if="!( !spielleiterMitglied && istEditModus && istSpielTabAktiv )"
+              v-if="punkte < 400 || !( !spielleiterMitglied && istEditModus && istSpielTabAktiv )"
               class="mb-2">
               Punkte: <strong>{{punkte}}</strong> / 400
               <span class="text-warning">({{400 - punkte}} übrig)</span>
             </p>
 
             <div
-              v-if="!( !spielleiterMitglied && istEditModus && istSpielTabAktiv )"
+              v-if="punkte < 400 || !( !spielleiterMitglied && istEditModus && istSpielTabAktiv )"
               class="progress"
               style="height:10px;">
               <div class="progress-bar" :style="{width: (punkte/400*100) + '%'}"></div>
@@ -1873,14 +2007,28 @@ window.HTBAH_SEITEN.Charakter = {
       <div v-if="spielleiterMitglied || istSpielTabAktiv || istNeuModus" class="card p-3 mb-2">
         <div class="row g-2">
           <div v-if="spielleiterMitglied || istSpielTabAktiv" class="col-12">
-            <icon-text-button
-              v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
-              type="button"
-              class="btn btn-outline-primary btn-lg w-100"
-              symbol="🎲"
-              @click="initiativeModalOeffnen">
-              Initiative würfeln
-            </icon-text-button>
+            <div class="row g-2">
+              <div class="col-12 col-md-6">
+                <icon-text-button
+                  v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
+                  type="button"
+                  class="btn btn-outline-primary btn-lg w-100"
+                  symbol="🎲"
+                  @click="initiativeModalOeffnen">
+                  Initiative würfeln
+                </icon-text-button>
+              </div>
+              <div class="col-12 col-md-6">
+                <icon-text-button
+                  v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
+                  type="button"
+                  class="btn btn-outline-primary btn-lg w-100"
+                  symbol="🛡️"
+                  @click="paradeModalOeffnen">
+                  Parieren
+                </icon-text-button>
+              </div>
+            </div>
           </div>
           <div class="col-12 col-md-6">
             <icon-text-button
@@ -2112,8 +2260,15 @@ window.HTBAH_SEITEN.Charakter = {
         :charakter-bild="charakterBild"
         @update:charakter-bild="setzeCharakterBild($event)"
       />
+      <input
+        ref="charakterbildDropInput"
+        type="file"
+        class="d-none"
+        accept="image/*"
+        @change="charakterbildDateiAusgewaehlt" />
       <vor-nachteile-modal ref="vorNachteileModal" :charakter="charakter" />
       <initiative-modal ref="initiativeModal" :charakter="charakter" />
+      <parade-modal ref="paradeModal" />
       <probe-wurf-modal ref="probeWurfModal" />
       <inventar-modal ref="inventarModal" :charakter="charakter" />
       <notizen-modal
