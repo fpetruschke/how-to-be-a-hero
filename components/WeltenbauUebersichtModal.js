@@ -1,12 +1,10 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
+var HTBAH_REFACTOR_UTILS =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.RefactorUtils) || null;
 
 (function () {
   const MAP_ZOOM_MIN = 0.01; // 1% (0% ist technisch nicht nutzbar)
   const MAP_ZOOM_MAX = 10; // 1000%
-  const ORT_BILD_AUTO_LOCK_SCHWELLE_AN = 0.55;
-  const ORT_BILD_AUTO_LOCK_SCHWELLE_AUS = 0.45;
-  const ORT_BILD_UNLOCK_FEEDBACK_MS = 1200;
-  const ORT_BILD_LOCK_HINWEIS_MS = 2400;
   const MAP_STANDARD_EINSTELLUNGEN = Object.freeze({
     zoomScale: 1,
     itemScale: 100,
@@ -20,16 +18,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   });
 
   function formatBytes(n) {
-    if (!Number.isFinite(n) || n <= 0) {
+    if (!HTBAH_REFACTOR_UTILS || !Number.isFinite(n) || n <= 0) {
       return '';
     }
-    if (n >= 1024 * 1024) {
-      return `${(n / (1024 * 1024)).toFixed(1).replace('.', ',')} MiB`;
-    }
-    if (n >= 1024) {
-      return `${Math.round(n / 1024)} KiB`;
-    }
-    return `${Math.round(n)} B`;
+    return HTBAH_REFACTOR_UTILS.formatBytesBinary(n);
   }
 
   function textWert(v, fallback = '—') {
@@ -129,6 +121,22 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           startHeight: 0,
           bewegt: false,
         },
+        gruppenDrag: {
+          aktiv: false,
+          startClientX: 0,
+          startClientY: 0,
+          nodeStartPositionen: {},
+          bildStartLayouts: {},
+          bewegt: false,
+        },
+        auswahlRahmen: {
+          aktiv: false,
+          startClientX: 0,
+          startClientY: 0,
+          endeClientX: 0,
+          endeClientY: 0,
+        },
+        ausgewaehlteElemente: {},
         mapBildLayoutsLokal: {},
         zuletztGezogeneNodeId: '',
         anlage: {
@@ -174,15 +182,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           toteBestienAnzeigen: true,
           geloesteRaetselAnzeigen: true,
         },
-        ortBildInteraktion: {
-          manuellGesperrt: {},
-          autoGesperrt: {},
-          unlockFeedback: {},
-          unlockFeedbackTimer: {},
-          lockHinweisSichtbar: {},
-          lockHinweisTimer: {},
-          lockHinweisEinmalGezeigt: {},
-        },
+        elementLocks: {},
+        suchText: '',
+        sucheFokusAktiv: false,
+        sucheBlurTimer: 0,
+        klickUnterdrueckenBisMs: 0,
       };
     },
     created() {
@@ -291,10 +295,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             if (!dataUrl) {
               return null;
             }
-            const ortId = `ort:${ort.id}`;
-            const layout = gruppeLayouts[ortId] && typeof gruppeLayouts[ortId] === 'object' ? gruppeLayouts[ortId] : {};
+            const ortNodeId = `ort:${ort.id}`;
+            const bildId = `ortbild:${ort.id}`;
+            const layout = gruppeLayouts[ortNodeId] && typeof gruppeLayouts[ortNodeId] === 'object' ? gruppeLayouts[ortNodeId] : {};
             return {
-              ortId,
+              ortNodeId,
+              bildId,
               ortName: textWert(ort.name),
               dataUrl,
               x: Number.isFinite(Number(layout.x)) ? Math.round(Number(layout.x)) : 140 + index * 40,
@@ -351,7 +357,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           .filter(Boolean);
         const ortBildKanten = this.ortBildElemente
           .map((bild) => {
-            const ortNode = byId.get(bild.ortId);
+            const ortNode = byId.get(bild.ortNodeId);
             if (!ortNode) {
               return null;
             }
@@ -364,7 +370,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             const bildH = Math.max(1, Number(bild.height) || 0);
             const rand = schnittpunktAmBildrand(sourceX, sourceY, bildX, bildY, bildW, bildH);
             return {
-              id: `e-bild-${bild.ortId}`,
+              id: `e-bild-${bild.bildId}`,
               x1: sourceX,
               y1: sourceY,
               x2: rand.x,
@@ -411,6 +417,88 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           anzahl += 1;
         }
         return anzahl;
+      },
+      suchtrefferListe() {
+        const q = String(this.suchText || '').trim().toLowerCase();
+        if (!q) {
+          return [];
+        }
+        const typAliasMap = {
+          ort: ['ort', 'orte', 'location'],
+          npc: ['npc', 'npcs'],
+          fraktion: ['fraktion', 'fraktionen', 'faction'],
+          bestie: ['bestie', 'bestien', 'monster', 'kreatur', 'kreaturen'],
+          raetsel: ['rätsel', 'raetsel', 'puzzle'],
+          gegenstand: ['gegenstand', 'gegenstände', 'gegenstaende', 'item', 'items', 'objekt', 'objekte'],
+          charakter: ['charakter', 'charaktere', 'character', 'characters', 'held', 'helden'],
+        };
+        const passtZuTypSuche = (entityType) => {
+          const alias = typAliasMap[entityType];
+          if (!alias || !alias.length) {
+            return false;
+          }
+          return alias.some((wort) => wort.includes(q) || q.includes(wort));
+        };
+        const treffer = [];
+        (this.graph.nodes || []).forEach((node) => {
+          const label = String((node && node.data && node.data.label) || '').trim();
+          const entityType = String((node && node.data && node.data.entityType) || '').trim();
+          const typTreffer = passtZuTypSuche(entityType);
+          if (!label || (!label.toLowerCase().includes(q) && !typTreffer)) {
+            return;
+          }
+          const typTitelMap = {
+            ort: 'Ort',
+            npc: 'NPC',
+            fraktion: 'Fraktion',
+            bestie: 'Bestie',
+            raetsel: 'Rätsel',
+            gegenstand: 'Gegenstand',
+            charakter: 'Charakter',
+          };
+          treffer.push({
+            id: `node:${node.id}`,
+            zielTyp: 'node',
+            zielId: node.id,
+            titel: label,
+            untertitel: typTitelMap[entityType] || 'Knoten',
+          });
+        });
+        (this.ortBildElemente || []).forEach((bild) => {
+          const name = String((bild && bild.ortName) || '').trim();
+          if (!name || !name.toLowerCase().includes(q)) {
+            return;
+          }
+          treffer.push({
+            id: `bild:${bild.bildId}`,
+            zielTyp: 'bild',
+            zielId: bild.bildId,
+            titel: `🖼️ ${name}`,
+            untertitel: 'Ortsbild',
+          });
+        });
+        return treffer.slice(0, 16);
+      },
+      suchtrefferAnzeigen() {
+        return this.sucheFokusAktiv && this.suchtrefferListe.length > 0;
+      },
+      ausgewaehlteElementeAnzahl() {
+        return Object.keys(this.ausgewaehlteElemente || {}).length;
+      },
+      auswahlRahmenStil() {
+        if (!this.auswahlRahmen.aktiv) {
+          return {};
+        }
+        const minX = Math.min(this.auswahlRahmen.startClientX, this.auswahlRahmen.endeClientX);
+        const minY = Math.min(this.auswahlRahmen.startClientY, this.auswahlRahmen.endeClientY);
+        const breite = Math.abs(this.auswahlRahmen.endeClientX - this.auswahlRahmen.startClientX);
+        const hoehe = Math.abs(this.auswahlRahmen.endeClientY - this.auswahlRahmen.startClientY);
+        return {
+          left: `${Math.round(minX)}px`,
+          top: `${Math.round(minY)}px`,
+          width: `${Math.max(1, Math.round(breite))}px`,
+          height: `${Math.max(1, Math.round(hoehe))}px`,
+        };
       },
     },
     methods: {
@@ -721,7 +809,49 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 ? filter.geloesteRaetselAnzeigen
                 : MAP_STANDARD_EINSTELLUNGEN.sichtbarkeitsFilter.geloesteRaetselAnzeigen,
           },
+          elementLocks: this.ladeElementLocks(),
         };
+      },
+      ladeElementLocks() {
+        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const gruppeKey = this.gruppeId || 'default';
+        const map =
+          wb && wb.mapElementLocks && typeof wb.mapElementLocks === 'object'
+            ? wb.mapElementLocks
+            : {};
+        const gruppeLocks =
+          map[gruppeKey] && typeof map[gruppeKey] === 'object'
+            ? map[gruppeKey]
+            : {};
+        if (Object.keys(gruppeLocks).length) {
+          return Object.fromEntries(
+            Object.entries(gruppeLocks).filter(
+              ([id, aktiv]) => typeof id === 'string' && id && typeof aktiv === 'boolean',
+            ),
+          );
+        }
+        // Backward compatibility: fallback to legacy storage in mapEinstellungen.
+        const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
+        const gruppe = alle[gruppeKey] && typeof alle[gruppeKey] === 'object' ? alle[gruppeKey] : {};
+        const legacy = gruppe.elementLocks && typeof gruppe.elementLocks === 'object' ? gruppe.elementLocks : {};
+        return Object.fromEntries(
+          Object.entries(legacy).filter(
+            ([id, aktiv]) => typeof id === 'string' && id && typeof aktiv === 'boolean',
+          ),
+        );
+      },
+      speichereElementLocksDirekt(lockMap) {
+        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const gruppeKey = this.gruppeId || 'default';
+        const alle =
+          wb && wb.mapElementLocks && typeof wb.mapElementLocks === 'object'
+            ? wb.mapElementLocks
+            : {};
+        wb.mapElementLocks = {
+          ...alle,
+          [gruppeKey]: { ...(lockMap || {}) },
+        };
+        window.HTBAH.speichereWeltenbauZustand(wb);
       },
       uebernehmeMapEinstellungen() {
         this.mapViewportPersistPause = true;
@@ -740,6 +870,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           ...this.sichtbarkeitsFilter,
           ...einstellungen.sichtbarkeitsFilter,
         };
+        this.elementLocks = { ...(einstellungen.elementLocks || {}) };
       },
       speichereMapEinstellung(key, value) {
         if (!key) {
@@ -771,6 +902,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           );
         });
         this.sichtbarkeitsFilter = { ...defaults.sichtbarkeitsFilter };
+        this.elementLocks = {};
         const wb = window.HTBAH.ladeWeltenbauZustand();
         const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
         const gruppeKey = this.gruppeId || 'default';
@@ -1121,17 +1253,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const centerY = Number(zielNode.position.y || 0) + this.nodeHoehe(zielNode) / 2;
         this.wendeMapCenterWeltAn(centerX, centerY);
       },
-      nodeKlassen(node) {
-        const t = node && node.data && node.data.entityType;
-        const istDragHoverZiel =
-          !!(this.nodeDrag && this.nodeDrag.aktiv && this.map && this.map.dragHoverNodeId && node && node.id === this.map.dragHoverNodeId);
-        return {
-          'htbah-map-node': true,
-          'htbah-map-node-ort': t === 'ort',
-          'htbah-map-node-charakter': t === 'charakter',
-          'htbah-map-node-drag-hover': istDragHoverZiel,
-        };
-      },
       nodeStil(node) {
         const itemScale = Math.max(0, (Number(this.map.itemScale) || 100) / 100);
         const istCharakter = !!(node && node.data && node.data.entityType === 'charakter');
@@ -1198,9 +1319,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return null;
         }
         const nodeEl = el.closest('[data-node-id]');
-        const ortBildEl = el.closest('[data-ort-image-id]');
+        const ortBildEl = el.closest('[data-ort-node-id]');
         if (!nodeEl && ortBildEl) {
-          const ortNodeId = ortBildEl.getAttribute('data-ort-image-id') || '';
+          const ortNodeId = ortBildEl.getAttribute('data-ort-node-id') || '';
           if (ortNodeId && ortNodeId !== draggedNodeId) {
             return this.findeNode(ortNodeId);
           }
@@ -1233,203 +1354,218 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         };
       },
       ortBildKlassen(bild) {
-        const ortId = bild && bild.ortId ? bild.ortId : '';
+        const ortId = bild && bild.bildId ? bild.bildId : '';
         return {
-          'htbah-map-ort-bild-locked': this.istOrtBildGesperrt(ortId),
-          'htbah-map-ort-bild-unlock-feedback': this.istOrtBildUnlockFeedbackSichtbar(ortId),
+          'htbah-map-element-locked': this.istElementGesperrt(ortId),
+          'htbah-map-element-ausgewaehlt': this.istElementAusgewaehlt(ortId),
         };
       },
-      ortBildLockButtonKlassen(bild) {
-        const ortId = bild && bild.ortId ? bild.ortId : '';
+      nodeKlassen(node) {
+        const t = node && node.data && node.data.entityType;
+        const istDragHoverZiel =
+          !!(this.nodeDrag && this.nodeDrag.aktiv && this.map && this.map.dragHoverNodeId && node && node.id === this.map.dragHoverNodeId);
         return {
-          'htbah-map-ort-bild-lock-button': true,
-          'is-visible': this.istOrtBildLockButtonSichtbar(ortId),
+          'htbah-map-node': true,
+          'htbah-map-node-ort': t === 'ort',
+          'htbah-map-node-charakter': t === 'charakter',
+          'htbah-map-node-drag-hover': istDragHoverZiel,
+          'htbah-map-element-locked': this.istElementGesperrt(node && node.id),
+          'htbah-map-element-ausgewaehlt': this.istElementAusgewaehlt(node && node.id),
         };
       },
-      ortBildLockHinweisSichtbar(ortId) {
-        if (!ortId) {
+      elementLockButtonIcon(elementId) {
+        return this.istElementGesperrt(elementId) ? '🔒' : '🔓';
+      },
+      elementLockButtonTitle(elementId) {
+        return this.istElementGesperrt(elementId)
+          ? '🔒 Gesperrt: Position/Groesse fix'
+          : '🔓 Entsperrt: Position/Groesse veraenderbar';
+      },
+      elementLockButtonKlassen(elementId) {
+        return {
+          'htbah-map-element-lock-button': true,
+          'is-locked': this.istElementGesperrt(elementId),
+          'is-unlocked': !this.istElementGesperrt(elementId),
+        };
+      },
+      istElementGesperrt(elementId) {
+        if (!elementId) {
           return false;
         }
-        return !!(this.ortBildInteraktion.lockHinweisSichtbar && this.ortBildInteraktion.lockHinweisSichtbar[ortId]);
+        return !!(this.elementLocks && this.elementLocks[elementId]);
       },
-      ortBildLockIcon(bild) {
-        return this.istOrtBildGesperrt(bild && bild.ortId) ? 'lock' : 'lock_open';
-      },
-      ortBildLockLabel(bild) {
-        return this.istOrtBildGesperrt(bild && bild.ortId)
-          ? 'Ortsbild-Position entsperren'
-          : 'Ortsbild-Position sperren';
-      },
-      istOrtBildManuellGesperrt(ortId) {
-        if (!ortId) {
+      istElementAusgewaehlt(elementId) {
+        if (!elementId) {
           return false;
         }
-        return !!(this.ortBildInteraktion.manuellGesperrt && this.ortBildInteraktion.manuellGesperrt[ortId]);
+        return !!(this.ausgewaehlteElemente && this.ausgewaehlteElemente[elementId]);
       },
-      istOrtBildAutoGesperrt(ortId) {
-        if (!ortId) {
-          return false;
-        }
-        return !!(this.ortBildInteraktion.autoGesperrt && this.ortBildInteraktion.autoGesperrt[ortId]);
+      auswahlEnthaeltVerschiebbaresElement(elementId) {
+        return this.istElementAusgewaehlt(elementId) && !this.istElementGesperrt(elementId);
       },
-      istOrtBildGesperrt(ortId) {
-        return this.istOrtBildManuellGesperrt(ortId) || this.istOrtBildAutoGesperrt(ortId);
+      anzahlAusgewaehlteVerschiebbareElemente() {
+        return Object.keys(this.ausgewaehlteElemente || {}).filter((id) => this.auswahlEnthaeltVerschiebbaresElement(id)).length;
       },
-      istOrtBildUnlockFeedbackSichtbar(ortId) {
-        if (!ortId) {
-          return false;
-        }
-        return !!(this.ortBildInteraktion.unlockFeedback && this.ortBildInteraktion.unlockFeedback[ortId]);
-      },
-      istOrtBildLockButtonSichtbar(ortId) {
-        return this.istOrtBildGesperrt(ortId) || this.istOrtBildUnlockFeedbackSichtbar(ortId);
-      },
-      berechneMapCanvasRechteck() {
-        const canvas = this.$el && this.$el.querySelector ? this.$el.querySelector('.htbah-weltenbau-map-canvas') : null;
-        if (!canvas || typeof canvas.getBoundingClientRect !== 'function') {
-          return null;
-        }
-        const rect = canvas.getBoundingClientRect();
-        if (!(rect.width > 0 && rect.height > 0)) {
-          return null;
-        }
-        return rect;
-      },
-      berechneOrtBildSichtanteil(bild, canvasRect) {
-        if (!bild || !canvasRect) {
-          return 0;
-        }
-        const scale = Number(this.map.scale) || 1;
-        const left = (Number(bild.x) || 0) * scale + (Number(this.map.offsetX) || 0);
-        const top = (Number(bild.y) || 0) * scale + (Number(this.map.offsetY) || 0);
-        const width = Math.max(1, (Number(bild.width) || 1) * scale);
-        const height = Math.max(1, (Number(bild.height) || 1) * scale);
-        const right = left + width;
-        const bottom = top + height;
-        const visibleLeft = Math.max(left, canvasRect.left);
-        const visibleTop = Math.max(top, canvasRect.top);
-        const visibleRight = Math.min(right, canvasRect.right);
-        const visibleBottom = Math.min(bottom, canvasRect.bottom);
-        const visibleWidth = Math.max(0, visibleRight - visibleLeft);
-        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-        if (!(visibleWidth > 0 && visibleHeight > 0)) {
-          return 0;
-        }
-        const viewportFlaeche = canvasRect.width * canvasRect.height;
-        if (!(viewportFlaeche > 0)) {
-          return 0;
-        }
-        return (visibleWidth * visibleHeight) / viewportFlaeche;
-      },
-      setzeOrtBildUnlockFeedback(ortId, sichtbar) {
-        if (!ortId) {
-          return;
-        }
-        const timerMap = {
-          ...(this.ortBildInteraktion.unlockFeedbackTimer || {}),
-        };
-        if (timerMap[ortId]) {
-          window.clearTimeout(timerMap[ortId]);
-          delete timerMap[ortId];
-        }
-        const unlockFeedback = {
-          ...(this.ortBildInteraktion.unlockFeedback || {}),
-        };
-        if (sichtbar) {
-          unlockFeedback[ortId] = true;
-          timerMap[ortId] = window.setTimeout(() => {
-            this.setzeOrtBildUnlockFeedback(ortId, false);
-          }, ORT_BILD_UNLOCK_FEEDBACK_MS);
-        } else {
-          delete unlockFeedback[ortId];
-        }
-        this.ortBildInteraktion = {
-          ...this.ortBildInteraktion,
-          unlockFeedback,
-          unlockFeedbackTimer: timerMap,
-        };
-      },
-      setzeOrtBildLockHinweis(ortId, sichtbar) {
-        if (!ortId) {
-          return;
-        }
-        const timerMap = {
-          ...(this.ortBildInteraktion.lockHinweisTimer || {}),
-        };
-        if (timerMap[ortId]) {
-          window.clearTimeout(timerMap[ortId]);
-          delete timerMap[ortId];
-        }
-        const lockHinweisSichtbar = {
-          ...(this.ortBildInteraktion.lockHinweisSichtbar || {}),
-        };
-        if (sichtbar) {
-          lockHinweisSichtbar[ortId] = true;
-          timerMap[ortId] = window.setTimeout(() => {
-            this.setzeOrtBildLockHinweis(ortId, false);
-          }, ORT_BILD_LOCK_HINWEIS_MS);
-        } else {
-          delete lockHinweisSichtbar[ortId];
-        }
-        this.ortBildInteraktion = {
-          ...this.ortBildInteraktion,
-          lockHinweisSichtbar,
-          lockHinweisTimer: timerMap,
-        };
-      },
-      aktualisiereOrtBildAutoLock() {
-        const canvasRect = this.berechneMapCanvasRechteck();
-        const vorher = this.ortBildInteraktion.autoGesperrt || {};
-        const einmalGezeigt = this.ortBildInteraktion.lockHinweisEinmalGezeigt || {};
-        const einmalGezeigtNeu = { ...einmalGezeigt };
-        const nachher = {};
-        (this.ortBildElemente || []).forEach((bild) => {
-          const ortId = bild && bild.ortId ? bild.ortId : '';
-          if (!ortId) {
-            return;
-          }
-          const anteil = this.berechneOrtBildSichtanteil(bild, canvasRect);
-          const warGesperrt = !!vorher[ortId];
-          const istGesperrt = warGesperrt
-            ? anteil >= ORT_BILD_AUTO_LOCK_SCHWELLE_AUS
-            : anteil >= ORT_BILD_AUTO_LOCK_SCHWELLE_AN;
-          if (istGesperrt) {
-            nachher[ortId] = true;
-            if (!warGesperrt && !einmalGezeigtNeu[ortId]) {
-              einmalGezeigtNeu[ortId] = true;
-              this.setzeOrtBildLockHinweis(ortId, true);
-            }
-          } else if (warGesperrt) {
-            this.setzeOrtBildUnlockFeedback(ortId, true);
+      markiereElemente(elementIds) {
+        const next = {};
+        (Array.isArray(elementIds) ? elementIds : []).forEach((id) => {
+          if (typeof id === 'string' && id) {
+            next[id] = true;
           }
         });
-        this.ortBildInteraktion = {
-          ...this.ortBildInteraktion,
-          autoGesperrt: nachher,
-          lockHinweisEinmalGezeigt: einmalGezeigtNeu,
-        };
+        this.ausgewaehlteElemente = next;
       },
-      ortBildLockUmschalten(bild) {
-        const ortId = bild && bild.ortId ? bild.ortId : '';
-        if (!ortId) {
+      auswahlAufheben() {
+        this.ausgewaehlteElemente = {};
+      },
+      elementRechteckWeltById(elementId) {
+        if (!elementId) {
+          return null;
+        }
+        if (String(elementId).startsWith('ortbild:')) {
+          const bild = (this.ortBildElemente || []).find((b) => b && b.bildId === elementId);
+          if (!bild) {
+            return null;
+          }
+          return {
+            x: Number(bild.x) || 0,
+            y: Number(bild.y) || 0,
+            w: Math.max(1, Number(bild.width) || 1),
+            h: Math.max(1, Number(bild.height) || 1),
+          };
+        }
+        const node = this.findeNode(elementId);
+        if (!node) {
+          return null;
+        }
+        return this.nodeRechteck(node);
+      },
+      starteAuswahlRahmen(event) {
+        if (!event || !event.shiftKey) {
+          return false;
+        }
+        if (event.pointerType === 'mouse' && event.button !== 0) {
+          return false;
+        }
+        this.auswahlRahmen.aktiv = true;
+        this.auswahlRahmen.startClientX = event.clientX;
+        this.auswahlRahmen.startClientY = event.clientY;
+        this.auswahlRahmen.endeClientX = event.clientX;
+        this.auswahlRahmen.endeClientY = event.clientY;
+        event.preventDefault();
+        return true;
+      },
+      starteGruppenDrag(event) {
+        const ids = Object.keys(this.ausgewaehlteElemente || {}).filter((id) => this.auswahlEnthaeltVerschiebbaresElement(id));
+        if (!ids.length) {
+          return false;
+        }
+        this.starteVerlaufAktion();
+        this.gruppenDrag.aktiv = true;
+        this.gruppenDrag.startClientX = event.clientX;
+        this.gruppenDrag.startClientY = event.clientY;
+        this.gruppenDrag.bewegt = false;
+        const nodeStart = {};
+        const bildStart = {};
+        ids.forEach((id) => {
+          if (String(id).startsWith('ortbild:')) {
+            const bild = (this.ortBildElemente || []).find((b) => b && b.bildId === id);
+            if (!bild) {
+              return;
+            }
+            bildStart[id] = {
+              ortNodeId: bild.ortNodeId,
+              x: Number(bild.x) || 0,
+              y: Number(bild.y) || 0,
+              width: Math.max(1, Number(bild.width) || 1),
+              height: Math.max(1, Number(bild.height) || 1),
+            };
+            return;
+          }
+          const node = this.findeNode(id);
+          if (!node || !node.position) {
+            return;
+          }
+          nodeStart[id] = {
+            x: Number(node.position.x) || 0,
+            y: Number(node.position.y) || 0,
+          };
+        });
+        this.gruppenDrag.nodeStartPositionen = nodeStart;
+        this.gruppenDrag.bildStartLayouts = bildStart;
+        event.preventDefault();
+        return true;
+      },
+      toggleElementLock(elementId) {
+        if (!elementId) {
           return;
         }
-        const warGesperrt = this.istOrtBildGesperrt(ortId);
-        const manuell = {
-          ...(this.ortBildInteraktion.manuellGesperrt || {}),
-        };
-        if (this.istOrtBildManuellGesperrt(ortId)) {
-          delete manuell[ortId];
+        const next = { ...(this.elementLocks || {}) };
+        if (next[elementId]) {
+          delete next[elementId];
         } else {
-          manuell[ortId] = true;
+          next[elementId] = true;
         }
-        this.ortBildInteraktion = {
-          ...this.ortBildInteraktion,
-          manuellGesperrt: manuell,
-        };
-        if (warGesperrt && !this.istOrtBildGesperrt(ortId)) {
-          this.setzeOrtBildUnlockFeedback(ortId, true);
+        this.elementLocks = next;
+        this.persistiereElementLocks();
+      },
+      persistiereElementLocks() {
+        const map = { ...(this.elementLocks || {}) };
+        this.speichereElementLocksDirekt(map);
+        // Legacy mirror for existing installs/features.
+        this.speichereMapEinstellung('elementLocks', map);
+      },
+      alleElementeSperren() {
+        const next = {};
+        (this.graph.nodes || []).forEach((node) => {
+          if (node && node.id) {
+            next[node.id] = true;
+          }
+        });
+        (this.ortBildElemente || []).forEach((bild) => {
+          if (bild && bild.bildId) {
+            next[bild.bildId] = true;
+          }
+        });
+        this.elementLocks = next;
+        this.persistiereElementLocks();
+      },
+      alleElementeEntsperren() {
+        this.elementLocks = {};
+        this.persistiereElementLocks();
+      },
+      springeZuSuchtreffer(treffer) {
+        if (!treffer || !treffer.zielTyp || !treffer.zielId) {
+          return;
         }
+        if (treffer.zielTyp === 'node') {
+          const node = this.findeNode(treffer.zielId);
+          if (!node || !node.position) {
+            return;
+          }
+          const centerX = Number(node.position.x || 0) + this.nodeBreite(node) / 2;
+          const centerY = Number(node.position.y || 0) + this.nodeHoehe(node) / 2;
+          this.wendeMapCenterWeltAn(centerX, centerY);
+        } else if (treffer.zielTyp === 'bild') {
+          const bild = (this.ortBildElemente || []).find((eintrag) => eintrag && eintrag.bildId === treffer.zielId);
+          if (!bild) {
+            return;
+          }
+          const centerX = (Number(bild.x) || 0) + Math.max(1, Number(bild.width) || 1) / 2;
+          const centerY = (Number(bild.y) || 0) + Math.max(1, Number(bild.height) || 1) / 2;
+          this.wendeMapCenterWeltAn(centerX, centerY);
+        }
+        this.sucheFokusAktiv = false;
+      },
+      onSucheBlur() {
+        if (this.sucheBlurTimer) {
+          globalThis.clearTimeout(this.sucheBlurTimer);
+          this.sucheBlurTimer = 0;
+        }
+        this.sucheBlurTimer = globalThis.setTimeout(() => {
+          this.sucheFokusAktiv = false;
+          this.sucheBlurTimer = 0;
+        }, 120);
       },
       schreibeOrtBildLayout(ortId, layout) {
         if (!ortId || !layout) {
@@ -1637,19 +1773,28 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         return false;
       },
       starteOrtBildDrag(event, bild, modus = 'move') {
-        if (!bild || !bild.ortId) {
+        if (!bild || !bild.bildId) {
+          return;
+        }
+        if (event && event.shiftKey) {
+          this.starteAuswahlRahmen(event);
           return;
         }
         if (event.pointerType === 'mouse' && event.button !== 0) {
           return;
         }
-        if (modus === 'move' && this.istOrtBildGesperrt(bild.ortId)) {
-          this.startePan(event, { vonGesperrtemBild: true });
+        if (this.istElementGesperrt(bild.bildId)) {
+          this.startePan(event, { ignoriereElementTreffer: true });
           return;
+        }
+        if (modus === 'move' && this.anzahlAusgewaehlteVerschiebbareElemente() > 1) {
+          if (this.starteGruppenDrag(event)) {
+            return;
+          }
         }
         this.starteVerlaufAktion();
         this.ortBildDrag.aktiv = true;
-        this.ortBildDrag.ortId = bild.ortId;
+        this.ortBildDrag.ortId = bild.bildId;
         this.ortBildDrag.modus = modus === 'resize' ? 'resize' : 'move';
         this.ortBildDrag.startClientX = event.clientX;
         this.ortBildDrag.startClientY = event.clientY;
@@ -1665,6 +1810,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (!node || !node.id) {
           return;
         }
+        if (event && event.shiftKey) {
+          this.starteAuswahlRahmen(event);
+          return;
+        }
+        if (this.istElementGesperrt(node.id)) {
+          return;
+        }
+        if (this.anzahlAusgewaehlteVerschiebbareElemente() > 1) {
+          if (this.starteGruppenDrag(event)) {
+            return;
+          }
+        }
         this.starteVerlaufAktion();
         this.nodeDrag.aktiv = true;
         this.nodeDrag.nodeId = node.id;
@@ -1678,6 +1835,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       onNodeClick(node) {
         if (!node || !node.id) {
+          return;
+        }
+        if (Date.now() < (Number(this.klickUnterdrueckenBisMs) || 0)) {
           return;
         }
         if (this.zuletztGezogeneNodeId && this.zuletztGezogeneNodeId === node.id) {
@@ -2139,7 +2299,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const scaleNeu = this.begrenzeMapScale(neueScale);
         if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
           this.map.scale = scaleNeu;
-          this.aktualisiereOrtBildAutoLock();
           return;
         }
         const weltX = (clientX - this.map.offsetX) / scaleAlt;
@@ -2147,7 +2306,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.map.scale = scaleNeu;
         this.map.offsetX = clientX - weltX * scaleNeu;
         this.map.offsetY = clientY - weltY * scaleNeu;
-        this.aktualisiereOrtBildAutoLock();
       },
       erstelleVerlaufSnapshot() {
         const nodePositionen = {};
@@ -2398,8 +2556,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       startePan(event, optionen) {
         const opts = optionen && typeof optionen === 'object' ? optionen : {};
+        if (this.starteAuswahlRahmen(event)) {
+          return;
+        }
         if (
-          !opts.vonGesperrtemBild &&
+          !opts.ignoriereElementTreffer &&
           event.target &&
           typeof event.target.closest === 'function' &&
           (event.target.closest('.htbah-map-node') || event.target.closest('.htbah-map-ort-bild'))
@@ -2435,14 +2596,44 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               this.map.scale = scaleNeu;
               this.map.offsetX = mitte.x - this.map.pinchWeltX * scaleNeu;
               this.map.offsetY = mitte.y - this.map.pinchWeltY * scaleNeu;
-              this.aktualisiereOrtBildAutoLock();
               event.preventDefault();
               return;
             }
           }
         }
+        if (this.auswahlRahmen.aktiv) {
+          this.auswahlRahmen.endeClientX = event.clientX;
+          this.auswahlRahmen.endeClientY = event.clientY;
+          return;
+        }
+        if (this.gruppenDrag.aktiv) {
+          const dx = (event.clientX - this.gruppenDrag.startClientX) / this.map.scale;
+          const dy = (event.clientY - this.gruppenDrag.startClientY) / this.map.scale;
+          if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+            this.gruppenDrag.bewegt = true;
+          }
+          Object.entries(this.gruppenDrag.nodeStartPositionen || {}).forEach(([nodeId, start]) => {
+            const node = this.findeNode(nodeId);
+            if (!node) {
+              return;
+            }
+            node.position = {
+              x: Math.round((Number(start.x) || 0) + dx),
+              y: Math.round((Number(start.y) || 0) + dy),
+            };
+          });
+          Object.entries(this.gruppenDrag.bildStartLayouts || {}).forEach(([bildId, start]) => {
+            this.schreibeOrtBildLayout(start.ortNodeId || bildId, {
+              x: (Number(start.x) || 0) + dx,
+              y: (Number(start.y) || 0) + dy,
+              width: Math.max(1, Number(start.width) || 1),
+              height: Math.max(1, Number(start.height) || 1),
+            });
+          });
+          return;
+        }
         if (this.ortBildDrag.aktiv) {
-          const bild = this.ortBildElemente.find((eintrag) => eintrag.ortId === this.ortBildDrag.ortId);
+          const bild = this.ortBildElemente.find((eintrag) => eintrag.bildId === this.ortBildDrag.ortId);
           if (!bild) {
             return;
           }
@@ -2452,21 +2643,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.ortBildDrag.bewegt = true;
           }
           if (this.ortBildDrag.modus === 'resize') {
-            this.schreibeOrtBildLayout(bild.ortId, {
+            this.schreibeOrtBildLayout(bild.ortNodeId, {
               x: this.ortBildDrag.startX,
               y: this.ortBildDrag.startY,
               width: Math.max(1, this.ortBildDrag.startWidth + dx),
               height: Math.max(1, this.ortBildDrag.startHeight + dy),
             });
           } else {
-            this.schreibeOrtBildLayout(bild.ortId, {
+            this.schreibeOrtBildLayout(bild.ortNodeId, {
               x: this.ortBildDrag.startX + dx,
               y: this.ortBildDrag.startY + dy,
               width: this.ortBildDrag.startWidth,
               height: this.ortBildDrag.startHeight,
             });
           }
-          this.aktualisiereOrtBildAutoLock();
           return;
         }
         if (this.nodeDrag.aktiv) {
@@ -2492,7 +2682,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         this.map.offsetX = this.map.panOffsetStartX + (event.clientX - this.map.panStartX);
         this.map.offsetY = this.map.panOffsetStartY + (event.clientY - this.map.panStartY);
-        this.aktualisiereOrtBildAutoLock();
       },
       onMapPointerUp(event) {
         if (event.pointerType === 'touch') {
@@ -2513,14 +2702,76 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.bestaetigeVerlaufAktion();
           }
         }
+        if (this.auswahlRahmen.aktiv) {
+          this.auswahlRahmen.endeClientX = event.clientX;
+          this.auswahlRahmen.endeClientY = event.clientY;
+          const minClientX = Math.min(this.auswahlRahmen.startClientX, this.auswahlRahmen.endeClientX);
+          const minClientY = Math.min(this.auswahlRahmen.startClientY, this.auswahlRahmen.endeClientY);
+          const maxClientX = Math.max(this.auswahlRahmen.startClientX, this.auswahlRahmen.endeClientX);
+          const maxClientY = Math.max(this.auswahlRahmen.startClientY, this.auswahlRahmen.endeClientY);
+          const canvas = this.$el && this.$el.querySelector ? this.$el.querySelector('.htbah-weltenbau-map-canvas') : null;
+          const canvasRect = canvas && typeof canvas.getBoundingClientRect === 'function'
+            ? canvas.getBoundingClientRect()
+            : { left: 0, top: 0 };
+          const scale = Number(this.map.scale) || 1;
+          const auswahlRect = {
+            x: (minClientX - (canvasRect.left || 0) - (Number(this.map.offsetX) || 0)) / scale,
+            y: (minClientY - (canvasRect.top || 0) - (Number(this.map.offsetY) || 0)) / scale,
+            w: Math.max(1, (maxClientX - minClientX) / scale),
+            h: Math.max(1, (maxClientY - minClientY) / scale),
+          };
+          const treffer = [];
+          (this.graph.nodes || []).forEach((node) => {
+            const r = this.nodeRechteck(node);
+            if (r && this.rechteckeUeberlappen(auswahlRect, r, 0)) {
+              treffer.push(node.id);
+            }
+          });
+          (this.ortBildElemente || []).forEach((bild) => {
+            const r = {
+              x: Number(bild.x) || 0,
+              y: Number(bild.y) || 0,
+              w: Math.max(1, Number(bild.width) || 1),
+              h: Math.max(1, Number(bild.height) || 1),
+            };
+            if (this.rechteckeUeberlappen(auswahlRect, r, 0)) {
+              treffer.push(bild.bildId);
+            }
+          });
+          this.markiereElemente(treffer);
+          this.auswahlRahmen.aktiv = false;
+          return;
+        }
+        if (this.gruppenDrag.aktiv) {
+          Object.keys(this.gruppenDrag.nodeStartPositionen || {}).forEach((nodeId) => {
+            const node = this.findeNode(nodeId);
+            if (!node || !node.position) {
+              return;
+            }
+            this.schreibeNodePosition(node.id, node.position, this.graph.gruppeKey);
+          });
+          if (Object.keys(this.gruppenDrag.bildStartLayouts || {}).length) {
+            this.persistiereLokaleOrtBildLayouts();
+          }
+          if (this.gruppenDrag.bewegt) {
+            this.klickUnterdrueckenBisMs = Date.now() + 260;
+          }
+          this.gruppenDrag.aktiv = false;
+          this.gruppenDrag.nodeStartPositionen = {};
+          this.gruppenDrag.bildStartLayouts = {};
+          this.bestaetigeVerlaufAktion();
+          return;
+        }
         if (this.ortBildDrag.aktiv) {
           this.ortBildDrag.aktiv = false;
           const ortId = this.ortBildDrag.ortId;
-          const ortNode = ortId ? this.findeNode(ortId) : null;
+          const dragBild = ortId ? this.ortBildElemente.find((eintrag) => eintrag && eintrag.bildId === ortId) : null;
+          const ortNode = dragBild && dragBild.ortNodeId ? this.findeNode(dragBild.ortNodeId) : null;
           const ortName = ortNode && ortNode.data && ortNode.data.payload
             ? String(ortNode.data.payload.name || '').trim()
             : '';
-          const aktuellesBildLayout = ortId && this.mapBildLayoutsLokal ? this.mapBildLayoutsLokal[ortId] : null;
+          const aktuellesBildLayout =
+            dragBild && dragBild.ortNodeId && this.mapBildLayoutsLokal ? this.mapBildLayoutsLokal[dragBild.ortNodeId] : null;
           const deltaX = aktuellesBildLayout
             ? Math.round((Number(aktuellesBildLayout.x) || 0) - this.ortBildDrag.startX)
             : 0;
@@ -2553,7 +2804,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           }
           this.ortBildDrag.ortId = '';
           this.ortBildDrag.modus = '';
-          this.aktualisiereOrtBildAutoLock();
           this.bestaetigeVerlaufAktion();
           return;
         }
@@ -2599,14 +2849,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.nodeDrag.nodeId = '';
         this.setzeDragHoverZiel('');
         this.map.panning = false;
-        this.aktualisiereOrtBildAutoLock();
         this.bestaetigeVerlaufAktion();
       },
       onMapWheel(event) {
         this.starteVerlaufAktion();
         const faktor = Math.exp(-event.deltaY * 0.0015);
         this.setzeMapScaleMitAnker((Number(this.map.scale) || 1) * faktor, event.clientX, event.clientY);
-        this.aktualisiereOrtBildAutoLock();
         this.planeZoomVerlaufCommit();
       },
       istEditierbaresElement(el) {
@@ -2617,6 +2865,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       onGlobalKeydown(event) {
         if (!this.offen || !event) {
+          return;
+        }
+        if (event.key === 'Escape' && this.ausgewaehlteElementeAnzahl > 0) {
+          event.preventDefault();
+          this.auswahlAufheben();
           return;
         }
         if (!(event.ctrlKey || event.metaKey)) {
@@ -3345,7 +3598,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (this.offen) {
           this.$nextTick(() => {
             this.stelleSichtbaresFensterSicher();
-            this.aktualisiereOrtBildAutoLock();
           });
         }
         if (this.charakterModal.offen) {
@@ -3364,9 +3616,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.refreshGraph();
             this.uebernehmeMapEinstellungen();
             this.verlaufZuruecksetzen();
-            this.aktualisiereOrtBildAutoLock();
           });
         } else {
+          this.persistiereLokaleOrtBildLayouts();
+          this.persistiereElementLocks();
           if (this.charakterModal.offen) {
             this.schliesseCharakterModal();
           }
@@ -3374,13 +3627,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.map.panning = false;
           this.map.pinchAktiv = false;
           this.map.touchPointer = {};
-          this.ortBildInteraktion = {
-            ...this.ortBildInteraktion,
-            autoGesperrt: {},
-            unlockFeedback: {},
-            lockHinweisSichtbar: {},
-            lockHinweisEinmalGezeigt: {},
-          };
+          this.auswahlRahmen.aktiv = false;
+          this.gruppenDrag.aktiv = false;
+          this.gruppenDrag.nodeStartPositionen = {};
+          this.gruppenDrag.bildStartLayouts = {};
+          this.ausgewaehlteElemente = {};
           this.setzeDragHoverZiel('');
           this.verlaufZuruecksetzen();
         }
@@ -3393,7 +3644,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.refreshGraph();
             this.uebernehmeMapEinstellungen();
             this.verlaufZuruecksetzen();
-            this.aktualisiereOrtBildAutoLock();
           });
         }
       },
@@ -3470,19 +3720,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       window.addEventListener('keydown', this.onGlobalKeydown);
     },
     beforeUnmount() {
+      if (this.sucheBlurTimer) {
+        globalThis.clearTimeout(this.sucheBlurTimer);
+        this.sucheBlurTimer = 0;
+      }
+      this.persistiereLokaleOrtBildLayouts();
+      this.persistiereElementLocks();
       this.verlaufZuruecksetzen();
       this.beendeCharakterZiehen();
       this.beendeCharakterResize();
-      Object.values(this.ortBildInteraktion.unlockFeedbackTimer || {}).forEach((timerId) => {
-        if (timerId) {
-          window.clearTimeout(timerId);
-        }
-      });
-      Object.values(this.ortBildInteraktion.lockHinweisTimer || {}).forEach((timerId) => {
-        if (timerId) {
-          window.clearTimeout(timerId);
-        }
-      });
       window.removeEventListener('resize', this.onResize);
       window.removeEventListener('pointermove', this.onMapPointerMove);
       window.removeEventListener('pointerup', this.onMapPointerUp);
@@ -3499,6 +3745,41 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2 htbah-weltenbau-map-header" @pointerdown="starteZiehen($event)">
             <h6 class="mb-0 htbah-weltenbau-map-title">Interaktive Welt</h6>
             <div class="d-flex align-items-center gap-1 htbah-weltenbau-map-actions">
+              <span
+                v-if="ausgewaehlteElementeAnzahl > 0"
+                class="badge text-bg-success"
+                :title="ausgewaehlteElementeAnzahl + ' Elemente ausgewählt'">
+                {{ ausgewaehlteElementeAnzahl }} ausgewählt
+              </span>
+              <button
+                v-if="ausgewaehlteElementeAnzahl > 0"
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                @click="auswahlAufheben">
+                Auswahl aufheben
+              </button>
+              <div class="htbah-map-suche-wrap">
+                <input
+                  type="search"
+                  class="form-control form-control-sm htbah-map-suche-input"
+                  v-model.trim="suchText"
+                  placeholder="🔎 Suchen…"
+                  @focus="sucheFokusAktiv = true"
+                  @blur="onSucheBlur"
+                  @keydown.esc.stop.prevent="sucheFokusAktiv = false" />
+                <div v-if="suchtrefferAnzeigen" class="htbah-map-suche-treffer card shadow-sm">
+                  <button
+                    v-for="treffer in suchtrefferListe"
+                    :key="treffer.id"
+                    type="button"
+                    class="htbah-map-suche-treffer-item"
+                    @mousedown.prevent
+                    @click.stop="springeZuSuchtreffer(treffer)">
+                    <span class="fw-semibold">{{ treffer.titel }}</span>
+                    <small class="text-body-secondary">{{ treffer.untertitel }}</small>
+                  </button>
+                </div>
+              </div>
               <div class="btn-group">
                 <button
                   type="button"
@@ -3573,6 +3854,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     max="16"
                     step="1"
                     v-model.number="map.edgeWidth" />
+                  <hr class="my-2" />
+                  <div class="card border-0 bg-body-secondary-subtle p-2 mb-2">
+                    <div class="small text-secondary fw-semibold mb-2">Alle Elemente/Bilder</div>
+                    <div class="btn-group btn-group-sm w-100" role="group" aria-label="Alle Elemente/Bilder sperren oder entsperren">
+                      <button type="button" class="btn btn-outline-secondary" @click.stop="alleElementeSperren">
+                        🔒 verankern
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary" @click.stop="alleElementeEntsperren">
+                        🔓 lösen
+                      </button>
+                    </div>
+                  </div>
                   <hr class="my-2" />
                   <div class="form-check form-switch mb-2">
                     <input
@@ -3669,10 +3962,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   </li>
                 </ul>
               </div>
-              <button type="button" class="regelwerk-icon-button" @click="vollbildUmschalten">
+              <button
+                type="button"
+                class="regelwerk-icon-button"
+                :aria-label="modal.istVollbild ? 'Vollbild beenden' : 'Vollbild'"
+                :title="modal.istVollbild ? 'Vollbild beenden' : 'Vollbild'"
+                @click="vollbildUmschalten">
                 <span class="material-symbols-outlined">{{ modal.istVollbild ? 'close_fullscreen' : 'open_in_full' }}</span>
               </button>
-              <button type="button" class="btn-close" @click="schliessen"></button>
+              <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
             </div>
           </div>
           <div class="htbah-weltenbau-map-content">
@@ -3686,6 +3984,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               class="htbah-weltenbau-map-canvas"
               @pointerdown="startePan($event)"
               @wheel.prevent="onMapWheel($event)">
+              <div
+                v-if="auswahlRahmen.aktiv"
+                class="htbah-map-auswahl-rahmen"
+                :style="auswahlRahmenStil"
+                aria-hidden="true"></div>
               <div class="htbah-weltenbau-map-stage" :style="mapStageStyle">
                 <div
                   v-if="mapHintergrundDataUrl"
@@ -3709,8 +4012,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 </svg>
                 <div
                   v-for="bild in ortBildElemente"
-                  :key="'ort-bild-map-' + bild.ortId"
-                  :data-ort-image-id="bild.ortId"
+                  :key="'ort-bild-map-' + bild.bildId"
+                  :data-ort-image-id="bild.bildId"
+                  :data-ort-node-id="bild.ortNodeId"
                   class="htbah-map-ort-bild"
                   :class="ortBildKlassen(bild)"
                   :style="ortBildStil(bild)"
@@ -3718,35 +4022,41 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   <img :src="bild.dataUrl" :alt="'Ortsbild: ' + bild.ortName" />
                   <button
                     type="button"
-                    :class="ortBildLockButtonKlassen(bild)"
-                    :aria-label="ortBildLockLabel(bild)"
-                    :title="ortBildLockLabel(bild)"
+                    :class="elementLockButtonKlassen(bild.bildId)"
+                    :aria-label="elementLockButtonTitle(bild.bildId)"
+                    :title="elementLockButtonTitle(bild.bildId)"
                     @pointerdown.stop.prevent
-                    @click.stop.prevent="ortBildLockUmschalten(bild)">
-                    <span class="material-symbols-outlined" aria-hidden="true">{{ ortBildLockIcon(bild) }}</span>
+                    @click.stop.prevent="toggleElementLock(bild.bildId)">
+                    <span aria-hidden="true">{{ elementLockButtonIcon(bild.bildId) }}</span>
                   </button>
-                  <div
-                    v-if="ortBildLockHinweisSichtbar(bild.ortId)"
-                    class="htbah-map-ort-bild-lock-hinweis"
-                    role="status"
-                    aria-live="polite">
-                    Bild gesperrt, um Navigation zu erleichtern
-                  </div>
                   <button
                     type="button"
                     class="htbah-map-ort-bild-resize"
+                    :disabled="istElementGesperrt(bild.bildId)"
                     aria-label="Ortsbild skalieren"
                     @pointerdown.stop.prevent="starteOrtBildDrag($event, bild, 'resize')"></button>
                 </div>
-                <button
+                <div
                   v-for="node in graph.nodes"
                   :key="node.id"
-                  type="button"
+                  role="button"
+                  tabindex="0"
                   :data-node-id="node.id"
                   :class="nodeKlassen(node)"
                   :style="nodeStil(node)"
                   @pointerdown.stop="starteNodeDrag($event, node)"
+                  @keydown.enter.prevent.stop="onNodeClick(node)"
+                  @keydown.space.prevent.stop="onNodeClick(node)"
                   @click.stop="onNodeClick(node)">
+                  <button
+                    type="button"
+                    :class="elementLockButtonKlassen(node.id)"
+                    :aria-label="elementLockButtonTitle(node.id)"
+                    :title="elementLockButtonTitle(node.id)"
+                    @pointerdown.stop.prevent
+                    @click.stop.prevent="toggleElementLock(node.id)">
+                    <span aria-hidden="true">{{ elementLockButtonIcon(node.id) }}</span>
+                  </button>
                   <template v-if="node.data && node.data.entityType === 'charakter'">
                     <div class="d-flex align-items-center gap-2">
                       <div class="htbah-map-charakter-avatar-wrap">
@@ -3800,7 +4110,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                       </div>
                     </div>
                   </template>
-                </button>
+                </div>
               </div>
             </div>
           </div>
@@ -3809,7 +4119,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         <div v-if="modal.detailsOffen && detail" class="htbah-weltenbau-map-detail card shadow">
           <div class="card-header d-flex justify-content-between align-items-center py-2">
             <strong>{{ detail.label }}</strong>
-            <button type="button" class="btn-close" @click="modal.detailsOffen = false"></button>
+            <button type="button" class="btn-close" aria-label="Details schließen" @click="modal.detailsOffen = false"></button>
           </div>
           <div class="card-body py-2 small">
             <div><span class="text-secondary">Typ:</span> {{ detail.entityType }}</div>
@@ -3870,10 +4180,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2" @pointerdown="starteCharakterZiehen($event)">
             <strong>🧙 Charakter bearbeiten</strong>
             <div class="d-flex align-items-center gap-2">
-              <button type="button" class="regelwerk-icon-button" @click="charakterVollbildUmschalten">
+              <button
+                type="button"
+                class="regelwerk-icon-button"
+                :aria-label="charakterModal.fenster.istVollbild ? 'Vollbild beenden' : 'Vollbild'"
+                :title="charakterModal.fenster.istVollbild ? 'Vollbild beenden' : 'Vollbild'"
+                @click="charakterVollbildUmschalten">
                 <span class="material-symbols-outlined">{{ charakterVollbildIcon }}</span>
               </button>
-              <button type="button" class="btn-close" @click="schliesseCharakterModal"></button>
+              <button type="button" class="btn-close" aria-label="Charakterfenster schließen" @click="schliesseCharakterModal"></button>
             </div>
           </div>
           <div class="card-body py-2 small htbah-weltenbau-charakter-modal-body">

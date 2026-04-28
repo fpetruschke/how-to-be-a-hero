@@ -1,16 +1,8 @@
 window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
-
-function htbahFormatBytes(bytes) {
-  const n = typeof bytes === 'number' && Number.isFinite(bytes) ? Math.max(0, bytes) : 0;
-  if (n === 0) {
-    return '0 Bytes';
-  }
-  const k = 1024;
-  const stufen = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.min(Math.floor(Math.log(n) / Math.log(k)), stufen.length - 1);
-  const wert = n / k ** i;
-  return `${wert.toLocaleString('de-DE', { maximumFractionDigits: i === 0 ? 0 : 2 })} ${stufen[i]}`;
-}
+var HTBAH_REFACTOR_UTILS =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.RefactorUtils) || null;
+var HTBAH_BOOTSTRAP_MODAL =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper) || null;
 
 const SPEICHER_BEREICHE = {
   charakter: {
@@ -319,14 +311,19 @@ window.HTBAH_SEITEN.Einstellungen = {
         return '';
       }
       const u = this.browserSpeicher.usage;
-      return htbahFormatBytes(typeof u === 'number' && Number.isFinite(u) ? u : 0);
+      if (!HTBAH_REFACTOR_UTILS) {
+        return '';
+      }
+      return HTBAH_REFACTOR_UTILS.formatBytesDecimal(
+        typeof u === 'number' && Number.isFinite(u) ? u : 0,
+      );
     },
     browserSpeicherQuotaText() {
       const b = this.browserSpeicher;
       if (!b || !this.browserSpeicherQuotaEndlich) {
         return '';
       }
-      return htbahFormatBytes(b.quota);
+      return HTBAH_REFACTOR_UTILS ? HTBAH_REFACTOR_UTILS.formatBytesDecimal(b.quota) : '';
     },
     browserSpeicherProgressBarKlasse() {
       const p = this.browserSpeicherProzent;
@@ -531,13 +528,15 @@ window.HTBAH_SEITEN.Einstellungen = {
       window.HTBAH.ui.notify({ text, typ: typ === 'danger' ? 'danger' : 'success' });
     },
     modalAnzeigen(modalRefName, instanzName) {
+      if (!HTBAH_BOOTSTRAP_MODAL) {
+        return;
+      }
       this.$nextTick(() => {
         const el = this.$refs[modalRefName];
-        if (!el || !window.bootstrap) {
-          return;
+        this[instanzName] = HTBAH_BOOTSTRAP_MODAL.ensureModalInstance(el);
+        if (this[instanzName]) {
+          this[instanzName].show();
         }
-        this[instanzName] = window.bootstrap.Modal.getOrCreateInstance(el);
-        this[instanzName].show();
       });
     },
     exportModalOeffnen() {
@@ -745,78 +744,17 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
       const aktiveCharakterIdVorImport = window.HTBAH.ladeAktivenCharakterId();
       const fehlerBereiche = [];
+      const keyHandler = {
+        htbah_sicherheitsmechanismen_bundle: (bereich) => this.importiereSicherheitsmechanismenBundle(bereich),
+        [WUERFELBECHER_BUNDLE_KEY]: (bereich) => this.importiereWuerfelbecherBundle(bereich),
+      };
 
       ausgewaehlteBereiche.forEach((bereich) => {
         try {
-        if (bereich.key === 'htbah_sicherheitsmechanismen_bundle') {
-          if (bereich.vorhanden && typeof bereich.wert === 'string') {
-            try {
-              const payload = JSON.parse(bereich.wert);
-              const eintraege = payload && payload.typ === 'sicherheitsmechanismen-bundle' && payload.eintraege
-                ? payload.eintraege
-                : {};
-              const sammlung = window.HTBAH.ladeCharakterSammlung();
-              const aktiveIdVorher = window.HTBAH.ladeAktivenCharakterId();
-              (sammlung.charaktere || []).forEach((eintrag) => {
-                const imported = eintraege[eintrag.id] || {};
-                window.HTBAH.importiereOderAktualisiereCharakterEintrag({
-                  ...eintrag,
-                  charakter: {
-                    ...(eintrag.charakter || {}),
-                    sicherheitsmechanismen: {
-                      tabuHtml: typeof imported.tabuHtml === 'string' ? imported.tabuHtml : '',
-                      schleierHtml: typeof imported.schleierHtml === 'string' ? imported.schleierHtml : '',
-                    },
-                  },
-                });
-              });
-              window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
-            } catch {
-              // defekten Import ignorieren
-            }
-          } else {
-            const sammlung = window.HTBAH.ladeCharakterSammlung();
-            const aktiveIdVorher = window.HTBAH.ladeAktivenCharakterId();
-            (sammlung.charaktere || []).forEach((eintrag) => {
-              window.HTBAH.importiereOderAktualisiereCharakterEintrag({
-                ...eintrag,
-                charakter: {
-                  ...(eintrag.charakter || {}),
-                  sicherheitsmechanismen: {
-                    tabuHtml: '',
-                    schleierHtml: '',
-                  },
-                },
-              });
-            });
-            window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
+          if (typeof keyHandler[bereich.key] === 'function') {
+            keyHandler[bereich.key](bereich);
+            return;
           }
-          return;
-        }
-        if (bereich.key === WUERFELBECHER_BUNDLE_KEY) {
-          if (bereich.vorhanden && typeof bereich.wert === 'string') {
-            try {
-              const payload = JSON.parse(bereich.wert);
-              const eintraege =
-                payload && payload.typ === 'wuerfelbecher-bundle' && payload.eintraege
-                  ? payload.eintraege
-                  : {};
-              WUERFELBECHER_KEYS.forEach((k) => {
-                if (Object.prototype.hasOwnProperty.call(eintraege, k) && typeof eintraege[k] === 'string') {
-                  window.HTBAH.speicher.schreibeText(k, eintraege[k]);
-                } else {
-                  window.HTBAH.speicher.loescheKey(k);
-                }
-              });
-            } catch {
-              /* defekten Import ignorieren */
-            }
-          } else {
-            WUERFELBECHER_KEYS.forEach((k) => window.HTBAH.speicher.loescheKey(k));
-          }
-          window.dispatchEvent(new CustomEvent('htbah:wuerfel-einstellungen-geaendert'));
-          return;
-        }
         if (bereich.key.startsWith('htbah_character_entry:')) {
           const charakterId = bereich.key.slice('htbah_character_entry:'.length);
           if (bereich.vorhanden && typeof bereich.wert === 'string') {
@@ -868,6 +806,58 @@ window.HTBAH_SEITEN.Einstellungen = {
         this.statusAnzeigen('Import abgeschlossen. Ausgewählte Speicherbereiche wurden übernommen.');
       }
       this.speicherSchaetzungLaden();
+    },
+    importiereSicherheitsmechanismenBundle(bereich) {
+      let eintraege = {};
+      if (bereich.vorhanden && typeof bereich.wert === 'string') {
+        try {
+          const payload = JSON.parse(bereich.wert);
+          eintraege =
+            payload && payload.typ === 'sicherheitsmechanismen-bundle' && payload.eintraege
+              ? payload.eintraege
+              : {};
+        } catch {
+          eintraege = {};
+        }
+      }
+      const sammlung = window.HTBAH.ladeCharakterSammlung();
+      const aktiveIdVorher = window.HTBAH.ladeAktivenCharakterId();
+      (sammlung.charaktere || []).forEach((eintrag) => {
+        const imported = eintraege[eintrag.id] || {};
+        window.HTBAH.importiereOderAktualisiereCharakterEintrag({
+          ...eintrag,
+          charakter: {
+            ...(eintrag.charakter || {}),
+            sicherheitsmechanismen: {
+              tabuHtml: typeof imported.tabuHtml === 'string' ? imported.tabuHtml : '',
+              schleierHtml: typeof imported.schleierHtml === 'string' ? imported.schleierHtml : '',
+            },
+          },
+        });
+      });
+      window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
+    },
+    importiereWuerfelbecherBundle(bereich) {
+      let eintraege = {};
+      if (bereich.vorhanden && typeof bereich.wert === 'string') {
+        try {
+          const payload = JSON.parse(bereich.wert);
+          eintraege =
+            payload && payload.typ === 'wuerfelbecher-bundle' && payload.eintraege
+              ? payload.eintraege
+              : {};
+        } catch {
+          eintraege = {};
+        }
+      }
+      WUERFELBECHER_KEYS.forEach((k) => {
+        if (Object.prototype.hasOwnProperty.call(eintraege, k) && typeof eintraege[k] === 'string') {
+          window.HTBAH.speicher.schreibeText(k, eintraege[k]);
+        } else {
+          window.HTBAH.speicher.loescheKey(k);
+        }
+      });
+      window.dispatchEvent(new CustomEvent('htbah:wuerfel-einstellungen-geaendert'));
     },
   },
   mounted() {

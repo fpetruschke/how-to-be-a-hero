@@ -1,4 +1,6 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
+var HTBAH_BOOTSTRAP_MODAL =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper) || null;
 
 window.HTBAH_KOMPONENTEN.BestaetigenModal = {
   props: {
@@ -23,6 +25,7 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       _onAbbrechen: null,
       _hatBestaetigt: false,
       modalInstanz: null,
+      _fokusVorModal: null,
     };
   },
   methods: {
@@ -35,6 +38,7 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       bestaetigenButtonClass = 'btn-danger',
       warnhinweisAnzeigen = true,
     }) {
+      this._fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.titel = titel || '';
       this.beschreibung = beschreibung || '';
       this.bestaetigenText = bestaetigenText;
@@ -46,11 +50,10 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
 
       this.$nextTick(() => {
         const el = this.$refs.modalElement;
-        if (!el || !window.bootstrap) {
+        if (!el || !HTBAH_BOOTSTRAP_MODAL) {
           return;
         }
-
-        this.modalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
+        this.modalInstanz = HTBAH_BOOTSTRAP_MODAL.ensureModalInstance(el);
         this.modalInstanz.show();
       });
     },
@@ -75,19 +78,23 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       if (!this._hatBestaetigt && this._onAbbrechen) {
         this._onAbbrechen();
       }
+      if (this._fokusVorModal && this._fokusVorModal.isConnected) {
+        this._fokusVorModal.focus();
+      }
       this.zuruecksetzenCallbacks();
+      this._fokusVorModal = null;
     },
   },
   mounted() {
     const el = this.$refs.modalElement;
-    if (el) {
-      el.addEventListener('hidden.bs.modal', this.modalGeschlossen);
+    if (el && HTBAH_BOOTSTRAP_MODAL) {
+      HTBAH_BOOTSTRAP_MODAL.bindHiddenEvent(el, this.modalGeschlossen);
     }
   },
   beforeUnmount() {
     const el = this.$refs.modalElement;
-    if (el) {
-      el.removeEventListener('hidden.bs.modal', this.modalGeschlossen);
+    if (el && HTBAH_BOOTSTRAP_MODAL) {
+      HTBAH_BOOTSTRAP_MODAL.unbindHiddenEvent(el, this.modalGeschlossen);
     }
   },
   template: `

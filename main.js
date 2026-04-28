@@ -840,6 +840,27 @@ function normalisiereWeltenbauMapBildLayouts(roh) {
   return map;
 }
 
+function normalisiereWeltenbauMapElementLocks(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return {};
+  }
+  const map = {};
+  Object.entries(roh).forEach(([gruppeId, gruppeLocks]) => {
+    if (typeof gruppeId !== 'string' || !gruppeId || !gruppeLocks || typeof gruppeLocks !== 'object') {
+      return;
+    }
+    const lockMap = {};
+    Object.entries(gruppeLocks).forEach(([elementId, locked]) => {
+      if (typeof elementId !== 'string' || !elementId || typeof locked !== 'boolean') {
+        return;
+      }
+      lockMap[elementId] = locked;
+    });
+    map[gruppeId] = lockMap;
+  });
+  return map;
+}
+
 function ladeWeltenbauZustand() {
   const roh = htbahSpeicher.leseJson(SPEICHER_KEY_WELTENBAU, null);
   if (!roh || typeof roh !== 'object') {
@@ -852,6 +873,7 @@ function ladeWeltenbauZustand() {
       mapBildLayouts: {},
       mapHintergruende: {},
       mapEinstellungen: {},
+      mapElementLocks: {},
     };
   }
   const eintraege = Array.isArray(roh.eintraege)
@@ -863,6 +885,7 @@ function ladeWeltenbauZustand() {
   const mapBildLayouts = normalisiereWeltenbauMapBildLayouts(roh.mapBildLayouts);
   const mapHintergruende = normalisiereWeltenbauMapHintergruende(roh.mapHintergruende);
   const mapEinstellungen = normalisiereWeltenbauMapEinstellungen(roh.mapEinstellungen);
+  const mapElementLocks = normalisiereWeltenbauMapElementLocks(roh.mapElementLocks);
   return {
     version: 4,
     eintraege,
@@ -872,6 +895,7 @@ function ladeWeltenbauZustand() {
     mapBildLayouts,
     mapHintergruende,
     mapEinstellungen,
+    mapElementLocks,
   };
 }
 
@@ -1915,6 +1939,21 @@ function syncLebenspunkteStatusFromCharakter(charakter) {
   lebenspunkteStatus.bewusstlos = status.bewusstlos;
 }
 
+function entsperreBildschirmAusrichtungWennMoeglich() {
+  if (typeof screen === 'undefined') {
+    return;
+  }
+  const orientationApi = screen.orientation;
+  if (!orientationApi || typeof orientationApi.unlock !== 'function') {
+    return;
+  }
+  try {
+    orientationApi.unlock();
+  } catch {
+    // Einige Browser erlauben unlock nur in bestimmten Kontexten.
+  }
+}
+
 window.HTBAH.lebenspunkteStatus = lebenspunkteStatus;
 window.HTBAH.berechneLebenspunkteStatus = berechneLebenspunkteStatus;
 window.HTBAH.syncLebenspunkteStatusFromCharakter = syncLebenspunkteStatusFromCharakter;
@@ -1983,6 +2022,13 @@ app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.Lebenspunkt
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);
 app.component('bildbetrachter-host', window.HTBAH_KOMPONENTEN.BildbetrachterHost);
 app.mount('#app');
+entsperreBildschirmAusrichtungWennMoeglich();
+window.addEventListener('orientationchange', entsperreBildschirmAusrichtungWennMoeglich);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    entsperreBildschirmAusrichtungWennMoeglich();
+  }
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

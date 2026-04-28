@@ -1,4 +1,18 @@
 window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
+var HTBAH_REFACTOR_UTILS =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.RefactorUtils) || null;
+var HTBAH_WELTENBAU_IMPORT =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.WeltenbauImport) || null;
+
+const TABLE_TYPE_CONFIG = {
+  npc: { label: 'NPC', emoji: '👤', detail: '👤 NPC · Übersicht' },
+  ort: { label: 'Ort', emoji: '🗺️', detail: '🗺️ Ort · Übersicht' },
+  fraktion: { label: 'Fraktion', emoji: '🏛️', detail: '🏛️ Fraktion · Übersicht' },
+  pantheon: { label: 'Gottheit', emoji: '✨', detail: '✨ Gottheit · Übersicht' },
+  raetsel: { label: 'Rätsel', emoji: '🧩', detail: '🧩 Rätsel · Übersicht' },
+  bestie: { label: 'Bestie', emoji: '🦁', detail: '🦁 Bestie · Übersicht' },
+  gegenstand: { label: 'Gegenstand', emoji: '📦', detail: '📦 Gegenstand · Übersicht' },
+};
 
 function htbahTextVorschau(html, maxLen) {
   const grenze = typeof maxLen === 'number' ? maxLen : 72;
@@ -17,28 +31,11 @@ function htbahHtmlText(html) {
 
 const ZUFALLSTABELLEN_MAX_ROH_DATEI_BYTES = 40 * 1024 * 1024;
 
-function zufallstabellenIstBildDatei(file) {
-  if (!file) {
-    return false;
-  }
-  if (file.type && file.type.startsWith('image/')) {
-    return true;
-  }
-  const n = String(file.name || '').toLowerCase();
-  return /\.(png|apng|jpe?g|gif|webp|bmp|svg|avif|heic|heif|tiff?)$/i.test(n);
-}
-
 function zufallstabellenFormatBytes(n) {
-  if (!Number.isFinite(n) || n <= 0) {
+  if (!HTBAH_REFACTOR_UTILS || !Number.isFinite(n) || n <= 0) {
     return '';
   }
-  if (n >= 1024 * 1024) {
-    return `${(n / (1024 * 1024)).toFixed(1).replace('.', ',')} MiB`;
-  }
-  if (n >= 1024) {
-    return `${Math.round(n / 1024)} KiB`;
-  }
-  return `${Math.round(n)} B`;
+  return HTBAH_REFACTOR_UTILS.formatBytesBinary(n);
 }
 
 function zufallstabellenDateiZuDataUrl(file) {
@@ -109,25 +106,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return '';
       }
       const neu = this.bearbeitungIndex < 0 ? 'Neu: ' : '';
-      if (this.bearbeitung.typ === 'npc') {
-        return `${neu}👤 NPC`;
-      }
-      if (this.bearbeitung.typ === 'ort') {
-        return `${neu}🗺️ Ort`;
-      }
-      if (this.bearbeitung.typ === 'fraktion') {
-        return `${neu}🏛️ Fraktion`;
-      }
-      if (this.bearbeitung.typ === 'pantheon') {
-        return `${neu}✨ Gottheit`;
-      }
-      if (this.bearbeitung.typ === 'raetsel') {
-        return `${neu}🧩 Rätsel`;
-      }
-      if (this.bearbeitung.typ === 'bestie') {
-        return `${neu}🦁 Bestarium`;
-      }
-      return `${neu}📦 Gegenstand`;
+      const cfg = TABLE_TYPE_CONFIG[this.bearbeitung.typ] || TABLE_TYPE_CONFIG.gegenstand;
+      const label = this.bearbeitung.typ === 'bestie' ? 'Bestarium' : cfg.label;
+      return `${neu}${cfg.emoji} ${label}`;
     },
     zufallsgeneratorBereit() {
       return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
@@ -136,26 +117,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (!this.detailAnsicht) {
         return '';
       }
-      const t = this.detailAnsicht.typ;
-      if (t === 'npc') {
-        return '👤 NPC · Übersicht';
-      }
-      if (t === 'ort') {
-        return '🗺️ Ort · Übersicht';
-      }
-      if (t === 'fraktion') {
-        return '🏛️ Fraktion · Übersicht';
-      }
-      if (t === 'pantheon') {
-        return '✨ Gottheit · Übersicht';
-      }
-      if (t === 'raetsel') {
-        return '🧩 Rätsel · Übersicht';
-      }
-      if (t === 'bestie') {
-        return '🦁 Bestie · Übersicht';
-      }
-      return '📦 Gegenstand · Übersicht';
+      const cfg = TABLE_TYPE_CONFIG[this.detailAnsicht.typ] || TABLE_TYPE_CONFIG.gegenstand;
+      return cfg.detail;
     },
     detailAnsichtFelder() {
       if (!this.detailAnsicht) {
@@ -880,7 +843,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         });
       }
       const bildDateien = verwertbar.filter(zufallstabellenIstBildDatei);
-      const sonstigeDateien = verwertbar.filter((f) => !zufallstabellenIstBildDatei(f));
+      const sonstigeDateien = verwertbar.filter(
+        (f) => !(HTBAH_WELTENBAU_IMPORT && HTBAH_WELTENBAU_IMPORT.istBildDatei(f)),
+      );
       if (bildDateien.length) {
         this.medienImportWarteschlange = this.medienImportWarteschlange.concat(bildDateien);
         if (this.medienImportWarteschlange.length === bildDateien.length) {

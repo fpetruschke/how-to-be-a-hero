@@ -268,7 +268,7 @@ window.HTBAH_SEITEN.Startseite = {
                   <img
                     v-if="eintrag.charakterBild"
                     :src="eintrag.charakterBild"
-                    alt=""
+                    :alt="'Profilbild von ' + charakterName(eintrag)"
                     class="htbah-start-card-avatar-img" />
                   <span
                     v-else

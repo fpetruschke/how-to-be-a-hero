@@ -1,4 +1,5 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
+const HTBAH_BEGEGNUNG_UTILS = window.HTBAH_SHARED && window.HTBAH_SHARED.BegegnungUtils;
 
 /** Aufgelöste URL für dynamisches import() (Bare Specifier wie "assets/…" sind im Browser ungültig). */
 function htbahAssetUrl(relMitPunktSlash) {
@@ -12,12 +13,6 @@ function htbahAssetUrl(relMitPunktSlash) {
 const HTBAH_DICE_BOX_MODULE_URL = htbahAssetUrl('./assets/js/dice-box.es.min.js');
 const HTBAH_DICE_INIT_TIMEOUT_MS = 7000;
 const HTBAH_APP_ORIGIN = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
-
-function htbahBegegnungStripHtmlText(html) {
-  const div = document.createElement('div');
-  div.innerHTML = typeof html === 'string' ? html : '';
-  return (div.textContent || '').replace(/\s+/g, ' ').trim();
-}
 
 window.HTBAH_KOMPONENTEN.BottomNav = {
   props: ['uiZustand'],
@@ -42,6 +37,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       wuerfelnLaeuft: false,
       wuerfelBeutelOffen: false,
       wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
+      wuerfelBeutelAusloeserElement: null,
       sicherheitsmechanismenModalOffen: false,
       _badgeDragMoveHandler: null,
       _badgeDragUpHandler: null,
@@ -289,10 +285,22 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     wuerfelBeutelOffen(neu) {
       if (neu) {
         window.addEventListener('resize', this.wuerfelBeutelBeiViewportResize);
+        window.addEventListener('keydown', this.onWuerfelBeutelKeydown);
+        this.$nextTick(() => {
+          const fenster = this.$refs.wuerfelBeutelFensterRef;
+          if (fenster && typeof fenster.focus === 'function') {
+            fenster.focus();
+          }
+        });
       } else {
         window.removeEventListener('resize', this.wuerfelBeutelBeiViewportResize);
+        window.removeEventListener('keydown', this.onWuerfelBeutelKeydown);
         this.wuerfelBeutelBeendeZiehen();
         this.wuerfelBeutelBeendeResize();
+        if (this.wuerfelBeutelAusloeserElement && this.wuerfelBeutelAusloeserElement.isConnected) {
+          this.wuerfelBeutelAusloeserElement.focus();
+        }
+        this.wuerfelBeutelAusloeserElement = null;
       }
     },
   },
@@ -312,6 +320,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.diceInitPromise = null;
     this.diceModulLadenPromise = null;
     window.removeEventListener('resize', this.wuerfelBeutelBeiViewportResize);
+    window.removeEventListener('keydown', this.onWuerfelBeutelKeydown);
     window.removeEventListener(
       'htbah:wuerfel-einstellungen-geaendert',
       this.onWuerfelEinstellungenGlobalGeaendert,
@@ -686,6 +695,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         tab === 'atmosphaere' || tab === 'begegnung' || tab === 'wuerfel' ? tab : 'wuerfel';
       const gmTab = zielTab === 'atmosphaere' || zielTab === 'begegnung';
       this.wuerfelModalTab = !this.istSpielleitung && gmTab ? 'wuerfel' : zielTab;
+      this.wuerfelBeutelAusloeserElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.ladeDiceFarbwahl();
       this.wuerfelBeutelOffen = true;
       this.$nextTick(() => {
@@ -698,6 +708,13 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     wuerfelBeutelSchliessen() {
       this.speichereWuerfelBeutelFenster();
       this.wuerfelBeutelOffen = false;
+    },
+    onWuerfelBeutelKeydown(event) {
+      if (!this.wuerfelBeutelOffen || !event || event.key !== 'Escape') {
+        return;
+      }
+      event.preventDefault();
+      this.wuerfelBeutelSchliessen();
     },
     wuerfelBeutelErmittleViewport() {
       return window.HTBAH_MODAL_FENSTER.utils.ermittleViewportGroesse();
@@ -1054,14 +1071,14 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         return '—';
       }
       if (raw.includes('<') && raw.includes('>')) {
-        const t = htbahBegegnungStripHtmlText(raw);
+        const t = HTBAH_BEGEGNUNG_UTILS ? HTBAH_BEGEGNUNG_UTILS.stripHtmlText(raw) : raw;
         return t || '—';
       }
       return raw;
     },
     begegnungRichTextHtml(html) {
       const inhalt = typeof html === 'string' ? html : '';
-      return htbahBegegnungStripHtmlText(inhalt) ? inhalt : '';
+      return HTBAH_BEGEGNUNG_UTILS && HTBAH_BEGEGNUNG_UTILS.stripHtmlText(inhalt) ? inhalt : '';
     },
     begegnungNpcWaffenWerteText(row) {
       const nah = String(row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '').trim();
@@ -1076,25 +1093,14 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       return teile.length ? teile.join(' · ') : '—';
     },
     begegnungBestieEpocheLabel(epoche) {
-      if (epoche === 'gegenwart') {
-        return 'Gegenwart';
-      }
-      if (epoche === 'zukunft') {
-        return 'Zukunft';
-      }
-      return 'Mittelalter';
+      return HTBAH_BEGEGNUNG_UTILS
+        ? HTBAH_BEGEGNUNG_UTILS.bestieEpocheLabel(epoche)
+        : 'Mittelalter';
     },
     begegnungBestieKategorieLabel(kategorie) {
-      if (kategorie === 'fantasy_tier') {
-        return 'Magisch / Fantasy';
-      }
-      if (kategorie === 'mutiert') {
-        return 'Mutiert';
-      }
-      if (kategorie === 'monster') {
-        return 'Monster';
-      }
-      return 'Normales Tier';
+      return HTBAH_BEGEGNUNG_UTILS
+        ? HTBAH_BEGEGNUNG_UTILS.bestieKategorieLabel(kategorie)
+        : 'Normales Tier';
     },
     begegnungBestieAggressivitaetText(row) {
       const n = row && Number(row.aggressivitaetSkala);

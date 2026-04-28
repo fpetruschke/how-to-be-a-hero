@@ -47,6 +47,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       modal: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       fraktionOrtEingabe: '',
       aktiverBearbeitungsTab: 'daten',
+      fokusVorModal: null,
     };
   },
   computed: {
@@ -85,11 +86,16 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
   watch: {
     'anlage.offen'(offen) {
       if (offen && !this.eingebettet) {
-        this.$nextTick(() => this.initialisierePosition());
+        this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        this.$nextTick(() => {
+          this.initialisierePosition();
+          this.fokussiereFenster();
+        });
       } else if (!offen) {
         this.beendeZiehen();
         this.beendeResize();
         this.modal.istVollbild = false;
+        this.stelleFokusWiederHer();
       }
       this.fraktionOrtEingabe = '';
       if (offen) {
@@ -223,6 +229,21 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         this.$nextTick(() => this.stelleSichtbaresFensterSicher());
       }
     },
+    fokussiereFenster() {
+      const fenster = this.$refs.fensterElement;
+      if (fenster && typeof fenster.focus === 'function') {
+        fenster.focus();
+      }
+    },
+    stelleFokusWiederHer() {
+      if (this.fokusVorModal && this.fokusVorModal.isConnected) {
+        this.fokusVorModal.focus();
+      }
+      this.fokusVorModal = null;
+    },
+    schliessen() {
+      this.$emit('close');
+    },
     onResize() {
       this.$nextTick(() => this.stelleSichtbaresFensterSicher());
     },
@@ -338,7 +359,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         ref="fensterElement"
         class="regelwerk-modal-window card shadow"
         :class="{ 'regelwerk-modal-window-fullscreen': modal.istVollbild }"
-        :style="fensterStil">
+        :style="fensterStil"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="zeileModalTitel || 'Eintrag bearbeiten'"
+        tabindex="-1"
+        @keydown.esc.stop.prevent="schliessen">
         <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2" @pointerdown="starteZiehen">
           <strong>{{ zeileModalTitel }}</strong>
           <div class="d-flex align-items-center gap-2">
@@ -350,10 +376,15 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
               @click="$emit('random')">
               Zufallsvorschlag
             </button>
-            <button type="button" class="regelwerk-icon-button" @click="vollbildUmschalten">
+            <button
+              type="button"
+              class="regelwerk-icon-button"
+              :aria-label="modal.istVollbild ? 'Vollbild beenden' : 'Vollbild'"
+              :title="modal.istVollbild ? 'Vollbild beenden' : 'Vollbild'"
+              @click="vollbildUmschalten">
               <span class="material-symbols-outlined">{{ vollbildIcon }}</span>
             </button>
-            <button type="button" class="btn-close" @click="$emit('close')"></button>
+            <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>
         </div>
         <div class="card-body py-2 small" style="max-height:70vh; overflow:auto;">
@@ -898,7 +929,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <button v-if="kannLoeschen" type="button" class="btn btn-sm btn-outline-danger" @click="$emit('delete')">Löschen</button>
           </div>
           <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" @click="$emit('close')">Abbrechen</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @click="schliessen">Abbrechen</button>
             <button type="button" class="btn btn-sm btn-primary" :disabled="speicherDeaktiviert" @click="$emit('save')">Speichern</button>
           </div>
         </div>

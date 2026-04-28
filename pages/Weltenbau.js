@@ -1,4 +1,8 @@
 window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
+var HTBAH_REFACTOR_UTILS =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.RefactorUtils) || null;
+var HTBAH_WELTENBAU_IMPORT =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.WeltenbauImport) || null;
 
 const WELTENBAU_GENERATOREN = [
   {
@@ -72,13 +76,6 @@ const WELTENBAU_GENERATOREN = [
   },
 ];
 
-function istHttpUrl(text) {
-  if (typeof text !== 'string') {
-    return false;
-  }
-  return /^https?:\/\//i.test(text.trim());
-}
-
 function normalisiereGeneratorUrlMap(roh) {
   if (!roh || typeof roh !== 'object') {
     return {};
@@ -89,7 +86,7 @@ function normalisiereGeneratorUrlMap(roh) {
       return;
     }
     const t = url.trim();
-    if (istHttpUrl(t)) {
+    if (HTBAH_REFACTOR_UTILS && HTBAH_REFACTOR_UTILS.istHttpUrl(t)) {
       map[id] = t;
     }
   });
@@ -114,47 +111,8 @@ function normalisiereGeneratorZeitstempelMap(roh) {
   return map;
 }
 
-function formatDatumZeit(value) {
-  if (!value) {
-    return '';
-  }
-  const datum = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(datum.getTime())) {
-    return '';
-  }
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const tag = pad2(datum.getDate());
-  const monat = pad2(datum.getMonth() + 1);
-  const jahr = datum.getFullYear();
-  const stunde = pad2(datum.getHours());
-  const minute = pad2(datum.getMinutes());
-  const sekunde = pad2(datum.getSeconds());
-  return `${tag}.${monat}.${jahr} - ${stunde}:${minute}:${sekunde}`;
-}
-
 /** Rohdatei-Limit vor dem Laden (Browser- & Speicher-Schutz). */
 const WELTENBAU_MAX_ROH_DATEI_BYTES = 40 * 1024 * 1024;
-
-function istBildDatei(file) {
-  if (!file) {
-    return false;
-  }
-  if (file.type && file.type.startsWith('image/')) {
-    return true;
-  }
-  const n = (file.name || '').toLowerCase();
-  return /\.(png|apng|jpe?g|gif|webp|bmp|svg|avif|heic|heif|tiff?)$/i.test(n);
-}
-
-function formatBytes(n) {
-  if (n >= 1024 * 1024) {
-    return `${(n / (1024 * 1024)).toFixed(1).replace('.', ',')} MiB`;
-  }
-  if (n >= 1024) {
-    return `${Math.round(n / 1024)} KiB`;
-  }
-  return `${n} B`;
-}
 
 window.HTBAH_SEITEN.Weltenbau = {
   components: {
@@ -210,6 +168,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         resizeStartBreite: 0,
         resizeStartHoehe: 0,
       },
+      generatorModalAusloeserElement: null,
     };
   },
   computed: {
@@ -241,7 +200,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       }
     },
     maxRohDateiHuman() {
-      return formatBytes(WELTENBAU_MAX_ROH_DATEI_BYTES);
+      return this.formatBytes(WELTENBAU_MAX_ROH_DATEI_BYTES);
     },
     generatorModalStil() {
       if (
@@ -355,7 +314,12 @@ window.HTBAH_SEITEN.Weltenbau = {
       this.zeigeImportHinweis = !this.zeigeImportHinweis;
     },
     persistGeneratorUrl(generatorId, url) {
-      if (typeof generatorId !== 'string' || !generatorId || !istHttpUrl(url)) {
+      if (
+        typeof generatorId !== 'string' ||
+        !generatorId ||
+        !HTBAH_REFACTOR_UTILS ||
+        !HTBAH_REFACTOR_UTILS.istHttpUrl(url)
+      ) {
         return;
       }
       const neu = normalisiereGeneratorUrlMap({
@@ -386,14 +350,14 @@ window.HTBAH_SEITEN.Weltenbau = {
       this.persist();
     },
     formatGeneratorAufruf(zeitstempel) {
-      return formatDatumZeit(zeitstempel);
+      return HTBAH_REFACTOR_UTILS ? HTBAH_REFACTOR_UTILS.formatDatumZeit(zeitstempel) : '';
     },
     gespeicherteGeneratorUrl(generator) {
       if (!generator || typeof generator.id !== 'string') {
         return '';
       }
       const gespeicherte = this.zustand.generatorUrls && this.zustand.generatorUrls[generator.id];
-      if (istHttpUrl(gespeicherte)) {
+      if (HTBAH_REFACTOR_UTILS && HTBAH_REFACTOR_UTILS.istHttpUrl(gespeicherte)) {
         return gespeicherte.trim();
       }
       return generator.startUrl;
@@ -416,6 +380,8 @@ window.HTBAH_SEITEN.Weltenbau = {
         return;
       }
       const startUrl = this.gespeicherteGeneratorUrl(generator);
+      this.generatorModalAusloeserElement =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.generatorModal.offen = true;
       this.generatorModal.generatorId = generator.id;
       this.generatorModal.titel = generator.titel;
@@ -424,7 +390,13 @@ window.HTBAH_SEITEN.Weltenbau = {
       this.generatorModal.istVollbild = false;
       this.beendeGeneratorZiehen();
       this.beendeGeneratorResize();
-      this.$nextTick(() => this.initialisiereGeneratorFenster());
+      this.$nextTick(() => {
+        this.initialisiereGeneratorFenster();
+        const fenster = this.$refs.generatorFenster;
+        if (fenster && typeof fenster.focus === 'function') {
+          fenster.focus();
+        }
+      });
       this.persistGeneratorUrl(generator.id, startUrl);
       this.persistGeneratorAufruf(generator.id, new Date());
     },
@@ -433,9 +405,17 @@ window.HTBAH_SEITEN.Weltenbau = {
       this.beendeGeneratorResize();
       this.generatorModal.offen = false;
       this.generatorModal.istVollbild = false;
+      if (this.generatorModalAusloeserElement && this.generatorModalAusloeserElement.isConnected) {
+        this.generatorModalAusloeserElement.focus();
+      }
+      this.generatorModalAusloeserElement = null;
     },
     generatorNeuLaden() {
-      if (!this.generatorModal.offen || !istHttpUrl(this.generatorModal.iframeUrl)) {
+      if (
+        !this.generatorModal.offen ||
+        !HTBAH_REFACTOR_UTILS ||
+        !HTBAH_REFACTOR_UTILS.istHttpUrl(this.generatorModal.iframeUrl)
+      ) {
         return;
       }
       const frame = this.$refs.generatorIframe;
@@ -444,7 +424,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       }
     },
     generatorInNeuemTab() {
-      if (!istHttpUrl(this.generatorModal.iframeUrl)) {
+      if (!HTBAH_REFACTOR_UTILS || !HTBAH_REFACTOR_UTILS.istHttpUrl(this.generatorModal.iframeUrl)) {
         return;
       }
       window.open(this.generatorModal.iframeUrl, '_blank', 'noopener,noreferrer');
@@ -457,20 +437,20 @@ window.HTBAH_SEITEN.Weltenbau = {
       let aktuelleUrl = typeof frame.src === 'string' ? frame.src : this.generatorModal.iframeUrl;
       try {
         const href = frame.contentWindow && frame.contentWindow.location && frame.contentWindow.location.href;
-        if (istHttpUrl(href)) {
+        if (HTBAH_REFACTOR_UTILS && HTBAH_REFACTOR_UTILS.istHttpUrl(href)) {
           aktuelleUrl = href;
         }
       } catch {
         // Cross-Origin: dann bleibt nur die (ggf. aufgelöste) iframe-src als best effort.
       }
-      if (istHttpUrl(aktuelleUrl)) {
+      if (HTBAH_REFACTOR_UTILS && HTBAH_REFACTOR_UTILS.istHttpUrl(aktuelleUrl)) {
         this.generatorModal.iframeUrl = aktuelleUrl;
         this.persistGeneratorUrl(this.generatorModal.generatorId, aktuelleUrl);
       }
     },
     onGeneratorUrlEingabeBlur(ev) {
       const text = ev && ev.target ? ev.target.value : '';
-      if (!istHttpUrl(text)) {
+      if (!HTBAH_REFACTOR_UTILS || !HTBAH_REFACTOR_UTILS.istHttpUrl(text)) {
         return;
       }
       const url = text.trim();
@@ -708,7 +688,14 @@ window.HTBAH_SEITEN.Weltenbau = {
       if (!dateiListe.length) {
         return;
       }
-      const bildDateien = dateiListe.filter(istBildDatei);
+      const trennung = HTBAH_WELTENBAU_IMPORT
+        ? HTBAH_WELTENBAU_IMPORT.teileDateienNachGroesse(dateiListe, WELTENBAU_MAX_ROH_DATEI_BYTES)
+        : {
+            bildDateien: dateiListe,
+            zuGross: [],
+            ok: dateiListe,
+          };
+      const bildDateien = trennung.bildDateien;
       if (!bildDateien.length) {
         this.zeigeStatus(
           'Keine Bilddateien erkannt. Erlaubt sind gängige Rasterformate (PNG, JPEG, WebP, GIF usw.) oder passende Dateiendung.',
@@ -717,12 +704,14 @@ window.HTBAH_SEITEN.Weltenbau = {
         return;
       }
       const max = WELTENBAU_MAX_ROH_DATEI_BYTES;
-      const zuGross = bildDateien.filter((f) => f.size > max);
-      const ok = bildDateien.filter((f) => f.size <= max);
+      const zuGross = trennung.zuGross;
+      const ok = trennung.ok;
       if (zuGross.length) {
-        const namen = zuGross.map((f) => `"${f.name}" (${formatBytes(f.size)})`).join(', ');
+        const namen = zuGross
+          .map((f) => `"${f.name}" (${this.formatBytes(f.size)})`)
+          .join(', ');
         this.zeigeStatus(
-          `Übersprungen (zu groß, max. ${formatBytes(max)} pro Datei): ${namen}.`,
+          `Übersprungen (zu groß, max. ${this.formatBytes(max)} pro Datei): ${namen}.`,
           'warning',
         );
       }
@@ -791,13 +780,16 @@ window.HTBAH_SEITEN.Weltenbau = {
       if (!eintrag || !eintrag.hinzugefuegtAm) {
         return '';
       }
-      return formatDatumZeit(eintrag.hinzugefuegtAm);
+      return HTBAH_REFACTOR_UTILS ? HTBAH_REFACTOR_UTILS.formatDatumZeit(eintrag.hinzugefuegtAm) : '';
     },
     formatEintragDateigroesse(eintrag) {
       if (!eintrag || !Number.isFinite(eintrag.dateigroesseBytes) || eintrag.dateigroesseBytes <= 0) {
         return '';
       }
-      return formatBytes(eintrag.dateigroesseBytes);
+      return this.formatBytes(eintrag.dateigroesseBytes);
+    },
+    formatBytes(value) {
+      return HTBAH_REFACTOR_UTILS ? HTBAH_REFACTOR_UTILS.formatBytesBinary(value) : `${value || 0} B`;
     },
   },
   mounted() {
@@ -1058,7 +1050,11 @@ window.HTBAH_SEITEN.Weltenbau = {
           ref="generatorFenster"
           class="regelwerk-modal-window card shadow htbah-generator-modal-window"
           :class="{ 'regelwerk-modal-window-fullscreen': generatorModal.istVollbild }"
-          :style="generatorModalStil">
+          :style="generatorModalStil"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="generatorModal.titel || 'Generator'"
+          tabindex="-1">
           <div
             class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2"
             @pointerdown="starteGeneratorZiehen">

@@ -1,15 +1,12 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
+const HTBAH_WB_REFACTOR_UTILS = window.HTBAH_SHARED && window.HTBAH_SHARED.RefactorUtils;
+const HTBAH_WB_BOOTSTRAP_MODAL =
+  window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper;
 
 /** Max. Kantenlänge des exportierten Bildes (JPEG/WebP nach Zuschnitt). */
 const WELTENBAU_EXPORT_MAX_KANTE = 2048;
 const WELTENBAU_JPEG_QUALITAET = 0.84;
 const WELTENBAU_WEBP_QUALITAET = 0.82;
-
-function dateinameOhneEndung(name) {
-  const roh = typeof name === 'string' ? name.trim() : '';
-  const o = roh.replace(/\.[^/.]+$/, '');
-  return o || 'Bild';
-}
 
 function canvasZuKomprimiertemDataUrl(canvas) {
   const webpProbe = canvas.toDataURL('image/webp', WELTENBAU_WEBP_QUALITAET);
@@ -57,9 +54,13 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
         return;
       }
       if (!this.bootstrapModal) {
-        this.bootstrapModal = window.bootstrap.Modal.getOrCreateInstance(el);
+        this.bootstrapModal = HTBAH_WB_BOOTSTRAP_MODAL
+          ? HTBAH_WB_BOOTSTRAP_MODAL.ensureModalInstance(el)
+          : null;
       }
-      this.bootstrapModal.show();
+      if (this.bootstrapModal) {
+        this.bootstrapModal.show();
+      }
       this.$nextTick(() => {
         this.setzeModalEbeneNachOben();
         window.setTimeout(() => this.setzeModalEbeneNachOben(), 80);
@@ -192,7 +193,9 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
         });
         return;
       }
-      const name = dateinameOhneEndung(this.aktuellerDateiname);
+      const name = HTBAH_WB_REFACTOR_UTILS
+        ? HTBAH_WB_REFACTOR_UTILS.dateinameOhneEndung(this.aktuellerDateiname, 'Bild')
+        : ((typeof this.aktuellerDateiname === 'string' ? this.aktuellerDateiname.trim() : '').replace(/\.[^/.]+$/, '') || 'Bild');
       this.schliessenOhneAbgebrochenEvent = true;
       this.$emit('fertig', { dataUrl, name, dateigroesseBytes: this.aktuelleDateigroesseBytes });
       if (this.bootstrapModal) {
@@ -225,13 +228,17 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
         this.urspruenglichesNaechstesGeschwister = el.nextSibling || null;
         document.body.appendChild(el);
       }
-      el.addEventListener('hidden.bs.modal', this.beimModalVersteckt);
+      if (HTBAH_WB_BOOTSTRAP_MODAL) {
+        HTBAH_WB_BOOTSTRAP_MODAL.bindHiddenEvent(el, this.beimModalVersteckt);
+      }
     }
   },
   beforeUnmount() {
     const el = this.$refs.modalElement;
     if (el) {
-      el.removeEventListener('hidden.bs.modal', this.beimModalVersteckt);
+      if (HTBAH_WB_BOOTSTRAP_MODAL) {
+        HTBAH_WB_BOOTSTRAP_MODAL.unbindHiddenEvent(el, this.beimModalVersteckt);
+      }
       if (this.urspruenglicherElternKnoten) {
         if (this.urspruenglichesNaechstesGeschwister && this.urspruenglichesNaechstesGeschwister.parentNode === this.urspruenglicherElternKnoten) {
           this.urspruenglicherElternKnoten.insertBefore(el, this.urspruenglichesNaechstesGeschwister);

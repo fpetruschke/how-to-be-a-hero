@@ -5,6 +5,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
   data() {
     return {
       ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
+      fokusVorModal: null,
     };
   },
   computed: {
@@ -26,13 +27,18 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
   watch: {
     'uiZustand.regelwerkOffen'(istOffen) {
       if (istOffen) {
-        this.$nextTick(this.initialisierePosition);
+        this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        this.$nextTick(() => {
+          this.initialisierePosition();
+          this.fokussiereFenster();
+        });
         return;
       }
 
       this.beendeZiehen();
       this.beendeResize();
       this.istVollbild = false;
+      this.stelleFokusWiederHer();
     },
   },
   mounted() {
@@ -45,11 +51,26 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
   },
   methods: {
     ...window.HTBAH_MODAL_FENSTER.methoden,
+    fokussiereFenster() {
+      const fenster = this.$refs.fensterElement;
+      if (fenster && typeof fenster.focus === 'function') {
+        fenster.focus();
+      }
+    },
+    stelleFokusWiederHer() {
+      if (this.fokusVorModal && this.fokusVorModal.isConnected) {
+        this.fokusVorModal.focus();
+      }
+      this.fokusVorModal = null;
+    },
     schliessen() {
       this.beendeZiehen();
       this.beendeResize();
       this.istVollbild = false;
       this.uiZustand.regelwerkOffen = false;
+    },
+    onFensterEscape() {
+      this.schliessen();
     },
   },
   template: `
@@ -58,7 +79,12 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
         ref="fensterElement"
         class="regelwerk-modal-window card shadow"
         :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
-        :style="fensterStil">
+        :style="fensterStil"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Regelwerk"
+        tabindex="-1"
+        @keydown.esc.stop.prevent="onFensterEscape">
         <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-3" @pointerdown="starteZiehen">
           <h4 class="mb-0">📜 Regelwerk</h4>
           <div class="d-flex gap-2 align-items-center">

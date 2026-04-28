@@ -577,17 +577,84 @@ input::placeholder {
 
 .htbah-weltenbau-map-header {
   gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: flex-start !important;
 }
 
 .htbah-weltenbau-map-title {
   flex: 0 1 auto;
   min-width: 0;
+  padding-top: 0.2rem;
 }
 
 .htbah-weltenbau-map-actions {
   flex: 1 1 auto;
   min-width: 0;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  row-gap: 0.35rem;
+}
+
+.htbah-map-suche-wrap {
+  position: relative;
+  width: min(360px, 44vw);
+  min-width: 180px;
+}
+
+.htbah-map-suche-input {
+  min-width: 180px;
+}
+
+@media (max-width: 1200px) {
+  .htbah-weltenbau-map-title {
+    flex: 1 1 100%;
+    padding-top: 0;
+  }
+
+  .htbah-weltenbau-map-actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 860px) {
+  .htbah-map-suche-wrap {
+    width: 100%;
+    min-width: 0;
+    order: -1;
+  }
+
+  .htbah-map-suche-input {
+    min-width: 0;
+  }
+}
+
+.htbah-map-suche-treffer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  max-height: min(46dvh, 320px);
+  overflow: auto;
+  padding: 0.2rem;
+}
+
+.htbah-map-suche-treffer-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0.42rem 0.5rem;
+  border-radius: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.htbah-map-suche-treffer-item:hover,
+.htbah-map-suche-treffer-item:focus-visible {
+  background: rgba(13, 110, 253, 0.12);
 }
 
 .htbah-weltenbau-map-canvas:active {
@@ -653,15 +720,19 @@ input::placeholder {
   background: #fff;
 }
 
-.htbah-map-ort-bild-locked {
+.htbah-map-element-locked {
   border-color: rgba(13, 110, 253, 0.95);
   box-shadow:
     0 0 0 2px rgba(13, 110, 253, 0.35),
     0 0.2rem 0.5rem rgba(0, 0, 0, 0.16);
 }
 
-.htbah-map-ort-bild-unlock-feedback {
-  animation: htbah-ort-bild-unlock-pulse 0.75s ease-out 1;
+.htbah-map-element-ausgewaehlt {
+  outline: 3px solid rgba(25, 135, 84, 0.95);
+  outline-offset: 1px;
+  box-shadow:
+    0 0 0 4px rgba(25, 135, 84, 0.35),
+    0 0.35rem 0.9rem rgba(0, 0, 0, 0.22);
 }
 
 .htbah-map-ort-bild img {
@@ -673,60 +744,41 @@ input::placeholder {
   pointer-events: none;
 }
 
-.htbah-map-ort-bild-lock-button {
+.htbah-map-element-lock-button {
   position: absolute;
-  left: 8px;
+  right: 8px;
   top: 8px;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: 0;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(33, 37, 41, 0.78);
+  background: rgba(73, 80, 87, 0.92);
   color: #fff;
-  opacity: 0;
-  pointer-events: none;
-  transform: scale(0.94);
-  transition:
-    opacity 180ms ease,
-    transform 180ms ease,
-    background-color 180ms ease;
-  z-index: 3;
-  touch-action: none;
-}
-
-.htbah-map-ort-bild-lock-button.is-visible {
-  opacity: 1;
   pointer-events: auto;
   transform: scale(1);
-}
-
-.htbah-map-ort-bild-lock-button:hover,
-.htbah-map-ort-bild-lock-button:focus-visible {
-  background: rgba(13, 110, 253, 0.95);
-}
-
-.htbah-map-ort-bild-lock-button .material-symbols-outlined {
-  font-size: 18px;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease;
+  z-index: 5;
+  touch-action: none;
+  font-size: 15px;
   line-height: 1;
 }
 
-.htbah-map-ort-bild-lock-hinweis {
-  position: absolute;
-  left: 40px;
-  top: 8px;
-  max-width: min(260px, calc(100% - 48px));
-  border-radius: 0.4rem;
-  background: rgba(33, 37, 41, 0.92);
-  color: #fff;
-  padding: 0.2rem 0.45rem;
-  font-size: 12px;
-  line-height: 1.2;
-  z-index: 3;
-  pointer-events: none;
-  animation: htbah-ort-bild-lock-hinweis-fade 2.4s ease-out 1;
+.htbah-map-element-lock-button.is-locked {
+  background: rgba(220, 53, 69, 0.96);
+}
+
+.htbah-map-element-lock-button.is-unlocked {
+  background: rgba(25, 135, 84, 0.96);
+}
+
+.htbah-map-element-lock-button:hover,
+.htbah-map-element-lock-button:focus-visible {
+  background: rgba(13, 110, 253, 0.95);
 }
 
 .htbah-map-ort-bild-resize {
@@ -742,36 +794,17 @@ input::placeholder {
   z-index: 4;
 }
 
-@keyframes htbah-ort-bild-unlock-pulse {
-  0% {
-    box-shadow:
-      0 0 0 2px rgba(25, 135, 84, 0.48),
-      0 0.2rem 0.5rem rgba(0, 0, 0, 0.16);
-  }
-  100% {
-    box-shadow:
-      0 0 0 0 rgba(25, 135, 84, 0),
-      0 0.2rem 0.5rem rgba(0, 0, 0, 0.16);
-  }
+.htbah-map-ort-bild-resize:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-@keyframes htbah-ort-bild-lock-hinweis-fade {
-  0% {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  12% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  76% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-2px);
-  }
+.htbah-map-auswahl-rahmen {
+  position: fixed;
+  z-index: 20;
+  border: 1px dashed rgba(25, 135, 84, 0.95);
+  background: rgba(25, 135, 84, 0.12);
+  pointer-events: none;
 }
 
 .htbah-map-node-ort {
@@ -2777,3 +2810,4 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
     font-size: .76rem;
   }
 }
+

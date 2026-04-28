@@ -370,7 +370,7 @@
       : '—';
 
     const bildBlock = bild
-      ? `<img src="${bild}" alt="" crossorigin="anonymous" style="width:92px;height:110px;object-fit:cover;border:1px solid #ccc;border-radius:4px;display:block;background:#f0f0f0;"/>`
+      ? `<img src="${bild}" alt="Charakterbild von ${escapeHtml(name || 'Unbenannt')}" crossorigin="anonymous" style="width:92px;height:110px;object-fit:cover;border:1px solid #ccc;border-radius:4px;display:block;background:#f0f0f0;"/>`
       : `<div style="width:92px;height:110px;border:1px dashed #bbb;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:7px;color:#888;text-align:center;line-height:1.2;">Kein Bild</div>`;
 
     return `<div class="htbah-pdf-wurzel" style="box-sizing:border-box;width:${PDF_BREITE_PX}px;padding:${PDF_PADDING};background:#fff;color:#111;font-family:${stil.schrift};line-height:1.2;">

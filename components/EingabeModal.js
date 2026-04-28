@@ -1,4 +1,6 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
+var HTBAH_BOOTSTRAP_MODAL =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper) || null;
 
 window.HTBAH_KOMPONENTEN.EingabeModal = {
   props: {
@@ -28,6 +30,7 @@ window.HTBAH_KOMPONENTEN.EingabeModal = {
       _onBestaetigen: null,
       _onAbbrechen: null,
       _erledigt: false,
+      _fokusVorModal: null,
     };
   },
   methods: {
@@ -42,6 +45,7 @@ window.HTBAH_KOMPONENTEN.EingabeModal = {
       onBestaetigen,
       onAbbrechen,
     }) {
+      this._fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.titel = titel || 'Eingabe';
       this.beschreibung = beschreibung || '';
       this.label = label || 'Eingabe';
@@ -55,10 +59,10 @@ window.HTBAH_KOMPONENTEN.EingabeModal = {
 
       this.$nextTick(() => {
         const el = this.$refs.modalElement;
-        if (!el || !window.bootstrap) {
+        if (!el || !HTBAH_BOOTSTRAP_MODAL) {
           return;
         }
-        this.modalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
+        this.modalInstanz = HTBAH_BOOTSTRAP_MODAL.ensureModalInstance(el);
         this.modalInstanz.show();
         this.$nextTick(() => {
           if (this.$refs.inputElement) {
@@ -100,19 +104,23 @@ window.HTBAH_KOMPONENTEN.EingabeModal = {
       if (!this._erledigt && this._onAbbrechen) {
         this._onAbbrechen();
       }
+      if (this._fokusVorModal && this._fokusVorModal.isConnected) {
+        this._fokusVorModal.focus();
+      }
       this.aufrufeZuruecksetzen();
+      this._fokusVorModal = null;
     },
   },
   mounted() {
     const el = this.$refs.modalElement;
-    if (el) {
-      el.addEventListener('hidden.bs.modal', this.modalGeschlossen);
+    if (el && HTBAH_BOOTSTRAP_MODAL) {
+      HTBAH_BOOTSTRAP_MODAL.bindHiddenEvent(el, this.modalGeschlossen);
     }
   },
   beforeUnmount() {
     const el = this.$refs.modalElement;
-    if (el) {
-      el.removeEventListener('hidden.bs.modal', this.modalGeschlossen);
+    if (el && HTBAH_BOOTSTRAP_MODAL) {
+      HTBAH_BOOTSTRAP_MODAL.unbindHiddenEvent(el, this.modalGeschlossen);
     }
   },
   template: `

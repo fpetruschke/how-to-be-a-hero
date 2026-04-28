@@ -7,6 +7,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
       quill: null,
       speichernTimer: null,
+      fokusVorModal: null,
     };
   },
   computed: {
@@ -23,9 +24,11 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
   watch: {
     'uiZustand.abenteuerbuchOffen'(istOffen) {
       if (istOffen) {
+        this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         this.$nextTick(() => {
           this.initialisierePosition();
           this.editorInitialisieren();
+          this.fokussiereFenster();
         });
         return;
       }
@@ -35,6 +38,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       this.istVollbild = false;
       this.speichernFlushen();
       this.quill = null;
+      this.stelleFokusWiederHer();
     },
   },
   mounted() {
@@ -53,6 +57,18 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
   },
   methods: {
     ...window.HTBAH_MODAL_FENSTER.methoden,
+    fokussiereFenster() {
+      const fenster = this.$refs.fensterElement;
+      if (fenster && typeof fenster.focus === 'function') {
+        fenster.focus();
+      }
+    },
+    stelleFokusWiederHer() {
+      if (this.fokusVorModal && this.fokusVorModal.isConnected) {
+        this.fokusVorModal.focus();
+      }
+      this.fokusVorModal = null;
+    },
     oeffnen() {
       this.uiZustand.abenteuerbuchOffen = true;
     },
@@ -62,6 +78,9 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       this.beendeResize();
       this.istVollbild = false;
       this.uiZustand.abenteuerbuchOffen = false;
+    },
+    onFensterEscape() {
+      this.schliessen();
     },
     beiSeiteVerlassen() {
       if (this.speichernTimer) {
@@ -121,7 +140,12 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
         ref="fensterElement"
         class="regelwerk-modal-window card shadow abenteuerbuch-modal-window"
         :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
-        :style="fensterStil">
+        :style="fensterStil"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Abenteuerbuch"
+        tabindex="-1"
+        @keydown.esc.stop.prevent="onFensterEscape">
         <div
           class="regelwerk-modal-header d-flex justify-content-between align-items-center p-3 flex-shrink-0"
           @pointerdown="starteZiehen">
