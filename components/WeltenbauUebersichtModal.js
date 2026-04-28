@@ -3,6 +3,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 (function () {
   const MAP_ZOOM_MIN = 0.01; // 1% (0% ist technisch nicht nutzbar)
   const MAP_ZOOM_MAX = 10; // 1000%
+  const ORT_BILD_AUTO_LOCK_SCHWELLE_AN = 0.55;
+  const ORT_BILD_AUTO_LOCK_SCHWELLE_AUS = 0.45;
+  const ORT_BILD_UNLOCK_FEEDBACK_MS = 1200;
+  const ORT_BILD_LOCK_HINWEIS_MS = 2400;
   const MAP_STANDARD_EINSTELLUNGEN = Object.freeze({
     zoomScale: 1,
     itemScale: 100,
@@ -145,6 +149,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           lpAenderungWaehrenEingabe: false,
           lpSnapshotVorEingabe: null,
           prevLpSnapshot: 0,
+          fenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
         },
         spielleiterTick: 0,
         zufallNpcEpoche: 'mittelalter',
@@ -169,6 +174,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           toteBestienAnzeigen: true,
           geloesteRaetselAnzeigen: true,
         },
+        ortBildInteraktion: {
+          manuellGesperrt: {},
+          autoGesperrt: {},
+          unlockFeedback: {},
+          unlockFeedbackTimer: {},
+          lockHinweisSichtbar: {},
+          lockHinweisTimer: {},
+          lockHinweisEinmalGezeigt: {},
+        },
       };
     },
     created() {
@@ -178,6 +192,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     computed: {
       fensterStil() {
         return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this.modal);
+      },
+      charakterFensterStil() {
+        return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this.charakterModal.fenster);
+      },
+      charakterVollbildIcon() {
+        return this.charakterModal.fenster.istVollbild ? 'close_fullscreen' : 'open_in_full';
       },
       gruppen() {
         // Recompute when local game-master state was persisted from this modal.
@@ -985,7 +1005,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               type: 'default',
               position: layout[key] || { x: anchor.x + 240 + (idx % 3) * 210, y: anchor.y + Math.floor(idx / 3) * 120 },
               data: {
-                label: `${emoji} ${textWert(row.name)}`,
+                label: `${emoji} ${textWert(prefix === 'raetsel' ? row.titel : row.name)}`,
                 entityType: prefix,
                 entityId: row.id,
                 payload: row,
@@ -1085,6 +1105,21 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       refreshGraph() {
         this.graph = this.baueGraph();
+      },
+      fokussiereNeuGespeicherteEntitaet(typ, entitaetId) {
+        if (!typ || !entitaetId || !this.graph || !Array.isArray(this.graph.nodes)) {
+          return;
+        }
+        const zielNode = this.graph.nodes.find((node) => {
+          const data = node && node.data;
+          return data && data.entityType === typ && data.entityId === entitaetId;
+        });
+        if (!zielNode || !zielNode.position) {
+          return;
+        }
+        const centerX = Number(zielNode.position.x || 0) + this.nodeBreite(zielNode) / 2;
+        const centerY = Number(zielNode.position.y || 0) + this.nodeHoehe(zielNode) / 2;
+        this.wendeMapCenterWeltAn(centerX, centerY);
       },
       nodeKlassen(node) {
         const t = node && node.data && node.data.entityType;
@@ -1197,6 +1232,205 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           height: `${Math.max(1, Math.round(Number(bild.height) || 220))}px`,
         };
       },
+      ortBildKlassen(bild) {
+        const ortId = bild && bild.ortId ? bild.ortId : '';
+        return {
+          'htbah-map-ort-bild-locked': this.istOrtBildGesperrt(ortId),
+          'htbah-map-ort-bild-unlock-feedback': this.istOrtBildUnlockFeedbackSichtbar(ortId),
+        };
+      },
+      ortBildLockButtonKlassen(bild) {
+        const ortId = bild && bild.ortId ? bild.ortId : '';
+        return {
+          'htbah-map-ort-bild-lock-button': true,
+          'is-visible': this.istOrtBildLockButtonSichtbar(ortId),
+        };
+      },
+      ortBildLockHinweisSichtbar(ortId) {
+        if (!ortId) {
+          return false;
+        }
+        return !!(this.ortBildInteraktion.lockHinweisSichtbar && this.ortBildInteraktion.lockHinweisSichtbar[ortId]);
+      },
+      ortBildLockIcon(bild) {
+        return this.istOrtBildGesperrt(bild && bild.ortId) ? 'lock' : 'lock_open';
+      },
+      ortBildLockLabel(bild) {
+        return this.istOrtBildGesperrt(bild && bild.ortId)
+          ? 'Ortsbild-Position entsperren'
+          : 'Ortsbild-Position sperren';
+      },
+      istOrtBildManuellGesperrt(ortId) {
+        if (!ortId) {
+          return false;
+        }
+        return !!(this.ortBildInteraktion.manuellGesperrt && this.ortBildInteraktion.manuellGesperrt[ortId]);
+      },
+      istOrtBildAutoGesperrt(ortId) {
+        if (!ortId) {
+          return false;
+        }
+        return !!(this.ortBildInteraktion.autoGesperrt && this.ortBildInteraktion.autoGesperrt[ortId]);
+      },
+      istOrtBildGesperrt(ortId) {
+        return this.istOrtBildManuellGesperrt(ortId) || this.istOrtBildAutoGesperrt(ortId);
+      },
+      istOrtBildUnlockFeedbackSichtbar(ortId) {
+        if (!ortId) {
+          return false;
+        }
+        return !!(this.ortBildInteraktion.unlockFeedback && this.ortBildInteraktion.unlockFeedback[ortId]);
+      },
+      istOrtBildLockButtonSichtbar(ortId) {
+        return this.istOrtBildGesperrt(ortId) || this.istOrtBildUnlockFeedbackSichtbar(ortId);
+      },
+      berechneMapCanvasRechteck() {
+        const canvas = this.$el && this.$el.querySelector ? this.$el.querySelector('.htbah-weltenbau-map-canvas') : null;
+        if (!canvas || typeof canvas.getBoundingClientRect !== 'function') {
+          return null;
+        }
+        const rect = canvas.getBoundingClientRect();
+        if (!(rect.width > 0 && rect.height > 0)) {
+          return null;
+        }
+        return rect;
+      },
+      berechneOrtBildSichtanteil(bild, canvasRect) {
+        if (!bild || !canvasRect) {
+          return 0;
+        }
+        const scale = Number(this.map.scale) || 1;
+        const left = (Number(bild.x) || 0) * scale + (Number(this.map.offsetX) || 0);
+        const top = (Number(bild.y) || 0) * scale + (Number(this.map.offsetY) || 0);
+        const width = Math.max(1, (Number(bild.width) || 1) * scale);
+        const height = Math.max(1, (Number(bild.height) || 1) * scale);
+        const right = left + width;
+        const bottom = top + height;
+        const visibleLeft = Math.max(left, canvasRect.left);
+        const visibleTop = Math.max(top, canvasRect.top);
+        const visibleRight = Math.min(right, canvasRect.right);
+        const visibleBottom = Math.min(bottom, canvasRect.bottom);
+        const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+        if (!(visibleWidth > 0 && visibleHeight > 0)) {
+          return 0;
+        }
+        const viewportFlaeche = canvasRect.width * canvasRect.height;
+        if (!(viewportFlaeche > 0)) {
+          return 0;
+        }
+        return (visibleWidth * visibleHeight) / viewportFlaeche;
+      },
+      setzeOrtBildUnlockFeedback(ortId, sichtbar) {
+        if (!ortId) {
+          return;
+        }
+        const timerMap = {
+          ...(this.ortBildInteraktion.unlockFeedbackTimer || {}),
+        };
+        if (timerMap[ortId]) {
+          window.clearTimeout(timerMap[ortId]);
+          delete timerMap[ortId];
+        }
+        const unlockFeedback = {
+          ...(this.ortBildInteraktion.unlockFeedback || {}),
+        };
+        if (sichtbar) {
+          unlockFeedback[ortId] = true;
+          timerMap[ortId] = window.setTimeout(() => {
+            this.setzeOrtBildUnlockFeedback(ortId, false);
+          }, ORT_BILD_UNLOCK_FEEDBACK_MS);
+        } else {
+          delete unlockFeedback[ortId];
+        }
+        this.ortBildInteraktion = {
+          ...this.ortBildInteraktion,
+          unlockFeedback,
+          unlockFeedbackTimer: timerMap,
+        };
+      },
+      setzeOrtBildLockHinweis(ortId, sichtbar) {
+        if (!ortId) {
+          return;
+        }
+        const timerMap = {
+          ...(this.ortBildInteraktion.lockHinweisTimer || {}),
+        };
+        if (timerMap[ortId]) {
+          window.clearTimeout(timerMap[ortId]);
+          delete timerMap[ortId];
+        }
+        const lockHinweisSichtbar = {
+          ...(this.ortBildInteraktion.lockHinweisSichtbar || {}),
+        };
+        if (sichtbar) {
+          lockHinweisSichtbar[ortId] = true;
+          timerMap[ortId] = window.setTimeout(() => {
+            this.setzeOrtBildLockHinweis(ortId, false);
+          }, ORT_BILD_LOCK_HINWEIS_MS);
+        } else {
+          delete lockHinweisSichtbar[ortId];
+        }
+        this.ortBildInteraktion = {
+          ...this.ortBildInteraktion,
+          lockHinweisSichtbar,
+          lockHinweisTimer: timerMap,
+        };
+      },
+      aktualisiereOrtBildAutoLock() {
+        const canvasRect = this.berechneMapCanvasRechteck();
+        const vorher = this.ortBildInteraktion.autoGesperrt || {};
+        const einmalGezeigt = this.ortBildInteraktion.lockHinweisEinmalGezeigt || {};
+        const einmalGezeigtNeu = { ...einmalGezeigt };
+        const nachher = {};
+        (this.ortBildElemente || []).forEach((bild) => {
+          const ortId = bild && bild.ortId ? bild.ortId : '';
+          if (!ortId) {
+            return;
+          }
+          const anteil = this.berechneOrtBildSichtanteil(bild, canvasRect);
+          const warGesperrt = !!vorher[ortId];
+          const istGesperrt = warGesperrt
+            ? anteil >= ORT_BILD_AUTO_LOCK_SCHWELLE_AUS
+            : anteil >= ORT_BILD_AUTO_LOCK_SCHWELLE_AN;
+          if (istGesperrt) {
+            nachher[ortId] = true;
+            if (!warGesperrt && !einmalGezeigtNeu[ortId]) {
+              einmalGezeigtNeu[ortId] = true;
+              this.setzeOrtBildLockHinweis(ortId, true);
+            }
+          } else if (warGesperrt) {
+            this.setzeOrtBildUnlockFeedback(ortId, true);
+          }
+        });
+        this.ortBildInteraktion = {
+          ...this.ortBildInteraktion,
+          autoGesperrt: nachher,
+          lockHinweisEinmalGezeigt: einmalGezeigtNeu,
+        };
+      },
+      ortBildLockUmschalten(bild) {
+        const ortId = bild && bild.ortId ? bild.ortId : '';
+        if (!ortId) {
+          return;
+        }
+        const warGesperrt = this.istOrtBildGesperrt(ortId);
+        const manuell = {
+          ...(this.ortBildInteraktion.manuellGesperrt || {}),
+        };
+        if (this.istOrtBildManuellGesperrt(ortId)) {
+          delete manuell[ortId];
+        } else {
+          manuell[ortId] = true;
+        }
+        this.ortBildInteraktion = {
+          ...this.ortBildInteraktion,
+          manuellGesperrt: manuell,
+        };
+        if (warGesperrt && !this.istOrtBildGesperrt(ortId)) {
+          this.setzeOrtBildUnlockFeedback(ortId, true);
+        }
+      },
       schreibeOrtBildLayout(ortId, layout) {
         if (!ortId || !layout) {
           return;
@@ -1236,7 +1470,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return null;
         }
         const sourceType = sourceNode.data.entityType;
-        if (!['charakter', 'npc', 'bestie', 'gegenstand', 'raetsel'].includes(sourceType)) {
+        if (!['charakter', 'npc', 'bestie', 'gegenstand', 'raetsel', 'fraktion'].includes(sourceType)) {
           return null;
         }
         const sourceRect = this.nodeRechteck(sourceNode);
@@ -1250,6 +1484,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             return false;
           }
           const t = n.data.entityType;
+          if (sourceType === 'fraktion') {
+            return t === 'ort';
+          }
           return t === 'ort' || t === 'fraktion';
         });
         let best = null;
@@ -1315,6 +1552,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           const ortName = String(targetPayload.name || '').trim();
           if (!ortName) {
             return false;
+          }
+          if (sourceType === 'fraktion') {
+            return this.verknuepfeFraktionMitOrt(sourceId, ortName);
           }
           if (sourceType === 'charakter') {
             return this.updateCharakterZuordnung(sourceId, (charakter) => ({
@@ -1403,6 +1643,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (event.pointerType === 'mouse' && event.button !== 0) {
           return;
         }
+        if (modus === 'move' && this.istOrtBildGesperrt(bild.ortId)) {
+          this.startePan(event, { vonGesperrtemBild: true });
+          return;
+        }
         this.starteVerlaufAktion();
         this.ortBildDrag.aktiv = true;
         this.ortBildDrag.ortId = bild.ortId;
@@ -1479,6 +1723,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.charakterModal.lpEingabeAktiv = false;
         this.charakterModal.lpAenderungWaehrenEingabe = false;
         this.charakterQuillSession += 1;
+        this.$nextTick(() => this.initialisiereCharakterFenster());
       },
       oeffneCharakterBearbeitung(node) {
         const mitgliedId = node && node.data ? node.data.entityId : '';
@@ -1498,6 +1743,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
       },
       schliesseCharakterModal() {
+        this.beendeCharakterZiehen();
+        this.beendeCharakterResize();
         this.charakterQuillInstanz = null;
         this.charakterQuillHostElement = null;
         this.charakterModal.offen = false;
@@ -1508,6 +1755,126 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.charakterModal.lpSnapshotVorEingabe = null;
         this.charakterModal.lpEingabeAktiv = false;
         this.charakterModal.lpAenderungWaehrenEingabe = false;
+        this.charakterModal.fenster.istVollbild = false;
+      },
+      begrenzeCharakterFensterGroesse(breite, hoehe) {
+        return window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(breite, hoehe, 420, 320);
+      },
+      initialisiereCharakterFenster() {
+        const fenster = this.$refs.charakterFensterElement;
+        if (!fenster || !this.charakterModal.offen) {
+          return;
+        }
+        if (this.charakterModal.fenster.breite == null || this.charakterModal.fenster.hoehe == null) {
+          const groesse = this.begrenzeCharakterFensterGroesse(fenster.offsetWidth, fenster.offsetHeight);
+          this.charakterModal.fenster.breite = groesse.breite;
+          this.charakterModal.fenster.hoehe = groesse.hoehe;
+        }
+        if (this.charakterModal.fenster.positionX == null || this.charakterModal.fenster.positionY == null) {
+          const v = this.ermittleViewportGroesse();
+          this.charakterModal.fenster.positionX = Math.max(0, Math.round((v.viewportBreite - this.charakterModal.fenster.breite) / 2));
+          this.charakterModal.fenster.positionY = Math.max(0, Math.round((v.viewportHoehe - this.charakterModal.fenster.hoehe) / 2));
+        }
+        this.stelleSichtbaresCharakterFensterSicher();
+      },
+      stelleSichtbaresCharakterFensterSicher() {
+        const fenster = this.charakterModal.fenster;
+        if (fenster.istVollbild || fenster.breite == null || fenster.hoehe == null) {
+          return;
+        }
+        const groesse = this.begrenzeCharakterFensterGroesse(fenster.breite, fenster.hoehe);
+        fenster.breite = groesse.breite;
+        fenster.hoehe = groesse.hoehe;
+        const pos = window.HTBAH_MODAL_FENSTER.utils.begrenzePosition(
+          fenster.positionX || 0,
+          fenster.positionY || 0,
+          fenster.breite,
+          fenster.hoehe,
+        );
+        fenster.positionX = pos.x;
+        fenster.positionY = pos.y;
+      },
+      starteCharakterZiehen(event) {
+        const fenster = this.charakterModal.fenster;
+        if (fenster.istVollbild || (event.target && event.target.closest('button, a, input, select, textarea'))) {
+          return;
+        }
+        if (event.pointerType === 'mouse' && event.button !== 0) {
+          return;
+        }
+        const el = this.$refs.charakterFensterElement;
+        if (!el) {
+          return;
+        }
+        const rect = el.getBoundingClientRect();
+        fenster.ziehenAktiv = true;
+        fenster.ziehOffsetX = event.clientX - rect.left;
+        fenster.ziehOffsetY = event.clientY - rect.top;
+        window.addEventListener('pointermove', this.beimCharakterZiehen);
+        window.addEventListener('pointerup', this.beendeCharakterZiehen);
+        window.addEventListener('pointercancel', this.beendeCharakterZiehen);
+        event.preventDefault();
+      },
+      beimCharakterZiehen(event) {
+        const fenster = this.charakterModal.fenster;
+        if (!fenster.ziehenAktiv || fenster.istVollbild || fenster.breite == null || fenster.hoehe == null) {
+          return;
+        }
+        fenster.positionX = event.clientX - fenster.ziehOffsetX;
+        fenster.positionY = event.clientY - fenster.ziehOffsetY;
+        this.stelleSichtbaresCharakterFensterSicher();
+      },
+      beendeCharakterZiehen() {
+        this.charakterModal.fenster.ziehenAktiv = false;
+        window.removeEventListener('pointermove', this.beimCharakterZiehen);
+        window.removeEventListener('pointerup', this.beendeCharakterZiehen);
+        window.removeEventListener('pointercancel', this.beendeCharakterZiehen);
+      },
+      starteCharakterResize(event) {
+        const fenster = this.charakterModal.fenster;
+        if (fenster.istVollbild) {
+          return;
+        }
+        if (event.pointerType === 'mouse' && event.button !== 0) {
+          return;
+        }
+        const el = this.$refs.charakterFensterElement;
+        if (!el) {
+          return;
+        }
+        fenster.resizeAktiv = true;
+        fenster.resizeStartX = event.clientX;
+        fenster.resizeStartY = event.clientY;
+        fenster.resizeStartBreite = fenster.breite != null ? fenster.breite : el.offsetWidth;
+        fenster.resizeStartHoehe = fenster.hoehe != null ? fenster.hoehe : el.offsetHeight;
+        window.addEventListener('pointermove', this.beimCharakterResize);
+        window.addEventListener('pointerup', this.beendeCharakterResize);
+        window.addEventListener('pointercancel', this.beendeCharakterResize);
+        event.preventDefault();
+      },
+      beimCharakterResize(event) {
+        const fenster = this.charakterModal.fenster;
+        if (!fenster.resizeAktiv || fenster.istVollbild) {
+          return;
+        }
+        const neueBreite = fenster.resizeStartBreite + (event.clientX - fenster.resizeStartX);
+        const neueHoehe = fenster.resizeStartHoehe + (event.clientY - fenster.resizeStartY);
+        const groesse = this.begrenzeCharakterFensterGroesse(neueBreite, neueHoehe);
+        fenster.breite = groesse.breite;
+        fenster.hoehe = groesse.hoehe;
+        this.stelleSichtbaresCharakterFensterSicher();
+      },
+      beendeCharakterResize() {
+        this.charakterModal.fenster.resizeAktiv = false;
+        window.removeEventListener('pointermove', this.beimCharakterResize);
+        window.removeEventListener('pointerup', this.beendeCharakterResize);
+        window.removeEventListener('pointercancel', this.beendeCharakterResize);
+      },
+      charakterVollbildUmschalten() {
+        this.charakterModal.fenster.istVollbild = !this.charakterModal.fenster.istVollbild;
+        if (!this.charakterModal.fenster.istVollbild) {
+          this.$nextTick(() => this.stelleSichtbaresCharakterFensterSicher());
+        }
       },
       charakterNotizenHtml() {
         if (!this.charakterModal.charakter) {
@@ -1772,6 +2139,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const scaleNeu = this.begrenzeMapScale(neueScale);
         if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
           this.map.scale = scaleNeu;
+          this.aktualisiereOrtBildAutoLock();
           return;
         }
         const weltX = (clientX - this.map.offsetX) / scaleAlt;
@@ -1779,6 +2147,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.map.scale = scaleNeu;
         this.map.offsetX = clientX - weltX * scaleNeu;
         this.map.offsetY = clientY - weltY * scaleNeu;
+        this.aktualisiereOrtBildAutoLock();
       },
       erstelleVerlaufSnapshot() {
         const nodePositionen = {};
@@ -2027,8 +2396,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.map.pinchWeltX = (mitte.x - this.map.offsetX) / this.map.pinchStartScale;
         this.map.pinchWeltY = (mitte.y - this.map.offsetY) / this.map.pinchStartScale;
       },
-      startePan(event) {
+      startePan(event, optionen) {
+        const opts = optionen && typeof optionen === 'object' ? optionen : {};
         if (
+          !opts.vonGesperrtemBild &&
           event.target &&
           typeof event.target.closest === 'function' &&
           (event.target.closest('.htbah-map-node') || event.target.closest('.htbah-map-ort-bild'))
@@ -2064,6 +2435,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               this.map.scale = scaleNeu;
               this.map.offsetX = mitte.x - this.map.pinchWeltX * scaleNeu;
               this.map.offsetY = mitte.y - this.map.pinchWeltY * scaleNeu;
+              this.aktualisiereOrtBildAutoLock();
               event.preventDefault();
               return;
             }
@@ -2094,6 +2466,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               height: this.ortBildDrag.startHeight,
             });
           }
+          this.aktualisiereOrtBildAutoLock();
           return;
         }
         if (this.nodeDrag.aktiv) {
@@ -2119,6 +2492,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         this.map.offsetX = this.map.panOffsetStartX + (event.clientX - this.map.panStartX);
         this.map.offsetY = this.map.panOffsetStartY + (event.clientY - this.map.panStartY);
+        this.aktualisiereOrtBildAutoLock();
       },
       onMapPointerUp(event) {
         if (event.pointerType === 'touch') {
@@ -2179,6 +2553,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           }
           this.ortBildDrag.ortId = '';
           this.ortBildDrag.modus = '';
+          this.aktualisiereOrtBildAutoLock();
           this.bestaetigeVerlaufAktion();
           return;
         }
@@ -2206,8 +2581,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 const nah = this.naechsterOrtNodeZu(node);
                 if (nah && nah.closest && nah.distance < 260) {
                   const ortName = (nah.closest.data && nah.closest.data.payload && nah.closest.data.payload.name) || '';
-                  this.updateAufenthaltsort(node.data.entityType, node.data.entityId, ortName);
-                  wurdeAktualisiert = true;
+                  if (node.data.entityType === 'fraktion') {
+                    wurdeAktualisiert = this.verknuepfeFraktionMitOrt(node.data.entityId, ortName);
+                  } else {
+                    this.updateAufenthaltsort(node.data.entityType, node.data.entityId, ortName);
+                    wurdeAktualisiert = true;
+                  }
                 }
               }
               if (wurdeAktualisiert) {
@@ -2220,12 +2599,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.nodeDrag.nodeId = '';
         this.setzeDragHoverZiel('');
         this.map.panning = false;
+        this.aktualisiereOrtBildAutoLock();
         this.bestaetigeVerlaufAktion();
       },
       onMapWheel(event) {
         this.starteVerlaufAktion();
         const faktor = Math.exp(-event.deltaY * 0.0015);
         this.setzeMapScaleMitAnker((Number(this.map.scale) || 1) * faktor, event.clientX, event.clientY);
+        this.aktualisiereOrtBildAutoLock();
         this.planeZoomVerlaufCommit();
       },
       istEditierbaresElement(el) {
@@ -2282,6 +2663,99 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           );
         }
         this.speichereZustand();
+      },
+      verknuepfeFraktionMitOrt(fraktionId, ortName) {
+        const name = String(ortName || '').trim();
+        if (!fraktionId || !name) {
+          return false;
+        }
+        let wurdeGeaendert = false;
+        this.zustand.fraktionen = (this.zustand.fraktionen || []).map((fraktion) => {
+          if (!fraktion || fraktion.id !== fraktionId) {
+            return fraktion;
+          }
+          const orte = this.fraktionOrteListe(fraktion);
+          if (orte.includes(name)) {
+            return fraktion;
+          }
+          wurdeGeaendert = true;
+          return {
+            ...fraktion,
+            orte: [...orte, name],
+          };
+        });
+        if (wurdeGeaendert) {
+          this.speichereZustand();
+        }
+        return wurdeGeaendert;
+      },
+      async loescheAnlageMitBestaetigung() {
+        const typ = this.anlage && this.anlage.typ;
+        const index = this.anlage && Number.isInteger(this.anlage.index) ? this.anlage.index : -1;
+        if (!typ || index < 0) {
+          return;
+        }
+        if (!['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand'].includes(typ)) {
+          return;
+        }
+        const bestaetigt = await window.HTBAH.ui.confirm({
+          titel: 'Eintrag löschen?',
+          beschreibung: 'Der Eintrag wird dauerhaft aus der Interaktiven Welt entfernt.',
+          bestaetigenText: 'Löschen',
+          bestaetigenButtonClass: 'btn-danger',
+          warnhinweisAnzeigen: false,
+        });
+        if (!bestaetigt) {
+          return;
+        }
+        if (!this.loescheAnlageIntern(typ, index)) {
+          return;
+        }
+        this.schliesseAnlageModal();
+        this.$nextTick(() => this.refreshGraph());
+      },
+      loescheAnlageIntern(typ, index) {
+        if (!Number.isInteger(index) || index < 0) {
+          return false;
+        }
+        const listeName =
+          typ === 'npc'
+            ? 'npcs'
+            : typ === 'ort'
+              ? 'orte'
+              : typ === 'fraktion'
+                ? 'fraktionen'
+                : typ === 'pantheon'
+                  ? 'pantheon'
+                  : typ === 'raetsel'
+                    ? 'raetsel'
+                    : typ === 'bestie'
+                      ? 'bestien'
+                      : typ === 'gegenstand'
+                        ? 'gegenstaende'
+                        : '';
+        if (!listeName || !Array.isArray(this.zustand[listeName]) || index >= this.zustand[listeName].length) {
+          return false;
+        }
+        this.zustand[listeName] = this.zustand[listeName].filter((_, i) => i !== index);
+        this.speichereZustand();
+        return true;
+      },
+      dupliziereAnlageAusModal() {
+        if (!this.anlage || this.anlage.typ !== 'bestie' || !this.anlage.zeile) {
+          return;
+        }
+        const kopie = JSON.parse(JSON.stringify(this.anlage.zeile));
+        kopie.id = window.HTBAH.neueEntropieId();
+        const basisName = String(kopie.name || '').trim();
+        kopie.name = basisName ? `${basisName} (Kopie)` : 'Neue Bestie (Kopie)';
+        this.zustand.bestien = [...(this.zustand.bestien || []), kopie];
+        this.speichereZustand();
+        this.schliesseAnlageModal();
+        this.$nextTick(() => {
+          this.refreshGraph();
+          this.$nextTick(() => this.fokussiereNeuGespeicherteEntitaet('bestie', kopie.id));
+        });
       },
       oeffneDetail(node) {
         this.detail = node && node.data ? node.data : null;
@@ -2557,6 +3031,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           },
         });
         this.zeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitung();
+        this.zeileQuillInstanz.on('selection-change', (range, oldRange) => {
+          if (this.anlage.offen && this.anlage.index >= 0 && oldRange && !range) {
+            this.anlageBearbeitungBeiBlurSpeichern();
+          }
+        });
       },
       quillHtmlInBearbeitungSchreiben() {
         if (!this.anlage.zeile || !this.zeileQuillInstanz) {
@@ -2606,6 +3085,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (!String(this.anlage.zeile.primaryMediumId || '').trim()) {
           this.anlage.zeile.primaryMediumId = neuerEintrag.id;
         }
+        this.anlageBearbeitungBeiBlurSpeichern();
         this.bildImportNaechstesAusWarteschlange();
       },
       onZeilenBildImportAbgebrochen() {
@@ -2622,8 +3102,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         if (this.anlage.index < 0) {
           await window.HTBAH.ui.alert({
-            titel: 'Schritt 1 fehlt',
-            beschreibung: 'Bitte zuerst die Entität speichern. Danach können Dateien im Schritt 2 hochgeladen werden.',
+            titel: 'Entität zuerst speichern',
+            beschreibung: 'Dateien und Bilder können erst bei bereits gespeicherten Entitäten bearbeitet werden.',
           });
           return;
         }
@@ -2671,6 +3151,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           }
         }
         this.anlage.zeile.medien = [...(Array.isArray(this.anlage.zeile.medien) ? this.anlage.zeile.medien : []), ...neu];
+        this.anlageBearbeitungBeiBlurSpeichern();
         if (this.medienImportWarteschlange.length) {
           this.bildImportNaechstesAusWarteschlange();
         }
@@ -2714,6 +3195,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return;
         }
         this.anlage.zeile.primaryMediumId = id;
+        this.anlageBearbeitungBeiBlurSpeichern();
       },
       mediumImBildbetrachterOeffnen(medium) {
         if (!this.mediumIstBild(medium) || typeof window.HTBAH.bildbetrachterOeffnen !== 'function') {
@@ -2750,6 +3232,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           const fallback = (this.anlage.zeile.medien || []).find((m) => this.mediumIstBild(m));
           this.anlage.zeile.primaryMediumId = fallback && fallback.id ? fallback.id : '';
         }
+        this.anlageBearbeitungBeiBlurSpeichern();
       },
       schliesseAnlageModal() {
         this.zeileQuillInstanz = null;
@@ -2763,6 +3246,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.anlage.index = -1;
       },
       speichereAnlage() {
+        this.speichereAnlageIntern({ schliessenNachSpeichern: true });
+      },
+      anlageBearbeitungBeiBlurSpeichern() {
+        if (!this.anlage.offen || !this.anlage.zeile || !this.anlage.typ || this.anlage.index < 0) {
+          return;
+        }
+        this.speichereAnlageIntern({ schliessenNachSpeichern: false });
+      },
+      speichereAnlageIntern({ schliessenNachSpeichern }) {
         if (!this.anlage.offen || !this.anlage.zeile || !this.anlage.typ) {
           return;
         }
@@ -2774,7 +3266,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const typ = this.anlage.typ;
         const index = Number.isInteger(this.anlage.index) ? this.anlage.index : -1;
         const z = JSON.parse(JSON.stringify(this.anlage.zeile));
-        let gespeicherterIndex = index;
         if (typ === 'npc') {
           z.handeln = this.normalisiereBegabungswert(z.handeln);
           z.wissen = this.normalisiereBegabungswert(z.wissen);
@@ -2794,14 +3285,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.zustand.orte = (this.zustand.orte || []).map((row, i) => (i === index ? z : row));
           } else {
             this.zustand.orte = [...(this.zustand.orte || []), z];
-            gespeicherterIndex = this.zustand.orte.length - 1;
           }
         } else if (typ === 'npc') {
           if (index >= 0) {
             this.zustand.npcs = (this.zustand.npcs || []).map((row, i) => (i === index ? z : row));
           } else {
             this.zustand.npcs = [...(this.zustand.npcs || []), z];
-            gespeicherterIndex = this.zustand.npcs.length - 1;
           }
         } else if (typ === 'fraktion') {
           z.orte = this.fraktionOrteListe(z);
@@ -2809,28 +3298,24 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.zustand.fraktionen = (this.zustand.fraktionen || []).map((row, i) => (i === index ? z : row));
           } else {
             this.zustand.fraktionen = [...(this.zustand.fraktionen || []), z];
-            gespeicherterIndex = this.zustand.fraktionen.length - 1;
           }
         } else if (typ === 'bestie') {
           if (index >= 0) {
             this.zustand.bestien = (this.zustand.bestien || []).map((row, i) => (i === index ? z : row));
           } else {
             this.zustand.bestien = [...(this.zustand.bestien || []), z];
-            gespeicherterIndex = this.zustand.bestien.length - 1;
           }
         } else if (typ === 'raetsel') {
           if (index >= 0) {
             this.zustand.raetsel = (this.zustand.raetsel || []).map((row, i) => (i === index ? z : row));
           } else {
             this.zustand.raetsel = [...(this.zustand.raetsel || []), z];
-            gespeicherterIndex = this.zustand.raetsel.length - 1;
           }
         } else if (typ === 'gegenstand') {
           if (index >= 0) {
             this.zustand.gegenstaende = (this.zustand.gegenstaende || []).map((row, i) => (i === index ? z : row));
           } else {
             this.zustand.gegenstaende = [...(this.zustand.gegenstaende || []), z];
-            gespeicherterIndex = this.zustand.gegenstaende.length - 1;
           }
         }
         try {
@@ -2844,19 +3329,27 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return;
         }
         if (index < 0) {
-          this.anlage.index = gespeicherterIndex;
-          this.anlage.zeile = JSON.parse(JSON.stringify(z));
-          this.speicherStatusHinweis = 'Schritt 1 abgeschlossen. Jetzt Dateien/Bilder im Schritt 2 hinzufügen und erneut speichern.';
-          window.HTBAH.ui.notify({ text: 'Entität gespeichert. Jetzt kannst Du Medien hinzufügen.', typ: 'success' });
-          this.$nextTick(() => this.refreshGraph());
-          return;
+          this.speicherStatusHinweis = '';
         }
-        this.schliesseAnlageModal();
-        this.$nextTick(() => this.refreshGraph());
+        if (schliessenNachSpeichern) {
+          this.schliesseAnlageModal();
+        }
+        this.$nextTick(() => {
+          this.refreshGraph();
+          if (index < 0 && z && z.id) {
+            this.$nextTick(() => this.fokussiereNeuGespeicherteEntitaet(typ, z.id));
+          }
+        });
       },
       onResize() {
         if (this.offen) {
-          this.$nextTick(() => this.stelleSichtbaresFensterSicher());
+          this.$nextTick(() => {
+            this.stelleSichtbaresFensterSicher();
+            this.aktualisiereOrtBildAutoLock();
+          });
+        }
+        if (this.charakterModal.offen) {
+          this.$nextTick(() => this.stelleSichtbaresCharakterFensterSicher());
         }
       },
     },
@@ -2871,12 +3364,23 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.refreshGraph();
             this.uebernehmeMapEinstellungen();
             this.verlaufZuruecksetzen();
+            this.aktualisiereOrtBildAutoLock();
           });
         } else {
+          if (this.charakterModal.offen) {
+            this.schliesseCharakterModal();
+          }
           this.nodeDrag.aktiv = false;
           this.map.panning = false;
           this.map.pinchAktiv = false;
           this.map.touchPointer = {};
+          this.ortBildInteraktion = {
+            ...this.ortBildInteraktion,
+            autoGesperrt: {},
+            unlockFeedback: {},
+            lockHinweisSichtbar: {},
+            lockHinweisEinmalGezeigt: {},
+          };
           this.setzeDragHoverZiel('');
           this.verlaufZuruecksetzen();
         }
@@ -2889,6 +3393,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.refreshGraph();
             this.uebernehmeMapEinstellungen();
             this.verlaufZuruecksetzen();
+            this.aktualisiereOrtBildAutoLock();
           });
         }
       },
@@ -2966,6 +3471,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     },
     beforeUnmount() {
       this.verlaufZuruecksetzen();
+      this.beendeCharakterZiehen();
+      this.beendeCharakterResize();
+      Object.values(this.ortBildInteraktion.unlockFeedbackTimer || {}).forEach((timerId) => {
+        if (timerId) {
+          window.clearTimeout(timerId);
+        }
+      });
+      Object.values(this.ortBildInteraktion.lockHinweisTimer || {}).forEach((timerId) => {
+        if (timerId) {
+          window.clearTimeout(timerId);
+        }
+      });
       window.removeEventListener('resize', this.onResize);
       window.removeEventListener('pointermove', this.onMapPointerMove);
       window.removeEventListener('pointerup', this.onMapPointerUp);
@@ -3195,9 +3712,26 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   :key="'ort-bild-map-' + bild.ortId"
                   :data-ort-image-id="bild.ortId"
                   class="htbah-map-ort-bild"
+                  :class="ortBildKlassen(bild)"
                   :style="ortBildStil(bild)"
                   @pointerdown.stop="starteOrtBildDrag($event, bild, 'move')">
                   <img :src="bild.dataUrl" :alt="'Ortsbild: ' + bild.ortName" />
+                  <button
+                    type="button"
+                    :class="ortBildLockButtonKlassen(bild)"
+                    :aria-label="ortBildLockLabel(bild)"
+                    :title="ortBildLockLabel(bild)"
+                    @pointerdown.stop.prevent
+                    @click.stop.prevent="ortBildLockUmschalten(bild)">
+                    <span class="material-symbols-outlined" aria-hidden="true">{{ ortBildLockIcon(bild) }}</span>
+                  </button>
+                  <div
+                    v-if="ortBildLockHinweisSichtbar(bild.ortId)"
+                    class="htbah-map-ort-bild-lock-hinweis"
+                    role="status"
+                    aria-live="polite">
+                    Bild gesperrt, um Navigation zu erleichtern
+                  </div>
                   <button
                     type="button"
                     class="htbah-map-ort-bild-resize"
@@ -3308,12 +3842,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           :zeile-quill-host-ref-fn="zeileQuillHostRefFn"
           @close="schliesseAnlageModal"
           @save="speichereAnlage"
+          @edit-blur="anlageBearbeitungBeiBlurSpeichern"
           @random="zufallsvorschlagUebernehmen"
           @media-upload="onBearbeitungsMedienDateienGewaehlt"
           @media-remove="mediumAusBearbeitungEntfernen"
           @media-set-primary="setzeBearbeitungPrimaryMedium"
           @media-open="mediumImBildbetrachterOeffnen"
           @media-download="mediumHerunterladen"
+          @delete="loescheAnlageMitBestaetigung"
+          @duplicate="dupliziereAnlageAusModal"
           @update:zufallNpcEpoche="zufallNpcEpoche = $event"
           @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
           @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
@@ -3324,12 +3861,22 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           @fertig="onMapHintergrundImportFertig"
           @abgebrochen="onMapHintergrundImportAbgebrochen"
           @datei-import-fehler="onMapHintergrundImportFehler" />
-        <div v-if="charakterModal.offen && charakterModal.charakter" class="htbah-weltenbau-map-detail card shadow">
-          <div class="card-header d-flex justify-content-between align-items-center py-2">
+        <div
+          v-if="charakterModal.offen && charakterModal.charakter"
+          ref="charakterFensterElement"
+          class="regelwerk-modal-window card shadow htbah-weltenbau-charakter-modal-window"
+          :class="{ 'regelwerk-modal-window-fullscreen': charakterModal.fenster.istVollbild }"
+          :style="charakterFensterStil">
+          <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2" @pointerdown="starteCharakterZiehen($event)">
             <strong>🧙 Charakter bearbeiten</strong>
-            <button type="button" class="btn-close" @click="schliesseCharakterModal"></button>
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="regelwerk-icon-button" @click="charakterVollbildUmschalten">
+                <span class="material-symbols-outlined">{{ charakterVollbildIcon }}</span>
+              </button>
+              <button type="button" class="btn-close" @click="schliesseCharakterModal"></button>
+            </div>
           </div>
-          <div class="card-body py-2 small">
+          <div class="card-body py-2 small htbah-weltenbau-charakter-modal-body">
             <div
               v-if="charakterModalStatus.tot || charakterModalStatus.bewusstlos"
               class="alert py-2 px-3 mb-2 htbah-charakter-status-alert"
@@ -3372,7 +3919,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 <label class="form-label small text-secondary mb-1">Initiative</label>
                 <div class="input-group">
                   <input
-                    class="form-control form-control-sm"
+                    class="form-control"
                     type="number"
                     min="1"
                     :max="10 + Math.max(0, Math.round(((charakterModal.charakter.handeln || []).reduce((sum, eintrag) => sum + (Number(eintrag && eintrag.value) || 0), 0)) / 10))"
@@ -3382,13 +3929,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     autocomplete="off" />
                   <button
                     type="button"
-                    class="btn btn-sm btn-outline-primary"
+                    class="btn btn-outline-primary"
                     @click="charakterInitiativeWuerfeln">
                     🎲
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-outline-secondary"
+                    class="btn btn-outline-secondary"
                     :disabled="!String(charakterModal.charakter.initiative || '').trim()"
                     @click="charakterInitiativeZuruecksetzen">
                     Reset
@@ -3452,7 +3999,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             </div>
             <label class="form-label mt-2 mb-1">Notizen</label>
             <div class="zufallstabellen-quill-wrap" :key="'wb-char-q-' + charakterQuillSession">
-              <div :ref="charakterQuillHostRefFn" class="quill-editor-host zufallstabellen-quill-host"></div>
+              <div :ref="charakterQuillHostRefFn" class="quill-editor-host zufallstabellen-quill-host htbah-charakter-journal-host"></div>
             </div>
             <div class="d-flex justify-content-between gap-2 mt-3">
               <button type="button" class="btn btn-sm btn-outline-secondary" @click="springeZumCharakterAusModal">
@@ -3464,6 +4011,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               </div>
             </div>
           </div>
+          <div
+            v-if="!charakterModal.fenster.istVollbild"
+            class="regelwerk-modal-resize-handle"
+            role="presentation"
+            aria-hidden="true"
+            @pointerdown="starteCharakterResize($event)"></div>
         </div>
       </div>
     `,

@@ -787,10 +787,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.bearbeitung.zeile.medien.splice(index, 1);
       const primaryId = String(this.bearbeitung.zeile.primaryMediumId || '').trim();
       if (!primaryId || !entfernt || primaryId !== entfernt.id) {
+        this.zeileBearbeitungBeiBlurSpeichern();
         return;
       }
       const fallback = this.medienBilderAusZeile(this.bearbeitung.zeile)[0];
       this.bearbeitung.zeile.primaryMediumId = fallback && fallback.id ? fallback.id : '';
+      this.zeileBearbeitungBeiBlurSpeichern();
     },
     mediumZurBearbeitungHinzufuegen(eintrag) {
       if (!this.bearbeitung || !this.bearbeitung.zeile || !eintrag) {
@@ -820,6 +822,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return;
       }
       this.bearbeitung.zeile.primaryMediumId = id;
+      this.zeileBearbeitungBeiBlurSpeichern();
     },
     bildImportNaechstesAusWarteschlange() {
       if (!this.medienImportWarteschlange.length) {
@@ -847,6 +850,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         size: Number.isFinite(dateigroesseBytes) && dateigroesseBytes > 0 ? Math.round(dateigroesseBytes) : null,
         createdAt: new Date().toISOString(),
       });
+      this.zeileBearbeitungBeiBlurSpeichern();
       this.bildImportNaechstesAusWarteschlange();
     },
     onZufallstabellenBildImportAbgebrochen() {
@@ -898,6 +902,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             size: Number.isFinite(file.size) && file.size > 0 ? Math.round(file.size) : null,
             createdAt: new Date().toISOString(),
           });
+          this.zeileBearbeitungBeiBlurSpeichern();
         } catch {
           await window.HTBAH.ui.alert({
             titel: 'Datei konnte nicht gelesen werden',
@@ -1376,6 +1381,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         },
       });
       this.zeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitung();
+      this.zeileQuillInstanz.on('selection-change', (range, oldRange) => {
+        if (this.bearbeitung && this.bearbeitungIndex >= 0 && oldRange && !range) {
+          this.zeileBearbeitungBeiBlurSpeichern();
+        }
+      });
     },
     schliesseZeileModal() {
       this.zeileQuillInstanz = null;
@@ -1465,6 +1475,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.$nextTick(() => this.quillAusBearbeitungSetzen());
     },
     zeileSpeichern() {
+      this.zeileSpeichernIntern({ schliessenNachSpeichern: true });
+    },
+    zeileBearbeitungBeiBlurSpeichern() {
+      if (!this.bearbeitung || this.bearbeitungIndex < 0) {
+        return;
+      }
+      this.zeileSpeichernIntern({ schliessenNachSpeichern: false });
+    },
+    zeileSpeichernIntern({ schliessenNachSpeichern }) {
       if (!this.bearbeitung) {
         return;
       }
@@ -1516,7 +1535,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         liste[this.bearbeitungIndex] = z;
       }
       this.persist();
-      this.schliesseZeileModal();
+      if (schliessenNachSpeichern) {
+        this.schliesseZeileModal();
+      }
     },
     zeileLoeschenDialog(typ, id) {
       this.zuLoeschendeZeile = { typ, id };
@@ -2778,6 +2799,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         :zeile-quill-host-ref-fn="zeileQuillHostRefFn"
         @close="schliesseZeileModal"
         @save="zeileSpeichern"
+        @edit-blur="zeileBearbeitungBeiBlurSpeichern"
         @random="zufallsvorschlagUebernehmen"
         @media-upload="onBearbeitungsMedienDateienGewaehlt"
         @media-remove="mediumAusBearbeitungEntfernen"

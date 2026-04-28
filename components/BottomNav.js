@@ -43,6 +43,8 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       wuerfelBeutelOffen: false,
       wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       sicherheitsmechanismenModalOffen: false,
+      _badgeDragMoveHandler: null,
+      _badgeDragUpHandler: null,
     };
   },
   created() {
@@ -317,6 +319,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.speichereWuerfelBeutelFenster();
     this.wuerfelBeutelBeendeZiehen();
     this.wuerfelBeutelBeendeResize();
+    this.badgeZiehenCleanup();
   },
   methods: {
     warte(ms) {
@@ -881,6 +884,18 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         kontext.speichern();
       }
     },
+    badgeZiehenCleanup() {
+      if (this._badgeDragMoveHandler) {
+        document.removeEventListener('pointermove', this._badgeDragMoveHandler);
+        this._badgeDragMoveHandler = null;
+      }
+      if (this._badgeDragUpHandler) {
+        document.removeEventListener('pointerup', this._badgeDragUpHandler);
+        document.removeEventListener('pointercancel', this._badgeDragUpHandler);
+        this._badgeDragUpHandler = null;
+      }
+      this.badgeZiehenEnd();
+    },
     badgeZiehenStart(e) {
       if (e.button != null && e.button !== 0) {
         return;
@@ -899,16 +914,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         baseLeft: r.left,
         baseTop: r.top,
       };
-      const move = (ev) => this.badgeZiehenMove(ev);
-      const up = (ev) => {
-        document.removeEventListener('pointermove', move);
-        document.removeEventListener('pointerup', up);
-        document.removeEventListener('pointercancel', up);
-        this.badgeZiehenEnd();
-      };
-      document.addEventListener('pointermove', move, { passive: false });
-      document.addEventListener('pointerup', up);
-      document.addEventListener('pointercancel', up);
+      this.badgeZiehenCleanup();
+      this._badgeDragMoveHandler = (ev) => this.badgeZiehenMove(ev);
+      this._badgeDragUpHandler = () => this.badgeZiehenCleanup();
+      document.addEventListener('pointermove', this._badgeDragMoveHandler, { passive: false });
+      document.addEventListener('pointerup', this._badgeDragUpHandler);
+      document.addEventListener('pointercancel', this._badgeDragUpHandler);
       try {
         e.target.setPointerCapture(e.pointerId);
       } catch {

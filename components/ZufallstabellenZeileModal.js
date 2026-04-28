@@ -33,6 +33,9 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     'media-set-primary',
     'media-open',
     'media-download',
+    'edit-blur',
+    'delete',
+    'duplicate',
     'update:zufallNpcEpoche',
     'update:zufallGegenstandEpoche',
     'update:zufallGegenstandKleidung',
@@ -43,6 +46,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     return {
       modal: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       fraktionOrtEingabe: '',
+      aktiverBearbeitungsTab: 'daten',
     };
   },
   computed: {
@@ -55,6 +59,28 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     entitaetGespeichert() {
       return !(Number.isInteger(this.anlage && this.anlage.index) && this.anlage.index < 0);
     },
+    istNeu() {
+      return !this.entitaetGespeichert;
+    },
+    istBearbeitung() {
+      return !this.istNeu;
+    },
+    zeigtDatenTab() {
+      return this.istNeu || this.aktiverBearbeitungsTab === 'daten';
+    },
+    zeigtMedienTab() {
+      return this.istBearbeitung && this.aktiverBearbeitungsTab === 'medien';
+    },
+    kannLoeschen() {
+      const typ = this.anlage && this.anlage.typ;
+      if (!this.istBearbeitung || !typ) {
+        return false;
+      }
+      return ['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand'].includes(typ);
+    },
+    kannDuplizieren() {
+      return this.istBearbeitung && this.anlage && this.anlage.typ === 'bestie';
+    },
   },
   watch: {
     'anlage.offen'(offen) {
@@ -66,6 +92,9 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         this.modal.istVollbild = false;
       }
       this.fraktionOrtEingabe = '';
+      if (offen) {
+        this.aktiverBearbeitungsTab = 'daten';
+      }
     },
   },
   mounted() {
@@ -291,6 +320,17 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         ruestungen: [],
       });
     },
+    datenBereichBlur(event) {
+      if (!this.istBearbeitung) {
+        return;
+      }
+      const current = event && event.currentTarget;
+      const next = event && event.relatedTarget;
+      if (current && next && current.contains(next)) {
+        return;
+      }
+      this.$emit('edit-blur');
+    },
   },
   template: `
     <div v-if="anlage.offen && anlage.zeile" class="regelwerk-modal-layer">
@@ -317,381 +357,496 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           </div>
         </div>
         <div class="card-body py-2 small" style="max-height:70vh; overflow:auto;">
+        <div v-if="istBearbeitung" class="mb-3">
+          <ul class="nav nav-pills nav-fill htbah-weltenbau-pill-tabs">
+            <li class="nav-item">
+              <button
+                type="button"
+                class="nav-link htbah-weltenbau-pill-tab"
+                :class="{ active: aktiverBearbeitungsTab === 'daten' }"
+                @click="aktiverBearbeitungsTab = 'daten'">
+                📋 Daten
+              </button>
+            </li>
+            <li class="nav-item">
+              <button
+                type="button"
+                class="nav-link htbah-weltenbau-pill-tab"
+                :class="{ active: aktiverBearbeitungsTab === 'medien' }"
+                @click="aktiverBearbeitungsTab = 'medien'">
+                🖼️ Medien
+              </button>
+            </li>
+          </ul>
+        </div>
+        <div v-if="zeigtDatenTab" @focusout="datenBereichBlur">
         <template v-if="anlage.typ === 'npc'">
-          <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
-            <div class="col-md-6">
-              <label class="form-label small text-secondary mb-1">Epoche für Zufallsvorschlag</label>
-              <select class="form-select form-select-sm" :value="zufallNpcEpoche" @change="$emit('update:zufallNpcEpoche', $event.target.value)">
-                <option value="mittelalter">Mittelalter</option>
-                <option value="gegenwart">Gegenwart</option>
-                <option value="zukunft">Zukunft</option>
-              </select>
-            </div>
-          </div>
-          <div class="row g-2">
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.spitzname" placeholder=" " /><label>Spitzname</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geschlecht" placeholder=" " /><label>Geschlecht</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.alter" placeholder=" " /><label>Alter</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.familienstand" placeholder=" " /><label>Familienstand</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.statur" placeholder=" " /><label>Statur</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Lebenspunkte</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
-            <div class="col-md-6">
-              <label class="form-label small text-secondary mb-1">Initiative</label>
-              <div class="input-group">
-                <input
-                  class="form-control"
-                  type="number"
-                  min="1"
-                  :max="10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0)))"
-                  v-model="anlage.zeile.initiative"
-                  placeholder="z. B. 14"
-                  inputmode="numeric"
-                  autocomplete="off" />
-                <button
-                  type="button"
-                  class="btn btn-outline-primary"
-                  @click="initiativeWuerfelnFuerZeile">
-                  🎲
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-outline-secondary"
-                  :disabled="!String(anlage.zeile.initiative || '').trim()"
-                  @click="initiativeZuruecksetzen">
-                  Reset
-                </button>
-              </div>
-              <div class="mt-2">
-                <button
-                  type="button"
-                  class="btn btn-outline-primary btn-sm w-100"
-                  @click="paradeModalOeffnenFuerZeile">
-                  🛡️ Parieren
-                </button>
-              </div>
-              <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
-            </div>
-            <div class="col-12">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpBewusstlosAusgeblendet" id="wb-npc-ausblenden" />
-                <label class="form-check-label small" for="wb-npc-ausblenden">Bewusstlos-Status aus LP-Bereich ausblenden</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpMassenschadenBewusstlos" id="wb-npc-massen" />
-                <label class="form-check-label small" for="wb-npc-massen">Bewusstlos durch Massenschaden erzwingen</label>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
+            <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1">Epoche für Zufallsvorschlag</label>
+                <select class="form-select form-select-sm" :value="zufallNpcEpoche" @change="$emit('update:zufallNpcEpoche', $event.target.value)">
+                  <option value="mittelalter">Mittelalter</option>
+                  <option value="gegenwart">Gegenwart</option>
+                  <option value="zukunft">Zukunft</option>
+                </select>
               </div>
             </div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.gesinnung" placeholder=" " /><label>Gesinnung</label></div></div>
-            <div class="col-md-6">
-              <label class="form-label small text-secondary mb-1" for="wb-zfn-glaube">Glaube</label>
-              <input id="wb-zfn-glaube" class="form-control" v-model="anlage.zeile.glaube" :list="pantheonNamenListe.length ? 'wb-zfn-glaube-datalist' : undefined" placeholder="Leer, aus Liste wählen oder Freitext" autocomplete="off" />
-              <datalist v-if="pantheonNamenListe.length" id="wb-zfn-glaube-datalist">
-                <option v-for="n in pantheonNamenListe" :key="'wb-pg-' + n" :value="n"></option>
-              </datalist>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.spitzname" placeholder=" " /><label>Spitzname</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geschlecht" placeholder=" " /><label>Geschlecht</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.alter" placeholder=" " /><label>Alter</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.familienstand" placeholder=" " /><label>Familienstand</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.beruf" placeholder=" " /><label>Beruf</label></div></div>
             </div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.beruf" placeholder=" " /><label>Beruf</label></div></div>
-            <div class="col-md-6"><label class="form-label small text-secondary mb-1">Fraktion</label><select class="form-select" v-model="anlage.zeile.fraktion"><option value="">— keine —</option><option v-for="f in fraktionenMitNamen" :key="f.id" :value="f.name">{{ f.name }}</option></select></div>
-            <div class="col-md-6">
-              <label class="form-label small text-secondary mb-1" for="wb-zfn-ort">Aufenthaltsort</label>
-              <input
-                id="wb-zfn-ort"
-                class="form-control"
-                v-model="anlage.zeile.aufenthaltsort"
-                :list="orteNamenListe.length ? 'wb-zfn-ort-datalist' : undefined"
-                placeholder="Ort wählen oder Freitext"
-                autocomplete="off" />
-              <datalist v-if="orteNamenListe.length" id="wb-zfn-ort-datalist">
-                <option v-for="ort in orteNamenListe" :key="'wb-zfn-ort-' + ort" :value="ort"></option>
-              </datalist>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧍 Körper & Merkmale</h6>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.statur" placeholder=" " /><label>Statur</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.stimme" placeholder=" " /><label>Stimme</label></div></div>
             </div>
-            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geheimnis" placeholder=" " /><label>Geheimnis</label></div></div>
-            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.ziel" placeholder=" " /><label>Ziel (z. B. Wohlstand, Lebenswandel)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.stimme" placeholder=" " /><label>Stimme</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.waffe" placeholder=" " /><label>Waffe</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Nahkampf</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Fernkampf</label></div></div>
-          </div>
-        </template>
-        <template v-else-if="anlage.typ === 'ort'">
-          <div class="row g-2">
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.groesse" placeholder=" " /><label>Größe</label></div></div>
-            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lage" placeholder=" " /><label>Lage (z. B. Wald, Hafenstadt, Fluss, Insel)</label></div></div>
-            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.zustand" placeholder=" " /><label>Zustand (z. B. zerstört, intakt, florierend)</label></div></div>
-          </div>
-        </template>
-        <template v-else-if="anlage.typ === 'fraktion'">
-          <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
-            <div class="col-md-6">
-              <label class="form-label small text-secondary mb-1">Epoche für Namensvorschlag</label>
-              <select class="form-select form-select-sm" :value="zufallFraktionEpoche" @change="$emit('update:zufallFraktionEpoche', $event.target.value)">
-                <option value="mittelalter">Mittelalter</option>
-                <option value="gegenwart">Gegenwart</option>
-                <option value="zukunft">Zukunft</option>
-              </select>
-            </div>
-          </div>
-          <div class="row g-2">
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.art" placeholder=" " /><label>Art (z. B. Gilde, Partei, Bande)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
-            <div class="col-12">
-              <label class="form-label small text-secondary mb-1">Zugeordnete Orte (Mehrfachauswahl)</label>
-              <div class="input-group">
-                <input
-                  class="form-control"
-                  v-model="fraktionOrtEingabe"
-                  :list="orteNamenListe.length ? 'zst-fraktion-orte-datalist' : undefined"
-                  placeholder="Ort wählen oder frei eingeben"
-                  autocomplete="off"
-                  @keydown.enter.prevent="fraktionOrtHinzufuegen" />
-                <button type="button" class="btn btn-outline-secondary" @click="fraktionOrtHinzufuegen">
-                  Hinzufügen
-                </button>
-              </div>
-              <datalist v-if="orteNamenListe.length" id="zst-fraktion-orte-datalist">
-                <option v-for="ort in orteNamenListe" :key="'zst-fraktion-ort-' + ort" :value="ort"></option>
-              </datalist>
-              <div class="d-flex flex-wrap gap-1 mt-2">
-                <span
-                  v-for="(ort, ortIndex) in (anlage.zeile.orte || [])"
-                  :key="'fraktion-ort-chip-' + ort + '-' + ortIndex"
-                  class="badge text-bg-secondary d-inline-flex align-items-center gap-1">
-                  {{ ort }}
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">⚔️ Werte & Kampf</h6>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Lebenspunkte</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.waffe" placeholder=" " /><label>Waffe</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Nahkampf</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Fernkampf</label></div></div>
+              <div class="col-md-6" v-if="istBearbeitung">
+                <label class="form-label small text-secondary mb-1">Initiative</label>
+                <div class="input-group">
+                  <input
+                    class="form-control"
+                    type="number"
+                    min="1"
+                    :max="10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0)))"
+                    v-model="anlage.zeile.initiative"
+                    placeholder="z. B. 14"
+                    inputmode="numeric"
+                    autocomplete="off" />
                   <button
                     type="button"
-                    class="btn-close btn-close-white"
-                    aria-label="Ort entfernen"
-                    style="font-size: .6rem;"
-                    @click="fraktionOrtEntfernen(ortIndex)"></button>
-                </span>
+                    class="btn btn-outline-primary"
+                    @click="initiativeWuerfelnFuerZeile">
+                    🎲
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    :disabled="!String(anlage.zeile.initiative || '').trim()"
+                    @click="initiativeZuruecksetzen">
+                    Reset
+                  </button>
+                </div>
+                <div class="mt-2">
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm w-100"
+                    @click="paradeModalOeffnenFuerZeile">
+                    🛡️ Parieren
+                  </button>
+                </div>
+                <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
+              </div>
+              <div class="col-12" v-if="istBearbeitung">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpBewusstlosAusgeblendet" id="wb-npc-ausblenden" />
+                  <label class="form-check-label small" for="wb-npc-ausblenden">Bewusstlos-Status aus LP-Bereich ausblenden</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpMassenschadenBewusstlos" id="wb-npc-massen" />
+                  <label class="form-check-label small" for="wb-npc-massen">Bewusstlos durch Massenschaden erzwingen</label>
+                </div>
               </div>
             </div>
-            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.ziel" placeholder=" " /><label>Ziel</label></div></div>
-            <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:5rem" v-model="anlage.zeile.gesinnungVerhalten" placeholder=" "></textarea><label>Gesinnung / Verhalten</label></div></div>
-          </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧭 Zugehörigkeit & Kontext</h6>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.gesinnung" placeholder=" " /><label>Gesinnung</label></div></div>
+              <div class="col-md-6 htbah-npc-feld-anheben">
+                <label class="form-label small text-secondary mb-1" for="wb-zfn-glaube">Glaube</label>
+                <input id="wb-zfn-glaube" class="form-control" v-model="anlage.zeile.glaube" :list="pantheonNamenListe.length ? 'wb-zfn-glaube-datalist' : undefined" placeholder="Leer, aus Liste wählen oder Freitext" autocomplete="off" />
+                <datalist v-if="pantheonNamenListe.length" id="wb-zfn-glaube-datalist">
+                  <option v-for="n in pantheonNamenListe" :key="'wb-pg-' + n" :value="n"></option>
+                </datalist>
+              </div>
+              <div class="col-md-6 htbah-npc-feld-anheben"><label class="form-label small text-secondary mb-1">Fraktion</label><select class="form-select" v-model="anlage.zeile.fraktion"><option value="">— keine —</option><option v-for="f in fraktionenMitNamen" :key="f.id" :value="f.name">{{ f.name }}</option></select></div>
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1" for="wb-zfn-ort">Aufenthaltsort</label>
+                <input
+                  id="wb-zfn-ort"
+                  class="form-control"
+                  v-model="anlage.zeile.aufenthaltsort"
+                  :list="orteNamenListe.length ? 'wb-zfn-ort-datalist' : undefined"
+                  placeholder="Ort wählen oder Freitext"
+                  autocomplete="off" />
+                <datalist v-if="orteNamenListe.length" id="wb-zfn-ort-datalist">
+                  <option v-for="ort in orteNamenListe" :key="'wb-zfn-ort-' + ort" :value="ort"></option>
+                </datalist>
+              </div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🎯 Motivation</h6>
+            <div class="row g-2">
+              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geheimnis" placeholder=" " /><label>Geheimnis</label></div></div>
+              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.ziel" placeholder=" " /><label>Ziel (z. B. Wohlstand, Lebenswandel)</label></div></div>
+            </div>
+          </section>
+        </template>
+        <template v-else-if="anlage.typ === 'ort'">
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.groesse" placeholder=" " /><label>Größe</label></div></div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🗺️ Geografie & Zustand</h6>
+            <div class="row g-2">
+              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lage" placeholder=" " /><label>Lage (z. B. Wald, Hafenstadt, Fluss, Insel)</label></div></div>
+              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.zustand" placeholder=" " /><label>Zustand (z. B. zerstört, intakt, florierend)</label></div></div>
+            </div>
+          </section>
+        </template>
+        <template v-else-if="anlage.typ === 'fraktion'">
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
+            <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1">Epoche für Namensvorschlag</label>
+                <select class="form-select form-select-sm" :value="zufallFraktionEpoche" @change="$emit('update:zufallFraktionEpoche', $event.target.value)">
+                  <option value="mittelalter">Mittelalter</option>
+                  <option value="gegenwart">Gegenwart</option>
+                  <option value="zukunft">Zukunft</option>
+                </select>
+              </div>
+            </div>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.art" placeholder=" " /><label>Art (z. B. Gilde, Partei, Bande)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">📍 Einflussraum</h6>
+            <div class="row g-2">
+              <div class="col-12">
+                <label class="form-label small text-secondary mb-1">Zugeordnete Orte (Mehrfachauswahl)</label>
+                <div class="input-group">
+                  <input
+                    class="form-control"
+                    v-model="fraktionOrtEingabe"
+                    :list="orteNamenListe.length ? 'zst-fraktion-orte-datalist' : undefined"
+                    placeholder="Ort wählen oder frei eingeben"
+                    autocomplete="off"
+                    @keydown.enter.prevent="fraktionOrtHinzufuegen" />
+                  <button type="button" class="btn btn-outline-secondary" @click="fraktionOrtHinzufuegen">
+                    Hinzufügen
+                  </button>
+                </div>
+                <datalist v-if="orteNamenListe.length" id="zst-fraktion-orte-datalist">
+                  <option v-for="ort in orteNamenListe" :key="'zst-fraktion-ort-' + ort" :value="ort"></option>
+                </datalist>
+                <div class="d-flex flex-wrap gap-1 mt-2">
+                  <span
+                    v-for="(ort, ortIndex) in (anlage.zeile.orte || [])"
+                    :key="'fraktion-ort-chip-' + ort + '-' + ortIndex"
+                    class="badge text-bg-secondary d-inline-flex align-items-center gap-1">
+                    {{ ort }}
+                    <button
+                      type="button"
+                      class="btn-close btn-close-white"
+                      aria-label="Ort entfernen"
+                      style="font-size: .6rem;"
+                      @click="fraktionOrtEntfernen(ortIndex)"></button>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧠 Ausrichtung</h6>
+            <div class="row g-2">
+              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.ziel" placeholder=" " /><label>Ziel</label></div></div>
+              <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:5rem" v-model="anlage.zeile.gesinnungVerhalten" placeholder=" "></textarea><label>Gesinnung / Verhalten</label></div></div>
+            </div>
+          </section>
         </template>
         <template v-else-if="anlage.typ === 'pantheon'">
-          <div class="row g-2">
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geschlecht" placeholder=" " /><label>Geschlecht / Darstellung</label></div></div>
-            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.domaene" placeholder=" " /><label>Wofür steht die Gottheit (Domäne)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.charakter" placeholder=" "></textarea><label>Charakter (z. B. rachsüchtig, gütig)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.staerke" placeholder=" "></textarea><label>Stärken</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.schwaeche" placeholder=" "></textarea><label>Schwächen</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.schutzpatronat" placeholder=" "></textarea><label>Schutzpatronat (wer / was)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.verlangen" placeholder=" "></textarea><label>Was verlangt sie (Opfer, Gebote)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.mythosGaben" placeholder=" "></textarea><label>Mythos: Was wird erzählt, dass sie geben würde</label></div></div>
-          </div>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geschlecht" placeholder=" " /><label>Geschlecht / Darstellung</label></div></div>
+              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.domaene" placeholder=" " /><label>Wofür steht die Gottheit (Domäne)</label></div></div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🕯️ Wesen & Lehre</h6>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.charakter" placeholder=" "></textarea><label>Charakter (z. B. rachsüchtig, gütig)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.staerke" placeholder=" "></textarea><label>Stärken</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.schwaeche" placeholder=" "></textarea><label>Schwächen</label></div></div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🙏 Kultbezug</h6>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.schutzpatronat" placeholder=" "></textarea><label>Schutzpatronat (wer / was)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.verlangen" placeholder=" "></textarea><label>Was verlangt sie (Opfer, Gebote)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.mythosGaben" placeholder=" "></textarea><label>Mythos: Was wird erzählt, dass sie geben würde</label></div></div>
+            </div>
+          </section>
         </template>
         <template v-else-if="anlage.typ === 'raetsel'">
-          <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
-            <div class="col-md-6">
-              <label class="form-label small text-secondary mb-1">Epoche für Zufallsvorschlag</label>
-              <select class="form-select form-select-sm" :value="zufallRaetselEpoche" @change="$emit('update:zufallRaetselEpoche', $event.target.value)">
-                <option value="mittelalter">Mittelalter</option>
-                <option value="gegenwart">Gegenwart</option>
-                <option value="zukunft">Zukunft</option>
-              </select>
-            </div>
-            <div class="col-md-6 small text-secondary align-self-end">
-              Namen aus den Tabellen „Orte“ und „NPCs“ können im Ergebnistext vorkommen, wenn Einträge existieren.
-            </div>
-          </div>
-          <div class="row g-2">
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.art" placeholder=" " /><label>Art (z. B. Licht- & Spiegelpuzzle)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.titel" placeholder=" " /><label>Titel / Stichwort</label></div></div>
-            <div class="col-md-6">
-              <label class="form-label small text-secondary mb-1" for="wb-zr-ort">Aufenthaltsort (optional)</label>
-              <input
-                id="wb-zr-ort"
-                class="form-control"
-                v-model="anlage.zeile.aufenthaltsort"
-                :list="orteNamenListe.length ? 'wb-zr-ort-datalist' : undefined"
-                placeholder="Ort wählen oder Freitext"
-                autocomplete="off" />
-              <datalist v-if="orteNamenListe.length" id="wb-zr-ort-datalist">
-                <option v-for="ort in orteNamenListe" :key="'wb-zr-ort-' + ort" :value="ort"></option>
-              </datalist>
-            </div>
-            <div class="col-md-6 d-flex align-items-center">
-              <div class="form-check form-switch mt-2">
-                <input class="form-check-input" type="checkbox" role="switch" v-model="anlage.zeile.geloest" id="wb-zr-geloest" />
-                <label class="form-check-label" for="wb-zr-geloest">Rätsel gelöst</label>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
+            <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1">Epoche für Zufallsvorschlag</label>
+                <select class="form-select form-select-sm" :value="zufallRaetselEpoche" @change="$emit('update:zufallRaetselEpoche', $event.target.value)">
+                  <option value="mittelalter">Mittelalter</option>
+                  <option value="gegenwart">Gegenwart</option>
+                  <option value="zukunft">Zukunft</option>
+                </select>
+              </div>
+              <div class="col-md-6 small text-secondary align-self-end">
+                Namen aus den Tabellen „Orte“ und „NPCs“ können im Ergebnistext vorkommen, wenn Einträge existieren.
               </div>
             </div>
-            <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.aufgabeWas" placeholder=" "></textarea><label>Was könnte die Aufgabe sein?</label></div></div>
-            <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.aufgabenstellung" placeholder=" "></textarea><label>Wie könnte die Aufgabenstellung lauten?</label></div></div>
-            <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:4rem" v-model="anlage.zeile.ergebnis" placeholder=" "></textarea><label>Ergebnis (Himmelsrichtung, Ort, Person, Tageszeit …)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schwierigkeit" placeholder=" " /><label>Schwierigkeit</label></div></div>
-          </div>
+            <div class="row g-2">
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.art" placeholder=" " /><label>Art (z. B. Licht- & Spiegelpuzzle)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.titel" placeholder=" " /><label>Titel / Stichwort</label></div></div>
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1" for="wb-zr-ort">Aufenthaltsort (optional)</label>
+                <input
+                  id="wb-zr-ort"
+                  class="form-control"
+                  v-model="anlage.zeile.aufenthaltsort"
+                  :list="orteNamenListe.length ? 'wb-zr-ort-datalist' : undefined"
+                  placeholder="Ort wählen oder Freitext"
+                  autocomplete="off" />
+                <datalist v-if="orteNamenListe.length" id="wb-zr-ort-datalist">
+                  <option v-for="ort in orteNamenListe" :key="'wb-zr-ort-' + ort" :value="ort"></option>
+                </datalist>
+              </div>
+              <div class="col-md-6 d-flex align-items-center">
+                <div class="form-check form-switch mt-2">
+                  <input class="form-check-input" type="checkbox" role="switch" v-model="anlage.zeile.geloest" id="wb-zr-geloest" />
+                  <label class="form-check-label" for="wb-zr-geloest">Rätsel gelöst</label>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧩 Spiellogik</h6>
+            <div class="row g-2">
+              <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.aufgabeWas" placeholder=" "></textarea><label>Was könnte die Aufgabe sein?</label></div></div>
+              <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.aufgabenstellung" placeholder=" "></textarea><label>Wie könnte die Aufgabenstellung lauten?</label></div></div>
+              <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:4rem" v-model="anlage.zeile.ergebnis" placeholder=" "></textarea><label>Ergebnis (Himmelsrichtung, Ort, Person, Tageszeit …)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schwierigkeit" placeholder=" " /><label>Schwierigkeit</label></div></div>
+            </div>
+          </section>
         </template>
         <template v-else-if="anlage.typ === 'bestie'">
-          <div class="row g-2">
-            <div class="col-md-6"><label class="form-label small text-secondary mb-1">Epoche</label><select class="form-select" v-model="anlage.zeile.epoche"><option value="mittelalter">Mittelalter</option><option value="gegenwart">Gegenwart</option><option value="zukunft">Zukunft</option></select></div>
-            <div class="col-md-6"><label class="form-label small text-secondary mb-1">Kategorie</label><select class="form-select" v-model="anlage.zeile.kategorie"><option value="normales_tier">Normales Tier</option><option value="fantasy_tier">Magisch / Fantasy</option><option value="mutiert">Mutiert</option><option value="monster">Monster</option></select></div>
-            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name der Bestie</label></div></div>
-            <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.angriff" placeholder=" " autocomplete="off" /><label>Angriff</label></div></div>
-            <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.verteidigung" placeholder=" " autocomplete="off" /><label>Verteidigung</label></div></div>
-            <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " autocomplete="off" /><label>Lebenspunkte</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.waffe" placeholder=" " /><label>Waffe</label></div></div>
-            <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schaden NK</label></div></div>
-            <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schaden FK</label></div></div>
-            <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
-            <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
-            <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
-            <div class="col-md-6">
-              <label class="form-label small text-secondary mb-1">Initiative</label>
-              <div class="input-group">
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
+            <div class="row g-2">
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Epoche</label><select class="form-select" v-model="anlage.zeile.epoche"><option value="mittelalter">Mittelalter</option><option value="gegenwart">Gegenwart</option><option value="zukunft">Zukunft</option></select></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Kategorie</label><select class="form-select" v-model="anlage.zeile.kategorie"><option value="normales_tier">Normales Tier</option><option value="fantasy_tier">Magisch / Fantasy</option><option value="mutiert">Mutiert</option><option value="monster">Monster</option></select></div>
+              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name der Bestie</label></div></div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">⚔️ Kampfwerte</h6>
+            <div class="row g-2">
+              <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.angriff" placeholder=" " autocomplete="off" /><label>Angriff</label></div></div>
+              <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.verteidigung" placeholder=" " autocomplete="off" /><label>Verteidigung</label></div></div>
+              <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " autocomplete="off" /><label>Lebenspunkte</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.waffe" placeholder=" " /><label>Waffe</label></div></div>
+              <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schaden NK</label></div></div>
+              <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schaden FK</label></div></div>
+              <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
+              <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
+              <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1">Initiative</label>
+                <div class="input-group">
+                  <input
+                    class="form-control"
+                    type="number"
+                    min="1"
+                    :max="10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0)))"
+                    v-model="anlage.zeile.initiative"
+                    placeholder="z. B. 11"
+                    inputmode="numeric"
+                    autocomplete="off" />
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary"
+                    @click="initiativeWuerfelnFuerZeile">
+                    🎲
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    :disabled="!String(anlage.zeile.initiative || '').trim()"
+                    @click="initiativeZuruecksetzen">
+                    Reset
+                  </button>
+                </div>
+                <div class="mt-2">
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm w-100"
+                    @click="paradeModalOeffnenFuerZeile">
+                    🛡️ Parieren
+                  </button>
+                </div>
+                <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpBewusstlosAusgeblendet" id="wb-bestie-ausblenden" />
+                  <label class="form-check-label small" for="wb-bestie-ausblenden">Bewusstlos-Status aus LP-Bereich ausblenden</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpMassenschadenBewusstlos" id="wb-bestie-massen" />
+                  <label class="form-check-label small" for="wb-bestie-massen">Bewusstlos durch Massenschaden erzwingen</label>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🐾 Verhalten & Natur</h6>
+            <div class="row g-2">
+              <div class="col-12">
+                <label class="form-label small text-secondary mb-1">
+                  Aggressivität und Offensive (Skala 1 = sehr defensiv / scheu, 10 = sehr aggressiv und offensiv)
+                </label>
+                <div class="d-flex align-items-center gap-3">
+                  <input type="range" class="form-range flex-grow-1" min="1" max="10" step="1" v-model.number="anlage.zeile.aggressivitaetSkala" />
+                  <span class="small text-nowrap text-secondary" style="min-width: 3.5rem">{{ Math.min(10, Math.max(1, Math.round(Number(anlage.zeile.aggressivitaetSkala) || 1))) }} / 10</span>
+                </div>
+              </div>
+              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.staerke" placeholder=" "></textarea><label>Stärken (optional)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.schwaeche" placeholder=" "></textarea><label>Schwächen (optional)</label></div></div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🌍 Weltbezug</h6>
+            <div class="row g-2">
+              <div class="col-12">
+                <label class="form-label small text-secondary mb-1" for="wb-zb-ort">Aufenthaltsort</label>
                 <input
+                  id="wb-zb-ort"
                   class="form-control"
-                  type="number"
-                  min="1"
-                  :max="10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0)))"
-                  v-model="anlage.zeile.initiative"
-                  placeholder="z. B. 11"
-                  inputmode="numeric"
+                  v-model="anlage.zeile.aufenthaltsort"
+                  :list="orteNamenListe.length ? 'wb-zb-ort-datalist' : undefined"
+                  placeholder="Ort wählen oder Freitext"
                   autocomplete="off" />
-                <button
-                  type="button"
-                  class="btn btn-outline-primary"
-                  @click="initiativeWuerfelnFuerZeile">
-                  🎲
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-outline-secondary"
-                  :disabled="!String(anlage.zeile.initiative || '').trim()"
-                  @click="initiativeZuruecksetzen">
-                  Reset
-                </button>
+                <datalist v-if="orteNamenListe.length" id="wb-zb-ort-datalist">
+                  <option v-for="ort in orteNamenListe" :key="'wb-zb-ort-' + ort" :value="ort"></option>
+                </datalist>
               </div>
-              <div class="mt-2">
-                <button
-                  type="button"
-                  class="btn btn-outline-primary btn-sm w-100"
-                  @click="paradeModalOeffnenFuerZeile">
-                  🛡️ Parieren
-                </button>
-              </div>
-              <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
-            </div>
-            <div class="col-12">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpBewusstlosAusgeblendet" id="wb-bestie-ausblenden" />
-                <label class="form-check-label small" for="wb-bestie-ausblenden">Bewusstlos-Status aus LP-Bereich ausblenden</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpMassenschadenBewusstlos" id="wb-bestie-massen" />
-                <label class="form-check-label small" for="wb-bestie-massen">Bewusstlos durch Massenschaden erzwingen</label>
+              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geheimnis" placeholder=" " /><label>Geheimnis</label></div></div>
+              <div class="col-12">
+                <label class="form-label small text-secondary mb-1">Fraktionen</label>
+                <div v-if="fraktionenMitNamen.length" class="d-flex flex-wrap gap-2">
+                  <button
+                    v-for="f in fraktionenMitNamen"
+                    :key="'bestie-fraktion-chip-' + f.id"
+                    type="button"
+                    class="btn btn-sm"
+                    :class="bestieFraktionAktiv(f.name) ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="bestieFraktionUmschalten(f.name)">
+                    {{ f.name }}
+                  </button>
+                </div>
+                <div v-else class="small text-body-secondary">Keine Fraktionen vorhanden.</div>
+                <div class="form-text">Mehrfachauswahl per Tap/Klick auf die Chips.</div>
               </div>
             </div>
-            <div class="col-12">
-              <label class="form-label small text-secondary mb-1" for="wb-zb-ort">Aufenthaltsort</label>
-              <input
-                id="wb-zb-ort"
-                class="form-control"
-                v-model="anlage.zeile.aufenthaltsort"
-                :list="orteNamenListe.length ? 'wb-zb-ort-datalist' : undefined"
-                placeholder="Ort wählen oder Freitext"
-                autocomplete="off" />
-              <datalist v-if="orteNamenListe.length" id="wb-zb-ort-datalist">
-                <option v-for="ort in orteNamenListe" :key="'wb-zb-ort-' + ort" :value="ort"></option>
-              </datalist>
-            </div>
-            <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.geheimnis" placeholder=" " /><label>Geheimnis</label></div></div>
-            <div class="col-12">
-              <label class="form-label small text-secondary mb-1">Fraktionen</label>
-              <div v-if="fraktionenMitNamen.length" class="d-flex flex-wrap gap-2">
-                <button
-                  v-for="f in fraktionenMitNamen"
-                  :key="'bestie-fraktion-chip-' + f.id"
-                  type="button"
-                  class="btn btn-sm"
-                  :class="bestieFraktionAktiv(f.name) ? 'btn-primary' : 'btn-outline-secondary'"
-                  @click="bestieFraktionUmschalten(f.name)">
-                  {{ f.name }}
-                </button>
-              </div>
-              <div v-else class="small text-body-secondary">Keine Fraktionen vorhanden.</div>
-              <div class="form-text">Mehrfachauswahl per Tap/Klick auf die Chips.</div>
-            </div>
-            <div class="col-12">
-              <label class="form-label small text-secondary mb-1">
-                Aggressivität und Offensive (Skala 1 = sehr defensiv / scheu, 10 = sehr aggressiv und offensiv)
-              </label>
-              <div class="d-flex align-items-center gap-3">
-                <input type="range" class="form-range flex-grow-1" min="1" max="10" step="1" v-model.number="anlage.zeile.aggressivitaetSkala" />
-                <span class="small text-nowrap text-secondary" style="min-width: 3.5rem">{{ Math.min(10, Math.max(1, Math.round(Number(anlage.zeile.aggressivitaetSkala) || 1))) }} / 10</span>
-              </div>
-            </div>
-            <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.staerke" placeholder=" "></textarea><label>Stärken (optional)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.schwaeche" placeholder=" "></textarea><label>Schwächen (optional)</label></div></div>
-          </div>
+          </section>
         </template>
         <template v-else-if="anlage.typ === 'gegenstand'">
-          <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
-            <div class="col-md-6">
-              <label class="form-label small text-secondary mb-1">Epoche für Zufallsvorschlag</label>
-              <select class="form-select form-select-sm" :value="zufallGegenstandEpoche" @change="$emit('update:zufallGegenstandEpoche', $event.target.value)">
-                <option value="mittelalter">Mittelalter</option>
-                <option value="gegenwart">Gegenwart</option>
-                <option value="zukunft">Zukunft</option>
-              </select>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
+            <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1">Epoche für Zufallsvorschlag</label>
+                <select class="form-select form-select-sm" :value="zufallGegenstandEpoche" @change="$emit('update:zufallGegenstandEpoche', $event.target.value)">
+                  <option value="mittelalter">Mittelalter</option>
+                  <option value="gegenwart">Gegenwart</option>
+                  <option value="zukunft">Zukunft</option>
+                </select>
+              </div>
+              <div class="col-md-6"><div class="form-check mt-3"><input class="form-check-input" type="checkbox" :checked="zufallGegenstandKleidung" @change="$emit('update:zufallGegenstandKleidung', $event.target.checked)" id="wb-zg-kleid" /><label class="form-check-label small" for="wb-zg-kleid">Kleidung als Kategorie zulassen</label></div></div>
             </div>
-            <div class="col-md-6"><div class="form-check mt-3"><input class="form-check-input" type="checkbox" :checked="zufallGegenstandKleidung" @change="$emit('update:zufallGegenstandKleidung', $event.target.checked)" id="wb-zg-kleid" /><label class="form-check-label small" for="wb-zg-kleid">Kleidung als Kategorie zulassen</label></div></div>
-          </div>
-          <div class="form-floating mb-3"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div>
-          <label class="form-label small text-secondary mb-1" for="wb-zg-ort">Aufenthaltsort</label>
-          <input
-            id="wb-zg-ort"
-            class="form-control mb-3"
-            v-model="anlage.zeile.aufenthaltsort"
-            :list="orteNamenListe.length ? 'wb-zg-ort-datalist' : undefined"
-            placeholder="Ort wählen oder Freitext"
-            autocomplete="off" />
-          <datalist v-if="orteNamenListe.length" id="wb-zg-ort-datalist">
-            <option v-for="ort in orteNamenListe" :key="'wb-zg-ort-' + ort" :value="ort"></option>
-          </datalist>
-          <label class="form-label small text-secondary mb-1">Initiative</label>
-          <div class="input-group mb-3">
+            <div class="row g-2">
+              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">📍 Einordnung & Standort</h6>
+            <label class="form-label small text-secondary mb-1" for="wb-zg-ort">Aufenthaltsort</label>
             <input
-              class="form-control"
-              type="number"
-              min="1"
-              max="50"
-              v-model="anlage.zeile.initiative"
-              placeholder="z. B. 9"
-              inputmode="numeric"
+              id="wb-zg-ort"
+              class="form-control mb-3"
+              v-model="anlage.zeile.aufenthaltsort"
+              :list="orteNamenListe.length ? 'wb-zg-ort-datalist' : undefined"
+              placeholder="Ort wählen oder Freitext"
               autocomplete="off" />
-            <button
-              type="button"
-              class="btn btn-outline-secondary"
-              :disabled="!String(anlage.zeile.initiative || '').trim()"
-              @click="anlage.zeile.initiative = ''">
-              Leeren
-            </button>
-          </div>
-          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" v-model="anlage.zeile.istWaffe" id="wb-zg-waffe" /><label class="form-check-label" for="wb-zg-waffe">Waffe</label></div>
-          <div class="row g-2 mb-1 align-items-end" v-if="anlage.zeile.istWaffe">
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Nahkampf (z. B. 2W10+1)</label></div></div>
-            <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Fernkampf (z. B. 3W10)</label></div></div>
-          </div>
+            <datalist v-if="orteNamenListe.length" id="wb-zg-ort-datalist">
+              <option v-for="ort in orteNamenListe" :key="'wb-zg-ort-' + ort" :value="ort"></option>
+            </datalist>
+            <label class="form-label small text-secondary mb-1">Initiative</label>
+            <div class="input-group mb-1">
+              <input
+                class="form-control"
+                type="number"
+                min="1"
+                max="50"
+                v-model="anlage.zeile.initiative"
+                placeholder="z. B. 9"
+                inputmode="numeric"
+                autocomplete="off" />
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="!String(anlage.zeile.initiative || '').trim()"
+                @click="anlage.zeile.initiative = ''">
+                Leeren
+              </button>
+            </div>
+          </section>
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🗡️ Kampffunktion</h6>
+            <div class="form-check mb-3"><input class="form-check-input" type="checkbox" v-model="anlage.zeile.istWaffe" id="wb-zg-waffe" /><label class="form-check-label" for="wb-zg-waffe">Waffe</label></div>
+            <div class="row g-2 mb-1 align-items-end" v-if="anlage.zeile.istWaffe">
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Nahkampf (z. B. 2W10+1)</label></div></div>
+              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Fernkampf (z. B. 3W10)</label></div></div>
+            </div>
+          </section>
         </template>
+        </div>
 
-        <div class="mt-3 mb-3">
+        <div v-if="zeigtMedienTab" class="mt-3 mb-3">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-            <label class="form-label mb-0">Medien & Dateien (Schritt 2)</label>
-            <label v-if="entitaetGespeichert" class="btn btn-sm btn-outline-secondary mb-0">
+            <label class="form-label mb-0">Medien & Dateien</label>
+            <label class="btn btn-sm btn-outline-secondary mb-0">
               Hochladen
               <input type="file" class="d-none" multiple @change="$emit('media-upload', $event)" />
             </label>
-          </div>
-          <div v-if="!entitaetGespeichert" class="alert alert-info py-2 small">
-            Schritt 1: Entität zuerst speichern. Schritt 2: Danach kannst Du hier Dateien/Bilder anhängen.
           </div>
           <div v-if="!(anlage.zeile.medien || []).length" class="text-secondary small">Noch keine Medien.</div>
           <div v-else class="row g-2">
@@ -726,6 +881,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           </div>
         </div>
 
+        <div v-if="zeigtDatenTab">
         <label class="form-label mt-3 mb-1" v-if="anlage.typ === 'npc'">Notizen</label>
         <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'pantheon'">Notizen & Mythos</label>
         <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'raetsel'">Aufgabe, Spielleitung & Notizen</label>
@@ -733,11 +889,18 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'ort'">Beschreibung / Notizen</label>
         <label class="form-label mt-3 mb-1" v-else>Beschreibung</label>
         <div class="zufallstabellen-quill-wrap" :key="'wb-zeile-q-' + zeileQuillSession">
-          <div :ref="zeileQuillHostRefFn" class="quill-editor-host zufallstabellen-quill-host"></div>
+          <div :ref="zeileQuillHostRefFn" class="quill-editor-host zufallstabellen-quill-host entitaet-quill-editor-host"></div>
         </div>
-        <div class="d-flex justify-content-end gap-2 mt-3">
-          <button type="button" class="btn btn-sm btn-outline-secondary" @click="$emit('close')">Abbrechen</button>
-          <button type="button" class="btn btn-sm btn-primary" :disabled="speicherDeaktiviert" @click="$emit('save')">Speichern</button>
+        </div>
+        <div class="d-flex justify-content-between align-items-center gap-2 mt-3">
+          <div class="d-flex gap-2">
+            <button v-if="kannDuplizieren" type="button" class="btn btn-sm btn-outline-primary" @click="$emit('duplicate')">Duplizieren</button>
+            <button v-if="kannLoeschen" type="button" class="btn btn-sm btn-outline-danger" @click="$emit('delete')">Löschen</button>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" @click="$emit('close')">Abbrechen</button>
+            <button type="button" class="btn btn-sm btn-primary" :disabled="speicherDeaktiviert" @click="$emit('save')">Speichern</button>
+          </div>
         </div>
         <div v-if="speicherHinweis" class="form-text text-end mt-1">{{ speicherHinweis }}</div>
         </div>

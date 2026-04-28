@@ -6,6 +6,8 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
   data() {
     return {
       modalInstanz: null,
+      oeffnenRetryTimeoutId: null,
+      wirdEntfernt: false,
     };
   },
   mounted() {
@@ -30,6 +32,9 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
       window.HTBAH?.speicher?.schreibeText(SPEICHER_KEY_VERSTANDEN_AM, this.heutigesDatum());
     },
     oeffnenWennBootstrapBereit(versuch = 0) {
+      if (this.wirdEntfernt) {
+        return;
+      }
       const maxVersuche = 80;
       const el = this.$refs.modalElement;
       if (window.bootstrap && el) {
@@ -41,9 +46,26 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
         return;
       }
       if (versuch < maxVersuche) {
-        setTimeout(() => this.oeffnenWennBootstrapBereit(versuch + 1), 0);
+        if (this.oeffnenRetryTimeoutId) {
+          window.clearTimeout(this.oeffnenRetryTimeoutId);
+        }
+        this.oeffnenRetryTimeoutId = window.setTimeout(() => {
+          this.oeffnenRetryTimeoutId = null;
+          this.oeffnenWennBootstrapBereit(versuch + 1);
+        }, 0);
       }
     },
+  },
+  beforeUnmount() {
+    this.wirdEntfernt = true;
+    if (this.oeffnenRetryTimeoutId) {
+      window.clearTimeout(this.oeffnenRetryTimeoutId);
+      this.oeffnenRetryTimeoutId = null;
+    }
+    if (this.modalInstanz && typeof this.modalInstanz.dispose === 'function') {
+      this.modalInstanz.dispose();
+    }
+    this.modalInstanz = null;
   },
   template: `
     <div

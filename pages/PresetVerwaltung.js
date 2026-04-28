@@ -64,16 +64,19 @@ window.HTBAH_SEITEN.PresetVerwaltung = {
         type: 'application/json',
       });
       const url = URL.createObjectURL(blob);
+      try {
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        const dateiNameSicher = preset.name
+          .toLowerCase()
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9\-]/g, '');
 
-      const downloadLink = document.createElement('a');
-      downloadLink.href = url;
-      const dateiNameSicher = preset.name
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9\-]/g, '');
-
-      downloadLink.download = 'faehigkeiten-preset-' + dateiNameSicher + '.json';
-      downloadLink.click();
+        downloadLink.download = 'faehigkeiten-preset-' + dateiNameSicher + '.json';
+        downloadLink.click();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     },
     presetImportieren(event) {
       const datei = event.target.files[0];

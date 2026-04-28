@@ -506,6 +506,10 @@ input::placeholder {
   box-shadow: none;
 }
 
+.htbah-npc-feld-anheben {
+  margin-top: -0.35rem;
+}
+
 @media (max-width: 575.98px) {
   .htbah-weltenbau-pill-tabs {
     gap: 0.35rem;
@@ -649,6 +653,17 @@ input::placeholder {
   background: #fff;
 }
 
+.htbah-map-ort-bild-locked {
+  border-color: rgba(13, 110, 253, 0.95);
+  box-shadow:
+    0 0 0 2px rgba(13, 110, 253, 0.35),
+    0 0.2rem 0.5rem rgba(0, 0, 0, 0.16);
+}
+
+.htbah-map-ort-bild-unlock-feedback {
+  animation: htbah-ort-bild-unlock-pulse 0.75s ease-out 1;
+}
+
 .htbah-map-ort-bild img {
   width: 100%;
   height: 100%;
@@ -656,6 +671,62 @@ input::placeholder {
   object-fit: cover;
   user-select: none;
   pointer-events: none;
+}
+
+.htbah-map-ort-bild-lock-button {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(33, 37, 41, 0.78);
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.94);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
+  z-index: 3;
+  touch-action: none;
+}
+
+.htbah-map-ort-bild-lock-button.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.htbah-map-ort-bild-lock-button:hover,
+.htbah-map-ort-bild-lock-button:focus-visible {
+  background: rgba(13, 110, 253, 0.95);
+}
+
+.htbah-map-ort-bild-lock-button .material-symbols-outlined {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.htbah-map-ort-bild-lock-hinweis {
+  position: absolute;
+  left: 40px;
+  top: 8px;
+  max-width: min(260px, calc(100% - 48px));
+  border-radius: 0.4rem;
+  background: rgba(33, 37, 41, 0.92);
+  color: #fff;
+  padding: 0.2rem 0.45rem;
+  font-size: 12px;
+  line-height: 1.2;
+  z-index: 3;
+  pointer-events: none;
+  animation: htbah-ort-bild-lock-hinweis-fade 2.4s ease-out 1;
 }
 
 .htbah-map-ort-bild-resize {
@@ -668,6 +739,39 @@ input::placeholder {
   background: linear-gradient(135deg, transparent 0 45%, rgba(13, 110, 253, 0.95) 46% 100%);
   cursor: nwse-resize;
   padding: 0;
+  z-index: 4;
+}
+
+@keyframes htbah-ort-bild-unlock-pulse {
+  0% {
+    box-shadow:
+      0 0 0 2px rgba(25, 135, 84, 0.48),
+      0 0.2rem 0.5rem rgba(0, 0, 0, 0.16);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(25, 135, 84, 0),
+      0 0.2rem 0.5rem rgba(0, 0, 0, 0.16);
+  }
+}
+
+@keyframes htbah-ort-bild-lock-hinweis-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  76% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
 }
 
 .htbah-map-node-ort {
@@ -753,6 +857,23 @@ input::placeholder {
   pointer-events: auto;
 }
 
+.htbah-weltenbau-charakter-modal-window {
+  width: min(50vw, 640px);
+  height: min(88dvh, 820px);
+  min-width: min(420px, 100vw);
+  min-height: min(320px, 100vh);
+  z-index: calc(var(--htbah-z-modal-detail) + 1);
+}
+
+.htbah-weltenbau-charakter-modal-body {
+  max-height: 72vh;
+  overflow: auto;
+}
+
+.htbah-charakter-journal-host.quill-editor-host {
+  min-height: 22vh;
+}
+
 @media (max-width: 768px) {
   .htbah-weltenbau-map-window {
     width: 100vw;
@@ -790,6 +911,20 @@ input::placeholder {
   .htbah-weltenbau-map-actions > .regelwerk-icon-button,
   .htbah-weltenbau-map-actions > .btn-close {
     flex: 0 0 auto;
+  }
+
+  .htbah-weltenbau-charakter-modal-window {
+    width: 100vw;
+    height: 100dvh;
+    max-width: 100vw;
+    max-height: 100dvh;
+    min-width: 0;
+    min-height: 0;
+    border-radius: 0;
+  }
+
+  .htbah-weltenbau-charakter-modal-body {
+    max-height: calc(100dvh - 3.2rem);
   }
 }
 
@@ -1361,8 +1496,12 @@ input::placeholder {
 }
 
 .htbah-weltenbau-import-cropper-wrap {
-  min-height: min(58vh, 560px);
+  min-height: min(72vh, 760px);
   width: 100%;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #weltenbauBildImportModal {
@@ -1378,14 +1517,24 @@ input::placeholder {
   padding-right: 0.9rem;
 }
 
+#weltenbauBildImportModal .htbah-weltenbau-import-modal-body {
+  min-height: min(84vh, 900px);
+  display: flex;
+  flex-direction: column;
+}
+
 #weltenbauBildImportModal .htbah-weltenbau-import-cropper-wrap .cropper-container {
   width: 100% !important;
+  height: 100% !important;
 }
 
 #weltenbauBildImportModal .cropper-image {
-  width: 100%;
-  max-height: 68vh;
+  width: auto;
+  max-width: 100%;
+  max-height: 78vh;
   object-fit: contain;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 @media (min-width: 992px) {
@@ -1405,6 +1554,10 @@ input::placeholder {
 
 .quill-editor-host {
   min-height: 60vh;
+}
+
+.entitaet-quill-editor-host.quill-editor-host {
+  min-height: 30vh;
 }
 
 .quill-editor-host .ql-toolbar.ql-snow,
@@ -2547,4 +2700,80 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 .htbah-begegnung-modal .htbah-begegnung-ergebnis-body .zufallstabellen-mobile-slide img {
   height: 7.5rem;
   object-fit: contain;
+}
+
+.htbah-entitaet-bereich {
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: .6rem;
+  padding: .5rem;
+  margin-bottom: .5rem;
+  background: var(--bs-body-bg);
+  box-shadow: 0 .3rem .9rem rgba(15, 23, 42, 0.12);
+}
+
+.htbah-entitaet-bereich-titel {
+  font-size: .8rem;
+  font-weight: 800;
+  margin-bottom: .4rem;
+  color: var(--bs-secondary-color);
+}
+
+@media (max-width: 991.98px) {
+  .htbah-entitaet-bereich {
+    padding: .48rem;
+    margin-bottom: .48rem;
+  }
+
+  .htbah-entitaet-bereich .row.g-2 {
+    --bs-gutter-x: .55rem;
+    --bs-gutter-y: .45rem;
+  }
+
+  .htbah-entitaet-bereich .form-control,
+  .htbah-entitaet-bereich .form-select {
+    font-size: .9rem;
+  }
+
+  .htbah-entitaet-bereich .form-floating > .form-control,
+  .htbah-entitaet-bereich .form-floating > .form-select {
+    min-height: calc(2.56rem + 2px);
+    height: calc(2.56rem + 2px);
+    padding-top: 1rem;
+    padding-bottom: .34rem;
+  }
+
+  .htbah-entitaet-bereich .form-floating > label {
+    padding: .52rem .62rem;
+    font-size: .79rem;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .htbah-entitaet-bereich {
+    padding: .4rem;
+    margin-bottom: .4rem;
+  }
+
+  .htbah-entitaet-bereich .row.g-2 {
+    --bs-gutter-x: .45rem;
+    --bs-gutter-y: .35rem;
+  }
+
+  .htbah-entitaet-bereich .form-control,
+  .htbah-entitaet-bereich .form-select {
+    font-size: .88rem;
+  }
+
+  .htbah-entitaet-bereich .form-floating > .form-control,
+  .htbah-entitaet-bereich .form-floating > .form-select {
+    min-height: calc(2.38rem + 2px);
+    height: calc(2.38rem + 2px);
+    padding-top: .92rem;
+    padding-bottom: .28rem;
+  }
+
+  .htbah-entitaet-bereich .form-floating > label {
+    padding: .46rem .58rem;
+    font-size: .76rem;
+  }
 }

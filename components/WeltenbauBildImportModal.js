@@ -263,7 +263,7 @@ window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
               data-bs-dismiss="modal"
               aria-label="Schließen"></button>
           </div>
-          <div class="modal-body">
+          <div class="modal-body htbah-weltenbau-import-modal-body">
             <p class="small text-body-secondary mb-2">
               Wähle den sichtbaren Kartenausschnitt. Gespeichert wird maximal
               ${WELTENBAU_EXPORT_MAX_KANTE} px Kantenlänge als komprimiertes JPEG oder WebP
