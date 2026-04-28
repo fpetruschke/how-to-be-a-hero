@@ -576,23 +576,35 @@ input::placeholder {
 }
 
 .htbah-weltenbau-map-header {
+  flex-direction: column;
   gap: 0.5rem;
-  flex-wrap: wrap;
-  align-items: flex-start !important;
+  align-items: stretch !important;
 }
 
 .htbah-weltenbau-map-title {
-  flex: 0 1 auto;
+  width: 100%;
+  flex: 0 0 auto;
   min-width: 0;
-  padding-top: 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .htbah-weltenbau-map-actions {
-  flex: 1 1 auto;
-  min-width: 0;
-  justify-content: flex-end;
+  width: 100%;
+  flex: 0 0 100%;
+  justify-content: flex-start !important;
   flex-wrap: wrap;
+  align-content: flex-start;
+  column-gap: 0.35rem;
   row-gap: 0.35rem;
+  overflow: visible;
+}
+
+.htbah-weltenbau-map-actions > .btn-group,
+.htbah-weltenbau-map-actions > .regelwerk-icon-button,
+.htbah-weltenbau-map-actions > .btn-close {
+  flex: 0 0 auto;
 }
 
 .htbah-map-suche-wrap {
@@ -603,18 +615,6 @@ input::placeholder {
 
 .htbah-map-suche-input {
   min-width: 180px;
-}
-
-@media (max-width: 1200px) {
-  .htbah-weltenbau-map-title {
-    flex: 1 1 100%;
-    padding-top: 0;
-  }
-
-  .htbah-weltenbau-map-actions {
-    flex: 1 1 100%;
-    justify-content: flex-start;
-  }
 }
 
 @media (max-width: 860px) {
@@ -907,6 +907,21 @@ input::placeholder {
   min-height: 22vh;
 }
 
+@media (max-width: 991.98px) {
+  .htbah-weltenbau-map-header {
+    cursor: default;
+    touch-action: auto;
+  }
+
+  .htbah-weltenbau-map-title {
+    font-size: 0.95rem;
+  }
+
+  .htbah-weltenbau-map-actions {
+    padding-bottom: 0.1rem;
+  }
+}
+
 @media (max-width: 768px) {
   .htbah-weltenbau-map-window {
     width: 100vw;
@@ -916,34 +931,6 @@ input::placeholder {
     min-width: 0;
     min-height: 0;
     border-radius: 0;
-  }
-
-  .htbah-weltenbau-map-header {
-    cursor: default;
-    touch-action: auto;
-    flex-direction: column;
-    align-items: stretch !important;
-    gap: 0.5rem;
-  }
-
-  .htbah-weltenbau-map-title {
-    font-size: 0.95rem;
-  }
-
-  .htbah-weltenbau-map-actions {
-    justify-content: flex-start;
-    width: 100%;
-    flex-wrap: wrap;
-    overflow: visible;
-    column-gap: 0.35rem;
-    row-gap: 0.35rem;
-    padding-bottom: 0.1rem;
-  }
-
-  .htbah-weltenbau-map-actions > .btn-group,
-  .htbah-weltenbau-map-actions > .regelwerk-icon-button,
-  .htbah-weltenbau-map-actions > .btn-close {
-    flex: 0 0 auto;
   }
 
   .htbah-weltenbau-charakter-modal-window {
