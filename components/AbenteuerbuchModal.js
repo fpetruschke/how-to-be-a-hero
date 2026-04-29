@@ -6,6 +6,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
     return {
       ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
       quill: null,
+      mentionController: null,
       speichernTimer: null,
       fokusVorModal: null,
     };
@@ -37,6 +38,10 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       this.beendeResize();
       this.istVollbild = false;
       this.speichernFlushen();
+      if (this.mentionController && typeof this.mentionController.destroy === 'function') {
+        this.mentionController.destroy();
+      }
+      this.mentionController = null;
       this.quill = null;
       this.stelleFokusWiederHer();
     },
@@ -47,6 +52,10 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
   },
   beforeUnmount() {
     this.beiSeiteVerlassen();
+    if (this.mentionController && typeof this.mentionController.destroy === 'function') {
+      this.mentionController.destroy();
+    }
+    this.mentionController = null;
     this.beendeZiehen();
     this.beendeResize();
     if (this.speichernTimer) {
@@ -115,6 +124,13 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
         this.quill.on('text-change', () => {
           this.speichernDebounced();
         });
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.installMentions === 'function') {
+          this.mentionController = mentionApi.installMentions(this.quill, {
+            getItems: (query) => mentionApi.collectMentionItems(query),
+            onEntityClick: (target) => mentionApi.oeffneEntitaetGlobal(target),
+          });
+        }
       }
 
       this.quill.root.innerHTML = html;

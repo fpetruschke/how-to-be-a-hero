@@ -38,6 +38,20 @@ function zufallstabellenFormatBytes(n) {
   return HTBAH_REFACTOR_UTILS.formatBytesBinary(n);
 }
 
+function zufallstabellenIstBildDatei(file) {
+  if (HTBAH_WELTENBAU_IMPORT && typeof HTBAH_WELTENBAU_IMPORT.istBildDatei === 'function') {
+    return HTBAH_WELTENBAU_IMPORT.istBildDatei(file);
+  }
+  if (!file) {
+    return false;
+  }
+  if (typeof file.type === 'string' && file.type.startsWith('image/')) {
+    return true;
+  }
+  const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
+  return /\.(png|apng|jpe?g|gif|webp|bmp|svg|avif|heic|heif|tiff?)$/i.test(name);
+}
+
 function zufallstabellenDateiZuDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -63,10 +77,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       zustand: window.HTBAH.ladeZufallstabellenZustand(),
       bearbeitung: null,
       bearbeitungIndex: -1,
+      bearbeitungOverlay: null,
+      bearbeitungOverlayIndex: -1,
       zeileQuillInstanz: null,
+      zeileMentionController: null,
       /** DOM-Knoten des Quill-Hosts (Funktions-Ref feuert bei jedem Re-Render erneut) */
       zeileQuillHostElement: null,
       zeileQuillSession: 0,
+      overlayZeileQuillInstanz: null,
+      overlayZeileMentionController: null,
+      overlayZeileQuillHostElement: null,
+      overlayZeileQuillSession: 0,
       zuLoeschendeZeile: null,
       zufallNpcEpoche: 'mittelalter',
       zufallGegenstandEpoche: 'mittelalter',
@@ -75,6 +96,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       zufallRaetselEpoche: 'mittelalter',
       /** Stabile Funktion für :ref (wie InventarModal), kein String-ref im Modal */
       zeileQuillHostRefFn: null,
+      overlayZeileQuillHostRefFn: null,
       sucheOrte: '',
       sucheFraktionen: '',
       sucheNpcs: '',
@@ -96,6 +118,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     this.zeileQuillHostRefFn = (el) => {
       this.zeileQuillHostRef(el);
     };
+    this.overlayZeileQuillHostRefFn = (el) => {
+      this.withModalKontext('overlay', () => this.zeileQuillHostRef(el));
+    };
   },
   computed: {
     rootKlassen() {
@@ -108,6 +133,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const neu = this.bearbeitungIndex < 0 ? 'Neu: ' : '';
       const cfg = TABLE_TYPE_CONFIG[this.bearbeitung.typ] || TABLE_TYPE_CONFIG.gegenstand;
       const label = this.bearbeitung.typ === 'bestie' ? 'Bestarium' : cfg.label;
+      return `${neu}${cfg.emoji} ${label}`;
+    },
+    zeileModalTitelOverlay() {
+      if (!this.bearbeitungOverlay) {
+        return '';
+      }
+      const neu = this.bearbeitungOverlayIndex < 0 ? 'Neu: ' : '';
+      const cfg = TABLE_TYPE_CONFIG[this.bearbeitungOverlay.typ] || TABLE_TYPE_CONFIG.gegenstand;
+      const label = this.bearbeitungOverlay.typ === 'bestie' ? 'Bestarium' : cfg.label;
       return `${neu}${cfg.emoji} ${label}`;
     },
     zufallsgeneratorBereit() {
@@ -538,6 +572,208 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     },
   },
   methods: {
+    entitaetTypLabelFuerMentions(typ) {
+      const map = {
+        charakter: 'Charakter',
+        npc: 'NPC',
+        ort: 'Ort',
+        fraktion: 'Fraktion',
+        pantheon: 'Gottheit',
+        raetsel: 'Rätsel',
+        bestie: 'Bestie',
+        gegenstand: 'Gegenstand',
+      };
+      return map[typ] || 'Entität';
+    },
+    mentionTypSortIndex(typ) {
+      const order = {
+        charakter: 0,
+        npc: 1,
+        ort: 2,
+        fraktion: 3,
+        gegenstand: 4,
+        bestie: 5,
+        raetsel: 6,
+        pantheon: 7,
+      };
+      return Number.isInteger(order[typ]) ? order[typ] : 99;
+    },
+    mentionScore(name, query) {
+      const n = String(name || '').trim().toLowerCase();
+      const q = String(query || '').trim().toLowerCase();
+      if (!q) {
+        return 500;
+      }
+      if (n === q) {
+        return 0;
+      }
+      if (`@${n}` === q || n === q.replace(/^@+/, '')) {
+        return 1;
+      }
+      if (n.startsWith(q)) {
+        return 2;
+      }
+      const wortTreffer = n.split(/\s+/).some((teil) => teil.startsWith(q));
+      if (wortTreffer) {
+        return 3;
+      }
+      if (n.includes(q)) {
+        return 4;
+      }
+      return 99;
+    },
+    mentionItemsFuerQuill(queryText) {
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      if (!mentionApi || typeof mentionApi.collectMentionItems !== 'function') {
+        return [];
+      }
+      return mentionApi.collectMentionItems(queryText);
+    },
+    oeffneEntitaetAusMention({ entityType, entityId }) {
+      const typ = String(entityType || '').trim();
+      const id = String(entityId || '').trim();
+      if (!typ || !id) {
+        return;
+      }
+      const map = {
+        npc: ['npcs', 'npcBearbeiten'],
+        ort: ['orte', 'ortBearbeiten'],
+        fraktion: ['fraktionen', 'fraktionBearbeiten'],
+        pantheon: ['pantheon', 'pantheonBearbeiten'],
+        raetsel: ['raetsel', 'raetselBearbeiten'],
+        bestie: ['bestien', 'bestieBearbeiten'],
+        gegenstand: ['gegenstaende', 'gegenstandBearbeiten'],
+      };
+      const entry = map[typ];
+      if (!entry) {
+        return false;
+      }
+      const liste = this.zustand[entry[0]] || [];
+      const index = this.indexNachId(liste, id);
+      if (index < 0 || typeof this[entry[1]] !== 'function') {
+        return false;
+      }
+      if (this.bearbeitung && !this.bearbeitungOverlay) {
+        this.zeileModalOeffnenAlsOverlay(typ, liste[index], index);
+        return true;
+      }
+      this[entry[1]](liste[index], index);
+      return true;
+    },
+    onRichTextLinkClick(event) {
+      const anchor =
+        event && event.target && typeof event.target.closest === 'function'
+          ? event.target.closest('a[href]')
+          : null;
+      if (!anchor) {
+        return;
+      }
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      if (!mentionApi || typeof mentionApi.parseEntityLink !== 'function') {
+        return;
+      }
+      const target = mentionApi.parseEntityLink(anchor.getAttribute('href') || anchor.href || '');
+      if (!target) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      this.oeffneEntitaetAusMention(target);
+    },
+    withModalKontext(ziel, fn) {
+      if (ziel !== 'overlay') {
+        return fn();
+      }
+      if (!this.bearbeitungOverlay) {
+        return null;
+      }
+      const snapshot = {
+        bearbeitung: this.bearbeitung,
+        bearbeitungIndex: this.bearbeitungIndex,
+        zeileQuillInstanz: this.zeileQuillInstanz,
+        zeileMentionController: this.zeileMentionController,
+        zeileQuillHostElement: this.zeileQuillHostElement,
+        zeileQuillSession: this.zeileQuillSession,
+      };
+      this.bearbeitung = this.bearbeitungOverlay;
+      this.bearbeitungIndex = this.bearbeitungOverlayIndex;
+      this.zeileQuillInstanz = this.overlayZeileQuillInstanz;
+      this.zeileMentionController = this.overlayZeileMentionController;
+      this.zeileQuillHostElement = this.overlayZeileQuillHostElement;
+      this.zeileQuillSession = this.overlayZeileQuillSession;
+      const result = fn();
+      this.bearbeitungOverlay = this.bearbeitung;
+      this.bearbeitungOverlayIndex = this.bearbeitungIndex;
+      this.overlayZeileQuillInstanz = this.zeileQuillInstanz;
+      this.overlayZeileMentionController = this.zeileMentionController;
+      this.overlayZeileQuillHostElement = this.zeileQuillHostElement;
+      this.overlayZeileQuillSession = this.zeileQuillSession;
+      this.bearbeitung = snapshot.bearbeitung;
+      this.bearbeitungIndex = snapshot.bearbeitungIndex;
+      this.zeileQuillInstanz = snapshot.zeileQuillInstanz;
+      this.zeileMentionController = snapshot.zeileMentionController;
+      this.zeileQuillHostElement = snapshot.zeileQuillHostElement;
+      this.zeileQuillSession = snapshot.zeileQuillSession;
+      return result;
+    },
+    zeileModalOeffnenAlsOverlay(typ, zeile, index) {
+      this.overlayZeileQuillInstanz = null;
+      this.overlayZeileMentionController = null;
+      this.overlayZeileQuillHostElement = null;
+      this.overlayZeileQuillSession += 1;
+      const zeileKopie = JSON.parse(JSON.stringify(zeile));
+      if (!Array.isArray(zeileKopie.medien)) {
+        zeileKopie.medien = [];
+      }
+      if (typeof zeileKopie.primaryMediumId !== 'string') {
+        zeileKopie.primaryMediumId = '';
+      }
+      if (typ === 'fraktion') {
+        zeileKopie.orte = this.fraktionOrteListe(zeileKopie);
+      }
+      this.bearbeitungOverlay = { typ, zeile: zeileKopie };
+      this.bearbeitungOverlayIndex = index;
+    },
+    overlaySchliesseZeileModal() {
+      this.withModalKontext('overlay', () => this.schliesseZeileModal());
+      this.bearbeitungOverlay = null;
+      this.bearbeitungOverlayIndex = -1;
+      this.overlayZeileQuillInstanz = null;
+      this.overlayZeileMentionController = null;
+      this.overlayZeileQuillHostElement = null;
+    },
+    overlayZeileSpeichern() {
+      this.withModalKontext('overlay', () => this.zeileSpeichernIntern({ schliessenNachSpeichern: true }));
+      this.overlaySchliesseZeileModal();
+    },
+    overlayZeileBearbeitungBeiBlurSpeichern() {
+      this.withModalKontext('overlay', () => this.zeileBearbeitungBeiBlurSpeichern());
+    },
+    overlayZufallsvorschlagUebernehmen() {
+      this.withModalKontext('overlay', () => this.zufallsvorschlagUebernehmen());
+    },
+    overlayMediaUpload(event) {
+      this.withModalKontext('overlay', () => this.onBearbeitungsMedienDateienGewaehlt(event));
+    },
+    overlayMediaRemove(index) {
+      this.withModalKontext('overlay', () => this.mediumAusBearbeitungEntfernen(index));
+    },
+    overlayMediaSetPrimary(mediumId) {
+      this.withModalKontext('overlay', () => this.setzeBearbeitungPrimaryMedium(mediumId));
+    },
+    overlayMediaDownload(medium) {
+      this.withModalKontext('overlay', () => this.mediumHerunterladen(medium));
+    },
+    onGlobalOpenEntityRequest(event) {
+      const detail = event && event.detail ? event.detail : null;
+      if (!detail || !detail.entityType || !detail.entityId) {
+        return;
+      }
+      const erfolg = this.oeffneEntitaetAusMention(detail);
+      if (erfolg) {
+        event.preventDefault();
+      }
+    },
     persist() {
       window.HTBAH.speichereZufallstabellenZustand(this.zustand);
     },
@@ -843,9 +1079,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         });
       }
       const bildDateien = verwertbar.filter(zufallstabellenIstBildDatei);
-      const sonstigeDateien = verwertbar.filter(
-        (f) => !(HTBAH_WELTENBAU_IMPORT && HTBAH_WELTENBAU_IMPORT.istBildDatei(f)),
-      );
+      const sonstigeDateien = verwertbar.filter((f) => !zufallstabellenIstBildDatei(f));
       if (bildDateien.length) {
         this.medienImportWarteschlange = this.medienImportWarteschlange.concat(bildDateien);
         if (this.medienImportWarteschlange.length === bildDateien.length) {
@@ -1345,6 +1579,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           ],
         },
       });
+      if (this.zeileMentionController && typeof this.zeileMentionController.destroy === 'function') {
+        this.zeileMentionController.destroy();
+      }
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      if (mentionApi && typeof mentionApi.installMentions === 'function') {
+        this.zeileMentionController = mentionApi.installMentions(this.zeileQuillInstanz, {
+          getItems: (query) => this.mentionItemsFuerQuill(query),
+          onEntityClick: (target) => this.oeffneEntitaetAusMention(target),
+        });
+      }
       this.zeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitung();
       this.zeileQuillInstanz.on('selection-change', (range, oldRange) => {
         if (this.bearbeitung && this.bearbeitungIndex >= 0 && oldRange && !range) {
@@ -1353,6 +1597,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       });
     },
     schliesseZeileModal() {
+      if (this.zeileMentionController && typeof this.zeileMentionController.destroy === 'function') {
+        this.zeileMentionController.destroy();
+      }
+      this.zeileMentionController = null;
       this.zeileQuillInstanz = null;
       this.zeileQuillHostElement = null;
       this.medienImportWarteschlange = [];
@@ -1634,7 +1882,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       });
     },
   },
+  mounted() {
+    window.addEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
+  },
   beforeUnmount() {
+    window.removeEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
+    this.overlaySchliesseZeileModal();
+    if (this.zeileMentionController && typeof this.zeileMentionController.destroy === 'function') {
+      this.zeileMentionController.destroy();
+    }
+    this.zeileMentionController = null;
     this.zeileQuillInstanz = null;
     this.zeileQuillHostElement = null;
   },
@@ -1722,7 +1979,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td>{{ karteWert(row.groesse) }}</td>
                   <td>{{ karteWert(row.lage) }}</td>
                   <td>{{ karteWert(row.zustand) }}</td>
-                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
+                  <td class="small">
+                    <div
+                      v-if="zeilenWertAlsText(row.notizenHtml)"
+                      class="htbah-zufall-rich-preview"
+                      @click.stop="onRichTextLinkClick($event)"
+                      v-html="richTextHtml(row.notizenHtml)"></div>
+                    <span v-else>—</span>
+                  </td>
                   <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
@@ -1776,6 +2040,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div
                   v-if="zeilenWertAlsText(row.notizenHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
+                  @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2" @click.stop>
@@ -1852,7 +2117,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="small">{{ karteWert(fraktionOrteText(row)) }}</td>
                   <td class="small">{{ karteWert(row.ziel) }}</td>
                   <td class="small">{{ karteWert(row.gesinnungVerhalten) }}</td>
-                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
+                  <td class="small">
+                    <div
+                      v-if="zeilenWertAlsText(row.beschreibungHtml)"
+                      class="htbah-zufall-rich-preview"
+                      @click.stop="onRichTextLinkClick($event)"
+                      v-html="richTextHtml(row.beschreibungHtml)"></div>
+                    <span v-else>—</span>
+                  </td>
                   <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
@@ -1904,6 +2176,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div
                   v-if="zeilenWertAlsText(row.beschreibungHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
+                  @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.beschreibungHtml)"></div>
                 <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2" @click.stop>
@@ -2011,7 +2284,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td>{{ karteWert(row.stimme) }}</td>
                   <td>{{ karteWert(row.waffe) }}</td>
                   <td class="small">{{ npcWaffenWerteText(row) }}</td>
-                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
+                  <td class="small">
+                    <div
+                      v-if="zeilenWertAlsText(row.notizenHtml)"
+                      class="htbah-zufall-rich-preview"
+                      @click.stop="onRichTextLinkClick($event)"
+                      v-html="richTextHtml(row.notizenHtml)"></div>
+                    <span v-else>—</span>
+                  </td>
                   <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
@@ -2071,6 +2351,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div
                   v-if="zeilenWertAlsText(row.notizenHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
+                  @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2" @click.stop>
@@ -2143,7 +2424,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td>{{ karteWert(row.name) }}</td>
                   <td class="small text-nowrap">{{ gegenstandWaffenWerteText(row) }}</td>
                   <td>{{ karteWert(row.aufenthaltsort) }}</td>
-                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
+                  <td class="small">
+                    <div
+                      v-if="zeilenWertAlsText(row.beschreibungHtml)"
+                      class="htbah-zufall-rich-preview"
+                      @click.stop="onRichTextLinkClick($event)"
+                      v-html="richTextHtml(row.beschreibungHtml)"></div>
+                    <span v-else>—</span>
+                  </td>
                   <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
@@ -2192,6 +2480,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div
                   v-if="zeilenWertAlsText(row.beschreibungHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
+                  @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.beschreibungHtml)"></div>
                 <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2" @click.stop>
@@ -2277,7 +2566,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="small">{{ karteWert(row.domaene) }}</td>
                   <td class="small">{{ karteWert(row.charakter) }}</td>
                   <td class="small">{{ karteWert(row.schutzpatronat) }}</td>
-                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
+                  <td class="small">
+                    <div
+                      v-if="zeilenWertAlsText(row.notizenHtml)"
+                      class="htbah-zufall-rich-preview"
+                      @click.stop="onRichTextLinkClick($event)"
+                      v-html="richTextHtml(row.notizenHtml)"></div>
+                    <span v-else>—</span>
+                  </td>
                   <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
@@ -2328,6 +2624,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div
                   v-if="zeilenWertAlsText(row.notizenHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
+                  @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2" @click.stop>
@@ -2415,7 +2712,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="small">{{ textVorschau(row.aufgabenstellung, 56) }}</td>
                   <td class="small">{{ karteWert(row.ergebnis) }}</td>
                   <td class="small">{{ karteWert(row.schwierigkeit) }}</td>
-                  <td class="small">{{ textVorschau(row.notizenHtml) }}</td>
+                  <td class="small">
+                    <div
+                      v-if="zeilenWertAlsText(row.notizenHtml)"
+                      class="htbah-zufall-rich-preview"
+                      @click.stop="onRichTextLinkClick($event)"
+                      v-html="richTextHtml(row.notizenHtml)"></div>
+                    <span v-else>—</span>
+                  </td>
                   <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
@@ -2476,6 +2780,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div
                   v-if="zeilenWertAlsText(row.notizenHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
+                  @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2" @click.stop>
@@ -2571,7 +2876,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="small text-nowrap">{{ bestieAggressivitaetText(row) }}</td>
                   <td class="small">{{ textVorschau(row.staerke, 48) }}</td>
                   <td class="small">{{ textVorschau(row.schwaeche, 48) }}</td>
-                  <td class="small">{{ textVorschau(row.beschreibungHtml) }}</td>
+                  <td class="small">
+                    <div
+                      v-if="zeilenWertAlsText(row.beschreibungHtml)"
+                      class="htbah-zufall-rich-preview"
+                      @click.stop="onRichTextLinkClick($event)"
+                      v-html="richTextHtml(row.beschreibungHtml)"></div>
+                    <span v-else>—</span>
+                  </td>
                   <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
@@ -2641,6 +2953,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div
                   v-if="zeilenWertAlsText(row.beschreibungHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
+                  @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.beschreibungHtml)"></div>
                 <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2" @click.stop>
@@ -2771,6 +3084,36 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @media-set-primary="setzeBearbeitungPrimaryMedium"
         @media-open="mediumImBildbetrachterOeffnen"
         @media-download="mediumHerunterladen"
+        @update:zufallNpcEpoche="zufallNpcEpoche = $event"
+        @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
+        @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
+        @update:zufallFraktionEpoche="zufallFraktionEpoche = $event"
+        @update:zufallRaetselEpoche="zufallRaetselEpoche = $event" />
+
+      <zufallstabellen-zeile-modal
+        :anlage="{ offen: !!bearbeitungOverlay, typ: bearbeitungOverlay ? bearbeitungOverlay.typ : '', zeile: bearbeitungOverlay ? bearbeitungOverlay.zeile : null }"
+        :zeile-modal-titel="zeileModalTitelOverlay"
+        :random-sichtbar="bearbeitungOverlayIndex < 0"
+        :zufallsgenerator-bereit="zufallsgeneratorBereit"
+        :zufall-npc-epoche="zufallNpcEpoche"
+        :zufall-gegenstand-epoche="zufallGegenstandEpoche"
+        :zufall-gegenstand-kleidung="zufallGegenstandKleidung"
+        :zufall-fraktion-epoche="zufallFraktionEpoche"
+        :zufall-raetsel-epoche="zufallRaetselEpoche"
+        :pantheon-namen-liste="pantheonNamenListe"
+        :fraktionen-mit-namen="fraktionenMitNamen"
+        :orte-namen-liste="orteNamenListe"
+        :zeile-quill-session="overlayZeileQuillSession"
+        :zeile-quill-host-ref-fn="overlayZeileQuillHostRefFn"
+        @close="overlaySchliesseZeileModal"
+        @save="overlayZeileSpeichern"
+        @edit-blur="overlayZeileBearbeitungBeiBlurSpeichern"
+        @random="overlayZufallsvorschlagUebernehmen"
+        @media-upload="overlayMediaUpload"
+        @media-remove="overlayMediaRemove"
+        @media-set-primary="overlayMediaSetPrimary"
+        @media-open="mediumImBildbetrachterOeffnen"
+        @media-download="overlayMediaDownload"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"
         @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
         @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"

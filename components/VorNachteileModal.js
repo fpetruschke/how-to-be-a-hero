@@ -16,6 +16,7 @@ window.HTBAH_KOMPONENTEN.VorNachteileModal = {
       editId: null,
       backup: null,
       quillNachPaarId: {},
+      mentionControllerNachPaarId: {},
       quillRefFnCache: Object.create(null),
       quillToolbarCleanup: {},
     };
@@ -36,6 +37,12 @@ window.HTBAH_KOMPONENTEN.VorNachteileModal = {
       return `${id}::${feld}`;
     },
     quillTeilZerstoeren(id, feld) {
+      const mentionKey = this.quillCleanupKey(id, `${feld}-mention`);
+      const mentionController = this.mentionControllerNachPaarId[mentionKey];
+      if (mentionController && typeof mentionController.destroy === 'function') {
+        mentionController.destroy();
+      }
+      delete this.mentionControllerNachPaarId[mentionKey];
       const key = this.quillCleanupKey(id, feld);
       const cleanup = this.quillToolbarCleanup[key];
       if (typeof cleanup === 'function') {
@@ -95,6 +102,14 @@ window.HTBAH_KOMPONENTEN.VorNachteileModal = {
         });
         quill.root.innerHTML = paar[htmlKey] || '';
         bucket[feld] = quill;
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.installMentions === 'function') {
+          const mentionKey = this.quillCleanupKey(id, `${feld}-mention`);
+          this.mentionControllerNachPaarId[mentionKey] = mentionApi.installMentions(quill, {
+            getItems: (query) => mentionApi.collectMentionItems(query),
+            onEntityClick: (target) => mentionApi.oeffneEntitaetGlobal(target),
+          });
+        }
 
         el.classList.add('inventar-quill-toolbar--hidden');
         const showToolbar = () => el.classList.remove('inventar-quill-toolbar--hidden');
@@ -301,6 +316,7 @@ window.HTBAH_KOMPONENTEN.VorNachteileModal = {
     }
     const ids = Object.keys(this.quillNachPaarId);
     ids.forEach((id) => this.quillZerstoeren(id));
+    this.mentionControllerNachPaarId = {};
   },
   template: `
     <div

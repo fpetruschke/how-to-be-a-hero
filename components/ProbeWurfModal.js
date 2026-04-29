@@ -29,6 +29,26 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
       }
       return 'probe-wurf-ergebnis--' + a.stufe.replace(/_/g, '-');
     },
+    wahrscheinlichkeitKlasse() {
+      const z = Math.max(0, Math.min(100, Math.round(Number(this.kontext.zielwert) || 0)));
+      if (z >= 75) {
+        return 'probe-wurf-ziel-card--sehr-leicht';
+      }
+      if (z >= 50) {
+        return 'probe-wurf-ziel-card--leicht';
+      }
+      if (z >= 30) {
+        return 'probe-wurf-ziel-card--mittel';
+      }
+      if (z >= 15) {
+        return 'probe-wurf-ziel-card--schwer';
+      }
+      return 'probe-wurf-ziel-card--sehr-schwer';
+    },
+    kritMissMin() {
+      const z = Math.max(0, Math.round(Number(this.kontext.zielwert) || 0));
+      return Math.ceil(90 + z * 0.1);
+    },
   },
   methods: {
     /**
@@ -85,12 +105,12 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
             <p class="small text-body-secondary mb-2">
               Regelwerk: 1W100 — bestanden, wenn der Wurf <strong>≤ Zielwert</strong>.
               Kritischer Erfolg nur bei Fähigkeit (untere 10 % des Zielwerts).
-              Kritischer Misserfolg von <strong>{{ 90 + Math.round(kontext.zielwert * 0.1) }}</strong> bis 100.
+              Kritischer Misserfolg von <strong>{{ kritMissMin }}</strong> bis 100.
             </p>
-            <div class="card p-3 mb-3 probe-wurf-ziel-card">
+            <div class="card p-2 mb-3 probe-wurf-ziel-card" :class="wahrscheinlichkeitKlasse">
               <div class="d-flex justify-content-between align-items-center">
-                <span>Zielwert (Probe)</span>
-                <span class="fs-5 fw-bold">{{ kontext.zielwert }}</span>
+                <span class="small">Zielwert (zu unterbieten)</span>
+                <span class="fs-6 fw-bold">{{ kontext.zielwert }}</span>
               </div>
             </div>
             <icon-text-button

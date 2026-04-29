@@ -1,12 +1,39 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 const HTBAH_WB_REFACTOR_UTILS = window.HTBAH_SHARED && window.HTBAH_SHARED.RefactorUtils;
-const HTBAH_WB_BOOTSTRAP_MODAL =
-  window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper;
 
 /** Max. Kantenlänge des exportierten Bildes (JPEG/WebP nach Zuschnitt). */
 const WELTENBAU_EXPORT_MAX_KANTE = 2048;
 const WELTENBAU_JPEG_QUALITAET = 0.84;
 const WELTENBAU_WEBP_QUALITAET = 0.82;
+
+function canvasSkalierenMaxKante(inputCanvas, maxKante) {
+  if (!inputCanvas || !Number.isFinite(maxKante) || maxKante <= 0) {
+    return inputCanvas;
+  }
+  const breite = Number(inputCanvas.width) || 0;
+  const hoehe = Number(inputCanvas.height) || 0;
+  if (breite <= 0 || hoehe <= 0) {
+    return inputCanvas;
+  }
+  const groessteKante = Math.max(breite, hoehe);
+  if (groessteKante <= maxKante) {
+    return inputCanvas;
+  }
+  const faktor = maxKante / groessteKante;
+  const zielBreite = Math.max(1, Math.round(breite * faktor));
+  const zielHoehe = Math.max(1, Math.round(hoehe * faktor));
+  const canvas = document.createElement('canvas');
+  canvas.width = zielBreite;
+  canvas.height = zielHoehe;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return inputCanvas;
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(inputCanvas, 0, 0, zielBreite, zielHoehe);
+  return canvas;
+}
 
 function canvasZuKomprimiertemDataUrl(canvas) {
   const webpProbe = canvas.toDataURL('image/webp', WELTENBAU_WEBP_QUALITAET);
@@ -17,306 +44,89 @@ function canvasZuKomprimiertemDataUrl(canvas) {
 }
 
 window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal = {
+  components: {
+    BildCropperModal: window.HTBAH_KOMPONENTEN.BildCropperModal,
+  },
   emits: ['fertig', 'abgebrochen', 'datei-import-fehler'],
   data() {
     return {
-      tempObjectUrl: '',
       aktuellerDateiname: '',
       aktuelleDateigroesseBytes: null,
-      cropper: null,
-      bootstrapModal: null,
-      urspruenglicherElternKnoten: null,
-      urspruenglichesNaechstesGeschwister: null,
-      schliessenOhneAbgebrochenEvent: false,
-      bildLaedt: false,
-      drehungGrad: 0,
-      spiegelX: 1,
-      spiegelY: 1,
     };
+  },
+  computed: {
+    beschreibungText() {
+      return `Wähle den sichtbaren Bildausschnitt. Gespeichert wird maximal ${WELTENBAU_EXPORT_MAX_KANTE} px Kantenlänge als komprimiertes JPEG oder WebP (Transparenz geht dabei verloren).`;
+    },
   },
   methods: {
     oeffnenMitDatei(file) {
       if (!file) {
         return;
       }
-      this.schliessenOhneAbgebrochenEvent = false;
-      this.cropperAufraeumen();
-      this.revokeTempUrl();
       this.aktuellerDateiname = file.name || 'Bild';
       this.aktuelleDateigroesseBytes = Number.isFinite(file.size) && file.size > 0 ? Math.round(file.size) : null;
-      this.bildLaedt = true;
-      this.drehungGrad = 0;
-      this.spiegelX = 1;
-      this.spiegelY = 1;
-      this.tempObjectUrl = URL.createObjectURL(file);
-      const el = this.$refs.modalElement;
-      if (!el) {
+      const modal = this.$refs.cropperModal;
+      if (!modal || typeof modal.oeffnenMitDatei !== 'function') {
         return;
       }
-      if (!this.bootstrapModal) {
-        this.bootstrapModal = HTBAH_WB_BOOTSTRAP_MODAL
-          ? HTBAH_WB_BOOTSTRAP_MODAL.ensureModalInstance(el)
-          : null;
-      }
-      if (this.bootstrapModal) {
-        this.bootstrapModal.show();
-      }
-      this.$nextTick(() => {
-        this.setzeModalEbeneNachOben();
-        window.setTimeout(() => this.setzeModalEbeneNachOben(), 80);
-      });
+      modal.oeffnenMitDatei(file);
     },
-    beimModalVersteckt() {
-      this.cropperAufraeumen();
-      this.revokeTempUrl();
-      this.bildLaedt = false;
-      this.aktuelleDateigroesseBytes = null;
-      this.drehungGrad = 0;
-      this.spiegelX = 1;
-      this.spiegelY = 1;
-      if (!this.schliessenOhneAbgebrochenEvent) {
-        this.$emit('abgebrochen');
-      }
-      this.schliessenOhneAbgebrochenEvent = false;
-    },
-    onCropperBildGeladen() {
-      this.bildLaedt = false;
-      this.$nextTick(() => this.cropperInitialisieren());
-    },
-    async onCropperBildFehler() {
-      this.bildLaedt = false;
-      await window.HTBAH.ui.alert({
-        titel: 'Bild konnte nicht geladen werden',
-        beschreibung:
-          'Das Bild konnte nicht geladen werden (Datei zu groß oder kein unterstütztes Format).',
-      });
-      this.schliessenOhneAbgebrochenEvent = true;
+    async onBildFehler() {
       this.$emit('datei-import-fehler');
-      if (this.bootstrapModal) {
-        this.bootstrapModal.hide();
-      }
+      return false;
     },
-    cropperInitialisieren() {
-      if (this.cropper) {
-        this.cropper.destroy();
-        this.cropper = null;
-      }
-      const bildElement = this.$refs.cropperBildElement;
-      if (!bildElement || !this.tempObjectUrl || !window.Cropper) {
-        return;
-      }
-      this.cropper = new window.Cropper(bildElement, {
-        aspectRatio: NaN,
-        viewMode: 1,
-        autoCropArea: 1,
-        background: false,
-        responsive: true,
-      });
-      this.cropper.rotateTo(this.drehungGrad);
-      this.cropper.scaleX(this.spiegelX);
-      this.cropper.scaleY(this.spiegelY);
+    onAbgebrochen() {
+      this.aktuelleDateigroesseBytes = null;
+      this.$emit('abgebrochen');
     },
-    setzeModalEbeneNachOben() {
-      const modalElement = this.$refs.modalElement;
-      const rootStyles = window.getComputedStyle(document.documentElement);
-      const cropZ = parseInt(rootStyles.getPropertyValue('--htbah-z-modal-crop'), 10);
-      const backdropZ = parseInt(rootStyles.getPropertyValue('--htbah-z-modal-crop-backdrop'), 10);
-      if (modalElement) {
-        modalElement.style.zIndex = String(Number.isFinite(cropZ) ? cropZ : 5000);
-      }
-      const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
-      const basisBackdropZ = Number.isFinite(backdropZ) ? backdropZ : 4990;
-      // Alle vorhandenen Backdrops unter dem Crop-Modal halten, damit kein Overlay die Bedienung blockiert.
-      backdrops.forEach((backdrop, index) => {
-        const z = basisBackdropZ - (backdrops.length - 1 - index);
-        backdrop.style.zIndex = String(Math.max(1000, z));
-      });
-    },
-    drehen(delta) {
-      if (!this.cropper) {
-        return;
-      }
-      const neu = (this.drehungGrad + delta) % 360;
-      this.drehungGrad = neu < 0 ? neu + 360 : neu;
-      this.cropper.rotateTo(this.drehungGrad);
-    },
-    spiegelnHorizontal() {
-      if (!this.cropper) {
-        return;
-      }
-      this.spiegelX = this.spiegelX === 1 ? -1 : 1;
-      this.cropper.scaleX(this.spiegelX);
-    },
-    spiegelnVertikal() {
-      if (!this.cropper) {
-        return;
-      }
-      this.spiegelY = this.spiegelY === 1 ? -1 : 1;
-      this.cropper.scaleY(this.spiegelY);
-    },
-    async zuschnittSpeichern() {
-      if (!this.cropper) {
-        return;
-      }
-      let canvas;
-      try {
-        canvas = this.cropper.getCroppedCanvas({
-          maxWidth: WELTENBAU_EXPORT_MAX_KANTE,
-          maxHeight: WELTENBAU_EXPORT_MAX_KANTE,
-          imageSmoothingQuality: 'high',
-        });
-      } catch {
-        canvas = null;
-      }
-      if (!canvas) {
+    async onSpeichern(canvas) {
+      let exportCanvas = canvasSkalierenMaxKante(canvas, WELTENBAU_EXPORT_MAX_KANTE);
+      if (!exportCanvas) {
         await window.HTBAH.ui.alert({
           titel: 'Zuschnitt fehlgeschlagen',
           beschreibung:
             'Der Zuschnitt konnte nicht erstellt werden (Bild möglicherweise zu groß für den Browser).',
         });
-        return;
+        return false;
       }
       let dataUrl;
       try {
-        dataUrl = canvasZuKomprimiertemDataUrl(canvas);
+        dataUrl = canvasZuKomprimiertemDataUrl(exportCanvas);
       } catch {
         await window.HTBAH.ui.alert({
           titel: 'Komprimierung fehlgeschlagen',
           beschreibung: 'Das Bild konnte nicht komprimiert werden.',
         });
-        return;
+        return false;
       }
       if (!dataUrl || !dataUrl.startsWith('data:image/')) {
         await window.HTBAH.ui.alert({
           titel: 'Ungültiges Bildformat',
           beschreibung: 'Ungültiges Bildformat nach Export.',
         });
-        return;
+        return false;
       }
       const name = HTBAH_WB_REFACTOR_UTILS
         ? HTBAH_WB_REFACTOR_UTILS.dateinameOhneEndung(this.aktuellerDateiname, 'Bild')
         : ((typeof this.aktuellerDateiname === 'string' ? this.aktuellerDateiname.trim() : '').replace(/\.[^/.]+$/, '') || 'Bild');
-      this.schliessenOhneAbgebrochenEvent = true;
       this.$emit('fertig', { dataUrl, name, dateigroesseBytes: this.aktuelleDateigroesseBytes });
-      if (this.bootstrapModal) {
-        this.bootstrapModal.hide();
-      }
+      this.aktuelleDateigroesseBytes = null;
+      return true;
     },
-    abbrechenKlick() {
-      if (this.bootstrapModal) {
-        this.bootstrapModal.hide();
-      }
-    },
-    cropperAufraeumen() {
-      if (this.cropper) {
-        this.cropper.destroy();
-        this.cropper = null;
-      }
-    },
-    revokeTempUrl() {
-      if (this.tempObjectUrl) {
-        URL.revokeObjectURL(this.tempObjectUrl);
-        this.tempObjectUrl = '';
-      }
-    },
-  },
-  mounted() {
-    const el = this.$refs.modalElement;
-    if (el) {
-      if (el.parentNode && el.parentNode !== document.body) {
-        this.urspruenglicherElternKnoten = el.parentNode;
-        this.urspruenglichesNaechstesGeschwister = el.nextSibling || null;
-        document.body.appendChild(el);
-      }
-      if (HTBAH_WB_BOOTSTRAP_MODAL) {
-        HTBAH_WB_BOOTSTRAP_MODAL.bindHiddenEvent(el, this.beimModalVersteckt);
-      }
-    }
-  },
-  beforeUnmount() {
-    const el = this.$refs.modalElement;
-    if (el) {
-      if (HTBAH_WB_BOOTSTRAP_MODAL) {
-        HTBAH_WB_BOOTSTRAP_MODAL.unbindHiddenEvent(el, this.beimModalVersteckt);
-      }
-      if (this.urspruenglicherElternKnoten) {
-        if (this.urspruenglichesNaechstesGeschwister && this.urspruenglichesNaechstesGeschwister.parentNode === this.urspruenglicherElternKnoten) {
-          this.urspruenglicherElternKnoten.insertBefore(el, this.urspruenglichesNaechstesGeschwister);
-        } else {
-          this.urspruenglicherElternKnoten.appendChild(el);
-        }
-      }
-    }
-    this.cropperAufraeumen();
-    this.revokeTempUrl();
   },
   template: `
-    <div
-      class="modal fade"
-      id="weltenbauBildImportModal"
-      ref="modalElement"
-      tabindex="-1"
-      aria-labelledby="weltenbauBildImportModalLabel"
-      aria-hidden="true">
-      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content shadow">
-          <div class="modal-header">
-            <h5 class="modal-title" id="weltenbauBildImportModalLabel">
-              Karte zuschneiden und komprimieren
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              data-bs-dismiss="modal"
-              aria-label="Schließen"></button>
-          </div>
-          <div class="modal-body htbah-weltenbau-import-modal-body">
-            <p class="small text-body-secondary mb-2">
-              Wähle den sichtbaren Kartenausschnitt. Gespeichert wird maximal
-              ${WELTENBAU_EXPORT_MAX_KANTE} px Kantenlänge als komprimiertes JPEG oder WebP
-              (Transparenz geht dabei verloren).
-            </p>
-            <div class="d-flex flex-wrap gap-2 mb-2">
-              <button type="button" class="btn btn-sm btn-outline-secondary" @click="drehen(-90)">
-                90° links
-              </button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" @click="drehen(90)">
-                90° rechts
-              </button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" @click="spiegelnHorizontal">
-                Horizontal spiegeln
-              </button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" @click="spiegelnVertikal">
-                Vertikal spiegeln
-              </button>
-            </div>
-            <div
-              v-if="bildLaedt"
-              class="text-center text-body-secondary small py-5">
-              Bild wird geladen …
-            </div>
-            <div class="text-center mb-2 htbah-weltenbau-import-cropper-wrap">
-              <!-- v-if statt v-show: leeres src="" würde sonst sofort @error auslösen -->
-              <img
-                v-if="tempObjectUrl"
-                ref="cropperBildElement"
-                :src="tempObjectUrl"
-                alt="Karte zuschneiden"
-                class="cropper-image"
-                @load="onCropperBildGeladen"
-                @error="onCropperBildFehler" />
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="abbrechenKlick">
-              Abbrechen
-            </button>
-            <button type="button" class="btn btn-primary" @click="zuschnittSpeichern">
-              Übernehmen und speichern
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <bild-cropper-modal
+      ref="cropperModal"
+      modal-id="weltenbauBildImportModal"
+      modal-class="htbah-weltenbau-bild-import-modal"
+      titel="Bild zuschneiden und komprimieren"
+      :beschreibung="beschreibungText"
+      speichern-text="Übernehmen und speichern"
+      bild-alt-text="Bild zuschneiden"
+      dialog-class="modal-lg"
+      :on-speichern="onSpeichern"
+      :on-bild-fehler="onBildFehler"
+      @abgebrochen="onAbgebrochen" />
   `,
 };

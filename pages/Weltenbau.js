@@ -129,6 +129,22 @@ window.HTBAH_SEITEN.Weltenbau = {
       generatorUrls: normalisiereGeneratorUrlMap(zustandRoh && zustandRoh.generatorUrls),
       generatorAufrufe: normalisiereGeneratorZeitstempelMap(zustandRoh && zustandRoh.generatorAufrufe),
       mapLayouts: zustandRoh && zustandRoh.mapLayouts && typeof zustandRoh.mapLayouts === 'object' ? zustandRoh.mapLayouts : {},
+      mapBildLayouts:
+        zustandRoh && zustandRoh.mapBildLayouts && typeof zustandRoh.mapBildLayouts === 'object'
+          ? zustandRoh.mapBildLayouts
+          : {},
+      mapFreieBilder:
+        zustandRoh && zustandRoh.mapFreieBilder && typeof zustandRoh.mapFreieBilder === 'object'
+          ? zustandRoh.mapFreieBilder
+          : {},
+      mapFreieNotizen:
+        zustandRoh && zustandRoh.mapFreieNotizen && typeof zustandRoh.mapFreieNotizen === 'object'
+          ? zustandRoh.mapFreieNotizen
+          : {},
+      mapFreiePfeile:
+        zustandRoh && zustandRoh.mapFreiePfeile && typeof zustandRoh.mapFreiePfeile === 'object'
+          ? zustandRoh.mapFreiePfeile
+          : {},
       mapHintergruende:
         zustandRoh && zustandRoh.mapHintergruende && typeof zustandRoh.mapHintergruende === 'object'
           ? zustandRoh.mapHintergruende
@@ -136,6 +152,10 @@ window.HTBAH_SEITEN.Weltenbau = {
       mapEinstellungen:
         zustandRoh && zustandRoh.mapEinstellungen && typeof zustandRoh.mapEinstellungen === 'object'
           ? zustandRoh.mapEinstellungen
+          : {},
+      mapElementLocks:
+        zustandRoh && zustandRoh.mapElementLocks && typeof zustandRoh.mapElementLocks === 'object'
+          ? zustandRoh.mapElementLocks
           : {},
     };
     return {
@@ -254,8 +274,24 @@ window.HTBAH_SEITEN.Weltenbau = {
       z.aktiveKampagneId = neu;
       window.HTBAH.speichereSpielleiterZustand(z);
     },
+    '$route.fullPath'() {
+      this.pruefeMentionNavigationTarget();
+    },
   },
   methods: {
+    pruefeMentionNavigationTarget() {
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      if (!mentionApi || typeof mentionApi.peekNavigationTarget !== 'function') {
+        return;
+      }
+      const pending = mentionApi.peekNavigationTarget();
+      if (!pending) {
+        return;
+      }
+      if (this.aktiveWeltenbauTab === 'welt' && !this.weltenbauMapModalOffen) {
+        this.weltenbauMapModalOffen = true;
+      }
+    },
     syncKampagneAusRoute() {
       const slugRaw = this.$route?.params?.kampagneSlug;
       const slug = typeof slugRaw === 'string' ? decodeURIComponent(slugRaw) : '';
@@ -291,8 +327,16 @@ window.HTBAH_SEITEN.Weltenbau = {
       this.zustand = {
         ...this.zustand,
         mapLayouts: wb && wb.mapLayouts && typeof wb.mapLayouts === 'object' ? wb.mapLayouts : {},
+        mapBildLayouts: wb && wb.mapBildLayouts && typeof wb.mapBildLayouts === 'object' ? wb.mapBildLayouts : {},
+        mapFreieBilder: wb && wb.mapFreieBilder && typeof wb.mapFreieBilder === 'object' ? wb.mapFreieBilder : {},
+        mapFreieNotizen:
+          wb && wb.mapFreieNotizen && typeof wb.mapFreieNotizen === 'object' ? wb.mapFreieNotizen : {},
+        mapFreiePfeile:
+          wb && wb.mapFreiePfeile && typeof wb.mapFreiePfeile === 'object' ? wb.mapFreiePfeile : {},
         mapHintergruende: wb && wb.mapHintergruende && typeof wb.mapHintergruende === 'object' ? wb.mapHintergruende : {},
         mapEinstellungen: wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {},
+        mapElementLocks:
+          wb && wb.mapElementLocks && typeof wb.mapElementLocks === 'object' ? wb.mapElementLocks : {},
       };
     },
     persist() {
@@ -303,8 +347,13 @@ window.HTBAH_SEITEN.Weltenbau = {
         // Diese Felder werden direkt im Interaktive-Welt-Modal gepflegt.
         // Hier nie mit möglicherweise stale Daten überschreiben.
         mapLayouts: aktuell.mapLayouts || {},
+        mapBildLayouts: aktuell.mapBildLayouts || {},
+        mapFreieBilder: aktuell.mapFreieBilder || {},
+        mapFreieNotizen: aktuell.mapFreieNotizen || {},
+        mapFreiePfeile: aktuell.mapFreiePfeile || {},
         mapHintergruende: aktuell.mapHintergruende || {},
         mapEinstellungen: aktuell.mapEinstellungen || {},
+        mapElementLocks: aktuell.mapElementLocks || {},
       });
     },
     zeigeStatus(text, typ = 'success') {
@@ -795,6 +844,7 @@ window.HTBAH_SEITEN.Weltenbau = {
   mounted() {
     window.addEventListener('resize', this.onFensterGroesseGeaendert);
     window.addEventListener('keydown', this.onGlobaleTaste);
+    this.pruefeMentionNavigationTarget();
   },
   beforeUnmount() {
     this.beendeGeneratorZiehen();
@@ -885,7 +935,7 @@ window.HTBAH_SEITEN.Weltenbau = {
           </div>
         </div>
         <p class="small text-body-secondary mb-3">
-          Für Bilder, die sonst nirgendwo richtig hin passen.
+          Gallerie von Bildern, die losgelöst von Orten, Fraktionen, NPCs etc. sind, aber in der interaktiven Welt dargestellt werden sollen.
         </p>
         <div v-if="zeigeImportHinweis" class="alert alert-info py-2 small mb-3" role="note">
           Unterstützt: gängige Bildformate (PNG, JPEG, WebP, GIF, BMP, …). Rohdateien bis

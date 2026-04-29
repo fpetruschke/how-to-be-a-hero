@@ -9,6 +9,7 @@ window.HTBAH_KOMPONENTEN.NotizenModal = {
     return {
       notizenModal: null,
       notizenQuill: null,
+      mentionController: null,
     };
   },
   methods: {
@@ -42,6 +43,13 @@ window.HTBAH_KOMPONENTEN.NotizenModal = {
             ],
           },
         });
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.installMentions === 'function') {
+          this.mentionController = mentionApi.installMentions(this.notizenQuill, {
+            getItems: (query) => mentionApi.collectMentionItems(query),
+            onEntityClick: (target) => mentionApi.oeffneEntitaetGlobal(target),
+          });
+        }
       }
 
       this.notizenQuill.root.innerHTML = this.journalHtml || '';
@@ -56,6 +64,10 @@ window.HTBAH_KOMPONENTEN.NotizenModal = {
     },
   },
   beforeUnmount() {
+    if (this.mentionController && typeof this.mentionController.destroy === 'function') {
+      this.mentionController.destroy();
+    }
+    this.mentionController = null;
     if (this.notizenQuill) {
       this.notizenQuill = null;
     }

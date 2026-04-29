@@ -833,7 +833,11 @@ function normalisiereWeltenbauMapBildLayouts(roh) {
       const y = Math.round(Number(layout.y) || 0);
       const width = Math.max(1, Math.round(Number(layout.width) || 260));
       const height = Math.max(1, Math.round(Number(layout.height) || 180));
-      gruppeMap[bildId] = { x, y, width, height };
+      const winkelRaw = Number(layout.angleDeg);
+      const angleDeg = Number.isFinite(winkelRaw)
+        ? Math.max(-3600, Math.min(3600, Math.round(winkelRaw * 100) / 100))
+        : 0;
+      gruppeMap[bildId] = { x, y, width, height, angleDeg };
     });
     map[gruppeId] = gruppeMap;
   });
@@ -861,6 +865,60 @@ function normalisiereWeltenbauMapElementLocks(roh) {
   return map;
 }
 
+function normalisiereWeltenbauMapFreieNotizen(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return {};
+  }
+  const map = {};
+  Object.entries(roh).forEach(([gruppeId, liste]) => {
+    if (typeof gruppeId !== 'string' || !gruppeId || !Array.isArray(liste)) {
+      return;
+    }
+    map[gruppeId] = liste
+      .map((eintrag) => {
+        const notizId = typeof (eintrag && eintrag.notizId) === 'string' ? eintrag.notizId.trim() : '';
+        if (!notizId) {
+          return null;
+        }
+        return {
+          notizId,
+          html: typeof (eintrag && eintrag.html) === 'string' ? eintrag.html : '',
+          bgColor:
+            typeof (eintrag && eintrag.bgColor) === 'string' &&
+            /^#[0-9a-fA-F]{6}$/.test(String(eintrag.bgColor).trim())
+              ? String(eintrag.bgColor).trim()
+              : '#fff8bf',
+        };
+      })
+      .filter(Boolean);
+  });
+  return map;
+}
+
+function normalisiereWeltenbauMapFreiePfeile(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return {};
+  }
+  const map = {};
+  Object.entries(roh).forEach(([gruppeId, liste]) => {
+    if (typeof gruppeId !== 'string' || !gruppeId || !Array.isArray(liste)) {
+      return;
+    }
+    map[gruppeId] = liste
+      .map((eintrag) => {
+        const pfeilId = typeof (eintrag && eintrag.pfeilId) === 'string' ? eintrag.pfeilId.trim() : '';
+        if (!pfeilId) {
+          return null;
+        }
+        const farbeRaw = typeof (eintrag && eintrag.farbe) === 'string' ? eintrag.farbe.trim() : '';
+        const farbe = /^#[0-9a-fA-F]{6}$/.test(farbeRaw) ? farbeRaw : '#509b4a';
+        return { pfeilId, farbe };
+      })
+      .filter(Boolean);
+  });
+  return map;
+}
+
 function ladeWeltenbauZustand() {
   const roh = htbahSpeicher.leseJson(SPEICHER_KEY_WELTENBAU, null);
   if (!roh || typeof roh !== 'object') {
@@ -871,6 +929,9 @@ function ladeWeltenbauZustand() {
       generatorAufrufe: {},
       mapLayouts: {},
       mapBildLayouts: {},
+      mapFreieBilder: {},
+      mapFreieNotizen: {},
+      mapFreiePfeile: {},
       mapHintergruende: {},
       mapEinstellungen: {},
       mapElementLocks: {},
@@ -883,6 +944,9 @@ function ladeWeltenbauZustand() {
   const generatorAufrufe = roh.generatorAufrufe && typeof roh.generatorAufrufe === 'object' ? roh.generatorAufrufe : {};
   const mapLayouts = roh.mapLayouts && typeof roh.mapLayouts === 'object' ? roh.mapLayouts : {};
   const mapBildLayouts = normalisiereWeltenbauMapBildLayouts(roh.mapBildLayouts);
+  const mapFreieBilder = roh.mapFreieBilder && typeof roh.mapFreieBilder === 'object' ? roh.mapFreieBilder : {};
+  const mapFreieNotizen = normalisiereWeltenbauMapFreieNotizen(roh.mapFreieNotizen);
+  const mapFreiePfeile = normalisiereWeltenbauMapFreiePfeile(roh.mapFreiePfeile);
   const mapHintergruende = normalisiereWeltenbauMapHintergruende(roh.mapHintergruende);
   const mapEinstellungen = normalisiereWeltenbauMapEinstellungen(roh.mapEinstellungen);
   const mapElementLocks = normalisiereWeltenbauMapElementLocks(roh.mapElementLocks);
@@ -893,6 +957,9 @@ function ladeWeltenbauZustand() {
     generatorAufrufe,
     mapLayouts,
     mapBildLayouts,
+    mapFreieBilder,
+    mapFreieNotizen,
+    mapFreiePfeile,
     mapHintergruende,
     mapEinstellungen,
     mapElementLocks,
@@ -1268,9 +1335,9 @@ function berechneProbeAuswertung(wurf, zielwert, optionen = {}) {
   const nurBegabung = Boolean(optionen.nurBegabung);
   const w = Math.max(1, Math.min(100, Math.floor(Number(wurf) || 0)));
   const z = Math.max(0, Math.round(Number(zielwert) || 0));
-  const zehnProzent = Math.round(z * 0.1);
-  const kritErfolgMax = zehnProzent;
-  const kritMissMin = 90 + zehnProzent;
+  const zehnProzentRoh = z * 0.1;
+  const kritErfolgMax = Math.floor(zehnProzentRoh);
+  const kritMissMin = Math.ceil(90 + zehnProzentRoh);
 
   if (w >= kritMissMin) {
     return {

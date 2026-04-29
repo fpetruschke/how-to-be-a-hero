@@ -12,6 +12,8 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
       modalInstanz: null,
       tabuQuill: null,
       schleierQuill: null,
+      tabuMentionController: null,
+      schleierMentionController: null,
       lokaleDaten: {
         tabuHtml: '',
         schleierHtml: '',
@@ -47,6 +49,14 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
     }
   },
   beforeUnmount() {
+    if (this.tabuMentionController && typeof this.tabuMentionController.destroy === 'function') {
+      this.tabuMentionController.destroy();
+    }
+    if (this.schleierMentionController && typeof this.schleierMentionController.destroy === 'function') {
+      this.schleierMentionController.destroy();
+    }
+    this.tabuMentionController = null;
+    this.schleierMentionController = null;
     this.tabuQuill = null;
     this.schleierQuill = null;
     this.modalInstanz = null;
@@ -98,6 +108,13 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
           this.lokaleDaten.tabuHtml = this.tabuQuill.root.innerHTML;
           this.emittiereAenderung();
         });
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.installMentions === 'function') {
+          this.tabuMentionController = mentionApi.installMentions(this.tabuQuill, {
+            getItems: (query) => mentionApi.collectMentionItems(query),
+            onEntityClick: (target) => mentionApi.oeffneEntitaetGlobal(target),
+          });
+        }
       }
       if (!this.schleierQuill && this.$refs.schleierEditorElement) {
         this.schleierQuill = new window.Quill(this.$refs.schleierEditorElement, {
@@ -117,6 +134,13 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
           this.lokaleDaten.schleierHtml = this.schleierQuill.root.innerHTML;
           this.emittiereAenderung();
         });
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.installMentions === 'function') {
+          this.schleierMentionController = mentionApi.installMentions(this.schleierQuill, {
+            getItems: (query) => mentionApi.collectMentionItems(query),
+            onEntityClick: (target) => mentionApi.oeffneEntitaetGlobal(target),
+          });
+        }
       }
       this.syncEditorInhalte();
     },

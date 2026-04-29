@@ -10,6 +10,8 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
   data() {
     return {
       zustand: window.HTBAH.ladeSpielleiterZustand(),
+      lokaleCharaktere: [],
+      ausgewaehlterLokalerCharakterId: '',
       aktivesMitgliedId: null,
       zielKampagneId: '',
       verschiebeModalInstanz: null,
@@ -46,6 +48,24 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       const aktiveId = this.kampagneId;
       return this.zustand.kampagnen.filter((g) => g.id !== aktiveId);
     },
+    verfuegbareLokaleCharaktere() {
+      const g = this.aktiveKampagne;
+      const mitglieder = Array.isArray(g && g.mitglieder) ? g.mitglieder : [];
+      const belegteStorageIds = new Set(
+        mitglieder
+          .map((m) => (m && typeof m.charakterStorageId === 'string' ? m.charakterStorageId : ''))
+          .filter(Boolean),
+      );
+      return this.lokaleCharaktere.filter((eintrag) => {
+        if (!eintrag || typeof eintrag.id !== 'string') {
+          return false;
+        }
+        return !belegteStorageIds.has(eintrag.id);
+      });
+    },
+    hatLokaleCharaktere() {
+      return this.verfuegbareLokaleCharaktere.length > 0;
+    },
   },
   watch: {
     kampagneId: {
@@ -64,6 +84,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
   mounted() {
     window.HTBAH._spielleiterAnsichtAktiv = true;
     window.HTBAH._spielleiterPersistFn = () => this.persist();
+    this.lokaleCharaktereNeuLaden();
     if (!this.aktivesMitglied) {
       window.HTBAH.syncLebenspunkteStatusFromCharakter(null);
     }
@@ -105,6 +126,56 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
     },
     zeigeStatus(text) {
       window.HTBAH.ui.notify({ text, typ: 'success' });
+    },
+    lokaleCharaktereNeuLaden() {
+      const liste =
+        window.HTBAH && typeof window.HTBAH.listeCharaktere === 'function'
+          ? window.HTBAH.listeCharaktere()
+          : [];
+      this.lokaleCharaktere = Array.isArray(liste) ? liste : [];
+      if (
+        this.ausgewaehlterLokalerCharakterId &&
+        !this.verfuegbareLokaleCharaktere.some(
+          (eintrag) => eintrag.id === this.ausgewaehlterLokalerCharakterId,
+        )
+      ) {
+        this.ausgewaehlterLokalerCharakterId = '';
+      }
+    },
+    lokalerCharakterLabel(eintrag, index) {
+      const name =
+        eintrag &&
+        eintrag.charakter &&
+        typeof eintrag.charakter.name === 'string' &&
+        eintrag.charakter.name.trim()
+          ? eintrag.charakter.name.trim()
+          : `Charakter ${index + 1}`;
+      return name;
+    },
+    lokalenCharakterZurKampagneHinzufuegen() {
+      if (!this.ausgewaehlterLokalerCharakterId) {
+        return;
+      }
+      const eintrag =
+        window.HTBAH && typeof window.HTBAH.ladeCharakterEintrag === 'function'
+          ? window.HTBAH.ladeCharakterEintrag(this.ausgewaehlterLokalerCharakterId)
+          : null;
+      if (!eintrag) {
+        this.lokaleCharaktereNeuLaden();
+        window.HTBAH.ui.notify({
+          text: 'Der ausgewählte lokale Charakter wurde nicht gefunden.',
+          typ: 'warning',
+        });
+        return;
+      }
+      this.fuegeMitgliedHinzu(
+        window.HTBAH_CHARAKTER_MODEL.charakterMitDefaults(eintrag.charakter),
+        typeof eintrag.charakterBild === 'string' ? eintrag.charakterBild : '',
+        eintrag.id,
+      );
+      this.lokaleCharaktereNeuLaden();
+      this.persist();
+      this.zeigeStatus('Lokaler Charakter hinzugefügt.');
     },
     charakterName(m) {
       const n = m && m.charakter && typeof m.charakter.name === 'string' ? m.charakter.name : '';
@@ -264,7 +335,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       }
       this.zeigeStatus(`„${name}“ wurde verschoben.`);
     },
-    fuegeMitgliedHinzu(charakter, charakterBild) {
+    fuegeMitgliedHinzu(charakter, charakterBild, charakterStorageId = '') {
       const g = this.aktiveKampagne;
       if (!g) {
         return;
@@ -273,6 +344,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         id: window.HTBAH.neueEntropieId(),
         charakter,
         charakterBild: typeof charakterBild === 'string' ? charakterBild : '',
+        charakterStorageId: typeof charakterStorageId === 'string' ? charakterStorageId : '',
       };
       g.mitglieder.push(mitglied);
       this.aktivesMitgliedId = mitglied.id;
@@ -361,10 +433,41 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
 
       <template v-if="aktiveKampagne">
       <div class="card p-3 mb-3">
-        <p class="small mb-2">
-          Charakterblätter als JSON importieren (Einzel-Export oder Komplett-Export).
+        <span class="fw-semibold d-block mb-2">
+          Charakter-Auswahl
+        </span>
+        <div class="row g-2 mb-2">
+          <div class="col-12 col-lg-8">
+            <div class="form-floating">
+              <select
+                id="sl-kampagne-lokal-charakter"
+                class="form-select"
+                v-model="ausgewaehlterLokalerCharakterId">
+                <option value="">Lokalen Charakter wählen …</option>
+                <option
+                  v-for="(eintrag, index) in verfuegbareLokaleCharaktere"
+                  :key="'lokal-' + eintrag.id"
+                  :value="eintrag.id">
+                  {{ lokalerCharakterLabel(eintrag, index) }}
+                </option>
+              </select>
+              <label for="sl-kampagne-lokal-charakter">Lokaler Charakter (Storage)</label>
+            </div>
+          </div>
+          <div class="col-12 col-lg-4 d-grid">
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              :disabled="!ausgewaehlterLokalerCharakterId || !hatLokaleCharaktere"
+              @click="lokalenCharakterZurKampagneHinzufuegen">
+              Lokalen Charakter hinzufügen
+            </button>
+          </div>
+        </div>
+        <p v-if="!hatLokaleCharaktere" class="small text-body-secondary mb-2">
+          Keine lokal gespeicherten Charaktere gefunden.
         </p>
-        <div class="form-floating">
+        <div class="form-floating mb-0">
           <input
             id="sl-kampagne-import"
             type="file"
@@ -372,12 +475,12 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
             multiple
             class="form-control"
             @change="importJsonDateien" />
-          <label for="sl-kampagne-import">Charakterblätter importieren</label>
+          <label for="sl-kampagne-import">Charakterblätter aus JSON importieren</label>
         </div>
       </div>
 
       <div class="card p-3 mb-3">
-        <h6 class="mb-2">Charaktere in dieser Kampagne</h6>
+        <span class="fw-semibold d-block mb-2">Charaktere in dieser Kampagne</span>
         <ul
           v-if="aktiveKampagne.mitglieder.length"
           class="nav htbah-weltenbau-pill-tabs mb-2"

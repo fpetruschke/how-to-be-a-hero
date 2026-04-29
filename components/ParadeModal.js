@@ -54,7 +54,7 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
       return 'probe-wurf-ergebnis--' + a.stufe.replace(/_/g, '-');
     },
     kritMissMin() {
-      return 90 + Math.round(this.zielwert * 0.1);
+      return Math.ceil(90 + this.zielwert * 0.1);
     },
   },
   methods: {

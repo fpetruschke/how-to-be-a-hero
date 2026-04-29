@@ -62,6 +62,7 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
       inventarEditId: null,
       inventarBackup: null,
       inventarQuillNachId: {},
+      inventarMentionControllerNachId: {},
       inventarQuillRefFnCache: Object.create(null),
       inventarQuillToolbarCleanup: {},
       waffenReferenzRegelwerk: INVENTAR_WAFFEN_REFERENZ_REGELWERK,
@@ -170,6 +171,11 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
       return this.charakter.inventar.find((e) => e.id === id);
     },
     inventarQuillZerstoeren(id) {
+      const mentionController = this.inventarMentionControllerNachId[id];
+      if (mentionController && typeof mentionController.destroy === 'function') {
+        mentionController.destroy();
+      }
+      delete this.inventarMentionControllerNachId[id];
       const cleanup = this.inventarQuillToolbarCleanup[id];
       if (typeof cleanup === 'function') {
         cleanup();
@@ -218,6 +224,13 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
         });
         quill.root.innerHTML = eintrag.beschreibungHtml || '';
         this.inventarQuillNachId[id] = quill;
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.installMentions === 'function') {
+          this.inventarMentionControllerNachId[id] = mentionApi.installMentions(quill, {
+            getItems: (query) => mentionApi.collectMentionItems(query),
+            onEntityClick: (target) => mentionApi.oeffneEntitaetGlobal(target),
+          });
+        }
 
         el.classList.add('inventar-quill-toolbar--hidden');
         const showToolbar = () => el.classList.remove('inventar-quill-toolbar--hidden');
@@ -417,6 +430,7 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
     }
 
     Object.keys(this.inventarQuillNachId).forEach((id) => this.inventarQuillZerstoeren(id));
+    this.inventarMentionControllerNachId = {};
   },
   template: `
     <div
