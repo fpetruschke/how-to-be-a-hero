@@ -59,6 +59,7 @@ var HTBAH_REFACTOR_UTILS =
     components: {
       ZufallstabellenZeileModal: window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal,
       WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
+      WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
     },
     props: {
       offen: { type: Boolean, default: false },
@@ -356,6 +357,7 @@ var HTBAH_REFACTOR_UTILS =
               y: Number.isFinite(Number(layout.y)) ? Math.round(Number(layout.y)) : 120 + index * 30,
               width: Number.isFinite(Number(layout.width)) ? Math.max(1, Math.round(Number(layout.width))) : 320,
               height: Number.isFinite(Number(layout.height)) ? Math.max(1, Math.round(Number(layout.height))) : 220,
+              angleDeg: Number.isFinite(Number(layout.angleDeg)) ? Number(layout.angleDeg) : 0,
             };
           })
           .filter(Boolean);
@@ -396,6 +398,7 @@ var HTBAH_REFACTOR_UTILS =
               y: Number.isFinite(Number(layout.y)) ? Math.round(Number(layout.y)) : 180 + index * 28,
               width: Number.isFinite(Number(layout.width)) ? Math.max(1, Math.round(Number(layout.width))) : 320,
               height: Number.isFinite(Number(layout.height)) ? Math.max(1, Math.round(Number(layout.height))) : 220,
+              angleDeg: Number.isFinite(Number(layout.angleDeg)) ? Number(layout.angleDeg) : 0,
             };
           })
           .filter(Boolean);
@@ -1848,6 +1851,7 @@ var HTBAH_REFACTOR_UTILS =
       ortBildStil(bild) {
         const minBreite = bild && (bild.ankerTyp === 'pfeil' || bild.ankerTyp === 'notiz') ? 220 : 1;
         const minHoehe = bild && (bild.ankerTyp === 'pfeil' || bild.ankerTyp === 'notiz') ? 56 : 1;
+        const istDrehbar = bild && bild.ankerTyp !== 'notiz';
         const winkel = Number.isFinite(Number(bild && bild.angleDeg)) ? Number(bild.angleDeg) : 0;
         const pfeilHoehe = Math.max(minHoehe, Math.round(Number(bild && bild.height) || 220));
         const pfeilLinienstaerke = Math.max(4, Math.round(pfeilHoehe * 0.12));
@@ -1857,8 +1861,8 @@ var HTBAH_REFACTOR_UTILS =
           top: `${Math.round(Number(bild.y) || 0)}px`,
           width: `${Math.max(minBreite, Math.round(Number(bild.width) || 320))}px`,
           height: `${pfeilHoehe}px`,
-          transform: bild && bild.ankerTyp === 'pfeil' ? `rotate(${winkel}deg)` : undefined,
-          transformOrigin: bild && bild.ankerTyp === 'pfeil' ? 'center center' : undefined,
+          transform: istDrehbar ? `rotate(${winkel}deg)` : undefined,
+          transformOrigin: istDrehbar ? 'center center' : undefined,
           '--htbah-pfeil-farbe':
             bild && bild.ankerTyp === 'pfeil' && /^#[0-9a-fA-F]{6}$/.test(String(bild.pfeilFarbe || '').trim())
               ? String(bild.pfeilFarbe).trim()
@@ -1918,8 +1922,8 @@ var HTBAH_REFACTOR_UTILS =
       },
       elementLockButtonTitle(elementId) {
         return this.istElementGesperrt(elementId)
-          ? '🔒 Gesperrt: Position/Groesse fix'
-          : '🔓 Entsperrt: Position/Groesse veraenderbar';
+          ? '🔒 Gesperrt: Position/Groesse/Drehung fix'
+          : '🔓 Entsperrt: Position/Groesse/Drehung veraenderbar';
       },
       elementLockButtonKlassen(elementId) {
         return {
@@ -2734,13 +2738,14 @@ var HTBAH_REFACTOR_UTILS =
             )
           : 0;
         const handelnBegabungswert = Math.max(0, Math.round(handelnSumme / 10));
-        const wurf = window.HTBAH.wuerfelW10();
-        window.HTBAH.spieleWuerfelSounds(1);
-        const gesamt = wurf + handelnBegabungswert;
-        this.charakterModal.charakter.initiative = this.normalisiereInitiativeWert(
-          gesamt,
-          handelnBegabungswert,
-        );
+        this.$refs.charakterInitiativeWuerfelbecher?.wuerfeln('1W10').then((werte) => {
+          const wurf = Array.isArray(werte) && werte.length ? Number(werte[0]) || 1 : 1;
+          const gesamt = wurf + handelnBegabungswert;
+          this.charakterModal.charakter.initiative = this.normalisiereInitiativeWert(
+            gesamt,
+            handelnBegabungswert,
+          );
+        });
       },
       async charakterInitiativeZuruecksetzen() {
         if (!this.charakterModal.charakter) {
@@ -4112,7 +4117,54 @@ var HTBAH_REFACTOR_UTILS =
       mediumDateigroesseLabel(medium) {
         return formatBytes(medium && medium.size);
       },
-      setzeBearbeitungPrimaryMedium(mediumId) {
+      ortHatBildLayout(ortId) {
+        const id = String(ortId || '').trim();
+        if (!id) {
+          return false;
+        }
+        const key = `ort:${id}`;
+        return !!(this.mapBildLayoutsLokal && this.mapBildLayoutsLokal[key]);
+      },
+      ortBildLayoutBeimNodeInitialisieren(ortId) {
+        const id = String(ortId || '').trim();
+        if (!id) {
+          return;
+        }
+        const layoutKey = `ort:${id}`;
+        if (this.mapBildLayoutsLokal && this.mapBildLayoutsLokal[layoutKey]) {
+          return;
+        }
+        const ortNode = this.findeNode(layoutKey);
+        if (!ortNode || !ortNode.position) {
+          return;
+        }
+        const width = 320;
+        const height = 220;
+        const nodeX = Number(ortNode.position.x) || 0;
+        const nodeY = Number(ortNode.position.y) || 0;
+        const x = Math.round(nodeX + (this.nodeBreite(ortNode) - width) / 2);
+        const y = Math.round(nodeY + this.nodeHoehe(ortNode) + 16);
+        this.schreibeOrtBildLayout(layoutKey, { x, y, width, height });
+        this.persistiereLokaleOrtBildLayouts();
+      },
+      initialisiereFehlendeOrtBildLayoutsAusGraph() {
+        const orte = Array.isArray(this.zustand && this.zustand.orte) ? this.zustand.orte : [];
+        let geaendert = false;
+        orte.forEach((ort) => {
+          const ortId = String((ort && ort.id) || '').trim();
+          if (!ortId || this.ortHatBildLayout(ortId)) {
+            return;
+          }
+          const dataUrl = this.entitaetBildDataUrl(ort);
+          if (!dataUrl) {
+            return;
+          }
+          this.ortBildLayoutBeimNodeInitialisieren(ortId);
+          geaendert = true;
+        });
+        return geaendert;
+      },
+      async setzeBearbeitungPrimaryMedium(mediumId) {
         if (!this.anlage.zeile || !Array.isArray(this.anlage.zeile.medien)) {
           return;
         }
@@ -4124,8 +4176,28 @@ var HTBAH_REFACTOR_UTILS =
         if (!this.mediumIstBild(medium)) {
           return;
         }
+        const bisherigePrimaryId = String(this.anlage.zeile.primaryMediumId || '').trim();
+        if (this.anlage.typ === 'ort' && bisherigePrimaryId && bisherigePrimaryId !== id) {
+          const bisherigesMedium = this.anlage.zeile.medien.find((m) => m && m.id === bisherigePrimaryId);
+          if (this.mediumIstBild(bisherigesMedium)) {
+            const bestaetigt = await window.HTBAH.ui.confirm({
+              titel: 'Titelbild ersetzen?',
+              beschreibung:
+                'Dieser Ort hat in der Interaktiven Welt bereits ein Bild. Soll das bestehende Bild durch das neue Titelbild ersetzt werden?',
+              bestaetigenText: 'Ersetzen',
+              bestaetigenButtonClass: 'btn-warning',
+              warnhinweisAnzeigen: false,
+            });
+            if (!bestaetigt) {
+              return;
+            }
+          }
+        }
         this.anlage.zeile.primaryMediumId = id;
         this.anlageBearbeitungBeiBlurSpeichern();
+        if (this.anlage.typ === 'ort') {
+          this.ortBildLayoutBeimNodeInitialisieren(this.anlage.zeile.id);
+        }
       },
       mediumImBildbetrachterOeffnen(medium) {
         if (!this.mediumIstBild(medium) || typeof window.HTBAH.bildbetrachterOeffnen !== 'function') {
@@ -4656,6 +4728,12 @@ var HTBAH_REFACTOR_UTILS =
             this.setzeNodeStartPositionImViewportZentrum(nodeId, standardGroesse);
           }
         }
+        if (typ === 'ort' && z && z.id) {
+          const hatBild = !!this.entitaetBildDataUrl(z);
+          if (hatBild) {
+            this.ortBildLayoutBeimNodeInitialisieren(z.id);
+          }
+        }
         this.$nextTick(() => {
           this.refreshGraph();
           if (index < 0 && z && z.id) {
@@ -4684,6 +4762,9 @@ var HTBAH_REFACTOR_UTILS =
           this.$nextTick(() => {
             this.initialisierePosition();
             this.refreshGraph();
+            if (this.initialisiereFehlendeOrtBildLayoutsAusGraph()) {
+              this.refreshGraph();
+            }
             this.uebernehmeMapEinstellungen();
             this.verlaufZuruecksetzen();
             this.$nextTick(() => this.verarbeiteMentionNavigationTarget());
@@ -5184,6 +5265,17 @@ var HTBAH_REFACTOR_UTILS =
                   </template>
                   <img v-else :src="bild.dataUrl" :alt="'Bild: ' + bild.anzeigename" draggable="false" />
                   <button
+                    v-if="bild.ankerTyp !== 'notiz' && bild.ankerTyp !== 'pfeil' && !istElementGesperrt(bild.bildId)"
+                    type="button"
+                    class="htbah-map-ort-bild-rotate-handle"
+                    aria-label="Bild drehen"
+                    @pointerdown.stop.prevent="starteOrtBildDrag($event, bild, 'rotate')"></button>
+                  <div
+                    v-if="ortBildDrag.aktiv && ortBildDrag.modus === 'rotate' && ortBildDrag.ortId === bild.bildId"
+                    class="htbah-map-pfeil-angle-badge">
+                    {{ pfeilWinkelBadgeText(bild) }}
+                  </div>
+                  <button
                     type="button"
                     :class="elementLockButtonKlassen(bild.bildId)"
                     :aria-label="elementLockButtonTitle(bild.bildId)"
@@ -5579,6 +5671,9 @@ var HTBAH_REFACTOR_UTILS =
             role="presentation"
             aria-hidden="true"
             @pointerdown="starteCharakterResize($event)"></div>
+        </div>
+        <div class="d-none" aria-hidden="true">
+          <wuerfelbecher-wurf ref="charakterInitiativeWuerfelbecher" modus="w10" :auto-init="false" />
         </div>
       </div>
     `,

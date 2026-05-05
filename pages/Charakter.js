@@ -12,6 +12,7 @@ window.HTBAH_SEITEN.Charakter = {
     FaehigkeitFormular: window.HTBAH_KOMPONENTEN.FaehigkeitFormular,
     InitiativeModal: window.HTBAH_KOMPONENTEN.InitiativeModal,
     ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
+    SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
     CharakterPdfModal: window.HTBAH_KOMPONENTEN.CharakterPdfModal,
   },
@@ -1168,6 +1169,9 @@ window.HTBAH_SEITEN.Charakter = {
     initiativeModalOeffnen() {
       this.$refs.initiativeModal.oeffnen();
     },
+    schadenModalOeffnen() {
+      this.$refs.schadenModal.oeffnen();
+    },
     paradeModalOeffnen() {
       const inventar = Array.isArray(this.charakter?.inventar) ? this.charakter.inventar : [];
       const ruestungen = inventar
@@ -1958,7 +1962,7 @@ window.HTBAH_SEITEN.Charakter = {
         <div class="row g-2">
           <div v-if="spielleiterMitglied || istSpielTabAktiv" class="col-12">
             <div class="row g-2">
-              <div class="col-12 col-md-6">
+              <div class="col-12 col-md-4">
                 <icon-text-button
                   v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
                   type="button"
@@ -1968,7 +1972,17 @@ window.HTBAH_SEITEN.Charakter = {
                   Initiative würfeln
                 </icon-text-button>
               </div>
-              <div class="col-12 col-md-6">
+              <div class="col-12 col-md-4">
+                <icon-text-button
+                  v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
+                  type="button"
+                  class="btn btn-outline-primary btn-lg w-100"
+                  symbol="💥"
+                  @click="schadenModalOeffnen">
+                  Schaden erwürfeln
+                </icon-text-button>
+              </div>
+              <div class="col-12 col-md-4">
                 <icon-text-button
                   v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
                   type="button"
@@ -2218,6 +2232,7 @@ window.HTBAH_SEITEN.Charakter = {
         @change="charakterbildDateiAusgewaehlt" />
       <vor-nachteile-modal ref="vorNachteileModal" :charakter="charakter" />
       <initiative-modal ref="initiativeModal" :charakter="charakter" />
+      <schaden-modal ref="schadenModal" :charakter="charakter" />
       <parade-modal ref="paradeModal" />
       <probe-wurf-modal ref="probeWurfModal" />
       <inventar-modal ref="inventarModal" :charakter="charakter" />

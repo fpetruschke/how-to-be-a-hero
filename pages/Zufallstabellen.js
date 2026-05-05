@@ -71,6 +71,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
   components: {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
     ZufallstabellenZeileModal: window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal,
+    ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
+    SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
   },
   data() {
     return {
@@ -1008,7 +1010,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         }
       }
     },
-    setzeBearbeitungPrimaryMedium(mediumId) {
+    async setzeBearbeitungPrimaryMedium(mediumId) {
       if (!this.bearbeitung || !this.bearbeitung.zeile || !Array.isArray(this.bearbeitung.zeile.medien)) {
         return;
       }
@@ -1019,6 +1021,25 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const medium = this.bearbeitung.zeile.medien.find((m) => m && m.id === id);
       if (!this.mediumIstBild(medium)) {
         return;
+      }
+      const bisherigePrimaryId = String(this.bearbeitung.zeile.primaryMediumId || '').trim();
+      if (
+        this.bearbeitung.typ === 'ort' &&
+        bisherigePrimaryId &&
+        bisherigePrimaryId !== id &&
+        this.mediumIstBild(this.bearbeitung.zeile.medien.find((m) => m && m.id === bisherigePrimaryId))
+      ) {
+        const bestaetigt = await window.HTBAH.ui.confirm({
+          titel: 'Titelbild ersetzen?',
+          beschreibung:
+            'Dieser Ort hat bereits ein Titelbild. Soll das bestehende Bild in der Interaktiven Welt durch das neue ersetzt werden?',
+          bestaetigenText: 'Ersetzen',
+          bestaetigenButtonClass: 'btn-warning',
+          warnhinweisAnzeigen: false,
+        });
+        if (!bestaetigt) {
+          return;
+        }
       }
       this.bearbeitung.zeile.primaryMediumId = id;
       this.zeileBearbeitungBeiBlurSpeichern();
@@ -1260,6 +1281,36 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const w = this.normalisiereBegabungswert(row.wissen);
       const s = this.normalisiereBegabungswert(row.soziales);
       return `H ${h} · W ${w} · S ${s}`;
+    },
+    paradeWuerfelnFuerEntitaet(row, typ) {
+      const handeln = this.normalisiereBegabungswert(row && row.handeln);
+      const typLabel = typ === 'bestie' ? 'Bestie' : 'NPC';
+      const name = this.zeilenWertAlsText(row && row.name);
+      this.$refs.paradeModal?.oeffnen({
+        titel: `Parade-Probe (${typLabel}${name ? `: ${name}` : ''})`,
+        basiswert: handeln,
+        ruestungen: [],
+      });
+    },
+    schadenWuerfelnFuerEntitaet(row, typ) {
+      const typLabel = typ === 'bestie' ? 'Bestie' : 'NPC';
+      const name = this.zeilenWertAlsText(row && row.name);
+      const waffenName = this.zeilenWertAlsText(row && row.waffe) || 'Waffe';
+      this.$refs.schadenModal?.oeffnen({
+        titel: `Schaden würfeln (${typLabel}${name ? `: ${name}` : ''})`,
+        charakter: {
+          inventar: [
+            {
+              id: `${typLabel.toLowerCase()}-waffe`,
+              typ: 'waffe',
+              name: waffenName,
+              schadenswertNahkampf: row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '',
+              schadenswertFernkampf: row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '',
+            },
+          ],
+          handeln: [],
+        },
+      });
     },
     gegenstandWaffenWerteText(row) {
       if (!row || !row.istWaffe) {
@@ -2295,6 +2346,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
+                      class="btn btn-sm btn-outline-danger me-1"
+                      @click="schadenWuerfelnFuerEntitaet(row, 'npc')">
+                      Schaden
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-info me-1"
+                      @click="paradeWuerfelnFuerEntitaet(row, 'npc')">
+                      Parieren
+                    </button>
+                    <button
+                      type="button"
                       class="btn btn-sm btn-outline-secondary me-1"
                       @click="galerieFuerZeileOeffnen(row)">
                       Medien ({{ medienAnzahl(row) }})
@@ -2355,6 +2418,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2" @click.stop>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-fill"
+                    @click="schadenWuerfelnFuerEntitaet(row, 'npc')">
+                    🎲 Schaden
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-info flex-fill"
+                    @click="paradeWuerfelnFuerEntitaet(row, 'npc')">
+                    🛡️ Parade
+                  </button>
+                </div>
+                <div class="d-flex gap-2 mt-2" @click.stop>
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-primary flex-fill"
@@ -2435,6 +2512,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td class="text-end text-nowrap" @click.stop>
                     <button
                       type="button"
+                      class="btn btn-sm btn-outline-danger me-1"
+                      @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">
+                      Schaden
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-info me-1"
+                      @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">
+                      Parieren
+                    </button>
+                    <button
+                      type="button"
                       class="btn btn-sm btn-outline-secondary me-1"
                       @click="galerieFuerZeileOeffnen(row)">
                       Medien ({{ medienAnzahl(row) }})
@@ -2484,6 +2573,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-html="richTextHtml(row.beschreibungHtml)"></div>
                 <div v-else class="small mb-2">—</div>
                 <div class="d-flex gap-2" @click.stop>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger flex-fill"
+                    @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">
+                    🎲 Schaden
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-info flex-fill"
+                    @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">
+                    🛡️ Parade
+                  </button>
+                </div>
+                <div class="d-flex gap-2 mt-2" @click.stop>
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-primary flex-fill"
@@ -3119,6 +3222,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
         @update:zufallFraktionEpoche="zufallFraktionEpoche = $event"
         @update:zufallRaetselEpoche="zufallRaetselEpoche = $event" />
+      <parade-modal ref="paradeModal" />
+      <schaden-modal ref="schadenModal" />
 
       <div
         class="modal fade"

@@ -272,6 +272,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       importModalInstanz: null,
       wuerfel3dAktiv: true,
       wuerfelFarbe: '#509b4a',
+      wuerfelFarbeZehner: '#3b7a36',
       wuerfelAudioStumm: false,
       wuerfelAudioLautstaerke: 0.88,
     };
@@ -419,7 +420,8 @@ window.HTBAH_SEITEN.Einstellungen = {
       const anzeige = window.HTBAH.ladeWuerfelAnzeigeProfil();
       const audio = window.HTBAH.ladeWuerfelAudioProfil();
       this.wuerfel3dAktiv = anzeige.enabled;
-      this.wuerfelFarbe = anzeige.theme;
+      this.wuerfelFarbe = anzeige.themeOnes || anzeige.theme;
+      this.wuerfelFarbeZehner = anzeige.themeTens || '#3b7a36';
       this.wuerfelAudioStumm = audio.stumm;
       this.wuerfelAudioLautstaerke = audio.lautstaerke;
     },
@@ -427,6 +429,8 @@ window.HTBAH_SEITEN.Einstellungen = {
       window.HTBAH.setzeWuerfelAnzeigeProfil({
         enabled: this.wuerfel3dAktiv,
         theme: this.wuerfelFarbe,
+        themeOnes: this.wuerfelFarbe,
+        themeTens: this.wuerfelFarbeZehner,
       });
       window.dispatchEvent(new CustomEvent('htbah:wuerfel-einstellungen-geaendert'));
     },
@@ -907,15 +911,31 @@ window.HTBAH_SEITEN.Einstellungen = {
           </label>
         </div>
         <div class="mb-3">
-          <label class="form-label small text-body-secondary mb-1" for="settings-wuerfel-farbe">
-            Würfelfarbe
-          </label>
-          <input
-            id="settings-wuerfel-farbe"
-            type="color"
-            class="form-control form-control-color w-100 htbah-dice-color-input"
-            v-model="wuerfelFarbe"
-            @change="speichereWuerfelAnzeigeEinstellungen" />
+          <label class="form-label small text-body-secondary mb-2">Würfelfarbe</label>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label small text-body-secondary mb-1" for="settings-wuerfel-farbe">
+                Einerstelle (W10)
+              </label>
+              <input
+                id="settings-wuerfel-farbe"
+                type="color"
+                class="form-control form-control-color w-100 htbah-dice-color-input"
+                v-model="wuerfelFarbe"
+                @change="speichereWuerfelAnzeigeEinstellungen" />
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label small text-body-secondary mb-1" for="settings-wuerfel-farbe-zehner">
+                Zehnerstelle (W100)
+              </label>
+              <input
+                id="settings-wuerfel-farbe-zehner"
+                type="color"
+                class="form-control form-control-color w-100 htbah-dice-color-input"
+                v-model="wuerfelFarbeZehner"
+                @change="speichereWuerfelAnzeigeEinstellungen" />
+            </div>
+          </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap pt-2 border-top border-secondary border-opacity-25">
           <span class="small text-body-secondary text-nowrap">Würfelsound</span>

@@ -2,6 +2,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
 /** Initiative laut Regelwerk (Kampf): 1W10 + Begabungswert Handeln */
 window.HTBAH_KOMPONENTEN.InitiativeModal = {
+  components: {
+    WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
+  },
   props: {
     charakter: { type: Object, required: true },
   },
@@ -40,8 +43,9 @@ window.HTBAH_KOMPONENTEN.InitiativeModal = {
       this.modalInstanz.show();
     },
     wuerfeln() {
-      this.letzterW10 = window.HTBAH.wuerfelW10();
-      window.HTBAH.spieleWuerfelSounds(1);
+      this.$refs.wuerfelbecher?.wuerfeln('1W10').then((werte) => {
+        this.letzterW10 = Array.isArray(werte) && werte.length ? Number(werte[0]) || null : null;
+      });
     },
   },
   template: `
@@ -84,9 +88,14 @@ window.HTBAH_KOMPONENTEN.InitiativeModal = {
               @click="wuerfeln">
               1W10 würfeln
             </icon-text-button>
+            <wuerfelbecher-wurf
+              ref="wuerfelbecher"
+              class="mt-3"
+              :auto-init="false"
+              modus="w10" />
             <div
               v-if="letzterW10 !== null"
-              class="mt-3 p-3 rounded border border-secondary border-opacity-25 initiative-modal-ergebnis">
+              class="mt-2 p-3 rounded border border-secondary border-opacity-25 initiative-modal-ergebnis">
               <div class="text-center">
                 <div class="small text-body-secondary mb-1">Initiative</div>
                 <div class="d-flex flex-wrap align-items-center justify-content-center gap-2 fs-5">

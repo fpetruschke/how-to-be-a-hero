@@ -24,6 +24,60 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     pantheon: ['pantheon', 'gottheit', 'gottheiten', 'gott', 'goetter', 'götter'],
   };
 
+  /**
+   * Kapselt Zugriff auf den zentralen HTBAH-Speicher-Gateway.
+   * Fallback auf direktes localStorage bleibt nur für sehr frühe Initialisierungsphasen bestehen.
+   */
+  function leseNavTargetKey() {
+    const keys = window.HTBAH && window.HTBAH.speicherKeys;
+    const key = keys && typeof keys.mentionNavigationTarget === 'string'
+      ? keys.mentionNavigationTarget
+      : NAV_TARGET_KEY;
+    return key || NAV_TARGET_KEY;
+  }
+
+  function schreibeNavTarget(payload) {
+    const key = leseNavTargetKey();
+    const speicher = window.HTBAH && window.HTBAH.speicher;
+    if (speicher && typeof speicher.schreibeJson === 'function') {
+      return speicher.schreibeJson(key, payload);
+    }
+    try {
+      localStorage.setItem(key, JSON.stringify(payload));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function leseNavTarget() {
+    const key = leseNavTargetKey();
+    const speicher = window.HTBAH && window.HTBAH.speicher;
+    if (speicher && typeof speicher.leseJson === 'function') {
+      return speicher.leseJson(key, null);
+    }
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function loescheNavTarget() {
+    const key = leseNavTargetKey();
+    const speicher = window.HTBAH && window.HTBAH.speicher;
+    if (speicher && typeof speicher.loescheKey === 'function') {
+      speicher.loescheKey(key);
+      return;
+    }
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+
   function escapeHtml(value) {
     return String(value || '')
       .replace(/&/g, '&amp;')
@@ -204,9 +258,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     if (!payload.entityType || !payload.entityId) {
       return;
     }
-    try {
-      localStorage.setItem(NAV_TARGET_KEY, JSON.stringify(payload));
-    } catch {
+    if (!schreibeNavTarget(payload)) {
       return;
     }
     const requestEvent = new CustomEvent('htbah:open-entity-request', {
@@ -218,21 +270,16 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   }
 
   function leseNavigationTargetRaw() {
-    try {
-      const raw = localStorage.getItem(NAV_TARGET_KEY);
-      const data = raw ? JSON.parse(raw) : null;
-      if (!data || typeof data !== 'object') {
-        return null;
-      }
-      const entityType = String(data.entityType || '').trim();
-      const entityId = String(data.entityId || '').trim();
-      if (!entityType || !entityId) {
-        return null;
-      }
-      return { entityType, entityId };
-    } catch {
+    const data = leseNavTarget();
+    if (!data || typeof data !== 'object') {
       return null;
     }
+    const entityType = String(data.entityType || '').trim();
+    const entityId = String(data.entityId || '').trim();
+    if (!entityType || !entityId) {
+      return null;
+    }
+    return { entityType, entityId };
   }
 
   function peekNavigationTarget() {
@@ -241,11 +288,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 
   function consumeNavigationTarget() {
     const target = leseNavigationTargetRaw();
-    try {
-      localStorage.removeItem(NAV_TARGET_KEY);
-    } catch {
-      // ignore
-    }
+    loescheNavTarget();
     return target;
   }
 

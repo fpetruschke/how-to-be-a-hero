@@ -16,6 +16,7 @@ const SPEICHER_KEY_WUERFEL_AUDIO = 'htbah_wuerfel_audio';
 const SPEICHER_KEY_WUERFEL_SOUND_LEGACY = 'htbah_wuerfel_sound';
 const SPEICHER_KEY_DICE_COLORS = 'htbah_dice_colors';
 const SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER = 'htbah_wuerfel_beutel_fenster';
+const SPEICHER_KEY_MENTION_NAV_TARGET = 'htbah_mention_nav_target';
 
 function erstelleLocalStorageBackend() {
   return {
@@ -1394,6 +1395,10 @@ function ermittleWuerfelSoundUrl() {
   return ermittleAssetUrl('assets/audio/wuerfel.mp3');
 }
 
+function htbahIstHexFarbe6(text) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(text || '').trim());
+}
+
 /**
  * @returns {{ stumm: boolean, lautstaerke: number }}
  */
@@ -1447,7 +1452,7 @@ function setzeWuerfelAudioProfil(teil) {
  * @returns {{ enabled: boolean, theme: string }}
  */
 function ladeWuerfelAnzeigeProfil() {
-  const defaults = { enabled: true, theme: '#509b4a' };
+  const defaults = { enabled: true, theme: '#509b4a', themeOnes: '#509b4a', themeTens: '#3b7a36' };
   try {
     const roh = htbahSpeicher.leseText(SPEICHER_KEY_DICE_COLORS, null);
     if (!roh) {
@@ -1458,9 +1463,18 @@ function ladeWuerfelAnzeigeProfil() {
       return defaults;
     }
     const themeRaw = typeof parsed.theme === 'string' ? parsed.theme.trim() : '';
+    const themeOnesRaw = typeof parsed.themeOnes === 'string' ? parsed.themeOnes.trim() : '';
+    const themeTensRaw = typeof parsed.themeTens === 'string' ? parsed.themeTens.trim() : '';
+    const themeOnes = htbahIstHexFarbe6(themeOnesRaw)
+      ? themeOnesRaw
+      : htbahIstHexFarbe6(themeRaw)
+        ? themeRaw
+        : defaults.themeOnes;
     return {
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : defaults.enabled,
-      theme: /^#[0-9a-fA-F]{6}$/.test(themeRaw) ? themeRaw : defaults.theme,
+      theme: themeOnes,
+      themeOnes,
+      themeTens: htbahIstHexFarbe6(themeTensRaw) ? themeTensRaw : defaults.themeTens,
     };
   } catch {
     return defaults;
@@ -1473,9 +1487,18 @@ function ladeWuerfelAnzeigeProfil() {
 function setzeWuerfelAnzeigeProfil(teil) {
   const aktuell = ladeWuerfelAnzeigeProfil();
   const themeRaw = typeof teil?.theme === 'string' ? teil.theme.trim() : '';
+  const themeOnesRaw = typeof teil?.themeOnes === 'string' ? teil.themeOnes.trim() : '';
+  const themeTensRaw = typeof teil?.themeTens === 'string' ? teil.themeTens.trim() : '';
+  const naechsteOnes = htbahIstHexFarbe6(themeOnesRaw)
+    ? themeOnesRaw
+    : htbahIstHexFarbe6(themeRaw)
+      ? themeRaw
+      : aktuell.themeOnes || aktuell.theme;
   const neu = {
     enabled: teil?.enabled !== undefined ? Boolean(teil.enabled) : aktuell.enabled,
-    theme: /^#[0-9a-fA-F]{6}$/.test(themeRaw) ? themeRaw : aktuell.theme,
+    theme: naechsteOnes,
+    themeOnes: naechsteOnes,
+    themeTens: htbahIstHexFarbe6(themeTensRaw) ? themeTensRaw : aktuell.themeTens,
   };
   htbahSpeicher.schreibeText(SPEICHER_KEY_DICE_COLORS, JSON.stringify(neu));
   return neu;
@@ -1693,6 +1716,7 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   wuerfelAudio: SPEICHER_KEY_WUERFEL_AUDIO,
   diceColors: SPEICHER_KEY_DICE_COLORS,
   wuerfelBeutelFenster: SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER,
+  mentionNavigationTarget: SPEICHER_KEY_MENTION_NAV_TARGET,
 });
 
 window.HTBAH = {

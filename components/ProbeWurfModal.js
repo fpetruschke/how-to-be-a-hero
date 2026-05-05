@@ -1,6 +1,9 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
 window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
+  components: {
+    WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
+  },
   data() {
     return {
       modalInstanz: null,
@@ -73,8 +76,9 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
       });
     },
     wuerfeln() {
-      this.letzterWurf = window.HTBAH.wuerfelW100();
-      window.HTBAH.spieleWuerfelSounds(1);
+      this.$refs.wuerfelbecher?.wuerfeln('1W100').then((werte) => {
+        this.letzterWurf = Array.isArray(werte) && werte.length ? Number(werte[0]) || null : null;
+      });
     },
   },
   template: `
@@ -120,9 +124,13 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
               @click="wuerfeln">
               1W100 würfeln
             </icon-text-button>
+            <wuerfelbecher-wurf
+              ref="wuerfelbecher"
+              :auto-init="false"
+              modus="w100" />
             <div
               v-if="auswertung"
-              class="mt-3 p-3 rounded border probe-wurf-ergebnis"
+              class="mt-2 p-3 rounded border probe-wurf-ergebnis"
               :class="ergebnisKlasse">
               <div class="text-center">
                 <div class="small text-body-secondary mb-1">W100</div>

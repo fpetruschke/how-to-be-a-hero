@@ -1,6 +1,9 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
 window.HTBAH_KOMPONENTEN.ParadeModal = {
+  components: {
+    WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
+  },
   data() {
     return {
       modalInstanz: null,
@@ -23,7 +26,7 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
       return this.ruestungenListe.length > 0;
     },
     effektiverModifikator() {
-      if (!this.hatRuestungenImInventar || this.modifikatorArt === 'kein') {
+      if (this.modifikatorArt === 'kein') {
         return 0;
       }
       if (this.modifikatorArt === 'bonus') {
@@ -55,6 +58,29 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
     },
     kritMissMin() {
       return Math.ceil(90 + this.zielwert * 0.1);
+    },
+    paradeAnzeigeGesamtwert() {
+      if (this.modifikatorArt === 'kein') {
+        return this.letzterWurf;
+      }
+      return this.zielwert;
+    },
+    paradeModifikatorHatWert() {
+      return this.effektiverModifikator !== 0;
+    },
+    paradeModifikatorBadgeText() {
+      if (!this.paradeModifikatorHatWert) {
+        return '';
+      }
+      return this.effektiverModifikator > 0
+        ? `Bonus: +${this.effektiverModifikator}`
+        : `Malus: ${this.effektiverModifikator}`;
+    },
+    paradeModifikatorBadgeKlasse() {
+      if (!this.paradeModifikatorHatWert) {
+        return '';
+      }
+      return this.effektiverModifikator > 0 ? 'text-bg-success' : 'text-bg-danger';
     },
   },
   methods: {
@@ -99,8 +125,9 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
       });
     },
     wuerfeln() {
-      this.letzterWurf = window.HTBAH.wuerfelW100();
-      window.HTBAH.spieleWuerfelSounds(1);
+      this.$refs.wuerfelbecher?.wuerfeln('1W100').then((werte) => {
+        this.letzterWurf = Array.isArray(werte) && werte.length ? Number(werte[0]) || null : null;
+      });
     },
   },
   template: `
@@ -233,13 +260,36 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
               Parade würfeln (1W100)
             </icon-text-button>
 
+            <wuerfelbecher-wurf
+              ref="wuerfelbecher"
+              class="mt-3"
+              :auto-init="false"
+              :prozentwurf-modifikator="effektiverModifikator"
+              modus="w100" />
             <div
               v-if="auswertung"
-              class="mt-3 p-3 rounded border probe-wurf-ergebnis"
+              class="mt-2 p-3 rounded border probe-wurf-ergebnis"
               :class="ergebnisKlasse">
               <div class="text-center">
-                <div class="small text-body-secondary mb-1">W100</div>
-                <div class="display-6 fw-bold mb-2">{{ letzterWurf }}</div>
+                <div class="small text-body-secondary mb-1">
+                  {{ modifikatorArt === 'kein' ? 'W100' : 'W100 (Rohwurf)' }}
+                </div>
+                <div class="fs-5 fw-semibold mb-2">{{ letzterWurf }}</div>
+                <div class="small text-body-secondary mb-1">
+                  Zielwert inkl. Bonus/Malus: <strong>{{ zielwert }}</strong>
+                </div>
+                <div class="d-flex justify-content-center flex-wrap gap-2 mb-2">
+                  <span
+                    v-if="paradeModifikatorHatWert"
+                    class="badge rounded-pill"
+                    :class="paradeModifikatorBadgeKlasse">
+                    {{ paradeModifikatorBadgeText }}
+                  </span>
+                  <span class="badge rounded-pill text-bg-primary">
+                    Summe: {{ paradeAnzeigeGesamtwert }}
+                  </span>
+                </div>
+                <div class="display-6 fw-bold mb-2">{{ paradeAnzeigeGesamtwert }}</div>
                 <div class="fw-semibold mb-1">{{ auswertung.label }}</div>
                 <div class="small probe-wurf-ergebnis-hinweis">{{ auswertung.kurztext }}</div>
               </div>

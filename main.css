@@ -714,14 +714,21 @@ input::placeholder {
 .htbah-weltenbau-map-edges {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 12;
   pointer-events: none;
   color: #5c636a;
+  /* Linien koennen ausserhalb der Stage liegen (Nodes/Bilder sind nicht hart geclippt). */
+  overflow: visible;
+}
+
+.htbah-weltenbau-map-edges line {
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
 }
 
 .htbah-map-node {
   position: absolute;
-  z-index: 3;
+  z-index: 20;
   min-height: 54px;
   text-align: left;
   border: 2px solid #adb5bd;
@@ -920,7 +927,27 @@ input::placeholder {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
+.htbah-map-ort-bild-rotate-handle {
+  position: absolute;
+  left: 50%;
+  top: -16px;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(25, 135, 84, 0.96);
+  cursor: grab;
+  padding: 0;
+  z-index: 6;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
 .htbah-map-pfeil-rotate-handle:active {
+  cursor: grabbing;
+}
+
+.htbah-map-ort-bild-rotate-handle:active {
   cursor: grabbing;
 }
 
@@ -930,6 +957,11 @@ input::placeholder {
 }
 
 .htbah-map-pfeil-rotate-handle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.htbah-map-ort-bild-rotate-handle:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -1086,7 +1118,7 @@ input::placeholder {
   box-shadow:
     0 0 0 2px rgba(13, 110, 253, 0.55),
     0 0.35rem 0.85rem rgba(0, 0, 0, 0.18);
-  z-index: 3;
+  z-index: 21;
 }
 
 .htbah-map-node-charakter .d-flex.align-items-center.gap-2 {

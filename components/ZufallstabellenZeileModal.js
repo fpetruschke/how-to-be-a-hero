@@ -4,6 +4,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
   name: 'ZufallstabellenZeileModal',
   components: {
     ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
+    SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
+    WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
   },
   props: {
     anlage: { type: Object, required: true },
@@ -304,10 +306,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         return;
       }
       const handeln = this.berechneHandelnFuerInitiative();
-      const gesamt = window.HTBAH.wuerfelW10() + handeln;
-      window.HTBAH.spieleWuerfelSounds(1);
-      const max = 10 + handeln;
-      this.anlage.zeile.initiative = String(Math.max(1, Math.min(max, gesamt)));
+      this.$refs.initiativeWuerfelbecher?.wuerfeln('1W10').then((werte) => {
+        const wurf = Array.isArray(werte) && werte.length ? Number(werte[0]) || 1 : 1;
+        const gesamt = wurf + handeln;
+        const max = 10 + handeln;
+        this.anlage.zeile.initiative = String(Math.max(1, Math.min(max, gesamt)));
+      });
     },
     async initiativeZuruecksetzen() {
       if (!this.anlage || !this.anlage.zeile) {
@@ -339,6 +343,30 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         titel: `Parade-Probe (${titelTeil})`,
         basiswert,
         ruestungen: [],
+      });
+    },
+    schadenModalOeffnenFuerZeile() {
+      if (!this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      const zeile = this.anlage.zeile;
+      const typ = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
+      const name = String(zeile.name || '').trim();
+      const waffenName = String(zeile.waffe || '').trim() || 'Waffe';
+      this.$refs.schadenModal?.oeffnen({
+        titel: `Schaden würfeln (${typ}${name ? `: ${name}` : ''})`,
+        charakter: {
+          inventar: [
+            {
+              id: `${this.anlage.typ || 'eintrag'}-waffe`,
+              typ: 'waffe',
+              name: waffenName,
+              schadenswertNahkampf: zeile.schadenswertNahkampf || '',
+              schadenswertFernkampf: zeile.schadenswertFernkampf || '',
+            },
+          ],
+          handeln: [],
+        },
       });
     },
     datenBereichBlur(event) {
@@ -477,6 +505,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   </button>
                 </div>
                 <div class="mt-2">
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger btn-sm w-100 mb-2"
+                    @click="schadenModalOeffnenFuerZeile">
+                    🎲 Schaden
+                  </button>
                   <button
                     type="button"
                     class="btn btn-outline-primary btn-sm w-100"
@@ -738,6 +772,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                 <div class="mt-2">
                   <button
                     type="button"
+                    class="btn btn-outline-danger btn-sm w-100 mb-2"
+                    @click="schadenModalOeffnenFuerZeile">
+                    🎲 Schaden
+                  </button>
+                  <button
+                    type="button"
                     class="btn btn-outline-primary btn-sm w-100"
                     @click="paradeModalOeffnenFuerZeile">
                     🛡️ Parieren
@@ -936,6 +976,10 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         <div v-if="speicherHinweis" class="form-text text-end mt-1">{{ speicherHinweis }}</div>
         </div>
         <parade-modal ref="paradeModal" />
+        <schaden-modal ref="schadenModal" />
+        <div class="d-none" aria-hidden="true">
+          <wuerfelbecher-wurf ref="initiativeWuerfelbecher" modus="w10" :auto-init="false" />
+        </div>
         <div
           v-if="!modal.istVollbild"
           class="regelwerk-modal-resize-handle"
