@@ -13,6 +13,9 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
     titelLabelId() {
       return `${this.modalId}Label`;
     },
+    beschreibungEnthaeltHtml() {
+      return /<[^>]+>/.test(String(this.beschreibung || ''));
+    },
   },
   data() {
     return {
@@ -118,7 +121,8 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
               aria-label="Schließen"></button>
           </div>
           <div class="modal-body text-start htbah-bestaetigen-beschreibung">
-            {{ beschreibung }}
+            <span v-if="beschreibungEnthaeltHtml" v-html="beschreibung"></span>
+            <span v-else>{{ beschreibung }}</span>
             <template v-if="warnhinweisAnzeigen">
               <br />
               <br />

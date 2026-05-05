@@ -214,6 +214,15 @@ body.htbah-mit-lp-banner #app {
 }
 
 @media (max-width: 991.98px) and (orientation: portrait) {
+  /* Tablet hochkant: Layout bewusst fluid halten statt fester Bootstrap-Container-Breite. */
+  .container,
+  .container-sm,
+  .container-md {
+    max-width: 100%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
   :root,
   [data-theme='dark'],
   [data-theme='light'] {
@@ -1520,6 +1529,27 @@ input::placeholder {
   overflow: hidden;
 }
 
+.htbah-musik-modal-window.regelwerk-modal-window {
+  width: min(96vw, 980px);
+  height: min(90vh, 760px);
+  max-height: min(94dvh, 820px);
+  overflow: hidden;
+}
+
+.htbah-musik-iframe-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.htbah-musik-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  overflow: auto;
+}
+
 .regelwerk-modal-window {
   position: absolute;
   top: 0;
@@ -2309,6 +2339,23 @@ input::placeholder {
   font-size: 0.9rem;
 }
 
+.wuerfel-ergebnis-chip-summe {
+  gap: 0.4rem;
+  padding-right: 6px;
+}
+
+.wuerfel-ergebnis-chip-summe-wert {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.1rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f2937;
+  border: 1px solid rgba(17, 24, 39, 0.14);
+}
+
 .wuerfel-ergebnis-chip-w10 {
   background: rgba(59, 130, 246, 0.2);
   color: var(--text-color);
@@ -2350,6 +2397,12 @@ input::placeholder {
 .htbah-dice-box {
   width: 100%;
   height: 14rem;
+}
+
+@media (max-width: 767.98px) {
+  .htbah-dice-box {
+    height: 11rem;
+  }
 }
 
 .htbah-dice-box canvas {
@@ -2456,6 +2509,10 @@ input::placeholder {
 .faehigkeiten-probe-wuerfel-btn:hover {
   color: var(--primary-color);
   background: rgba(34, 197, 94, 0.15);
+}
+
+.htbah-wuerfel-action-btn {
+  min-height: 2.9rem;
 }
 
 /* Startseite: Hero-Kopf */
@@ -3004,10 +3061,31 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   border-radius: 0.75rem;
   border-color: var(--border-color);
   background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+}
+
+.htbah-zufall-karten-titel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--heading-color);
+}
+
+.htbah-zufall-karten-titel .material-symbols-outlined {
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--primary-color);
 }
 
 .zufallstabellen-mobile-card--klickbar .card-body {
   cursor: pointer;
+  overflow: visible;
+}
+
+.zufallstabellen-mobile-card .dropdown-menu {
+  z-index: 1080;
 }
 
 .zufallstabellen-tabellenzeile-klickbar {
@@ -3016,6 +3094,24 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 
 .zufallstabellen-tabellenzeile-klickbar:hover {
   background-color: color-mix(in srgb, var(--bs-primary) 6%, transparent);
+}
+
+.table-warning > * {
+  --bs-table-bg: color-mix(in srgb, var(--warning-color) 18%, transparent);
+}
+
+.table-error > * {
+  --bs-table-bg: color-mix(in srgb, var(--danger-color) 15%, transparent);
+}
+
+.zufall-status-warning {
+  border: 1px solid color-mix(in srgb, var(--warning-color) 68%, #000 8%) !important;
+  background: color-mix(in srgb, var(--warning-color) 22%, var(--card-bg)) !important;
+}
+
+.zufall-status-error {
+  border: 1px solid color-mix(in srgb, var(--danger-color) 66%, #000 8%) !important;
+  background: color-mix(in srgb, var(--danger-color) 20%, var(--card-bg)) !important;
 }
 
 .zufallstabellen-detail-sheet {
@@ -3142,6 +3238,45 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 .htbah-begegnung-modal .htbah-begegnung-ergebnis-body .zufallstabellen-mobile-slide img {
   height: 7.5rem;
   object-fit: contain;
+}
+
+.htbah-begegnung-kompaktkarte {
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: .6rem;
+  background: var(--bs-tertiary-bg);
+  padding: .55rem .65rem;
+  height: 100%;
+}
+
+.htbah-begegnung-kompaktkarte-titel {
+  font-size: .74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .01em;
+  color: var(--bs-secondary-color);
+  margin-bottom: .42rem;
+}
+
+.htbah-begegnung-kompaktliste {
+  display: grid;
+  grid-template-columns: minmax(6.2rem, auto) minmax(0, 1fr);
+  gap: .2rem .55rem;
+  margin: 0;
+}
+
+.htbah-begegnung-kompaktliste dt,
+.htbah-begegnung-kompaktliste dd {
+  margin: 0;
+  line-height: 1.25;
+}
+
+.htbah-begegnung-kompaktliste dt {
+  color: var(--bs-secondary-color);
+}
+
+.htbah-begegnung-kompaktliste dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .htbah-entitaet-bereich {

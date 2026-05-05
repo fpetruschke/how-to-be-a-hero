@@ -96,6 +96,9 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       }
       return this.prozentwurfDetails.gesamt + this.prozentwurfModWertGerundet;
     },
+    prozentwurfHatGueltigeSumme() {
+      return Number.isFinite(Number(this.prozentwurfSummeMitModifikator));
+    },
     wuerfelRolltText() {
       if (this.istProzentwurf) {
         return 'Würfel rollen …';
@@ -475,22 +478,6 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
   },
   template: `
     <div class="card p-3 shadow-sm mb-2">
-      <div v-if="dice3dAktiv && !istProzentwurf" class="htbah-dice-box-wrap mb-2">
-        <div :id="diceContainerId" ref="diceBoxElement" class="htbah-dice-box"></div>
-      </div>
-      <div v-if="dice3dAktiv && istProzentwurf" class="row g-2 mb-2">
-        <div class="col-12 col-md-6">
-          <div class="htbah-dice-box-wrap">
-            <div :id="diceContainerIdZehner" ref="diceBoxZehnerElement" class="htbah-dice-box"></div>
-          </div>
-        </div>
-        <div class="col-12 col-md-6">
-          <div class="htbah-dice-box-wrap">
-            <div :id="diceContainerIdEiner" ref="diceBoxEinerElement" class="htbah-dice-box"></div>
-          </div>
-        </div>
-      </div>
-      <small v-if="diceFehler" class="text-warning d-block mb-2">{{ diceFehler }}</small>
       <div v-if="istProzentwurf && prozentwurfDetails" class="row g-2 mb-2">
         <div class="col-12 col-md-6">
           <div class="p-2 rounded border border-secondary border-opacity-25 h-100">
@@ -515,8 +502,12 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
               :style="prozentwurfModBadgeStil">
               {{ prozentwurfModWertGerundet > 0 ? 'Bonus' : 'Malus' }}: {{ prozentwurfModWertGerundet > 0 ? '+' : '' }}{{ prozentwurfModWertGerundet }}
             </span>
-            <span class="wuerfel-ergebnis-chip wuerfel-ergebnis-chip-w100 fw-semibold" :style="prozentwurfBadgeErgebnisStil">
-              Summe: {{ prozentwurfSummeMitModifikator }}
+            <span
+              v-if="prozentwurfHatGueltigeSumme"
+              class="wuerfel-ergebnis-chip wuerfel-ergebnis-chip-w100 wuerfel-ergebnis-chip-summe fw-semibold"
+              :style="prozentwurfBadgeErgebnisStil">
+              <span>Summe</span>
+              <span class="wuerfel-ergebnis-chip-summe-wert">{{ prozentwurfSummeMitModifikator }}</span>
             </span>
           </div>
         </div>
@@ -537,6 +528,22 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
           </template>
         </span>
       </div>
+      <div v-if="dice3dAktiv && !istProzentwurf" class="htbah-dice-box-wrap mb-2">
+        <div :id="diceContainerId" ref="diceBoxElement" class="htbah-dice-box"></div>
+      </div>
+      <div v-if="dice3dAktiv && istProzentwurf" class="row g-2 mb-2">
+        <div class="col-12 col-md-6">
+          <div class="htbah-dice-box-wrap">
+            <div :id="diceContainerIdZehner" ref="diceBoxZehnerElement" class="htbah-dice-box"></div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="htbah-dice-box-wrap">
+            <div :id="diceContainerIdEiner" ref="diceBoxEinerElement" class="htbah-dice-box"></div>
+          </div>
+        </div>
+      </div>
+      <small v-if="diceFehler" class="text-warning d-block mb-2">{{ diceFehler }}</small>
       <small v-else-if="wuerfelnLaeuft">{{ wuerfelRolltText }}</small>
       <small v-else-if="!prozentwurfDetails">Noch kein Wurf.</small>
       <div v-if="modus === 'w10' && ergebnisse.length" class="small text-body-secondary mt-2">

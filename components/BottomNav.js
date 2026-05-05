@@ -15,6 +15,9 @@ const HTBAH_DICE_INIT_TIMEOUT_MS = 7000;
 const HTBAH_APP_ORIGIN = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
 
 window.HTBAH_KOMPONENTEN.BottomNav = {
+  components: {
+    WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
+  },
   props: ['uiZustand'],
   data() {
     return {
@@ -48,6 +51,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       wuerfelBeutelOffen: false,
       wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       wuerfelBeutelAusloeserElement: null,
+      musikboardOffen: false,
+      musikboardFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
+      musikboardAusloeserElement: null,
       sicherheitsmechanismenModalOffen: false,
       _badgeDragMoveHandler: null,
       _badgeDragUpHandler: null,
@@ -185,6 +191,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     wuerfelNavAktiv() {
       return this.wuerfelBeutelOffen;
     },
+    musikNavAktiv() {
+      return this.musikboardOffen;
+    },
     /** Frische Listen aus dem Speicher (Reaktivität über Tab/Route). */
     begegnungListenAusSpeicher() {
       void this.$route.fullPath;
@@ -202,6 +211,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     wuerfelBeutelFensterStil() {
       return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this.wuerfelBeutelFenster);
+    },
+    musikboardFensterStil() {
+      return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this.musikboardFenster);
     },
     wuerfelErgebnisChipStil() {
       return {
@@ -345,6 +357,27 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.wuerfelBeutelAusloeserElement = null;
       }
     },
+    musikboardOffen(neu) {
+      if (neu) {
+        window.addEventListener('resize', this.musikboardBeiViewportResize);
+        window.addEventListener('keydown', this.onMusikboardKeydown);
+        this.$nextTick(() => {
+          const fenster = this.$refs.musikboardFensterRef;
+          if (fenster && typeof fenster.focus === 'function') {
+            fenster.focus();
+          }
+        });
+      } else {
+        window.removeEventListener('resize', this.musikboardBeiViewportResize);
+        window.removeEventListener('keydown', this.onMusikboardKeydown);
+        this.musikboardBeendeZiehen();
+        this.musikboardBeendeResize();
+        if (this.musikboardAusloeserElement && this.musikboardAusloeserElement.isConnected) {
+          this.musikboardAusloeserElement.focus();
+        }
+        this.musikboardAusloeserElement = null;
+      }
+    },
   },
   mounted() {
     this._navReserveObserver = null;
@@ -373,9 +406,13 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       'htbah:wuerfel-einstellungen-geaendert',
       this.onWuerfelEinstellungenGlobalGeaendert,
     );
+    window.removeEventListener('resize', this.musikboardBeiViewportResize);
+    window.removeEventListener('keydown', this.onMusikboardKeydown);
     this.speichereWuerfelBeutelFenster();
     this.wuerfelBeutelBeendeZiehen();
     this.wuerfelBeutelBeendeResize();
+    this.musikboardBeendeZiehen();
+    this.musikboardBeendeResize();
     this.badgeZiehenCleanup();
   },
   methods: {
@@ -968,6 +1005,174 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.speichereWuerfelBeutelFenster();
       }
     },
+    musikboardOeffnen() {
+      this.musikboardAusloeserElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      this.musikboardOffen = true;
+      this.$nextTick(() => this.musikboardInitialisierePosition());
+    },
+    musikboardSchliessen() {
+      this.musikboardOffen = false;
+    },
+    onMusikboardKeydown(event) {
+      if (!this.musikboardOffen || !event || event.key !== 'Escape') {
+        return;
+      }
+      event.preventDefault();
+      this.musikboardSchliessen();
+    },
+    musikboardErmittleViewport() {
+      return window.HTBAH_MODAL_FENSTER.utils.ermittleViewportGroesse();
+    },
+    musikboardBegrenzeGroesse(breite, hoehe) {
+      return window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(breite, hoehe, 360, 280);
+    },
+    musikboardInitialisierePosition() {
+      const fenster = this.$refs.musikboardFensterRef;
+      if (!fenster) {
+        return;
+      }
+      const v = this.musikboardErmittleViewport();
+      const istDesktop = v.viewportBreite >= 992;
+      if (this.musikboardFenster.breite == null || this.musikboardFenster.hoehe == null) {
+        const initialBreite = istDesktop ? fenster.offsetWidth : Math.max(320, v.viewportBreite - 16);
+        const initialHoehe = istDesktop ? 620 : fenster.offsetHeight;
+        const groesse = this.musikboardBegrenzeGroesse(initialBreite, initialHoehe);
+        this.musikboardFenster.breite = groesse.breite;
+        this.musikboardFenster.hoehe = groesse.hoehe;
+      } else {
+        const groesse = this.musikboardBegrenzeGroesse(
+          this.musikboardFenster.breite,
+          this.musikboardFenster.hoehe,
+        );
+        this.musikboardFenster.breite = groesse.breite;
+        this.musikboardFenster.hoehe = groesse.hoehe;
+      }
+      if (this.musikboardFenster.positionX == null || this.musikboardFenster.positionY == null) {
+        this.musikboardFenster.positionX = Math.max(
+          0,
+          Math.round((v.viewportBreite - this.musikboardFenster.breite) / 2),
+        );
+        this.musikboardFenster.positionY = Math.max(
+          0,
+          Math.round((v.viewportHoehe - this.musikboardFenster.hoehe) / 2),
+        );
+      }
+      this.musikboardStelleSichtbar();
+    },
+    musikboardStelleSichtbar() {
+      if (this.musikboardFenster.istVollbild) {
+        return;
+      }
+      if (this.musikboardFenster.breite == null || this.musikboardFenster.hoehe == null) {
+        return;
+      }
+      const groesse = this.musikboardBegrenzeGroesse(
+        this.musikboardFenster.breite,
+        this.musikboardFenster.hoehe,
+      );
+      this.musikboardFenster.breite = groesse.breite;
+      this.musikboardFenster.hoehe = groesse.hoehe;
+      const v = this.musikboardErmittleViewport();
+      const maxX = Math.max(0, v.viewportBreite - this.musikboardFenster.breite);
+      const maxY = Math.max(0, v.viewportHoehe - this.musikboardFenster.hoehe);
+      this.musikboardFenster.positionX = Math.min(
+        Math.max(0, this.musikboardFenster.positionX || 0),
+        maxX,
+      );
+      this.musikboardFenster.positionY = Math.min(
+        Math.max(0, this.musikboardFenster.positionY || 0),
+        maxY,
+      );
+    },
+    musikboardBeiViewportResize() {
+      this.musikboardStelleSichtbar();
+    },
+    musikboardStarteZiehen(event) {
+      if (this.musikboardFenster.istVollbild || event.target.closest('button, a, input, textarea, select')) {
+        return;
+      }
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+      const fenster = this.$refs.musikboardFensterRef;
+      if (!fenster) {
+        return;
+      }
+      const rect = fenster.getBoundingClientRect();
+      this.musikboardFenster.ziehenAktiv = true;
+      this.musikboardFenster.ziehOffsetX = event.clientX - rect.left;
+      this.musikboardFenster.ziehOffsetY = event.clientY - rect.top;
+      window.addEventListener('pointermove', this.musikboardBeimZiehen);
+      window.addEventListener('pointerup', this.musikboardBeendeZiehen);
+      window.addEventListener('pointercancel', this.musikboardBeendeZiehen);
+      event.preventDefault();
+    },
+    musikboardBeimZiehen(event) {
+      if (!this.musikboardFenster.ziehenAktiv || this.musikboardFenster.istVollbild) {
+        return;
+      }
+      const fenster = this.$refs.musikboardFensterRef;
+      if (!fenster) {
+        return;
+      }
+      const maxX = Math.max(0, window.innerWidth - fenster.offsetWidth);
+      const maxY = Math.max(0, window.innerHeight - fenster.offsetHeight);
+      this.musikboardFenster.positionX = Math.min(
+        Math.max(0, event.clientX - this.musikboardFenster.ziehOffsetX),
+        maxX,
+      );
+      this.musikboardFenster.positionY = Math.min(
+        Math.max(0, event.clientY - this.musikboardFenster.ziehOffsetY),
+        maxY,
+      );
+    },
+    musikboardBeendeZiehen() {
+      this.musikboardFenster.ziehenAktiv = false;
+      window.removeEventListener('pointermove', this.musikboardBeimZiehen);
+      window.removeEventListener('pointerup', this.musikboardBeendeZiehen);
+      window.removeEventListener('pointercancel', this.musikboardBeendeZiehen);
+    },
+    musikboardStarteResize(event) {
+      if (this.musikboardFenster.istVollbild) {
+        return;
+      }
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+      const fenster = this.$refs.musikboardFensterRef;
+      if (!fenster) {
+        return;
+      }
+      this.musikboardFenster.resizeAktiv = true;
+      this.musikboardFenster.resizeStartX = event.clientX;
+      this.musikboardFenster.resizeStartY = event.clientY;
+      this.musikboardFenster.resizeStartBreite =
+        this.musikboardFenster.breite != null ? this.musikboardFenster.breite : fenster.offsetWidth;
+      this.musikboardFenster.resizeStartHoehe =
+        this.musikboardFenster.hoehe != null ? this.musikboardFenster.hoehe : fenster.offsetHeight;
+      window.addEventListener('pointermove', this.musikboardBeimResize);
+      window.addEventListener('pointerup', this.musikboardBeendeResize);
+      window.addEventListener('pointercancel', this.musikboardBeendeResize);
+      event.preventDefault();
+    },
+    musikboardBeimResize(event) {
+      if (!this.musikboardFenster.resizeAktiv || this.musikboardFenster.istVollbild) {
+        return;
+      }
+      const groesse = this.musikboardBegrenzeGroesse(
+        this.musikboardFenster.resizeStartBreite + (event.clientX - this.musikboardFenster.resizeStartX),
+        this.musikboardFenster.resizeStartHoehe + (event.clientY - this.musikboardFenster.resizeStartY),
+      );
+      this.musikboardFenster.breite = groesse.breite;
+      this.musikboardFenster.hoehe = groesse.hoehe;
+      this.musikboardStelleSichtbar();
+    },
+    musikboardBeendeResize() {
+      this.musikboardFenster.resizeAktiv = false;
+      window.removeEventListener('pointermove', this.musikboardBeimResize);
+      window.removeEventListener('pointerup', this.musikboardBeendeResize);
+      window.removeEventListener('pointercancel', this.musikboardBeendeResize);
+    },
     wuerfelBeutelStarteZiehen(event) {
       if (this.wuerfelBeutelFenster.istVollbild || event.target.closest('button, a, input, textarea, select')) {
         return;
@@ -1246,6 +1451,24 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.wuerfelnLaeuft = false;
       }
     },
+    async wuerfelnMitBecherKomponente() {
+      const becher = this.$refs.bottomNavWuerfelbecher;
+      if (!becher || typeof becher.wuerfeln !== 'function' || this.wuerfelnLaeuft) {
+        return;
+      }
+      this.wuerfelnLaeuft = true;
+      const notation =
+        this.wuerfelModus === 'w100'
+          ? '1W100'
+          : `${Math.max(1, Math.min(50, Number(this.anzahlW10) || 1))}W10`;
+      this.letzterWurfAnzahl = this.wuerfelModus === 'w100' ? 2 : Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
+      try {
+        const werte = await becher.wuerfeln(notation);
+        this.ergebnisse = Array.isArray(werte) ? werte : [];
+      } finally {
+        this.wuerfelnLaeuft = false;
+      }
+    },
     begegnungMediumIstBild(medium) {
       if (!medium || typeof medium !== 'object') {
         return false;
@@ -1322,55 +1545,93 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const k = Math.min(10, Math.max(1, Math.round(n)));
       return `${k} / 10`;
     },
-    begegnungZiehen() {
+    begegnungOpenPayload() {
+      if (!this.begegnungZiehung || !this.begegnungZiehung.zeile) {
+        return null;
+      }
+      const entityType = String(this.begegnungZiehung.typ || '').trim();
+      const entityId = String(this.begegnungZiehung.zeile.id || '').trim();
+      if (!entityType || !entityId) {
+        return null;
+      }
+      return { entityType, entityId, ts: Date.now() };
+    },
+    sendeBegegnungOpenRequest(payload) {
+      if (!payload || !payload.entityType || !payload.entityId) {
+        return;
+      }
+      const requestEvent = new CustomEvent('htbah:open-entity-request', {
+        detail: { ...payload, ts: Date.now() },
+        cancelable: true,
+      });
+      window.dispatchEvent(requestEvent);
+    },
+    begegnungBearbeitenOeffnen() {
+      const payload = this.begegnungOpenPayload();
+      if (!payload) {
+        return;
+      }
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      if (mentionApi && typeof mentionApi.oeffneEntitaetGlobal === 'function') {
+        mentionApi.oeffneEntitaetGlobal(payload);
+      } else {
+        this.sendeBegegnungOpenRequest(payload);
+      }
+      const zielPfad = '/weltenbau/zufallstabellen';
+      const istSchonDort = this.$route && this.$route.path === zielPfad;
+      if (!istSchonDort) {
+        this.$router.push(zielPfad).finally(() => {
+          window.setTimeout(() => this.sendeBegegnungOpenRequest(payload), 120);
+        });
+      }
+      this.wuerfelBeutelSchliessen();
+    },
+    begegnungZiehen(zielTyp = 'auto') {
       const { npcs, bestien, pantheon } = this.begegnungListenAusSpeicher;
       const canNpc = npcs.length > 0;
       const canBestie = bestien.length > 0;
       const canPantheon = pantheon.length > 0;
+      const pick = (typ, liste) => ({
+        typ,
+        zeile: liste[Math.floor(Math.random() * liste.length)],
+      });
       if (!canNpc && !canBestie && !canPantheon) {
         this.begegnungZiehung = null;
         return;
       }
+      if (zielTyp === 'npc') {
+        if (!canNpc) return;
+        this.begegnungZiehung = pick('npc', npcs);
+        return;
+      }
+      if (zielTyp === 'bestie') {
+        if (!canBestie) return;
+        this.begegnungZiehung = pick('bestie', bestien);
+        return;
+      }
+      if (zielTyp === 'pantheon') {
+        if (!canPantheon) return;
+        this.begegnungZiehung = pick('pantheon', pantheon);
+        return;
+      }
       const rar = Math.floor(Math.random() * 10000) + 1;
       if (canPantheon && rar <= 50 && (canNpc || canBestie)) {
-        this.begegnungZiehung = {
-          typ: 'pantheon',
-          zeile: pantheon[Math.floor(Math.random() * pantheon.length)],
-        };
+        this.begegnungZiehung = pick('pantheon', pantheon);
         return;
       }
       if (canNpc && canBestie) {
-        if (Math.random() < 0.5) {
-          this.begegnungZiehung = {
-            typ: 'npc',
-            zeile: npcs[Math.floor(Math.random() * npcs.length)],
-          };
-        } else {
-          this.begegnungZiehung = {
-            typ: 'bestie',
-            zeile: bestien[Math.floor(Math.random() * bestien.length)],
-          };
-        }
+        this.begegnungZiehung = Math.random() < 0.5 ? pick('npc', npcs) : pick('bestie', bestien);
         return;
       }
       if (canNpc) {
-        this.begegnungZiehung = {
-          typ: 'npc',
-          zeile: npcs[Math.floor(Math.random() * npcs.length)],
-        };
+        this.begegnungZiehung = pick('npc', npcs);
         return;
       }
       if (canBestie) {
-        this.begegnungZiehung = {
-          typ: 'bestie',
-          zeile: bestien[Math.floor(Math.random() * bestien.length)],
-        };
+        this.begegnungZiehung = pick('bestie', bestien);
         return;
       }
-      this.begegnungZiehung = {
-        typ: 'pantheon',
-        zeile: pantheon[Math.floor(Math.random() * pantheon.length)],
-      };
+      this.begegnungZiehung = pick('pantheon', pantheon);
     },
   },
   template: `
@@ -1437,6 +1698,15 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               <span class="htbah-nav-item-emoji" aria-hidden="true">🎲</span>
               <span class="htbah-nav-item-label">Würfel</span>
             </button>
+            <button
+              type="button"
+              title="Soundboard"
+              class="htbah-nav-item"
+              :class="{ 'htbah-nav-button-active': musikNavAktiv }"
+              @click="musikboardOeffnen">
+              <span class="htbah-nav-item-emoji" aria-hidden="true">🎵</span>
+              <span class="htbah-nav-item-label">Musik</span>
+            </button>
             <router-link
               to="/einstellungen"
               title="Einstellungen"
@@ -1493,6 +1763,13 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             :class="{ 'htbah-nav-button-active': wuerfelNavAktiv }"
             @click="wuerfelModalOeffnen('wuerfel')">
             🎲
+          </button>
+          <button
+            type="button"
+            title="Soundboard"
+            :class="{ 'htbah-nav-button-active': musikNavAktiv }"
+            @click="musikboardOeffnen">
+            🎵
           </button>
           <router-link
             to="/einstellungen"
@@ -1563,6 +1840,56 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       :nur-lesen="sicherheitsmodalNurLesen"
       @update:offen="sicherheitsmechanismenModalOffen = $event"
       @update:wert="sichereSicherheitsmechanismen" />
+
+    <teleport to="body">
+      <div
+        v-if="musikboardOffen"
+        class="regelwerk-modal-layer htbah-wuerfel-beutel-layer"
+        role="presentation">
+        <div
+          ref="musikboardFensterRef"
+          class="regelwerk-modal-window card shadow htbah-musik-modal-window"
+          :style="musikboardFensterStil"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="musikModalLabel"
+          tabindex="-1">
+          <div
+            class="regelwerk-modal-header d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
+            @pointerdown="musikboardStarteZiehen($event)">
+            <h5 class="modal-title d-flex align-items-center gap-2 mb-0" id="musikModalLabel">
+              <span aria-hidden="true">🎵</span>
+              Musik
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              aria-label="Schließen"
+              @click="musikboardSchliessen"></button>
+          </div>
+          <div class="px-3 pt-2 pb-0">
+            <div class="alert alert-info mb-2 py-2" role="note">
+              Das eingebettete Tool ist ein experimentelles Soundboard und nur zu Demonstrationszwecken eingebunden.
+            </div>
+          </div>
+          <div class="htbah-musik-iframe-wrap">
+            <iframe
+              class="htbah-musik-iframe"
+              src="https://fpetruschke.github.io/simple-soundboard/"
+              title="Simple Soundboard"
+              loading="lazy"
+              scrolling="auto"
+              referrerpolicy="no-referrer-when-downgrade"></iframe>
+          </div>
+          <div class="border-top px-3 py-2 d-flex justify-content-end flex-shrink-0 bg-body-tertiary">
+            <button type="button" class="btn btn-secondary" @click="musikboardSchliessen">
+              Schließen
+            </button>
+          </div>
+          <div class="regelwerk-modal-resize-handle" @pointerdown="musikboardStarteResize($event)"></div>
+        </div>
+      </div>
+    </teleport>
 
     <teleport to="body">
       <div
@@ -1658,66 +1985,19 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     class="btn btn-primary w-100 htbah-wuerfeln-btn"
                     icon="casino"
                     :disabled="wuerfelnLaeuft"
-                    @click="wuerfeln">
+                    @click="wuerfelnMitBecherKomponente">
                     {{ wuerfelnLaeuft ? 'Würfelt …' : 'Würfeln' }}
                   </icon-text-button>
                 </div>
 
-                <div class="card p-3 shadow-sm mb-2">
-                  <div class="d-flex align-items-center justify-content-between mb-2">
-                    <h6 class="mb-0">{{ ergebnisTitel }}</h6>
-                    <span
-                      class="badge"
-                      :class="wuerfelModus === 'w10' ? 'text-bg-primary' : 'text-bg-success'"
-                      v-if="wuerfelModus === 'w10' && ergebnisse.length">
-                      Summe: {{ ergebnisSumme }}
-                    </span>
-                  </div>
-                  <div v-if="dice3dAktiv && wuerfelModus !== 'w100'" class="htbah-dice-box-wrap mb-2">
-                    <div id="htbah-dice-box" ref="diceBoxElement" class="htbah-dice-box"></div>
-                  </div>
-                  <div v-if="dice3dAktiv && wuerfelModus === 'w100'" class="row g-2 mb-2">
-                    <div class="col-12 col-md-6">
-                      <div class="htbah-dice-box-wrap">
-                        <div id="htbah-dice-box-zehner" ref="diceBoxZehnerElement" class="htbah-dice-box"></div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                      <div class="htbah-dice-box-wrap">
-                        <div id="htbah-dice-box-einer" ref="diceBoxEinerElement" class="htbah-dice-box"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <small v-if="diceFehler" class="text-warning d-block mb-2">{{ diceFehler }}</small>
-                  <div v-if="wuerfelModus === 'w100' && prozentwurfDetails" class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="wuerfel-ergebnis-chip wuerfel-ergebnis-chip-w100" :style="prozentwurfBadgeZehnerStil">
-                      Zehner: {{ prozentwurfDetails.zehnerWert === 0 ? '00' : prozentwurfDetails.zehnerWert }}
-                    </span>
-                    <span class="wuerfel-ergebnis-chip wuerfel-ergebnis-chip-w100" :style="prozentwurfBadgeEinerStil">
-                      Einer: {{ prozentwurfDetails.einerDigit }}
-                    </span>
-                    <span class="wuerfel-ergebnis-chip wuerfel-ergebnis-chip-w100 fw-semibold" :style="prozentwurfBadgeSummeStil">
-                      Summe: {{ prozentwurfDetails.summe }}
-                    </span>
-                  </div>
-                  <div class="d-flex flex-wrap gap-2" v-if="ergebnisse.length">
-                    <span
-                      class="wuerfel-ergebnis-chip"
-                      :class="wuerfelModus === 'w10' ? 'wuerfel-ergebnis-chip-w10' : 'wuerfel-ergebnis-chip-w100'"
-                      :style="wuerfelErgebnisChipStil"
-                      v-for="(wert, index) in ergebnisse"
-                      :key="wuerfelModus + '-' + index">
-                      <template v-if="wuerfelModus === 'w10'">
-                        #{{ index + 1 }}: {{ wert }}
-                      </template>
-                      <template v-else-if="!prozentwurfDetails">
-                        {{ wert }}
-                      </template>
-                    </span>
-                  </div>
-                  <small v-else-if="wuerfelnLaeuft">{{ wuerfelRolltText }}</small>
-                  <small v-else-if="!prozentwurfDetails">Noch kein Wurf.</small>
-                </div>
+                <wuerfelbecher-wurf
+                  ref="bottomNavWuerfelbecher"
+                  class="mb-2"
+                  :auto-init="false"
+                  :modus="wuerfelModus"
+                  :notation="wuerfelModus === 'w100' ? '1W100' : (Math.max(1, Math.min(50, Number(anzahlW10) || 1)) + 'W10')"
+                  chip-praefix="#"
+                />
               </div>
 
               <div v-if="istSpielleitung" v-show="wuerfelModalTab === 'atmosphaere'" class="htbah-atmosphaere-modal">
@@ -1908,11 +2188,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 v-if="istSpielleitung"
                 v-show="wuerfelModalTab === 'begegnung'"
                 class="htbah-begegnung-modal text-start">
-                <p class="small text-body-secondary mb-3">
-                  Es wird ein zufälliger Eintrag aus den Zufallstabellen gezogen: meist
-                  <strong>NPC</strong> oder <strong>Bestie</strong>, in etwa 0,5&nbsp;% der Fälle eine
-                  <strong>Gottheit</strong> aus dem Pantheon (nur wenn dort Einträge existieren).
-                </p>
                 <div v-if="!begegnungHatBegegnungsEintrag" class="alert alert-info mb-0" role="status">
                   Noch keine passenden Einträge. Lege zuerst unter
                   <router-link to="/weltenbau/zufallstabellen" class="alert-link">Zufallstabellen</router-link>
@@ -1920,30 +2195,82 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                   nichts gezogen werden.
                 </div>
                 <template v-else>
-                  <icon-text-button
-                    type="button"
-                    class="btn btn-primary w-100 mb-3"
-                    icon="casino"
-                    @click="begegnungZiehen">
-                    Begegnung ziehen
-                  </icon-text-button>
+                  <div class="btn-group w-100 mb-3">
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      @click="begegnungZiehen('auto')">
+                      Begegnung ziehen
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-primary dropdown-toggle dropdown-toggle-split"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      aria-label="Begegnungstyp auswählen">
+                      <span class="visually-hidden">Menü öffnen</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end w-100">
+                      <li>
+                        <button type="button" class="dropdown-item" @click="begegnungZiehen('auto')">
+                          Zufällig (Standard)
+                        </button>
+                      </li>
+                      <li><hr class="dropdown-divider"></li>
+                      <li>
+                        <button
+                          type="button"
+                          class="dropdown-item"
+                          :disabled="!begegnungListenAusSpeicher.npcs.length"
+                          @click="begegnungZiehen('npc')">
+                          NPC ziehen
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          class="dropdown-item"
+                          :disabled="!begegnungListenAusSpeicher.bestien.length"
+                          @click="begegnungZiehen('bestie')">
+                          Bestie ziehen
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          class="dropdown-item"
+                          :disabled="!begegnungListenAusSpeicher.pantheon.length"
+                          @click="begegnungZiehen('pantheon')">
+                          Gottheit ziehen
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
                   <div
                     v-if="begegnungZiehung"
                     class="card border-0 shadow-sm overflow-hidden">
                     <div
                       class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
                       <span class="fw-semibold text-truncate me-2">{{ begegnungZiehung.zeile.name || 'Ohne Namen' }}</span>
-                      <span
-                        v-if="begegnungZiehung.typ === 'npc'"
-                        class="badge rounded-pill text-bg-primary flex-shrink-0">
-                        NPC
-                      </span>
-                      <span
-                        v-else-if="begegnungZiehung.typ === 'bestie'"
-                        class="badge rounded-pill text-bg-warning text-dark flex-shrink-0">
-                        Bestie
-                      </span>
-                      <span v-else class="badge rounded-pill text-bg-secondary flex-shrink-0">Pantheon</span>
+                      <div class="d-flex align-items-center gap-2">
+                        <span
+                          v-if="begegnungZiehung.typ === 'npc'"
+                          class="badge rounded-pill text-bg-primary flex-shrink-0">
+                          NPC
+                        </span>
+                        <span
+                          v-else-if="begegnungZiehung.typ === 'bestie'"
+                          class="badge rounded-pill text-bg-warning text-dark flex-shrink-0">
+                          Bestie
+                        </span>
+                        <span v-else class="badge rounded-pill text-bg-secondary flex-shrink-0">Pantheon</span>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-primary"
+                          @click="begegnungBearbeitenOeffnen">
+                          Bearbeiten
+                        </button>
+                      </div>
                     </div>
                     <div class="card-body p-3 htbah-begegnung-ergebnis-body small">
                       <div
@@ -1966,103 +2293,124 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                       </div>
 
                       <template v-if="begegnungZiehung.typ === 'npc'">
-                        <dl class="row mb-0">
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Spitzname</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.spitzname) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Geschlecht</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.geschlecht) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Alter</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.alter) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Familienstand</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.familienstand) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Statur</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.statur) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Lebenspunkte</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.lebenspunkte) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Gesinnung</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.gesinnung) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Glaube</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.glaube) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Beruf</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.beruf) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Fraktion</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.fraktion) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Aufenthaltsort</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.aufenthaltsort) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Ziel</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.ziel) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Stimme</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.stimme) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Waffe</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.waffe) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Schaden / Kampfart</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungNpcWaffenWerteText(begegnungZiehung.zeile) }}</dd>
-                        </dl>
-                        <div v-if="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)" class="mt-2">
-                          <div class="text-secondary mb-1">Notizen</div>
-                          <div
-                            class="zufallstabellen-richtext-vorschau"
-                            v-html="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)"></div>
+                        <div class="row g-2">
+                          <div class="col-12 col-md-6">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Stammdaten</h6>
+                              <dl class="htbah-begegnung-kompaktliste mb-0">
+                                <dt>Spitzname</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.spitzname) }}</dd>
+                                <dt>Geschlecht</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.geschlecht) }}</dd>
+                                <dt>Alter</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.alter) }}</dd>
+                                <dt>Familienstand</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.familienstand) }}</dd>
+                                <dt>Beruf</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.beruf) }}</dd>
+                                <dt>Statur</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.statur) }}</dd>
+                                <dt>Stimme</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.stimme) }}</dd>
+                              </dl>
+                            </section>
+                          </div>
+                          <div class="col-12 col-md-6">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Kampf</h6>
+                              <dl class="htbah-begegnung-kompaktliste mb-0">
+                                <dt>LP</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.lebenspunkte) }}</dd>
+                                <dt>Waffe</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.waffe) }}</dd>
+                                <dt>Schaden</dt><dd>{{ begegnungNpcWaffenWerteText(begegnungZiehung.zeile) }}</dd>
+                              </dl>
+                            </section>
+                          </div>
+                          <div class="col-12 col-md-6">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Kontext</h6>
+                              <dl class="htbah-begegnung-kompaktliste mb-0">
+                                <dt>Gesinnung</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.gesinnung) }}</dd>
+                                <dt>Glaube</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.glaube) }}</dd>
+                                <dt>Fraktion</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.fraktion) }}</dd>
+                                <dt>Ort</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.aufenthaltsort) }}</dd>
+                                <dt>Ziel</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.ziel) }}</dd>
+                              </dl>
+                            </section>
+                          </div>
+                          <div class="col-12" v-if="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Notizen</h6>
+                              <div
+                                class="zufallstabellen-richtext-vorschau"
+                                v-html="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)"></div>
+                            </section>
+                          </div>
                         </div>
                       </template>
 
                       <template v-else-if="begegnungZiehung.typ === 'bestie'">
-                        <dl class="row mb-0">
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Epoche</dt>
-                          <dd class="col-sm-8 col-lg-9">
-                            {{ begegnungBestieEpocheLabel(begegnungZiehung.zeile.epoche) }}
-                          </dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Art</dt>
-                          <dd class="col-sm-8 col-lg-9">
-                            {{ begegnungBestieKategorieLabel(begegnungZiehung.zeile.kategorie) }}
-                          </dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Angriff</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.angriff) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Verteidigung</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.verteidigung) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Lebenspunkte</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.lebenspunkte) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Aggressivität</dt>
-                          <dd class="col-sm-8 col-lg-9">
-                            {{ begegnungBestieAggressivitaetText(begegnungZiehung.zeile) }}
-                          </dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Stärken</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.staerke) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Schwächen</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.schwaeche) }}</dd>
-                        </dl>
-                        <div v-if="begegnungRichTextHtml(begegnungZiehung.zeile.beschreibungHtml)" class="mt-2">
-                          <div class="text-secondary mb-1">Beschreibung</div>
-                          <div
-                            class="zufallstabellen-richtext-vorschau"
-                            v-html="begegnungRichTextHtml(begegnungZiehung.zeile.beschreibungHtml)"></div>
+                        <div class="row g-2">
+                          <div class="col-12 col-md-6">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Stammdaten</h6>
+                              <dl class="htbah-begegnung-kompaktliste mb-0">
+                                <dt>Epoche</dt><dd>{{ begegnungBestieEpocheLabel(begegnungZiehung.zeile.epoche) }}</dd>
+                                <dt>Art</dt><dd>{{ begegnungBestieKategorieLabel(begegnungZiehung.zeile.kategorie) }}</dd>
+                                <dt>Ort</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.aufenthaltsort) }}</dd>
+                                <dt>Stärken</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.staerke) }}</dd>
+                                <dt>Schwächen</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.schwaeche) }}</dd>
+                              </dl>
+                            </section>
+                          </div>
+                          <div class="col-12 col-md-6">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Kampf</h6>
+                              <dl class="htbah-begegnung-kompaktliste mb-0">
+                                <dt>Angriff</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.angriff) }}</dd>
+                                <dt>Verteidigung</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.verteidigung) }}</dd>
+                                <dt>LP</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.lebenspunkte) }}</dd>
+                                <dt>Aggro</dt><dd>{{ begegnungBestieAggressivitaetText(begegnungZiehung.zeile) }}</dd>
+                                <dt>Waffe</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.waffe) }}</dd>
+                                <dt>Schaden</dt><dd>{{ begegnungNpcWaffenWerteText(begegnungZiehung.zeile) }}</dd>
+                              </dl>
+                            </section>
+                          </div>
+                          <div class="col-12" v-if="begegnungRichTextHtml(begegnungZiehung.zeile.beschreibungHtml)">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Notizen</h6>
+                              <div
+                                class="zufallstabellen-richtext-vorschau"
+                                v-html="begegnungRichTextHtml(begegnungZiehung.zeile.beschreibungHtml)"></div>
+                            </section>
+                          </div>
                         </div>
                       </template>
 
                       <template v-else>
-                        <dl class="row mb-0">
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Geschlecht</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.geschlecht) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Domäne</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.domaene) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Charakter</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.charakter) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Stärke</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.staerke) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Schwäche</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.schwaeche) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Schutzpatronat</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.schutzpatronat) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Verlangen</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.verlangen) }}</dd>
-                          <dt class="col-sm-4 col-lg-3 text-secondary">Mythos-Gaben</dt>
-                          <dd class="col-sm-8 col-lg-9">{{ begegnungZeileWert(begegnungZiehung.zeile.mythosGaben) }}</dd>
-                        </dl>
-                        <div v-if="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)" class="mt-2">
-                          <div class="text-secondary mb-1">Notizen</div>
-                          <div
-                            class="zufallstabellen-richtext-vorschau"
-                            v-html="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)"></div>
+                        <div class="row g-2">
+                          <div class="col-12 col-md-6">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Stammdaten</h6>
+                              <dl class="htbah-begegnung-kompaktliste mb-0">
+                                <dt>Geschlecht</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.geschlecht) }}</dd>
+                                <dt>Domäne</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.domaene) }}</dd>
+                                <dt>Charakter</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.charakter) }}</dd>
+                              </dl>
+                            </section>
+                          </div>
+                          <div class="col-12 col-md-6">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Aspekte</h6>
+                              <dl class="htbah-begegnung-kompaktliste mb-0">
+                                <dt>Stärke</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.staerke) }}</dd>
+                                <dt>Schwäche</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.schwaeche) }}</dd>
+                                <dt>Schutzpatronat</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.schutzpatronat) }}</dd>
+                                <dt>Verlangen</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.verlangen) }}</dd>
+                                <dt>Mythos-Gaben</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.mythosGaben) }}</dd>
+                              </dl>
+                            </section>
+                          </div>
+                          <div class="col-12" v-if="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)">
+                            <section class="htbah-begegnung-kompaktkarte">
+                              <h6 class="htbah-begegnung-kompaktkarte-titel">Notizen</h6>
+                              <div
+                                class="zufallstabellen-richtext-vorschau"
+                                v-html="begegnungRichTextHtml(begegnungZiehung.zeile.notizenHtml)"></div>
+                            </section>
+                          </div>
                         </div>
                       </template>
                     </div>

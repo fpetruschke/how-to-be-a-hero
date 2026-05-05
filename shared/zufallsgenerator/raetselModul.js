@@ -90,7 +90,6 @@ window.HTBAH = window.HTBAH || {};
     const buchstaben = wort.split('');
     const perm = buchstaben.slice().sort(() => Math.random() - 0.5);
     const anagramm = perm.join(' · ');
-    const aufgabeWas = `Die Gruppe soll aus verstreuten Buchstaben (hier: ${anagramm}) ein passendes Wort bilden — idealerweise mit Bezug zur Szene oder zum Ort.`;
     const aufgabenstellung = `„Vor euch liegt eine Inschrift aus losen Buchstaben: ${anagramm}. Ordnet sie so, dass ein Wort entsteht, das hier Sinn ergibt.“`;
     const html = [
       `<p><strong>Aufgabe:</strong> Aus den Buchstaben soll ein sinnvolles Wort gebildet werden: <em>${U.htmlEsc(
@@ -99,7 +98,7 @@ window.HTBAH = window.HTBAH || {};
       `<p><strong>Hinweis für die Gruppe:</strong> Es hat mit dem Ort oder dem Thema der Szene zu tun.</p>`,
       `<p><strong>Lösung (nur SL):</strong> ${U.htmlEsc(wort)}</p>`,
     ].join('');
-    return { html, aufgabeWas, aufgabenstellung };
+    return { html, aufgabenstellung };
   }
 
   function ratespielKern(epoche) {
@@ -115,14 +114,13 @@ window.HTBAH = window.HTBAH || {};
       'Es wurde von jemandem mit linkshändiger Schrift beschriftet.',
       'Es passt zu einem Lied, das in der Schenke gesungen wurde.',
     ]);
-    const aufgabeWas = `Anhand eines konkreten Fundstücks oder einer Spur (${ziel}) sollen die Spieler herausfinden, was es ist oder welche Bedeutung es für die Handlung hat — durch Raten, Kombinieren oder gezielte Fragen.`;
     const aufgabenstellung = `„Ihr entdeckt Folgendes: ${ziel}. Was fällt euch dazu ein? Ich gebe euch zwei weitere Eindrücke: (1) ${a} (2) ${b} — Was macht das mit euch?“`;
     const html = [
       `<p><strong>Aufgabe:</strong> Die Helden finden <em>${U.htmlEsc(ziel)}</em>. Was ist es — oder was bedeutet es?</p>`,
       `<p><strong>Clue 1:</strong> ${U.htmlEsc(a)}</p>`,
       `<p><strong>Clue 2:</strong> ${U.htmlEsc(b)}</p>`,
     ].join('');
-    return { html, aufgabeWas, aufgabenstellung };
+    return { html, aufgabenstellung };
   }
 
   function schlossKern(epoche) {
@@ -133,25 +131,23 @@ window.HTBAH = window.HTBAH || {};
         : k === 'gegenwart'
           ? 'Ein elektronisches Schloss akzeptiert nur die richtige PIN — Teile der Ziffern stehen auf Post-its, Visitenkarten und einem Kalenderblatt im Raum.'
           : 'Ein Schlüsselchip muss in drei Lesegeräte nacheinander — die Reihenfolge steht in einem Störsignal als Rhythmus.';
-    const aufgabeWas = `Die Helden müssen eine verschlossene Barriere öffnen: ${variant} Ziel ist Zugang ohne schwere Konsequenzen.`;
     const aufgabenstellung = `„Die Tür (oder der Behälter) weigert sich. ${variant} Findet einen Weg hinein — aber Vorsicht: ein Fehlversuch hat Folgen.“`;
     const html = [
       `<p><strong>Aufgabe:</strong> Zugang verschaffen, ohne Alarm oder Fluch auszulösen.</p>`,
       `<p>${U.htmlEsc(variant)}</p>`,
       `<p><strong>Spielleitung:</strong> Misserfolg = Lärm, Rufschaden, oder Zeitverlust — kein sofortiger Tod nötig.</p>`,
     ].join('');
-    return { html, aufgabeWas, aufgabenstellung };
+    return { html, aufgabenstellung };
   }
 
   function mechanikLichtKern(epoche) {
     const szene = zufaelligListe(Ls('MECHANIK_SZENE', epoche));
-    const aufgabeWas = `Ein physikalisches oder räumliches Puzzle: ${szene} Die Gruppe muss Objekte im Raum richtig setzen, drehen oder kombinieren, bis die Bedingung erfüllt ist.`;
     const aufgabenstellung = `„${szene} Was tut ihr? Beschreibt genau, wie ihr vorgeht — ich sage euch, was sich verändert.“`;
     const html = [
       `<p><strong>Aufgabe:</strong> ${U.htmlEsc(szene)}</p>`,
       `<p><strong>Spielleitung:</strong> Jede falsche Drehung kann ein kleines Geräusch auslösen (Patrouille rollt würfeln). Bei Erfolg: ein Klick, ein Lichtfleck, ein sich öffnender Spalt.</p>`,
     ].join('');
-    return { html, aufgabeWas, aufgabenstellung };
+    return { html, aufgabenstellung };
   }
 
   function codefolgeKern() {
@@ -166,7 +162,6 @@ window.HTBAH = window.HTBAH || {};
       'Eine der Inschriften ist absichtlich ein „Roter Hering“.',
       'Zwei Symbole sehen fast gleich aus — nur die Spitze unterscheidet sich.',
     ]);
-    const aufgabeWas = `Eine Reihe von Symbolen (${folgeStr}) ist sichtbar, aber die richtige Eingabe-/Betätigungsreihenfolge ist unklar. ${falsch}`;
     const aufgabenstellung = `„An der Wand leuchtet (oder ist eingraviert): ${folgeStr}. Ihr habt dieselben Symbole als Druckfelder oder Hebel. Was tut ihr?“`;
     const html = [
       `<p><strong>Aufgabe:</strong> Die richtige Symbolfolge eingeben: die Wand zeigt <em>${U.htmlEsc(
@@ -175,7 +170,7 @@ window.HTBAH = window.HTBAH || {};
       `<p><strong>Knackpunkt:</strong> ${U.htmlEsc(falsch)}</p>`,
       `<p><strong>Lösung (Vorschlag):</strong> Reihenfolge wie angezeigt <em>rückwärts</em> oder nach Größe der eingravierten Punkte sortieren.</p>`,
     ].join('');
-    return { html, aufgabeWas, aufgabenstellung };
+    return { html, aufgabenstellung };
   }
 
   function musterKern(epoche) {
@@ -186,13 +181,12 @@ window.HTBAH = window.HTBAH || {};
         : k === 'gegenwart'
           ? 'Drei Lichtschalter: jeder verändert den Zustand der anderen. Start: alle AUS. Ziel: nur die Mitte AN.'
           : 'Drei Energieknoten müssen gleichzeitig den gleichen „Phasenwinkel“ haben — die Konsole zeigt nur Relativwerte.';
-    const aufgabeWas = `Die Gruppe soll ein Zustands- oder Reihenfolgeproblem lösen: ${beispiel} Probierfehler sind erlaubt oder zeitlich begrenzt.`;
     const aufgabenstellung = `„${beispiel} Ihr könnt in Ruhe kombinieren — oder ich starte eine Uhr. Was macht ihr als Erstes?“`;
     const html = [
       `<p><strong>Aufgabe:</strong> ${U.htmlEsc(beispiel)}</p>`,
       `<p><strong>Spielleitung:</strong> Notiere dir eine gültige Endkonfiguration; Spieler dürfen probieren, zähle Versuche oder setze eine Belastungs-Uhr.</p>`,
     ].join('');
-    return { html, aufgabeWas, aufgabenstellung };
+    return { html, aufgabenstellung };
   }
 
   window.HTBAH.ZufallsgeneratorRaetselModul = {
@@ -234,15 +228,11 @@ window.HTBAH = window.HTBAH || {};
         kern = musterKern(epoche);
       }
 
-      const { html: kernHtml, aufgabeWas, aufgabenstellung } = kern;
+      const { html: kernHtml, aufgabenstellung } = kern;
 
       const slTipp = U.zufaellig(L.SL_TIPPS);
       const notizenHtml = [
-        `<p><strong>Schwierigkeit:</strong> ${U.htmlEsc(schwierigkeit)} · <strong>Epoche-Stimmung:</strong> ${U.htmlEsc(
-          epocheKey(epoche),
-        )}</p>`,
-        `<p><strong>Was könnte die Aufgabe sein?</strong> ${U.htmlEsc(aufgabeWas)}</p>`,
-        `<p><strong>Wie könnte die Aufgabenstellung lauten?</strong> ${U.htmlEsc(aufgabenstellung)}</p>`,
+        `<p><strong>Schwierigkeit:</strong> ${U.htmlEsc(schwierigkeit)}</p>`,
         kernHtml,
         `<p><strong>Ergebnis bei gelöstem Rätsel (Vorschlag):</strong> ${U.htmlEsc(ergebnis)}</p>`,
         `<p><strong>Tipp für die Spielleitung:</strong> ${U.htmlEsc(slTipp)}</p>`,
@@ -251,7 +241,6 @@ window.HTBAH = window.HTBAH || {};
       return {
         art,
         titel,
-        aufgabeWas,
         aufgabenstellung,
         ergebnis,
         schwierigkeit,

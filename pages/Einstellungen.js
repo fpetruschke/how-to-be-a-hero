@@ -262,7 +262,8 @@ window.HTBAH_SEITEN.Einstellungen = {
       speicherBereiche: SPEICHER_BEREICHE,
       browserSpeicher: null,
       browserSpeicherFehler: '',
-      browserSpeicherLaden: true,
+      browserSpeicherLaden: false,
+      browserSpeicherInitialErmittelt: false,
       datenExportBereiche: DATEN_EXPORT_BEREICHE,
       exportAuswahl: neueBereichsAuswahl(DATEN_EXPORT_BEREICHE),
       importAuswahl: {},
@@ -453,6 +454,7 @@ window.HTBAH_SEITEN.Einstellungen = {
     async speicherSchaetzungLaden() {
       this.browserSpeicherFehler = '';
       this.browserSpeicherLaden = true;
+      this.browserSpeicherInitialErmittelt = true;
       if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
         this.browserSpeicher = null;
         this.browserSpeicherFehler =
@@ -526,7 +528,9 @@ window.HTBAH_SEITEN.Einstellungen = {
         this.$router.push('/');
       }
 
-      this.speicherSchaetzungLaden();
+      if (this.browserSpeicherInitialErmittelt) {
+        this.speicherSchaetzungLaden();
+      }
     },
     statusAnzeigen(text, typ = 'success') {
       window.HTBAH.ui.notify({ text, typ: typ === 'danger' ? 'danger' : 'success' });
@@ -809,7 +813,9 @@ window.HTBAH_SEITEN.Einstellungen = {
       } else {
         this.statusAnzeigen('Import abgeschlossen. Ausgewählte Speicherbereiche wurden übernommen.');
       }
-      this.speicherSchaetzungLaden();
+      if (this.browserSpeicherInitialErmittelt) {
+        this.speicherSchaetzungLaden();
+      }
     },
     importiereSicherheitsmechanismenBundle(bereich) {
       let eintraege = {};
@@ -866,7 +872,6 @@ window.HTBAH_SEITEN.Einstellungen = {
   },
   mounted() {
     this.wuerfelEinstellungenLaden();
-    this.speicherSchaetzungLaden();
   },
   template: `
     <div class="container content py-3 text-center">
@@ -977,7 +982,10 @@ window.HTBAH_SEITEN.Einstellungen = {
           Geschätztes Kontingent für diese Website (localStorage, IndexedDB, Service-Worker-Caches u. a.).
           Die Werte sind ungefähr; unter HTTPS ist die Anzeige meist am zuverlässigsten.
         </p>
-        <div v-if="browserSpeicherLaden" class="small text-body-secondary">Wird geladen …</div>
+        <div v-if="!browserSpeicherInitialErmittelt" class="small text-body-secondary mb-2">
+          Werte werden erst auf Anfrage geladen.
+        </div>
+        <div v-else-if="browserSpeicherLaden" class="small text-body-secondary">Wird geladen …</div>
         <div v-else-if="browserSpeicherFehler" class="alert alert-warning py-2 mb-0 small">
           {{ browserSpeicherFehler }}
         </div>
@@ -1013,7 +1021,7 @@ window.HTBAH_SEITEN.Einstellungen = {
           icon="refresh"
           :disabled="browserSpeicherLaden"
           @click="speicherSchaetzungLaden">
-          Aktualisieren
+          {{ browserSpeicherInitialErmittelt ? 'Aktualisieren' : 'Speicherbedarf ermitteln' }}
         </icon-text-button>
       </div>
 

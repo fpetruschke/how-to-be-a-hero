@@ -119,7 +119,7 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
             </div>
             <icon-text-button
               type="button"
-              class="btn btn-primary w-100"
+              class="btn btn-primary btn-lg w-100 htbah-wuerfel-action-btn"
               icon="casino"
               @click="wuerfeln">
               1W100 würfeln

@@ -205,20 +205,6 @@ window.HTBAH_SEITEN.Weltenbau = {
     kampagnenAuswahlDeaktiviert() {
       return this.spielleiterKampagnen.length <= 1;
     },
-    geschaetzteSpeicherGroesseKb() {
-      try {
-        let n = 0;
-        for (const e of this.zustand.eintraege) {
-          if (e && typeof e.dataUrl === 'string') {
-            n += e.dataUrl.length;
-          }
-        }
-        n += Math.max(0, (this.zustand.eintraege.length + 1) * 80);
-        return Math.max(0, Math.round(n / 1024));
-      } catch {
-        return 0;
-      }
-    },
     maxRohDateiHuman() {
       return this.formatBytes(WELTENBAU_MAX_ROH_DATEI_BYTES);
     },
@@ -921,9 +907,6 @@ window.HTBAH_SEITEN.Weltenbau = {
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
           <h6 class="mb-0">Importierte Bilder</h6>
           <div class="d-flex align-items-center gap-2">
-            <span class="badge text-bg-secondary" v-if="geschaetzteSpeicherGroesseKb">
-              ca. {{ geschaetzteSpeicherGroesseKb }} KB (nur diese Seite)
-            </span>
             <button
               type="button"
               class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"

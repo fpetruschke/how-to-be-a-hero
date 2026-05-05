@@ -5,7 +5,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
   components: {
     ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
-    WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
   },
   props: {
     anlage: { type: Object, required: true },
@@ -306,12 +305,10 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         return;
       }
       const handeln = this.berechneHandelnFuerInitiative();
-      this.$refs.initiativeWuerfelbecher?.wuerfeln('1W10').then((werte) => {
-        const wurf = Array.isArray(werte) && werte.length ? Number(werte[0]) || 1 : 1;
-        const gesamt = wurf + handeln;
-        const max = 10 + handeln;
-        this.anlage.zeile.initiative = String(Math.max(1, Math.min(max, gesamt)));
-      });
+      const wurf = Math.floor(Math.random() * 10) + 1;
+      const gesamt = wurf + handeln;
+      const max = 10 + handeln;
+      this.anlage.zeile.initiative = String(Math.max(1, Math.min(max, gesamt)));
     },
     async initiativeZuruecksetzen() {
       if (!this.anlage || !this.anlage.zeile) {
@@ -396,14 +393,24 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2" @pointerdown="starteZiehen">
           <strong>{{ zeileModalTitel }}</strong>
           <div class="d-flex align-items-center gap-2">
-            <button
-              v-if="randomSichtbar"
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              :disabled="!zufallsgeneratorBereit"
-              @click="$emit('random')">
-              Zufallsvorschlag
-            </button>
+            <div v-if="randomSichtbar" class="dropdown">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                :disabled="!zufallsgeneratorBereit"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                aria-label="Aktionen">
+                ⚙️
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('random')">
+                    Zufallsvorschlag
+                  </button>
+                </li>
+              </ul>
+            </div>
             <button
               type="button"
               class="regelwerk-icon-button"
@@ -505,18 +512,20 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   </button>
                 </div>
                 <div class="mt-2">
-                  <button
+                  <icon-text-button
                     type="button"
-                    class="btn btn-outline-danger btn-sm w-100 mb-2"
+                    class="btn btn-outline-primary btn-sm w-100 mb-2"
+                    symbol="💥"
                     @click="schadenModalOeffnenFuerZeile">
-                    🎲 Schaden
-                  </button>
-                  <button
+                    Schaden
+                  </icon-text-button>
+                  <icon-text-button
                     type="button"
                     class="btn btn-outline-primary btn-sm w-100"
+                    symbol="🛡️"
                     @click="paradeModalOeffnenFuerZeile">
-                    🛡️ Parieren
-                  </button>
+                    Parieren
+                  </icon-text-button>
                 </div>
                 <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
               </div>
@@ -715,7 +724,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧩 Spiellogik</h6>
             <div class="row g-2">
-              <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.aufgabeWas" placeholder=" "></textarea><label>Was könnte die Aufgabe sein?</label></div></div>
               <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.aufgabenstellung" placeholder=" "></textarea><label>Wie könnte die Aufgabenstellung lauten?</label></div></div>
               <div class="col-12"><div class="form-floating"><textarea class="form-control" style="height:4rem" v-model="anlage.zeile.ergebnis" placeholder=" "></textarea><label>Ergebnis (Himmelsrichtung, Ort, Person, Tageszeit …)</label></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schwierigkeit" placeholder=" " /><label>Schwierigkeit</label></div></div>
@@ -726,7 +734,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
             <div class="row g-2">
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Epoche</label><select class="form-select" v-model="anlage.zeile.epoche"><option value="mittelalter">Mittelalter</option><option value="gegenwart">Gegenwart</option><option value="zukunft">Zukunft</option></select></div>
               <div class="col-md-6"><label class="form-label small text-secondary mb-1">Kategorie</label><select class="form-select" v-model="anlage.zeile.kategorie"><option value="normales_tier">Normales Tier</option><option value="fantasy_tier">Magisch / Fantasy</option><option value="mutiert">Mutiert</option><option value="monster">Monster</option></select></div>
               <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name der Bestie</label></div></div>
             </div>
@@ -770,18 +777,20 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   </button>
                 </div>
                 <div class="mt-2">
-                  <button
+                  <icon-text-button
                     type="button"
-                    class="btn btn-outline-danger btn-sm w-100 mb-2"
+                    class="btn btn-outline-primary btn-sm w-100 mb-2"
+                    symbol="💥"
                     @click="schadenModalOeffnenFuerZeile">
-                    🎲 Schaden
-                  </button>
-                  <button
+                    Schaden
+                  </icon-text-button>
+                  <icon-text-button
                     type="button"
                     class="btn btn-outline-primary btn-sm w-100"
+                    symbol="🛡️"
                     @click="paradeModalOeffnenFuerZeile">
-                    🛡️ Parieren
-                  </button>
+                    Parieren
+                  </icon-text-button>
                 </div>
                 <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
               </div>
@@ -955,7 +964,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         <div v-if="zeigtDatenTab">
         <label class="form-label mt-3 mb-1" v-if="anlage.typ === 'npc'">Notizen</label>
         <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'pantheon'">Notizen & Mythos</label>
-        <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'raetsel'">Aufgabe, Spielleitung & Notizen</label>
+        <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'raetsel'">Notizen</label>
         <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'bestie'">Lebensraum, Lebensweise und Legende</label>
         <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'ort'">Beschreibung / Notizen</label>
         <label class="form-label mt-3 mb-1" v-else>Beschreibung</label>
@@ -977,9 +986,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         </div>
         <parade-modal ref="paradeModal" />
         <schaden-modal ref="schadenModal" />
-        <div class="d-none" aria-hidden="true">
-          <wuerfelbecher-wurf ref="initiativeWuerfelbecher" modus="w10" :auto-init="false" />
-        </div>
         <div
           v-if="!modal.istVollbild"
           class="regelwerk-modal-resize-handle"

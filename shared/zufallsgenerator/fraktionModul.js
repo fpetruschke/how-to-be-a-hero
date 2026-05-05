@@ -63,7 +63,6 @@ window.HTBAH = window.HTBAH || {};
       const gesinnungVerhalten = U.zufaellig(L.GESINNUNG_VERHALTEN);
 
       const beschreibungHtml = [
-        `<p><strong>Art:</strong> ${U.htmlEsc(art)} · <strong>Epoche (Name):</strong> ${U.htmlEsc(epoche)}</p>`,
         `<p><strong>Öffentliches Bild:</strong> ${U.htmlEsc(
           U.zufaellig([
             'wird als unnahbar beschrieben',

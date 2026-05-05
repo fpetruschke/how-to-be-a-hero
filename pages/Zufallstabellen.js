@@ -106,6 +106,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       suchePantheon: '',
       sucheRaetsel: '',
       sucheBestien: '',
+      zeigeBewusstloseNpcs: true,
+      zeigeToteNpcs: true,
+      zeigeBewusstloseBestien: true,
+      zeigeToteBestien: true,
       /** Filtert alle Tabellen gleichzeitig (zusätzlich zu den Feldern pro Kategorie) */
       sucheGlobal: '',
       medienImportWarteschlange: [],
@@ -188,7 +192,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           plain('Orte', this.fraktionOrteText(z)),
           plain('Ziel', z.ziel),
           plain('Gesinnung / Verhalten', z.gesinnungVerhalten),
-          rich('Beschreibung', z.beschreibungHtml),
+          rich('Beschreibung', this.bereinigeFraktionBeschreibungHtml(z.beschreibungHtml)),
         ];
       }
       if (typ === 'npc') {
@@ -214,7 +218,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           plain('Schadenswert Nahkampf', z.schadenswertNahkampf),
           plain('Schadenswert Fernkampf', z.schadenswertFernkampf),
           plain('Initiative', z.initiative),
-          rich('Notizen', z.notizenHtml),
+          rich('Notizen', this.bereinigeNpcNotizenHtml(z.notizenHtml)),
         ];
       }
       if (typ === 'gegenstand') {
@@ -249,16 +253,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           plain('Titel / Stichwort', z.titel),
           plain('Aufenthaltsort', z.aufenthaltsort),
           plain('Gelöst', z.geloest ? 'Ja' : 'Nein'),
-          plain('Was könnte die Aufgabe sein?', z.aufgabeWas),
           plain('Wie könnte die Aufgabenstellung lauten?', z.aufgabenstellung),
           plain('Ergebnis', z.ergebnis),
           plain('Schwierigkeit', z.schwierigkeit),
-          rich('Aufgabe, Spielleitung & Notizen', z.notizenHtml),
+          rich('Notizen', this.bereinigeRaetselNotizenHtml(z.notizenHtml)),
         ];
       }
       if (typ === 'bestie') {
         return [
-          plain('Epoche', this.bestieEpocheLabel(z.epoche)),
           plain('Kategorie', this.bestieKategorieLabel(z.kategorie)),
           plain('Name', z.name),
           plain('Waffe', z.waffe),
@@ -320,10 +322,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     },
     gefilterteNpcs() {
       const q = this.normSucheText(this.sucheNpcs);
-      if (!q) {
-        return this.zustand.npcs || [];
-      }
       return (this.zustand.npcs || []).filter((row) => {
+        const status = this.lebensstatusFuerZeile(row);
+        if (status.tot && !this.zeigeToteNpcs) {
+          return false;
+        }
+        if (status.bewusstlos && !status.tot && !this.zeigeBewusstloseNpcs) {
+          return false;
+        }
+        if (!q) {
+          return true;
+        }
         const felder = [
           'name',
           'spitzname',
@@ -405,18 +414,24 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       return (this.zustand.raetsel || []).filter((row) =>
         this.trifftSucheZu(
           row,
-          ['art', 'titel', 'aufenthaltsort', 'aufgabeWas', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'geloest', 'notizenHtml'],
+          ['art', 'titel', 'aufenthaltsort', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'geloest', 'notizenHtml'],
           q,
         ),
       );
     },
     gefilterteBestien() {
       const q = this.normSucheText(this.sucheBestien);
-      if (!q) {
-        return this.zustand.bestien || [];
-      }
       return (this.zustand.bestien || []).filter((row) => {
-        const ep = this.bestieEpocheLabel(row.epoche);
+        const status = this.lebensstatusFuerZeile(row);
+        if (status.tot && !this.zeigeToteBestien) {
+          return false;
+        }
+        if (status.bewusstlos && !status.tot && !this.zeigeBewusstloseBestien) {
+          return false;
+        }
+        if (!q) {
+          return true;
+        }
         const kat = this.bestieKategorieLabel(row.kategorie);
         return this.trifftSucheZu(
           row,
@@ -436,7 +451,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             'beschreibungHtml',
           ],
           q,
-          `${ep} ${kat}`,
+          kat,
         );
       });
     },
@@ -552,7 +567,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return base;
       }
       return base.filter((row) =>
-        this.trifftSucheZu(row, ['art', 'titel', 'aufenthaltsort', 'aufgabeWas', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'geloest', 'notizenHtml'], gq),
+        this.trifftSucheZu(row, ['art', 'titel', 'aufenthaltsort', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'geloest', 'notizenHtml'], gq),
       );
     },
     anzeigeBestien() {
@@ -562,13 +577,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return base;
       }
       return base.filter((row) => {
-        const ep = this.bestieEpocheLabel(row.epoche);
         const kat = this.bestieKategorieLabel(row.kategorie);
         return this.trifftSucheZu(
           row,
           ['name', 'angriff', 'verteidigung', 'lebenspunkte', 'handeln', 'wissen', 'soziales', 'aufenthaltsort', 'initiative', 'staerke', 'schwaeche', 'geheimnis', 'beschreibungHtml'],
           gq,
-          `${ep} ${kat}`,
+          kat,
         );
       });
     },
@@ -779,12 +793,96 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     persist() {
       window.HTBAH.speichereZufallstabellenZustand(this.zustand);
     },
+    typSingularAusTabellenTyp(tabellenTyp) {
+      const map = {
+        npcs: 'npc',
+        orte: 'ort',
+        gegenstaende: 'gegenstand',
+        fraktionen: 'fraktion',
+        pantheon: 'pantheon',
+        raetsel: 'raetsel',
+        bestien: 'bestie',
+      };
+      return map[tabellenTyp] || '';
+    },
+    entitaetLayoutKeyPasstZuTypUndId(layoutKey, typ, id) {
+      const key = String(layoutKey || '').trim();
+      const entitaetId = String(id || '').trim();
+      if (!key || !typ || !entitaetId) {
+        return false;
+      }
+      if (typ === 'fraktion') {
+        return key === `fraktion:${entitaetId}` || key.startsWith(`fraktion:${entitaetId}:`);
+      }
+      return key === `${typ}:${entitaetId}`;
+    },
+    bereinigeWeltenbauMapFeld(weltenbauMap, entitaeten) {
+      if (!weltenbauMap || typeof weltenbauMap !== 'object') {
+        return { map: {}, geaendert: false };
+      }
+      let geaendert = false;
+      const bereinigt = Object.fromEntries(
+        Object.entries(weltenbauMap).map(([gruppeKey, gruppeWert]) => {
+          if (!gruppeWert || typeof gruppeWert !== 'object') {
+            return [gruppeKey, gruppeWert];
+          }
+          const altEintraege = Object.entries(gruppeWert);
+          const neuEintraege = altEintraege.filter(([layoutKey]) => !entitaeten.some(({ typ, id }) => this.entitaetLayoutKeyPasstZuTypUndId(layoutKey, typ, id)));
+          if (neuEintraege.length !== altEintraege.length) {
+            geaendert = true;
+          }
+          return [gruppeKey, Object.fromEntries(neuEintraege)];
+        }),
+      );
+      return { map: bereinigt, geaendert };
+    },
+    bereinigeWeltenbauLayoutdaten(entitaetenRoh) {
+      const entitaeten = (Array.isArray(entitaetenRoh) ? entitaetenRoh : [])
+        .map((eintrag) => ({
+          typ: String(eintrag && eintrag.typ ? eintrag.typ : '').trim(),
+          id: String(eintrag && eintrag.id ? eintrag.id : '').trim(),
+        }))
+        .filter((eintrag) => !!eintrag.typ && !!eintrag.id);
+      if (!entitaeten.length) {
+        return;
+      }
+      const wb = window.HTBAH.ladeWeltenbauZustand();
+      const layouts = this.bereinigeWeltenbauMapFeld(wb.mapLayouts, entitaeten);
+      const bildLayouts = this.bereinigeWeltenbauMapFeld(wb.mapBildLayouts, entitaeten);
+      const locks = this.bereinigeWeltenbauMapFeld(wb.mapElementLocks, entitaeten);
+      if (!layouts.geaendert && !bildLayouts.geaendert && !locks.geaendert) {
+        return;
+      }
+      wb.mapLayouts = layouts.map;
+      wb.mapBildLayouts = bildLayouts.map;
+      wb.mapElementLocks = locks.map;
+      window.HTBAH.speichereWeltenbauZustand(wb);
+    },
     textVorschau(html) {
       return htbahTextVorschau(html);
     },
     richTextHtml(html) {
       const inhalt = typeof html === 'string' ? html : '';
       return htbahHtmlText(inhalt) ? inhalt : '';
+    },
+    bereinigeFraktionBeschreibungHtml(html) {
+      const inhalt = typeof html === 'string' ? html : '';
+      return inhalt.replace(/<p><strong>Art:<\/strong>[\s\S]*?<\/p>/gi, '').trim();
+    },
+    bereinigeNpcNotizenHtml(html) {
+      const inhalt = typeof html === 'string' ? html : '';
+      return inhalt
+        .replace(/<p><strong>Lebenspunkte:<\/strong>[\s\S]*?<\/p>/gi, '')
+        .replace(/<p><strong>Waffe:<\/strong>[\s\S]*?<\/p>/gi, '')
+        .trim();
+    },
+    bereinigeRaetselNotizenHtml(html) {
+      const inhalt = typeof html === 'string' ? html : '';
+      return inhalt
+        .replace(/<p><strong>Schwierigkeit:<\/strong>[\s\S]*?Epoche-Stimmung:[\s\S]*?<\/p>/gi, '')
+        .replace(/<p><strong>Was könnte die Aufgabe sein\?<\/strong>[\s\S]*?<\/p>/gi, '')
+        .replace(/<p><strong>Wie könnte die Aufgabenstellung lauten\?<\/strong>[\s\S]*?<\/p>/gi, '')
+        .trim();
     },
     normSucheText(wert) {
       return String(wert || '')
@@ -878,7 +976,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     statusZeilenKlasse(row) {
       const status = this.lebensstatusFuerZeile(row);
       if (status.tot) {
-        return 'table-secondary text-body-secondary';
+        return 'table-error';
       }
       if (status.bewusstlos) {
         return 'table-warning';
@@ -888,10 +986,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     statusCardKlasse(row) {
       const status = this.lebensstatusFuerZeile(row);
       if (status.tot) {
-        return 'bg-secondary-subtle text-body-secondary border-secondary-subtle';
+        return 'zufall-status-error';
       }
       if (status.bewusstlos) {
-        return 'bg-warning-subtle border-warning-subtle';
+        return 'zufall-status-warning';
       }
       return '';
     },
@@ -1244,15 +1342,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       return teile.join(' · ');
     },
-    bestieEpocheLabel(epoche) {
-      if (epoche === 'gegenwart') {
-        return 'Gegenwart';
-      }
-      if (epoche === 'zukunft') {
-        return 'Zukunft';
-      }
-      return 'Mittelalter';
-    },
     bestieKategorieLabel(kategorie) {
       if (kategorie === 'fantasy_tier') {
         return 'Magisch / Fantasy';
@@ -1442,7 +1531,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         art: '',
         titel: '',
         aufenthaltsort: '',
-        aufgabeWas: '',
         aufgabenstellung: '',
         ergebnis: '',
         schwierigkeit: '',
@@ -1455,7 +1543,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     bestieLeer() {
       return {
         id: window.HTBAH.neueEntropieId(),
-        epoche: 'mittelalter',
         kategorie: 'normales_tier',
         name: '',
         waffe: '',
@@ -1807,7 +1894,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.zuLoeschendeZeile = { typ, id };
       this.$refs.zufallstabellenBestaetigen.oeffnen({
         titel: 'Zeile löschen?',
-        beschreibung: 'Diese Tabellenzeile wird entfernt.',
+        beschreibung:
+          'Diese Tabellenzeile wird entfernt <strong>und auch aus der interaktiven Welt gelöscht</strong>. Gespeicherte Position, Größe und Drehung werden ebenfalls bereinigt.',
         onBestaetigen: () => this.zeileLoeschenAusfuehren(),
       });
     },
@@ -1837,6 +1925,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const i = liste.findIndex((r) => r.id === id);
       if (i !== -1) {
         liste.splice(i, 1);
+        this.bereinigeWeltenbauLayoutdaten([{ typ, id }]);
         this.persist();
       }
     },
@@ -1911,22 +2000,37 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       };
       this.$refs.zufallstabellenBestaetigen.oeffnen({
         titel: `${labels[typ] || 'Tabelle'} leeren?`,
-        beschreibung: 'Alle Einträge in dieser Tabelle werden entfernt.',
+        beschreibung:
+          'Alle Einträge in dieser Tabelle werden entfernt <strong>und auch aus der interaktiven Welt gelöscht</strong>. Gespeicherte Positionen, Größen und Drehungen werden ebenfalls bereinigt.',
         onBestaetigen: () => {
+          const singularTyp = this.typSingularAusTabellenTyp(typ);
+          let zuBereinigendeIds = [];
           if (typ === 'npcs') {
+            zuBereinigendeIds = (this.zustand.npcs || []).map((row) => row && row.id).filter(Boolean);
             this.zustand.npcs = [];
           } else if (typ === 'orte') {
+            zuBereinigendeIds = (this.zustand.orte || []).map((row) => row && row.id).filter(Boolean);
             this.zustand.orte = [];
           } else if (typ === 'gegenstaende') {
+            zuBereinigendeIds = (this.zustand.gegenstaende || []).map((row) => row && row.id).filter(Boolean);
             this.zustand.gegenstaende = [];
           } else if (typ === 'fraktionen') {
+            zuBereinigendeIds = (this.zustand.fraktionen || []).map((row) => row && row.id).filter(Boolean);
             this.zustand.fraktionen = [];
           } else if (typ === 'pantheon') {
+            zuBereinigendeIds = (this.zustand.pantheon || []).map((row) => row && row.id).filter(Boolean);
             this.zustand.pantheon = [];
           } else if (typ === 'raetsel') {
+            zuBereinigendeIds = (this.zustand.raetsel || []).map((row) => row && row.id).filter(Boolean);
             this.zustand.raetsel = [];
           } else if (typ === 'bestien') {
+            zuBereinigendeIds = (this.zustand.bestien || []).map((row) => row && row.id).filter(Boolean);
             this.zustand.bestien = [];
+          }
+          if (singularTyp && zuBereinigendeIds.length) {
+            this.bereinigeWeltenbauLayoutdaten(
+              zuBereinigendeIds.map((id) => ({ typ: singularTyp, id })),
+            );
           }
           this.persist();
         },
@@ -2039,21 +2143,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     <span v-else>—</span>
                   </td>
                   <td class="text-end text-nowrap" @click.stop>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary me-1"
-                      @click="galerieFuerZeileOeffnen(row)">
-                      Medien ({{ medienAnzahl(row) }})
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-primary me-1"
-                      @click="ortBearbeiten(row, indexNachId(zustand.orte, row.id))">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('ort', row.id)">
-                      Löschen
-                    </button>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                        ⚙️
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                        <li><button type="button" class="dropdown-item" @click="ortBearbeiten(row, indexNachId(zustand.orte, row.id))">Bearbeiten</button></li>
+                        <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('ort', row.id)">Löschen</button></li>
+                      </ul>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -2094,19 +2193,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2" @click.stop>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary flex-fill"
-                    @click="ortBearbeiten(row, indexNachId(zustand.orte, row.id))">
-                    Bearbeiten
+                <div class="dropdown" @click.stop>
+                  <button type="button" class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                    ⚙️
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger flex-fill"
-                    @click="zeileLoeschenDialog('ort', row.id)">
-                    Löschen
-                  </button>
+                  <ul class="dropdown-menu w-100">
+                    <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                    <li><button type="button" class="dropdown-item" @click="ortBearbeiten(row, indexNachId(zustand.orte, row.id))">Bearbeiten</button></li>
+                    <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('ort', row.id)">Löschen</button></li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -2173,25 +2268,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                       v-if="zeilenWertAlsText(row.beschreibungHtml)"
                       class="htbah-zufall-rich-preview"
                       @click.stop="onRichTextLinkClick($event)"
-                      v-html="richTextHtml(row.beschreibungHtml)"></div>
+                      v-html="richTextHtml(bereinigeFraktionBeschreibungHtml(row.beschreibungHtml))"></div>
                     <span v-else>—</span>
                   </td>
                   <td class="text-end text-nowrap" @click.stop>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary me-1"
-                      @click="galerieFuerZeileOeffnen(row)">
-                      Medien ({{ medienAnzahl(row) }})
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-primary me-1"
-                      @click="fraktionBearbeiten(row, indexNachId(zustand.fraktionen, row.id))">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('fraktion', row.id)">
-                      Löschen
-                    </button>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                        ⚙️
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                        <li><button type="button" class="dropdown-item" @click="fraktionBearbeiten(row, indexNachId(zustand.fraktionen, row.id))">Bearbeiten</button></li>
+                        <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('fraktion', row.id)">Löschen</button></li>
+                      </ul>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -2228,21 +2318,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-if="zeilenWertAlsText(row.beschreibungHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
                   @click.stop="onRichTextLinkClick($event)"
-                  v-html="richTextHtml(row.beschreibungHtml)"></div>
+                  v-html="richTextHtml(bereinigeFraktionBeschreibungHtml(row.beschreibungHtml))"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2" @click.stop>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary flex-fill"
-                    @click="fraktionBearbeiten(row, indexNachId(zustand.fraktionen, row.id))">
-                    Bearbeiten
+                <div class="dropdown" @click.stop>
+                  <button type="button" class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                    ⚙️
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger flex-fill"
-                    @click="zeileLoeschenDialog('fraktion', row.id)">
-                    Löschen
-                  </button>
+                  <ul class="dropdown-menu w-100">
+                    <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                    <li><button type="button" class="dropdown-item" @click="fraktionBearbeiten(row, indexNachId(zustand.fraktionen, row.id))">Bearbeiten</button></li>
+                    <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('fraktion', row.id)">Löschen</button></li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -2274,6 +2360,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               type="search"
               class="form-control form-control-sm"
               placeholder="NPCs durchsuchen…" />
+            <div class="d-flex flex-wrap gap-3 mt-2 small">
+              <div class="form-check m-0">
+                <input id="zst-npc-filter-bewusstlos" class="form-check-input" type="checkbox" v-model="zeigeBewusstloseNpcs" />
+                <label class="form-check-label" for="zst-npc-filter-bewusstlos">Bewusstlose anzeigen</label>
+              </div>
+              <div class="form-check m-0">
+                <input id="zst-npc-filter-tot" class="form-check-input" type="checkbox" v-model="zeigeToteNpcs" />
+                <label class="form-check-label" for="zst-npc-filter-tot">Tote anzeigen</label>
+              </div>
+            </div>
           </div>
           <div class="table-responsive d-none d-md-block">
             <table class="table table-sm table-striped mb-0 align-middle">
@@ -2340,37 +2436,22 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                       v-if="zeilenWertAlsText(row.notizenHtml)"
                       class="htbah-zufall-rich-preview"
                       @click.stop="onRichTextLinkClick($event)"
-                      v-html="richTextHtml(row.notizenHtml)"></div>
+                      v-html="richTextHtml(bereinigeNpcNotizenHtml(row.notizenHtml))"></div>
                     <span v-else>—</span>
                   </td>
                   <td class="text-end text-nowrap" @click.stop>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-danger me-1"
-                      @click="schadenWuerfelnFuerEntitaet(row, 'npc')">
-                      Schaden
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-info me-1"
-                      @click="paradeWuerfelnFuerEntitaet(row, 'npc')">
-                      Parieren
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary me-1"
-                      @click="galerieFuerZeileOeffnen(row)">
-                      Medien ({{ medienAnzahl(row) }})
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-primary me-1"
-                      @click="npcBearbeiten(row, indexNachId(zustand.npcs, row.id))">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('npc', row.id)">
-                      Löschen
-                    </button>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                        ⚙️
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'npc')">Schaden</button></li>
+                        <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'npc')">Parieren</button></li>
+                        <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                        <li><button type="button" class="dropdown-item" @click="npcBearbeiten(row, indexNachId(zustand.npcs, row.id))">Bearbeiten</button></li>
+                        <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('npc', row.id)">Löschen</button></li>
+                      </ul>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -2415,35 +2496,19 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-if="zeilenWertAlsText(row.notizenHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
                   @click.stop="onRichTextLinkClick($event)"
-                  v-html="richTextHtml(row.notizenHtml)"></div>
+                  v-html="richTextHtml(bereinigeNpcNotizenHtml(row.notizenHtml))"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2" @click.stop>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger flex-fill"
-                    @click="schadenWuerfelnFuerEntitaet(row, 'npc')">
-                    🎲 Schaden
+                <div class="dropdown mt-2" @click.stop>
+                  <button type="button" class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                    ⚙️
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-info flex-fill"
-                    @click="paradeWuerfelnFuerEntitaet(row, 'npc')">
-                    🛡️ Parade
-                  </button>
-                </div>
-                <div class="d-flex gap-2 mt-2" @click.stop>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary flex-fill"
-                    @click="npcBearbeiten(row, indexNachId(zustand.npcs, row.id))">
-                    Bearbeiten
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger flex-fill"
-                    @click="zeileLoeschenDialog('npc', row.id)">
-                    Löschen
-                  </button>
+                  <ul class="dropdown-menu w-100">
+                    <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'npc')">Schaden</button></li>
+                    <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'npc')">Parieren</button></li>
+                    <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                    <li><button type="button" class="dropdown-item" @click="npcBearbeiten(row, indexNachId(zustand.npcs, row.id))">Bearbeiten</button></li>
+                    <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('npc', row.id)">Löschen</button></li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -2453,7 +2518,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
 
       <div class="card mb-3 text-start">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">📦 Gegenstände</span>
+          <span class="fw-semibold htbah-zufall-karten-titel">
+            <span class="material-symbols-outlined" aria-hidden="true">deployed_code</span>
+            Gegenstände
+          </span>
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('gegenstaende')">
               Leeren
@@ -2510,33 +2578,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     <span v-else>—</span>
                   </td>
                   <td class="text-end text-nowrap" @click.stop>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-danger me-1"
-                      @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">
-                      Schaden
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-info me-1"
-                      @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">
-                      Parieren
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary me-1"
-                      @click="galerieFuerZeileOeffnen(row)">
-                      Medien ({{ medienAnzahl(row) }})
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-primary me-1"
-                      @click="gegenstandBearbeiten(row, indexNachId(zustand.gegenstaende, row.id))">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">
-                      Löschen
-                    </button>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                        ⚙️
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                        <li><button type="button" class="dropdown-item" @click="gegenstandBearbeiten(row, indexNachId(zustand.gegenstaende, row.id))">Bearbeiten</button></li>
+                        <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">Löschen</button></li>
+                      </ul>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -2572,33 +2623,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.beschreibungHtml)"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2" @click.stop>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger flex-fill"
-                    @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">
-                    🎲 Schaden
+                <div class="dropdown mt-2" @click.stop>
+                  <button type="button" class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                    ⚙️
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-info flex-fill"
-                    @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">
-                    🛡️ Parade
-                  </button>
-                </div>
-                <div class="d-flex gap-2 mt-2" @click.stop>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary flex-fill"
-                    @click="gegenstandBearbeiten(row, indexNachId(zustand.gegenstaende, row.id))">
-                    Bearbeiten
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger flex-fill"
-                    @click="zeileLoeschenDialog('gegenstand', row.id)">
-                    Löschen
-                  </button>
+                  <ul class="dropdown-menu w-100">
+                    <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                    <li><button type="button" class="dropdown-item" @click="gegenstandBearbeiten(row, indexNachId(zustand.gegenstaende, row.id))">Bearbeiten</button></li>
+                    <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">Löschen</button></li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -2674,25 +2707,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                       v-if="zeilenWertAlsText(row.notizenHtml)"
                       class="htbah-zufall-rich-preview"
                       @click.stop="onRichTextLinkClick($event)"
-                      v-html="richTextHtml(row.notizenHtml)"></div>
+                      v-html="richTextHtml(bereinigeRaetselNotizenHtml(row.notizenHtml))"></div>
                     <span v-else>—</span>
                   </td>
                   <td class="text-end text-nowrap" @click.stop>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary me-1"
-                      @click="galerieFuerZeileOeffnen(row)">
-                      Medien ({{ medienAnzahl(row) }})
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-primary me-1"
-                      @click="pantheonBearbeiten(row, indexNachId(zustand.pantheon, row.id))">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('pantheon', row.id)">
-                      Löschen
-                    </button>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                        ⚙️
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                        <li><button type="button" class="dropdown-item" @click="pantheonBearbeiten(row, indexNachId(zustand.pantheon, row.id))">Bearbeiten</button></li>
+                        <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('pantheon', row.id)">Löschen</button></li>
+                      </ul>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -2728,21 +2756,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-if="zeilenWertAlsText(row.notizenHtml)"
                   class="small mb-2 zufallstabellen-richtext-vorschau"
                   @click.stop="onRichTextLinkClick($event)"
-                  v-html="richTextHtml(row.notizenHtml)"></div>
+                  v-html="richTextHtml(bereinigeRaetselNotizenHtml(row.notizenHtml))"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2" @click.stop>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary flex-fill"
-                    @click="pantheonBearbeiten(row, indexNachId(zustand.pantheon, row.id))">
-                    Bearbeiten
+                <div class="dropdown" @click.stop>
+                  <button type="button" class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                    ⚙️
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger flex-fill"
-                    @click="zeileLoeschenDialog('pantheon', row.id)">
-                    Löschen
-                  </button>
+                  <ul class="dropdown-menu w-100">
+                    <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                    <li><button type="button" class="dropdown-item" @click="pantheonBearbeiten(row, indexNachId(zustand.pantheon, row.id))">Bearbeiten</button></li>
+                    <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('pantheon', row.id)">Löschen</button></li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -2783,7 +2807,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <th>Titel</th>
                   <th>Ort</th>
                   <th>Status</th>
-                  <th>Was ist die Aufgabe?</th>
                   <th>Aufgabenstellung</th>
                   <th>Ergebnis</th>
                   <th>Schwierigkeit</th>
@@ -2793,7 +2816,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeRaetsel.length">
-                  <td colspan="10" class="text-secondary text-center py-3">
+                  <td colspan="9" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.raetsel || []).length, sucheRaetsel) }}
                   </td>
                 </tr>
@@ -2811,7 +2834,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     </span>
                     <span v-else>—</span>
                   </td>
-                  <td class="small">{{ textVorschau(row.aufgabeWas, 56) }}</td>
                   <td class="small">{{ textVorschau(row.aufgabenstellung, 56) }}</td>
                   <td class="small">{{ karteWert(row.ergebnis) }}</td>
                   <td class="small">{{ karteWert(row.schwierigkeit) }}</td>
@@ -2824,21 +2846,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     <span v-else>—</span>
                   </td>
                   <td class="text-end text-nowrap" @click.stop>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary me-1"
-                      @click="galerieFuerZeileOeffnen(row)">
-                      Medien ({{ medienAnzahl(row) }})
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-primary me-1"
-                      @click="raetselBearbeiten(row, indexNachId(zustand.raetsel, row.id))">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('raetsel', row.id)">
-                      Löschen
-                    </button>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                        ⚙️
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                        <li><button type="button" class="dropdown-item" @click="raetselBearbeiten(row, indexNachId(zustand.raetsel, row.id))">Bearbeiten</button></li>
+                        <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('raetsel', row.id)">Löschen</button></li>
+                      </ul>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -2863,7 +2880,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   </span>
                   <span v-else>Offen</span>
                 </div>
-                <div class="small"><span class="text-secondary">Aufgabe:</span> {{ textVorschau(row.aufgabeWas, 96) }}</div>
                 <div class="small"><span class="text-secondary">Formulierung:</span> {{ textVorschau(row.aufgabenstellung, 96) }}</div>
                 <div class="small"><span class="text-secondary">Ergebnis:</span> {{ karteWert(row.ergebnis) }}</div>
                 <div class="small mb-2">
@@ -2886,19 +2902,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.notizenHtml)"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2" @click.stop>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary flex-fill"
-                    @click="raetselBearbeiten(row, indexNachId(zustand.raetsel, row.id))">
-                    Bearbeiten
+                <div class="dropdown" @click.stop>
+                  <button type="button" class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                    ⚙️
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger flex-fill"
-                    @click="zeileLoeschenDialog('raetsel', row.id)">
-                    Löschen
-                  </button>
+                  <ul class="dropdown-menu w-100">
+                    <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                    <li><button type="button" class="dropdown-item" @click="raetselBearbeiten(row, indexNachId(zustand.raetsel, row.id))">Bearbeiten</button></li>
+                    <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('raetsel', row.id)">Löschen</button></li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -2908,7 +2920,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
 
       <div class="card mb-3 text-start">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">🦁 Bestarium</span>
+          <span class="fw-semibold htbah-zufall-karten-titel">
+            <span class="material-symbols-outlined" aria-hidden="true">pets</span>
+            Bestarium
+          </span>
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('bestien')">
               Leeren
@@ -2930,12 +2945,21 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               type="search"
               class="form-control form-control-sm"
               placeholder="Bestien durchsuchen…" />
+            <div class="d-flex flex-wrap gap-3 mt-2 small">
+              <div class="form-check m-0">
+                <input id="zst-bestie-filter-bewusstlos" class="form-check-input" type="checkbox" v-model="zeigeBewusstloseBestien" />
+                <label class="form-check-label" for="zst-bestie-filter-bewusstlos">Bewusstlose anzeigen</label>
+              </div>
+              <div class="form-check m-0">
+                <input id="zst-bestie-filter-tot" class="form-check-input" type="checkbox" v-model="zeigeToteBestien" />
+                <label class="form-check-label" for="zst-bestie-filter-tot">Tote anzeigen</label>
+              </div>
+            </div>
           </div>
           <div class="table-responsive d-none d-md-block">
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
-                  <th>Epoche</th>
                   <th>Art</th>
                   <th>Name</th>
                   <th>Angriff</th>
@@ -2952,7 +2976,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeBestien.length">
-                  <td colspan="13" class="text-secondary text-center py-3">
+                  <td colspan="12" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.bestien || []).length, sucheBestien) }}
                   </td>
                 </tr>
@@ -2962,7 +2986,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   class="zufallstabellen-tabellenzeile-klickbar"
                   :class="statusZeilenKlasse(row)"
                   @click="detailAnsichtOeffnen('bestie', row)">
-                  <td class="small text-nowrap">{{ bestieEpocheLabel(row.epoche) }}</td>
                   <td class="small">{{ bestieKategorieLabel(row.kategorie) }}</td>
                   <td>
                     {{ karteWert(row.name) }}
@@ -2988,21 +3011,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     <span v-else>—</span>
                   </td>
                   <td class="text-end text-nowrap" @click.stop>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary me-1"
-                      @click="galerieFuerZeileOeffnen(row)">
-                      Medien ({{ medienAnzahl(row) }})
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-primary me-1"
-                      @click="bestieBearbeiten(row, indexNachId(zustand.bestien, row.id))">
-                      Bearbeiten
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="zeileLoeschenDialog('bestie', row.id)">
-                      Löschen
-                    </button>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                        ⚙️
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">Schaden</button></li>
+                        <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">Parieren</button></li>
+                        <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                        <li><button type="button" class="dropdown-item" @click="bestieBearbeiten(row, indexNachId(zustand.bestien, row.id))">Bearbeiten</button></li>
+                        <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('bestie', row.id)">Löschen</button></li>
+                      </ul>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -3025,7 +3045,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   </span>
                   <span v-if="statusEmoji(row)">{{ statusEmoji(row) }}</span>
                 </div>
-                <div class="small"><span class="text-secondary">Epoche:</span> {{ bestieEpocheLabel(row.epoche) }}</div>
                 <div class="small"><span class="text-secondary">Art:</span> {{ bestieKategorieLabel(row.kategorie) }}</div>
                 <div class="small"><span class="text-secondary">Ort:</span> {{ karteWert(row.aufenthaltsort) }}</div>
                 <div class="small"><span class="text-secondary">Begabungen:</span> {{ begabungswerteKurzText(row) }}</div>
@@ -3059,19 +3078,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   @click.stop="onRichTextLinkClick($event)"
                   v-html="richTextHtml(row.beschreibungHtml)"></div>
                 <div v-else class="small mb-2">—</div>
-                <div class="d-flex gap-2" @click.stop>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary flex-fill"
-                    @click="bestieBearbeiten(row, indexNachId(zustand.bestien, row.id))">
-                    Bearbeiten
+                <div class="dropdown mt-2" @click.stop>
+                  <button type="button" class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                    ⚙️
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger flex-fill"
-                    @click="zeileLoeschenDialog('bestie', row.id)">
-                    Löschen
-                  </button>
+                  <ul class="dropdown-menu w-100">
+                    <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">Schaden</button></li>
+                    <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">Parieren</button></li>
+                    <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                    <li><button type="button" class="dropdown-item" @click="bestieBearbeiten(row, indexNachId(zustand.bestien, row.id))">Bearbeiten</button></li>
+                    <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('bestie', row.id)">Löschen</button></li>
+                  </ul>
                 </div>
               </div>
             </div>

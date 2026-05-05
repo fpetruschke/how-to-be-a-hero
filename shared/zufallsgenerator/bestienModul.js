@@ -205,7 +205,6 @@ window.HTBAH = window.HTBAH || {};
         kategorieLabel: katLabels[kategorie] || 'Bestie',
       });
       return {
-        epoche,
         kategorie,
         name,
         waffe: U.zufaellig(['Klauen', 'Biss', 'Stachel', 'Magischer Stoß', 'Schweifhieb']),

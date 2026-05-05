@@ -246,11 +246,9 @@ window.HTBAH = window.HTBAH || {};
       const notizenHtml = [
         `<p><strong>Eindruck:</strong> ${U.htmlEsc(U.zufaellig(L.EINDRUCK))}.</p>`,
         `<p><strong>Merkmal:</strong> ${U.htmlEsc(U.zufaellig(L.MERKMAL))}.</p>`,
-        `<p><strong>Lebenspunkte:</strong> ${U.htmlEsc(lebenspunkte)}.</p>`,
         `<p><strong>Waffenloser Nahkampf (Fäuste, Tritte):</strong> ${U.htmlEsc(schadenWaffenlos)}.</p>`,
         `<p><strong>Stimme:</strong> ${U.htmlEsc(stimme)}.</p>`,
         `<p><strong>Geheimnis:</strong> ${U.htmlEsc(geheimnis)}.</p>`,
-        `<p><strong>Waffe:</strong> ${U.htmlEsc(waffe.name)}${waffenwerte.schadenswertNahkampf ? ` · Nahkampf ${U.htmlEsc(waffenwerte.schadenswertNahkampf)}` : ''}${waffenwerte.schadenswertFernkampf ? ` · Fernkampf ${U.htmlEsc(waffenwerte.schadenswertFernkampf)}` : ''}.</p>`,
       ].join('');
 
       return {

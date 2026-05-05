@@ -100,6 +100,7 @@ var HTBAH_REFACTOR_UTILS =
           pendingBefore: null,
           zoomCommitTimer: 0,
           mapScaleSpeicherTimer: 0,
+          ortBildLayoutSpeicherTimer: 0,
         },
         nodeDrag: {
           aktiv: false,
@@ -2152,8 +2153,13 @@ var HTBAH_REFACTOR_UTILS =
             angleDeg,
           },
         };
+        this.planeOrtBildLayoutsPersistieren();
       },
       persistiereLokaleOrtBildLayouts() {
+        if (this.verlauf.ortBildLayoutSpeicherTimer) {
+          window.clearTimeout(this.verlauf.ortBildLayoutSpeicherTimer);
+          this.verlauf.ortBildLayoutSpeicherTimer = 0;
+        }
         const gruppeKey = this.gruppeId || 'default';
         const alleLayouts = this.ladeBildLayouts();
         this.speichereBildLayouts({
@@ -2974,9 +2980,22 @@ var HTBAH_REFACTOR_UTILS =
           window.clearTimeout(this.verlauf.mapScaleSpeicherTimer);
           this.verlauf.mapScaleSpeicherTimer = 0;
         }
+        if (this.verlauf.ortBildLayoutSpeicherTimer) {
+          window.clearTimeout(this.verlauf.ortBildLayoutSpeicherTimer);
+          this.verlauf.ortBildLayoutSpeicherTimer = 0;
+        }
         this.verlauf.undoStack = [];
         this.verlauf.redoStack = [];
         this.verlauf.pendingBefore = null;
+      },
+      planeOrtBildLayoutsPersistieren() {
+        if (this.verlauf.ortBildLayoutSpeicherTimer) {
+          window.clearTimeout(this.verlauf.ortBildLayoutSpeicherTimer);
+        }
+        this.verlauf.ortBildLayoutSpeicherTimer = window.setTimeout(() => {
+          this.verlauf.ortBildLayoutSpeicherTimer = 0;
+          this.persistiereLokaleOrtBildLayouts();
+        }, 120);
       },
       starteVerlaufAktion() {
         if (!this.verlauf.pendingBefore) {
