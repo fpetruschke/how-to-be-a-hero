@@ -543,6 +543,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
           <charakter
             :key="aktivesMitglied.id"
             :spielleiter-mitglied="aktivesMitglied"
+            :aktive-kampagne-id="kampagneId"
             :on-spielleiter-persist="persist"
           />
         </div>

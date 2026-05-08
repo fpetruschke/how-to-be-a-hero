@@ -119,6 +119,7 @@ const SPEICHER_BEREICHE = {
       'htbah_dice_colors',
       'htbah_wuerfel_beutel_fenster',
       'htbah_wuerfelbecher_bundle',
+      'htbah_orientation_mode',
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
@@ -276,6 +277,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       wuerfelFarbeZehner: '#3b7a36',
       wuerfelAudioStumm: false,
       wuerfelAudioLautstaerke: 0.88,
+      orientierungModus: 'frei',
     };
   },
   computed: {
@@ -416,6 +418,12 @@ window.HTBAH_SEITEN.Einstellungen = {
     themeUmschalten() {
       const neuesTheme = this.istHellesTheme ? 'light' : 'dark';
       window.HTBAH.setzeTheme(neuesTheme);
+    },
+    setzeOrientierungModus(modus) {
+      if (!window.HTBAH || typeof window.HTBAH.speichereOrientierungModus !== 'function') {
+        return;
+      }
+      this.orientierungModus = window.HTBAH.speichereOrientierungModus(modus);
     },
     wuerfelEinstellungenLaden() {
       const anzeige = window.HTBAH.ladeWuerfelAnzeigeProfil();
@@ -872,6 +880,9 @@ window.HTBAH_SEITEN.Einstellungen = {
   },
   mounted() {
     this.wuerfelEinstellungenLaden();
+    if (window.HTBAH && typeof window.HTBAH.ladeOrientierungModus === 'function') {
+      this.orientierungModus = window.HTBAH.ladeOrientierungModus();
+    }
   },
   template: `
     <div class="container content py-3 text-center">
@@ -898,6 +909,48 @@ window.HTBAH_SEITEN.Einstellungen = {
               v-model="istHellesTheme"
               @change="themeUmschalten" />
           </div>
+        </div>
+      </div>
+
+      <h5 class="text-start mb-2">Ausrichtung</h5>
+      <div class="card p-3 mb-3 text-start">
+        <p class="small text-body-secondary mb-2">
+          Lege fest, ob die Ansicht frei drehbar bleibt oder auf Quer-/Hochformat fixiert wird.
+        </p>
+        <div
+          class="btn-group w-100"
+          role="radiogroup"
+          aria-label="Ausrichtung wählen">
+          <button
+            type="button"
+            class="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1 flex-fill"
+            :class="orientierungModus === 'frei' ? 'btn-primary' : 'btn-outline-secondary'"
+            role="radio"
+            :aria-checked="orientierungModus === 'frei' ? 'true' : 'false'"
+            @click="setzeOrientierungModus('frei')">
+            <span class="material-symbols-outlined" aria-hidden="true">screen_rotation</span>
+            <span>frei</span>
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1 flex-fill"
+            :class="orientierungModus === 'landscape' ? 'btn-primary' : 'btn-outline-secondary'"
+            role="radio"
+            :aria-checked="orientierungModus === 'landscape' ? 'true' : 'false'"
+            @click="setzeOrientierungModus('landscape')">
+            <span class="material-symbols-outlined" aria-hidden="true">stay_current_landscape</span>
+            <span>Landscape</span>
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1 flex-fill"
+            :class="orientierungModus === 'portrait' ? 'btn-primary' : 'btn-outline-secondary'"
+            role="radio"
+            :aria-checked="orientierungModus === 'portrait' ? 'true' : 'false'"
+            @click="setzeOrientierungModus('portrait')">
+            <span class="material-symbols-outlined" aria-hidden="true">stay_current_portrait</span>
+            <span>Portrait</span>
+          </button>
         </div>
       </div>
 

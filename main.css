@@ -584,6 +584,7 @@ input::placeholder {
 .htbah-weltenbau-map-canvas {
   width: 100%;
   height: 100%;
+  min-width: min(360px, 100vw);
   min-height: 360px;
   overflow: hidden;
   background:
@@ -592,6 +593,10 @@ input::placeholder {
     #fff;
   cursor: grab;
   touch-action: none;
+}
+
+.htbah-weltenbau-map-canvas canvas {
+  min-width: min(360px, 100vw);
 }
 
 .htbah-weltenbau-map-header {
@@ -1120,6 +1125,44 @@ input::placeholder {
   border-color: #0d6efd;
 }
 
+.htbah-map-node-kreis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  overflow: visible;
+  text-align: center;
+}
+
+.htbah-map-node-kreis .htbah-map-charakter-avatar-wrap {
+  z-index: 1;
+}
+
+.htbah-map-node-kreis-label {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: calc(11px * var(--htbah-node-scale, 1));
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--text-color);
+  background: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 2px 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.htbah-map-node-kreis .htbah-map-element-lock-button {
+  top: -8px;
+  right: -8px;
+  z-index: 8;
+}
+
 .htbah-map-node-drag-hover {
   transform: scale(1.06);
   transform-origin: center;
@@ -1135,8 +1178,8 @@ input::placeholder {
 }
 
 .htbah-map-charakterbild {
-  width: calc(36px * var(--htbah-node-scale, 1));
-  height: calc(36px * var(--htbah-node-scale, 1));
+  width: var(--htbah-node-avatar-size, calc(36px * var(--htbah-node-scale, 1)));
+  height: var(--htbah-node-avatar-size, calc(36px * var(--htbah-node-scale, 1)));
   object-fit: cover;
   border-radius: 999px;
   border: 1px solid rgba(0, 0, 0, 0.12);
@@ -1145,8 +1188,8 @@ input::placeholder {
 
 .htbah-map-charakter-avatar-wrap {
   position: relative;
-  width: calc(36px * var(--htbah-node-scale, 1));
-  height: calc(36px * var(--htbah-node-scale, 1));
+  width: var(--htbah-node-avatar-size, calc(36px * var(--htbah-node-scale, 1)));
+  height: var(--htbah-node-avatar-size, calc(36px * var(--htbah-node-scale, 1)));
   flex: 0 0 auto;
 }
 
@@ -1160,7 +1203,7 @@ input::placeholder {
 .htbah-map-charakter-status {
   position: absolute;
   top: calc(-10px * var(--htbah-node-scale, 1));
-  right: calc(-8px * var(--htbah-node-scale, 1));
+  left: calc(-8px * var(--htbah-node-scale, 1));
   width: calc(20px * var(--htbah-node-scale, 1));
   height: calc(20px * var(--htbah-node-scale, 1));
   display: flex;

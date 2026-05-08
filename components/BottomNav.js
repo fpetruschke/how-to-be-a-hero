@@ -303,6 +303,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       ) {
         this.wuerfelModalTab = 'wuerfel';
       }
+      if (neu !== 'spielleitung' && this.musikboardOffen) {
+        this.musikboardSchliessen();
+      }
     },
     wuerfelModalTab(neu) {
       if (neu === 'wuerfel' && this.dice3dAktiv) {
@@ -1699,6 +1702,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               <span class="htbah-nav-item-label">Würfel</span>
             </button>
             <button
+              v-if="istSpielleitung"
               type="button"
               title="Soundboard"
               class="htbah-nav-item"
@@ -1765,6 +1769,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             🎲
           </button>
           <button
+            v-if="istSpielleitung"
             type="button"
             title="Soundboard"
             :class="{ 'htbah-nav-button-active': musikNavAktiv }"

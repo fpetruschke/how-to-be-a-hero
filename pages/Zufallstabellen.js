@@ -1825,6 +1825,58 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       this.$nextTick(() => this.quillAusBearbeitungSetzen());
     },
+    npcFeldNeuWuerfeln(payload) {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'npc' || !this.bearbeitung.zeile) {
+        return;
+      }
+      const modul = window.HTBAH && window.HTBAH.ZufallsgeneratorNpcModul;
+      if (!modul || typeof modul.neuBerechnenFeld !== 'function') {
+        return;
+      }
+      const feld = payload && payload.feld ? String(payload.feld) : '';
+      if (!feld) {
+        return;
+      }
+      const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
+      const fraktionNamen = (this.zustand.fraktionen || []).map((f) => (f && f.name ? String(f.name) : ''));
+      const pantheonNamen = (this.zustand.pantheon || []).map((p) => (p && p.name ? String(p.name) : ''));
+      const patch = modul.neuBerechnenFeld(this.bearbeitung.zeile, feld, {
+        modus: payload && payload.modus === 'einzeln' ? 'einzeln' : 'mitAbhaengigen',
+        epoche: this.zufallNpcEpoche,
+        orteNamen,
+        fraktionNamen,
+        pantheonNamen,
+      });
+      if (patch && typeof patch === 'object') {
+        Object.assign(this.bearbeitung.zeile, patch);
+      }
+    },
+    overlayNpcFeldNeuWuerfeln(payload) {
+      if (!this.bearbeitungOverlay || this.bearbeitungOverlay.typ !== 'npc' || !this.bearbeitungOverlay.zeile) {
+        return;
+      }
+      const modul = window.HTBAH && window.HTBAH.ZufallsgeneratorNpcModul;
+      if (!modul || typeof modul.neuBerechnenFeld !== 'function') {
+        return;
+      }
+      const feld = payload && payload.feld ? String(payload.feld) : '';
+      if (!feld) {
+        return;
+      }
+      const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
+      const fraktionNamen = (this.zustand.fraktionen || []).map((f) => (f && f.name ? String(f.name) : ''));
+      const pantheonNamen = (this.zustand.pantheon || []).map((p) => (p && p.name ? String(p.name) : ''));
+      const patch = modul.neuBerechnenFeld(this.bearbeitungOverlay.zeile, feld, {
+        modus: payload && payload.modus === 'einzeln' ? 'einzeln' : 'mitAbhaengigen',
+        epoche: this.zufallNpcEpoche,
+        orteNamen,
+        fraktionNamen,
+        pantheonNamen,
+      });
+      if (patch && typeof patch === 'object') {
+        Object.assign(this.bearbeitungOverlay.zeile, patch);
+      }
+    },
     zeileSpeichern() {
       this.zeileSpeichernIntern({ schliessenNachSpeichern: true });
     },
@@ -3199,6 +3251,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @save="zeileSpeichern"
         @edit-blur="zeileBearbeitungBeiBlurSpeichern"
         @random="zufallsvorschlagUebernehmen"
+        @npc-refresh-field="npcFeldNeuWuerfeln"
         @media-upload="onBearbeitungsMedienDateienGewaehlt"
         @media-remove="mediumAusBearbeitungEntfernen"
         @media-set-primary="setzeBearbeitungPrimaryMedium"
@@ -3229,6 +3282,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @save="overlayZeileSpeichern"
         @edit-blur="overlayZeileBearbeitungBeiBlurSpeichern"
         @random="overlayZufallsvorschlagUebernehmen"
+        @npc-refresh-field="overlayNpcFeldNeuWuerfeln"
         @media-upload="overlayMediaUpload"
         @media-remove="overlayMediaRemove"
         @media-set-primary="overlayMediaSetPrimary"

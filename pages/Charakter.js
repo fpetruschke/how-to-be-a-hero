@@ -18,6 +18,7 @@ window.HTBAH_SEITEN.Charakter = {
   },
   props: {
     spielleiterMitglied: { type: Object, default: null },
+    aktiveKampagneId: { type: String, default: '' },
     onSpielleiterPersist: { type: Function, default: null },
   },
   data() {
@@ -187,6 +188,10 @@ window.HTBAH_SEITEN.Charakter = {
         return 'Charakter ist bewusstlos';
       }
       return '';
+    },
+    zeigeAktuellePositionButton() {
+      const pfad = this.$route && typeof this.$route.path === 'string' ? this.$route.path : '';
+      return !!(this.spielleiterMitglied && this.aktiveKampagneId && pfad.startsWith('/kampagne/'));
     },
   },
   created() {
@@ -1234,6 +1239,44 @@ window.HTBAH_SEITEN.Charakter = {
     fraktionInfoUmschalten() {
       this.fraktionInfoOffen = !this.fraktionInfoOffen;
     },
+    async aktuellePositionOeffnen() {
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      const oeffneEntitaet =
+        mentionApi && typeof mentionApi.oeffneEntitaetGlobal === 'function'
+          ? mentionApi.oeffneEntitaetGlobal
+          : null;
+      if (!oeffneEntitaet) {
+        await window.HTBAH.ui.alert({
+          titel: 'Interaktive Welt nicht verfügbar',
+          beschreibung: 'Die Verknüpfung zur Interaktiven Welt ist aktuell nicht geladen.',
+        });
+        return;
+      }
+      const istKampagnenModus = !!(this.spielleiterMitglied && this.aktiveKampagneId);
+      if (!istKampagnenModus) {
+        await window.HTBAH.ui.alert({
+          titel: 'Keine Kampagne aktiv',
+          beschreibung:
+            'Diese Funktion ist in der Kampagnen-Charakteransicht verfügbar, wenn der Charakter zur aktiven Kampagne gehört.',
+        });
+        return;
+      }
+      oeffneEntitaet({
+        entityType: 'charakter',
+        entityId: this.spielleiterMitglied.id,
+        openMode: 'focus',
+      });
+      const ziel = window.HTBAH.kampagnenPfad('welt', this.aktiveKampagneId);
+      if (this.$route && this.$route.path === ziel) {
+        return;
+      }
+      const nav = this.$router && typeof this.$router.push === 'function'
+        ? this.$router.push(ziel)
+        : null;
+      if (nav && typeof nav.catch === 'function') {
+        nav.catch(() => {});
+      }
+    },
   },
   template: `
     <div :class="spielleiterMitglied ? 'content py-3' : 'container content py-3'">
@@ -1454,13 +1497,24 @@ window.HTBAH_SEITEN.Charakter = {
           <div class="col-12 col-lg order-lg-2">
             <div class="mb-3">
               <label for="ce-char-name" class="form-label text-body-secondary small mb-1">Name</label>
-              <input
-                id="ce-char-name"
-                type="text"
-                class="form-control htbah-charakter-name-input"
-                v-model="charakter.name"
-                placeholder="Name deines Helden"
-                autocomplete="name" />
+              <div class="input-group">
+                <input
+                  id="ce-char-name"
+                  type="text"
+                  class="form-control htbah-charakter-name-input"
+                  v-model="charakter.name"
+                  placeholder="Name deines Helden"
+                  autocomplete="name" />
+                <button
+                  v-if="zeigeAktuellePositionButton"
+                  type="button"
+                  class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
+                  aria-label="Aktuelle Position in Interaktiver Welt öffnen"
+                  title="Aktuelle Position"
+                  @click="aktuellePositionOeffnen">
+                  🌍
+                </button>
+              </div>
             </div>
 
             <div class="row g-2 mb-2">

@@ -215,18 +215,272 @@ window.HTBAH = window.HTBAH || {};
     return { handeln, wissen, soziales: Math.max(0, soziales) };
   }
 
+  function zufallsNameUndGeschlecht() {
+    const maennlich = Math.random() < 0.5;
+    const vor = maennlich ? U.zufaellig(L.VORNAMEN_M) : U.zufaellig(L.VORNAMEN_W);
+    const nach = U.zufaellig(L.NACHNAMEN);
+    return {
+      name: `${vor} ${nach}`,
+      geschlecht: maennlich ? 'Männlich' : 'Weiblich',
+    };
+  }
+
+  function basisKontextFuerNeuberechnung(zeile, opts) {
+    const z = zeile || {};
+    const o = opts || {};
+    return {
+      epoche: o.epoche || E.MITTELALTER,
+      orteNamen: Array.isArray(o.orteNamen) ? o.orteNamen : [],
+      fraktionNamen: Array.isArray(o.fraktionNamen) ? o.fraktionNamen : [],
+      pantheonNamen: Array.isArray(o.pantheonNamen) ? o.pantheonNamen : [],
+      alter: String(z.alter || ''),
+      beruf: String(z.beruf || ''),
+      statur: String(z.statur || ''),
+      waffe: String(z.waffe || ''),
+    };
+  }
+
+  function neuFeldUndAbhaengige(zeile, feld, opts) {
+    const kontext = basisKontextFuerNeuberechnung(zeile, opts);
+    const patch = {};
+    if (feld === 'name' || feld === 'geschlecht') {
+      const ng = zufallsNameUndGeschlecht();
+      patch.name = ng.name;
+      patch.geschlecht = ng.geschlecht;
+      return patch;
+    }
+    if (feld === 'spitzname') {
+      patch.spitzname = U.zufaellig(L.SPITZNAMEN);
+      return patch;
+    }
+    if (feld === 'familienstand') {
+      patch.familienstand = U.zufaellig(L.FAMILIENSTAND);
+      return patch;
+    }
+    if (feld === 'gesinnung') {
+      patch.gesinnung = U.zufaellig(L.GESINNUNG);
+      return patch;
+    }
+    if (feld === 'ziel') {
+      patch.ziel = zielFuerEpoche(kontext.epoche);
+      return patch;
+    }
+    if (feld === 'geheimnis') {
+      patch.geheimnis = geheimnisFuerEpoche(kontext.epoche);
+      return patch;
+    }
+    if (feld === 'stimme') {
+      patch.stimme = U.zufaellig(L.STIMME);
+      return patch;
+    }
+    if (feld === 'aufenthaltsort') {
+      patch.aufenthaltsort = aufenthaltsortAusOrteListe(kontext.orteNamen);
+      return patch;
+    }
+    if (feld === 'fraktion') {
+      patch.fraktion = fraktionAusFraktionenListe(kontext.fraktionNamen);
+      return patch;
+    }
+    if (feld === 'glaube') {
+      patch.glaube = fraktionAusFraktionenListe(kontext.pantheonNamen);
+      return patch;
+    }
+
+    if (feld === 'alter') {
+      const neuesAlter = String(U.zufallsInt(16, 72));
+      patch.alter = neuesAlter;
+      const wirksamerBeruf = kontext.beruf || berufFuerEpoche(kontext.epoche);
+      const neueStatur = staturAusAlterUndBeruf(neuesAlter, wirksamerBeruf);
+      patch.statur = neueStatur;
+      patch.lebenspunkte = lebenspunkteFuerStaturUndAlter(neueStatur, neuesAlter);
+      return patch;
+    }
+
+    if (feld === 'beruf') {
+      const neuerBeruf = berufFuerEpoche(kontext.epoche);
+      patch.beruf = neuerBeruf;
+      const wirksamesAlter = kontext.alter || String(U.zufallsInt(16, 72));
+      if (!kontext.alter) {
+        patch.alter = wirksamesAlter;
+      }
+      const neueStatur = staturAusAlterUndBeruf(wirksamesAlter, neuerBeruf);
+      patch.statur = neueStatur;
+      const neueWaffe = waffeFuerBerufUndEpoche(neuerBeruf, kontext.epoche);
+      patch.waffe = neueWaffe.name;
+      const waffenwerte = dualeWaffenwerte(neueWaffe, neueStatur);
+      patch.schadenswertNahkampf = waffenwerte.schadenswertNahkampf;
+      patch.schadenswertFernkampf = waffenwerte.schadenswertFernkampf;
+      patch.lebenspunkte = lebenspunkteFuerStaturUndAlter(neueStatur, wirksamesAlter);
+      const begabung = begabungswerteVerteilen(neuerBeruf);
+      patch.handeln = begabung.handeln;
+      patch.wissen = begabung.wissen;
+      patch.soziales = begabung.soziales;
+      return patch;
+    }
+
+    if (feld === 'statur') {
+      const wirksamesAlter = kontext.alter || String(U.zufallsInt(16, 72));
+      const wirksamerBeruf = kontext.beruf || berufFuerEpoche(kontext.epoche);
+      const neueStatur = staturAusAlterUndBeruf(wirksamesAlter, wirksamerBeruf);
+      patch.statur = neueStatur;
+      patch.lebenspunkte = lebenspunkteFuerStaturUndAlter(neueStatur, wirksamesAlter);
+      return patch;
+    }
+
+    if (feld === 'waffe') {
+      const wirksamerBeruf = kontext.beruf || berufFuerEpoche(kontext.epoche);
+      const wirksameStatur = kontext.statur || staturAusAlterUndBeruf(kontext.alter, wirksamerBeruf);
+      if (!kontext.statur) {
+        patch.statur = wirksameStatur;
+      }
+      const neueWaffe = waffeFuerBerufUndEpoche(wirksamerBeruf, kontext.epoche);
+      patch.waffe = neueWaffe.name;
+      const waffenwerte = dualeWaffenwerte(neueWaffe, wirksameStatur);
+      patch.schadenswertNahkampf = waffenwerte.schadenswertNahkampf;
+      patch.schadenswertFernkampf = waffenwerte.schadenswertFernkampf;
+      return patch;
+    }
+
+    if (feld === 'lebenspunkte') {
+      const wirksameStatur = kontext.statur || staturAusAlterUndBeruf(kontext.alter, kontext.beruf);
+      const wirksamesAlter = kontext.alter || String(U.zufallsInt(16, 72));
+      if (!kontext.statur) {
+        patch.statur = wirksameStatur;
+      }
+      if (!kontext.alter) {
+        patch.alter = wirksamesAlter;
+      }
+      patch.lebenspunkte = lebenspunkteFuerStaturUndAlter(wirksameStatur, wirksamesAlter);
+      return patch;
+    }
+
+    if (feld === 'begabung') {
+      const wirksamerBeruf = kontext.beruf || berufFuerEpoche(kontext.epoche);
+      if (!kontext.beruf) {
+        patch.beruf = wirksamerBeruf;
+      }
+      const begabung = begabungswerteVerteilen(wirksamerBeruf);
+      patch.handeln = begabung.handeln;
+      patch.wissen = begabung.wissen;
+      patch.soziales = begabung.soziales;
+      return patch;
+    }
+
+    return patch;
+  }
+
+  function neuFeldEinzeln(zeile, feld, opts) {
+    const kontext = basisKontextFuerNeuberechnung(zeile, opts);
+    const patch = {};
+    if (feld === 'name') {
+      patch.name = zufallsNameUndGeschlecht().name;
+      return patch;
+    }
+    if (feld === 'geschlecht') {
+      patch.geschlecht = Math.random() < 0.5 ? 'Männlich' : 'Weiblich';
+      return patch;
+    }
+    if (feld === 'spitzname') {
+      patch.spitzname = U.zufaellig(L.SPITZNAMEN);
+      return patch;
+    }
+    if (feld === 'alter') {
+      patch.alter = String(U.zufallsInt(16, 72));
+      return patch;
+    }
+    if (feld === 'familienstand') {
+      patch.familienstand = U.zufaellig(L.FAMILIENSTAND);
+      return patch;
+    }
+    if (feld === 'statur') {
+      patch.statur = U.zufaellig(L.STATUR);
+      return patch;
+    }
+    if (feld === 'gesinnung') {
+      patch.gesinnung = U.zufaellig(L.GESINNUNG);
+      return patch;
+    }
+    if (feld === 'beruf') {
+      patch.beruf = berufFuerEpoche(kontext.epoche);
+      return patch;
+    }
+    if (feld === 'ziel') {
+      patch.ziel = zielFuerEpoche(kontext.epoche);
+      return patch;
+    }
+    if (feld === 'geheimnis') {
+      patch.geheimnis = geheimnisFuerEpoche(kontext.epoche);
+      return patch;
+    }
+    if (feld === 'stimme') {
+      patch.stimme = U.zufaellig(L.STIMME);
+      return patch;
+    }
+    if (feld === 'waffe') {
+      patch.waffe = waffeFuerEpoche(kontext.epoche).name;
+      return patch;
+    }
+    if (feld === 'schadenswertNahkampf') {
+      patch.schadenswertNahkampf = U.zufaellig(['1W10', '1W10+1', '1W10+2', '2W10']);
+      return patch;
+    }
+    if (feld === 'schadenswertFernkampf') {
+      patch.schadenswertFernkampf = U.zufaellig(['1W10+2', '2W10', '2W10+1', '3W10']);
+      return patch;
+    }
+    if (feld === 'lebenspunkte') {
+      patch.lebenspunkte = String(U.zufallsInt(45, 110));
+      return patch;
+    }
+    if (feld === 'aufenthaltsort') {
+      patch.aufenthaltsort = aufenthaltsortAusOrteListe(kontext.orteNamen);
+      return patch;
+    }
+    if (feld === 'fraktion') {
+      patch.fraktion = fraktionAusFraktionenListe(kontext.fraktionNamen);
+      return patch;
+    }
+    if (feld === 'glaube') {
+      patch.glaube = fraktionAusFraktionenListe(kontext.pantheonNamen);
+      return patch;
+    }
+    if (feld === 'begabung') {
+      patch.handeln = U.zufallsInt(8, 22);
+      patch.wissen = U.zufallsInt(8, 22);
+      patch.soziales = U.zufallsInt(8, 22);
+      return patch;
+    }
+    return patch;
+  }
+
   window.HTBAH.ZufallsgeneratorNpcModul = {
+    abhaengigkeiten() {
+      return [
+        { ausloeser: 'alter', abhaengige: ['statur', 'lebenspunkte'] },
+        { ausloeser: 'beruf', abhaengige: ['statur', 'waffe', 'schadenswertNahkampf', 'schadenswertFernkampf', 'lebenspunkte', 'handeln', 'wissen', 'soziales'] },
+        { ausloeser: 'statur', abhaengige: ['lebenspunkte'] },
+        { ausloeser: 'waffe', abhaengige: ['schadenswertNahkampf', 'schadenswertFernkampf'] },
+      ];
+    },
+    neuBerechnenFeld(zeile, feld, opts) {
+      const modus = opts && opts.modus === 'einzeln' ? 'einzeln' : 'mitAbhaengigen';
+      if (!feld) {
+        return {};
+      }
+      if (modus === 'einzeln') {
+        return neuFeldEinzeln(zeile, feld, opts);
+      }
+      return neuFeldUndAbhaengige(zeile, feld, opts);
+    },
     /**
      * @param {{ epoche?: string, orteNamen?: string[], fraktionNamen?: string[], pantheonNamen?: string[] }} opts — orteNamen: Namen aus der Orte-Tabelle; fraktionNamen: Namen aus der Fraktionen-Tabelle; pantheonNamen: Gottheitsnamen aus der Pantheon-Tabelle (für Glaube, wie Fraktion zufällig wenn vorhanden).
      */
     generiere(opts) {
       opts = opts || {};
       const epoche = opts.epoche || E.MITTELALTER;
-      const maennlich = Math.random() < 0.5;
-      const vor = maennlich ? U.zufaellig(L.VORNAMEN_M) : U.zufaellig(L.VORNAMEN_W);
-      const nach = U.zufaellig(L.NACHNAMEN);
-      const name = `${vor} ${nach}`;
-      const geschlecht = maennlich ? 'Männlich' : 'Weiblich';
+      const nameGeschlecht = zufallsNameUndGeschlecht();
+      const name = nameGeschlecht.name;
+      const geschlecht = nameGeschlecht.geschlecht;
       const alter = String(U.zufallsInt(16, 72));
       const ziel = zielFuerEpoche(epoche);
       const beruf = berufFuerEpoche(epoche);

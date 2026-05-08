@@ -250,9 +250,12 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     if (!target || !target.entityType || !target.entityId) {
       return;
     }
+    const openModeRaw = typeof target.openMode === 'string' ? target.openMode.trim().toLowerCase() : '';
+    const openMode = openModeRaw === 'focus' ? 'focus' : 'open';
     const payload = {
       entityType: String(target.entityType || '').trim(),
       entityId: String(target.entityId || '').trim(),
+      openMode,
       ts: Date.now(),
     };
     if (!payload.entityType || !payload.entityId) {
@@ -279,7 +282,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     if (!entityType || !entityId) {
       return null;
     }
-    return { entityType, entityId };
+    const openModeRaw = typeof data.openMode === 'string' ? data.openMode.trim().toLowerCase() : '';
+    const openMode = openModeRaw === 'focus' ? 'focus' : 'open';
+    return { entityType, entityId, openMode };
   }
 
   function peekNavigationTarget() {

@@ -17,6 +17,7 @@ const SPEICHER_KEY_WUERFEL_SOUND_LEGACY = 'htbah_wuerfel_sound';
 const SPEICHER_KEY_DICE_COLORS = 'htbah_dice_colors';
 const SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER = 'htbah_wuerfel_beutel_fenster';
 const SPEICHER_KEY_MENTION_NAV_TARGET = 'htbah_mention_nav_target';
+const SPEICHER_KEY_ORIENTATION_MODE = 'htbah_orientation_mode';
 
 function erstelleLocalStorageBackend() {
   return {
@@ -1561,6 +1562,65 @@ function setzeTheme(theme) {
   return gueltigesTheme;
 }
 
+function normalisiereOrientierungModus(modus) {
+  if (modus === 'landscape' || modus === 'portrait') {
+    return modus;
+  }
+  return 'frei';
+}
+
+function ladeOrientierungModus() {
+  return normalisiereOrientierungModus(htbahSpeicher.leseText(SPEICHER_KEY_ORIENTATION_MODE, 'frei'));
+}
+
+function entsperreBildschirmAusrichtungWennMoeglich() {
+  if (typeof screen === 'undefined') {
+    return;
+  }
+  const orientationApi = screen.orientation;
+  if (!orientationApi || typeof orientationApi.unlock !== 'function') {
+    return;
+  }
+  try {
+    orientationApi.unlock();
+  } catch {
+    // Einige Browser erlauben unlock nur in bestimmten Kontexten.
+  }
+}
+
+async function sperreBildschirmAusrichtungWennMoeglich(ziel) {
+  if (typeof screen === 'undefined') {
+    return false;
+  }
+  const orientationApi = screen.orientation;
+  if (!orientationApi || typeof orientationApi.lock !== 'function') {
+    return false;
+  }
+  try {
+    await orientationApi.lock(ziel);
+    return true;
+  } catch {
+    // In einigen Browsern nur mit Nutzerinteraktion/Fullscreen erlaubt.
+    return false;
+  }
+}
+
+function wendeOrientierungModusAn(modus) {
+  const normalisiert = normalisiereOrientierungModus(modus);
+  if (normalisiert === 'frei') {
+    entsperreBildschirmAusrichtungWennMoeglich();
+    return;
+  }
+  void sperreBildschirmAusrichtungWennMoeglich(normalisiert);
+}
+
+function speichereOrientierungModus(modus) {
+  const normalisiert = normalisiereOrientierungModus(modus);
+  htbahSpeicher.schreibeText(SPEICHER_KEY_ORIENTATION_MODE, normalisiert);
+  wendeOrientierungModusAn(normalisiert);
+  return normalisiert;
+}
+
 function ladeCharakterBild(charakterId = null) {
   const id = typeof charakterId === 'string' && charakterId ? charakterId : ladeAktivenCharakterId();
   if (!id) {
@@ -1779,6 +1839,8 @@ window.HTBAH = {
   bildbetrachterNachVorne,
   ladeAppRolle,
   speichereAppRolle,
+  ladeOrientierungModus,
+  speichereOrientierungModus,
   speicher: htbahSpeicher,
   speicherKeys: HTBAH_SPEICHER_KEYS,
 };
@@ -2030,21 +2092,6 @@ function syncLebenspunkteStatusFromCharakter(charakter) {
   lebenspunkteStatus.bewusstlos = status.bewusstlos;
 }
 
-function entsperreBildschirmAusrichtungWennMoeglich() {
-  if (typeof screen === 'undefined') {
-    return;
-  }
-  const orientationApi = screen.orientation;
-  if (!orientationApi || typeof orientationApi.unlock !== 'function') {
-    return;
-  }
-  try {
-    orientationApi.unlock();
-  } catch {
-    // Einige Browser erlauben unlock nur in bestimmten Kontexten.
-  }
-}
-
 window.HTBAH.lebenspunkteStatus = lebenspunkteStatus;
 window.HTBAH.berechneLebenspunkteStatus = berechneLebenspunkteStatus;
 window.HTBAH.syncLebenspunkteStatusFromCharakter = syncLebenspunkteStatusFromCharakter;
@@ -2113,11 +2160,13 @@ app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.Lebenspunkt
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);
 app.component('bildbetrachter-host', window.HTBAH_KOMPONENTEN.BildbetrachterHost);
 app.mount('#app');
-entsperreBildschirmAusrichtungWennMoeglich();
-window.addEventListener('orientationchange', entsperreBildschirmAusrichtungWennMoeglich);
+wendeOrientierungModusAn(ladeOrientierungModus());
+window.addEventListener('orientationchange', () => {
+  wendeOrientierungModusAn(ladeOrientierungModus());
+});
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    entsperreBildschirmAusrichtungWennMoeglich();
+    wendeOrientierungModusAn(ladeOrientierungModus());
   }
 });
 

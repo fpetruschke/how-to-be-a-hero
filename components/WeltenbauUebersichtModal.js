@@ -194,6 +194,9 @@ var HTBAH_REFACTOR_UTILS =
         charakterQuillHostElement: null,
         charakterQuillSession: 0,
         charakterQuillHostRefFn: null,
+        charakterInventarQuillInstanzen: {},
+        charakterInventarMentionController: {},
+        charakterInventarQuillRefFnCache: {},
         notizQuillInstanzen: {},
         notizQuillEditorRefs: {},
         hintergrundUploadLaeuft: false,
@@ -787,7 +790,38 @@ var HTBAH_REFACTOR_UTILS =
         if (!target || !target.entityType || !target.entityId) {
           return;
         }
-        this.oeffneEntitaetAusMention(target);
+        const focusOnly = target.openMode === 'focus';
+        if (!focusOnly) {
+          const erfolg = this.oeffneEntitaetAusMention(target);
+          if (!erfolg) {
+            return;
+          }
+        }
+        this.$nextTick(() => {
+          this.fokussiereEntitaetNode(target.entityType, target.entityId, { zielZoom: 1.08 });
+        });
+      },
+      fokussiereEntitaetNode(entityType, entityId, optionen) {
+        const typ = String(entityType || '').trim();
+        const id = String(entityId || '').trim();
+        if (!typ || !id || !this.graph || !Array.isArray(this.graph.nodes)) {
+          return;
+        }
+        const zielNode = this.graph.nodes.find((node) => {
+          const data = node && node.data;
+          return data && data.entityType === typ && data.entityId === id;
+        });
+        if (!zielNode || !zielNode.position) {
+          return;
+        }
+        const opts = optionen && typeof optionen === 'object' ? optionen : {};
+        if (Number.isFinite(Number(opts.zielZoom))) {
+          const mitte = this.mapViewportMitteClient();
+          this.setzeMapScaleMitAnker(Number(opts.zielZoom), mitte.x, mitte.y);
+        }
+        const centerX = Number(zielNode.position.x || 0) + this.nodeBreite(zielNode) / 2;
+        const centerY = Number(zielNode.position.y || 0) + this.nodeHoehe(zielNode) / 2;
+        this.wendeMapCenterWeltAn(centerX, centerY);
       },
       onGlobalOpenEntityRequest(event) {
         if (!this.offen) {
@@ -797,8 +831,12 @@ var HTBAH_REFACTOR_UTILS =
         if (!detail || !detail.entityType || !detail.entityId) {
           return;
         }
-        const erfolg = this.oeffneEntitaetAusMention(detail);
+        const focusOnly = detail.openMode === 'focus';
+        const erfolg = focusOnly ? true : this.oeffneEntitaetAusMention(detail);
         if (erfolg) {
+          this.$nextTick(() => {
+            this.fokussiereEntitaetNode(detail.entityType, detail.entityId, { zielZoom: 1.08 });
+          });
           event.preventDefault();
         }
       },
@@ -1636,6 +1674,7 @@ var HTBAH_REFACTOR_UTILS =
               : status.bewusstlos
                 ? warningEntityStyle()
                 : {};
+            const istKreisTyp = prefix === 'npc' || prefix === 'bestie';
             nodes.push({
               id: key,
               type: 'default',
@@ -1649,7 +1688,7 @@ var HTBAH_REFACTOR_UTILS =
                 initiative: typeof row.initiative === 'string' ? row.initiative : '',
                 statusEmoji: status.tot ? '💀' : status.bewusstlos ? '😵' : '',
               },
-              style: { width: 200, ...style },
+              style: { width: istKreisTyp ? 86 : 200, ...style },
             });
             if (ort && !fraktionNodeIds.length) {
               edges.push({ id: `e-${key}-ort:${ort.id}`, source: `ort:${ort.id}`, target: key, type: 'straight' });
@@ -1713,7 +1752,7 @@ var HTBAH_REFACTOR_UTILS =
               initiative: typeof char.initiative === 'string' ? char.initiative : '',
               statusEmoji,
             },
-            style: { width: 220, ...charStatusStyle },
+            style: { width: 86, ...charStatusStyle },
           });
           if (ort && !fraktionNodeIds.length) {
             edges.push({ id: `e-ort:${ort.id}-${key}`, source: `ort:${ort.id}`, target: key, type: 'straight' });
@@ -1759,24 +1798,49 @@ var HTBAH_REFACTOR_UTILS =
       },
       nodeStil(node) {
         const itemScale = Math.max(0, (Number(this.map.itemScale) || 100) / 100);
-        const istCharakter = !!(node && node.data && node.data.entityType === 'charakter');
+        const entityType = node && node.data ? node.data.entityType : '';
+        const istCharakter = entityType === 'charakter';
+        const istKreisEntitaet = entityType === 'charakter' || entityType === 'npc' || entityType === 'bestie';
         const basisFont = istCharakter ? 14 : 14;
         const basisPaddingY = istCharakter ? 6 : 8;
         const basisPaddingX = istCharakter ? 8 : 10;
+        const breite = this.nodeBreite(node);
+        const hoehe = this.nodeHoehe(node);
+        const kreisDurchmesser = istKreisEntitaet ? Math.max(30, Math.round(Math.min(breite, hoehe) * 0.78)) : null;
+        const avatarGroesse =
+          istKreisEntitaet && kreisDurchmesser
+            ? Math.max(22, Math.round(kreisDurchmesser * 0.86))
+            : null;
+        const basisMinHeight =
+          node && node.style && Number.isFinite(Number(node.style.minHeight))
+            ? Math.max(18, Math.round(Number(node.style.minHeight) * itemScale))
+            : undefined;
+        const borderWidthRoh = node && node.style ? Number(node.style.borderWidth) : NaN;
+        const borderWidth =
+          Number.isFinite(borderWidthRoh) && borderWidthRoh > 0
+            ? borderWidthRoh
+            : istKreisEntitaet
+              ? 3
+              : undefined;
         return {
           ...(node.style || {}),
           left: `${Math.round((node.position && node.position.x) || 0)}px`,
           top: `${Math.round((node.position && node.position.y) || 0)}px`,
-          width: `${this.nodeBreite(node)}px`,
-          minHeight:
-            node && node.style && Number.isFinite(Number(node.style.minHeight))
-              ? `${Math.max(18, Math.round(Number(node.style.minHeight) * itemScale))}px`
+          width: istKreisEntitaet ? `${kreisDurchmesser}px` : `${breite}px`,
+          minHeight: istKreisEntitaet
+            ? `${kreisDurchmesser}px`
+            : basisMinHeight != null
+              ? `${basisMinHeight}px`
               : undefined,
+          height: istKreisEntitaet ? `${kreisDurchmesser}px` : undefined,
+          borderRadius: istKreisEntitaet ? '999px' : undefined,
+          borderWidth: borderWidth != null ? `${borderWidth}px` : undefined,
           fontSize: `${Math.max(8, Math.round(basisFont * itemScale))}px`,
           padding: `${Math.max(2, Math.round(basisPaddingY * itemScale))}px ${Math.max(
             3,
             Math.round(basisPaddingX * itemScale),
           )}px`,
+          '--htbah-node-avatar-size': avatarGroesse ? `${avatarGroesse}px` : undefined,
           '--htbah-node-scale': String(itemScale),
         };
       },
@@ -1909,10 +1973,12 @@ var HTBAH_REFACTOR_UTILS =
         const t = node && node.data && node.data.entityType;
         const istDragHoverZiel =
           !!(this.nodeDrag && this.nodeDrag.aktiv && this.map && this.map.dragHoverNodeId && node && node.id === this.map.dragHoverNodeId);
+        const istKreisNode = t === 'charakter' || t === 'npc' || t === 'bestie';
         return {
           'htbah-map-node': true,
           'htbah-map-node-ort': t === 'ort',
           'htbah-map-node-charakter': t === 'charakter',
+          'htbah-map-node-kreis': istKreisNode,
           'htbah-map-node-drag-hover': istDragHoverZiel,
           'htbah-map-element-locked': this.istElementGesperrt(node && node.id),
           'htbah-map-element-ausgewaehlt': this.istElementAusgewaehlt(node && node.id),
@@ -2480,6 +2546,17 @@ var HTBAH_REFACTOR_UTILS =
         if (!Array.isArray(charakter.inventar)) {
           charakter.inventar = [];
         }
+        charakter.inventar = charakter.inventar.map((item) =>
+          window.HTBAH_CHARAKTER_MODEL.inventarEintragNachTypBereinigen({
+            id: item && item.id ? item.id : window.HTBAH_CHARAKTER_MODEL.neueInventarId(),
+            name: String((item && item.name) || ''),
+            typ: item && item.typ ? item.typ : 'gegenstand',
+            beschreibungHtml: String((item && item.beschreibungHtml) || ''),
+            schadenswertNahkampf: item ? item.schadenswertNahkampf : '',
+            schadenswertFernkampf: item ? item.schadenswertFernkampf : '',
+            rustwert: item ? item.rustwert : '',
+          }),
+        );
         charakter.fraktionen = this.normalisiereFraktionenArray(charakter.fraktionen);
         this.charakterModal.offen = true;
         this.charakterModal.mitgliedId = mitgliedId;
@@ -2513,6 +2590,8 @@ var HTBAH_REFACTOR_UTILS =
         if (this.charakterMentionController && typeof this.charakterMentionController.destroy === 'function') {
           this.charakterMentionController.destroy();
         }
+        this.uebernehmeCharakterInventarQuillInModel();
+        this.beendeCharakterInventarEditoren();
         this.charakterMentionController = null;
         this.beendeCharakterZiehen();
         this.beendeCharakterResize();
@@ -2813,6 +2892,7 @@ var HTBAH_REFACTOR_UTILS =
           schadenswertFernkampf: '',
           rustwert: '',
         });
+        this.$nextTick(() => this.charakterInventarEditorenSync());
       },
       inventarEintragEntfernen(index) {
         if (!this.charakterModal.charakter || !Array.isArray(this.charakterModal.charakter.inventar)) {
@@ -2821,7 +2901,140 @@ var HTBAH_REFACTOR_UTILS =
         if (index < 0 || index >= this.charakterModal.charakter.inventar.length) {
           return;
         }
+        const eintrag = this.charakterModal.charakter.inventar[index];
+        const id = eintrag && eintrag.id ? eintrag.id : '';
+        if (id) {
+          this.uebernehmeCharakterInventarQuillEintrag(id);
+          this.charakterInventarQuillZerstoeren(id);
+          this.charakterInventarQuillRefFnEntfernen(id);
+        }
         this.charakterModal.charakter.inventar.splice(index, 1);
+      },
+      charakterInventarEintragFinden(id) {
+        const inventar = this.charakterModal.charakter && Array.isArray(this.charakterModal.charakter.inventar)
+          ? this.charakterModal.charakter.inventar
+          : [];
+        return inventar.find((eintrag) => eintrag && eintrag.id === id) || null;
+      },
+      charakterInventarBeschreibungRefFn(eintrag) {
+        const id = eintrag && eintrag.id ? eintrag.id : '';
+        if (!id) {
+          return () => {};
+        }
+        if (!this.charakterInventarQuillRefFnCache[id]) {
+          this.charakterInventarQuillRefFnCache[id] = (el) => this.charakterInventarQuillHostRef(id, el);
+        }
+        return this.charakterInventarQuillRefFnCache[id];
+      },
+      charakterInventarQuillRefFnEntfernen(id) {
+        if (!id) {
+          return;
+        }
+        delete this.charakterInventarQuillRefFnCache[id];
+      },
+      charakterInventarQuillHostRef(id, el) {
+        if (!id) {
+          return;
+        }
+        if (!el) {
+          this.charakterInventarQuillZerstoeren(id);
+          return;
+        }
+        if (!this.charakterModal.charakter || !window.Quill) {
+          return;
+        }
+        this.$nextTick(() => this.charakterInventarQuillAufHostEinrichten(id, el));
+      },
+      charakterInventarQuillAufHostEinrichten(id, el, retry) {
+        const r = typeof retry === 'number' ? retry : 0;
+        if (!id || !el || !this.charakterModal.charakter) {
+          return;
+        }
+        if (!window.Quill) {
+          if (r < 40) {
+            window.setTimeout(() => this.charakterInventarQuillAufHostEinrichten(id, el, r + 1), 25);
+          }
+          return;
+        }
+        if (this.charakterInventarQuillInstanzen[id] && el.contains(this.charakterInventarQuillInstanzen[id].root)) {
+          return;
+        }
+        const eintrag = this.charakterInventarEintragFinden(id);
+        if (!eintrag) {
+          return;
+        }
+        el.innerHTML = '';
+        const quill = new window.Quill(el, {
+          theme: 'snow',
+          placeholder: 'Beschreibung…',
+          modules: {
+            toolbar: [
+              ['bold', 'italic', 'underline'],
+              [{ color: [] }, { background: [] }],
+              [{ list: 'ordered' }, { list: 'bullet' }],
+              ['clean'],
+            ],
+          },
+        });
+        quill.root.innerHTML = eintrag.beschreibungHtml || '';
+        this.charakterInventarQuillInstanzen[id] = quill;
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.installMentions === 'function') {
+          this.charakterInventarMentionController[id] = mentionApi.installMentions(quill, {
+            getItems: (query) => this.mentionItemsFuerQuill(query),
+            onEntityClick: (target) => this.oeffneEntitaetAusMention(target),
+          });
+        }
+      },
+      charakterInventarQuillZerstoeren(id) {
+        if (!id) {
+          return;
+        }
+        const mentionController = this.charakterInventarMentionController[id];
+        if (mentionController && typeof mentionController.destroy === 'function') {
+          mentionController.destroy();
+        }
+        delete this.charakterInventarMentionController[id];
+        delete this.charakterInventarQuillInstanzen[id];
+      },
+      uebernehmeCharakterInventarQuillEintrag(id) {
+        if (!id) {
+          return;
+        }
+        const eintrag = this.charakterInventarEintragFinden(id);
+        const quill = this.charakterInventarQuillInstanzen[id];
+        if (eintrag && quill) {
+          eintrag.beschreibungHtml = quill.root.innerHTML;
+        }
+      },
+      uebernehmeCharakterInventarQuillInModel() {
+        Object.keys(this.charakterInventarQuillInstanzen || {}).forEach((id) => {
+          this.uebernehmeCharakterInventarQuillEintrag(id);
+        });
+      },
+      charakterInventarEditorenSync() {
+        const inventar = this.charakterModal.charakter && Array.isArray(this.charakterModal.charakter.inventar)
+          ? this.charakterModal.charakter.inventar
+          : [];
+        const aktiveIds = new Set(
+          inventar
+            .map((eintrag) => (eintrag && typeof eintrag.id === 'string' ? eintrag.id : ''))
+            .filter(Boolean),
+        );
+        Object.keys(this.charakterInventarQuillInstanzen || {}).forEach((id) => {
+          if (!aktiveIds.has(id)) {
+            this.charakterInventarQuillZerstoeren(id);
+            this.charakterInventarQuillRefFnEntfernen(id);
+          }
+        });
+      },
+      beendeCharakterInventarEditoren() {
+        Object.keys(this.charakterInventarQuillInstanzen || {}).forEach((id) => {
+          this.charakterInventarQuillZerstoeren(id);
+        });
+        this.charakterInventarQuillInstanzen = {};
+        this.charakterInventarMentionController = {};
+        this.charakterInventarQuillRefFnCache = {};
       },
       aktualisiereCharakterLpStatus(charakter) {
         if (!charakter || typeof charakter !== 'object') {
@@ -2869,6 +3082,7 @@ var HTBAH_REFACTOR_UTILS =
           return;
         }
         const charakter = JSON.parse(JSON.stringify(this.charakterModal.charakter));
+        this.uebernehmeCharakterInventarQuillInModel();
         if (this.charakterQuillInstanz) {
           charakter.journalHtml = this.charakterQuillInstanz.root.innerHTML;
         }
@@ -5345,26 +5559,26 @@ var HTBAH_REFACTOR_UTILS =
                     @click.stop.prevent="toggleElementLock(node.id)">
                     <span aria-hidden="true">{{ elementLockButtonIcon(node.id) }}</span>
                   </button>
-                  <template v-if="node.data && node.data.entityType === 'charakter'">
-                    <div class="d-flex align-items-center gap-2">
-                      <div class="htbah-map-charakter-avatar-wrap">
-                        <img
-                          v-if="node.data.charakterBild"
-                          :src="node.data.charakterBild"
-                          alt="Charakterbild"
-                          class="htbah-map-charakterbild"
-                          draggable="false" />
-                        <div v-else class="htbah-map-charakterbild htbah-map-charakter-emoji">🧙</div>
-                        <div v-if="node.data.statusEmoji" class="htbah-map-charakter-status">{{ node.data.statusEmoji }}</div>
+                  <template v-if="node.data && (node.data.entityType === 'charakter' || node.data.entityType === 'npc' || node.data.entityType === 'bestie')">
+                    <div class="htbah-map-charakter-avatar-wrap">
+                      <img
+                        v-if="(node.data.entityType === 'charakter' && node.data.charakterBild) || (node.data.entityType !== 'charakter' && node.data.avatarDataUrl)"
+                        :src="node.data.entityType === 'charakter' ? node.data.charakterBild : node.data.avatarDataUrl"
+                        :alt="node.data.entityType === 'charakter' ? 'Charakterbild' : 'Avatar'"
+                        class="htbah-map-charakterbild"
+                        draggable="false" />
+                      <div v-else class="htbah-map-charakterbild htbah-map-charakter-emoji">
+                        {{ node.data.entityType === 'bestie' ? '🦁' : (node.data.entityType === 'npc' ? '👤' : '🧙') }}
                       </div>
-                      <div class="text-start">
-                        <span>{{ node.data && node.data.label ? node.data.label : 'Charakter' }}</span>
-                        <span
-                          v-if="node.data && initiativeBadgeText(node.data.initiative)"
-                          class="badge rounded-pill text-bg-info ms-1">
-                          INI {{ initiativeBadgeText(node.data.initiative) }}
-                        </span>
-                      </div>
+                      <div v-if="node.data.statusEmoji" class="htbah-map-charakter-status">{{ node.data.statusEmoji }}</div>
+                    </div>
+                    <div class="htbah-map-node-kreis-label">
+                      <span>{{ node.data && node.data.label ? node.data.label : 'Eintrag' }}</span>
+                      <span
+                        v-if="node.data && initiativeBadgeText(node.data.initiative)"
+                        class="badge rounded-pill text-bg-info ms-1">
+                        INI {{ initiativeBadgeText(node.data.initiative) }}
+                      </span>
                     </div>
                   </template>
                   <template v-else>
@@ -5666,7 +5880,11 @@ var HTBAH_REFACTOR_UTILS =
                   <div class="col-md-6" v-if="item.typ === 'waffe'"><input class="form-control form-control-sm" v-model="item.schadenswertNahkampf" placeholder="Schadenswert Nahkampf" /></div>
                   <div class="col-md-6" v-if="item.typ === 'waffe'"><input class="form-control form-control-sm" v-model="item.schadenswertFernkampf" placeholder="Schadenswert Fernkampf" /></div>
                   <div class="col-md-6" v-if="item.typ === 'rustung'"><input class="form-control form-control-sm" v-model="item.rustwert" placeholder="Rüstwert" /></div>
-                  <div class="col-12"><textarea class="form-control form-control-sm" rows="2" v-model="item.beschreibungHtml" placeholder="Beschreibung"></textarea></div>
+                  <div class="col-12">
+                    <div
+                      :ref="charakterInventarBeschreibungRefFn(item)"
+                      class="quill-editor-host inventar-beschreibung-quill"></div>
+                  </div>
                 </div>
               </div>
             </div>
