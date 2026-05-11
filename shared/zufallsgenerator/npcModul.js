@@ -215,14 +215,60 @@ window.HTBAH = window.HTBAH || {};
     return { handeln, wissen, soziales: Math.max(0, soziales) };
   }
 
-  function zufallsNameUndGeschlecht() {
-    const maennlich = Math.random() < 0.5;
+  function zufallsNameUndGeschlecht(vorgabe) {
+    let maennlich;
+    if (vorgabe === 'Männlich') {
+      maennlich = true;
+    } else if (vorgabe === 'Weiblich') {
+      maennlich = false;
+    } else {
+      maennlich = Math.random() < 0.5;
+    }
     const vor = maennlich ? U.zufaellig(L.VORNAMEN_M) : U.zufaellig(L.VORNAMEN_W);
     const nach = U.zufaellig(L.NACHNAMEN);
     return {
       name: `${vor} ${nach}`,
       geschlecht: maennlich ? 'Männlich' : 'Weiblich',
     };
+  }
+
+  /** Wählt eine Stimme passend zum Alter (gewichtet). */
+  function stimmeFuerAlter(alterStr) {
+    const alter = parseInt(String(alterStr || '').trim(), 10);
+    if (!Number.isFinite(alter)) {
+      return U.zufaellig(L.STIMME);
+    }
+    const gewichtet = (L.STIMME || []).map((stimme) => {
+      const s = String(stimme).toLowerCase();
+      let gewicht = 1;
+      const wirktAlt = s.includes('brüchig') || s.includes('alter') || s.includes('heiser');
+      const wirktJung = s.includes('hell') || s.includes('hastig') || s.includes('schnell');
+      if (alter >= 60 && wirktAlt) {
+        gewicht += 3;
+      }
+      if (alter < 25 && wirktAlt) {
+        gewicht = 0.05;
+      }
+      if (alter < 25 && wirktJung) {
+        gewicht += 2;
+      }
+      if (alter >= 65 && wirktJung) {
+        gewicht = 0.3;
+      }
+      return { wert: stimme, gewicht: Math.max(0.05, gewicht) };
+    });
+    return U.gewichtet(gewichtet);
+  }
+
+  /** Liefert die Berufeliste zur Epoche (für UI/Autocomplete). */
+  function berufslisteFuerEpoche(epoche) {
+    if (epoche === E.GEGENWART) {
+      return (L.BERUF_GEGENWART || []).slice();
+    }
+    if (epoche === E.ZUKUNFT) {
+      return (L.BERUF_ZUKUNFT || []).slice();
+    }
+    return (L.BERUF_MITTELALTER || []).slice();
   }
 
   function basisKontextFuerNeuberechnung(zeile, opts) {
@@ -475,16 +521,35 @@ window.HTBAH = window.HTBAH || {};
     /**
      * @param {{ epoche?: string, orteNamen?: string[], fraktionNamen?: string[], pantheonNamen?: string[] }} opts — orteNamen: Namen aus der Orte-Tabelle; fraktionNamen: Namen aus der Fraktionen-Tabelle; pantheonNamen: Gottheitsnamen aus der Pantheon-Tabelle (für Glaube, wie Fraktion zufällig wenn vorhanden).
      */
+    berufslisteFuerEpoche(epoche) {
+      return berufslisteFuerEpoche(epoche);
+    },
+    /**
+     * Generiert einen NPC. Wenn opts.geschlecht/alter/beruf gesetzt sind, werden diese
+     * als Vorgaben übernommen (z. B. aus dem NPC-Wizard).
+     * @param {{
+     *   epoche?: string,
+     *   geschlecht?: string,
+     *   alter?: string|number,
+     *   beruf?: string,
+     *   orteNamen?: string[],
+     *   fraktionNamen?: string[],
+     *   pantheonNamen?: string[],
+     * }} opts
+     */
     generiere(opts) {
       opts = opts || {};
       const epoche = opts.epoche || E.MITTELALTER;
-      const nameGeschlecht = zufallsNameUndGeschlecht();
+      const geschlechtVorgabe = typeof opts.geschlecht === 'string' ? opts.geschlecht.trim() : '';
+      const nameGeschlecht = zufallsNameUndGeschlecht(geschlechtVorgabe);
       const name = nameGeschlecht.name;
       const geschlecht = nameGeschlecht.geschlecht;
-      const alter = String(U.zufallsInt(16, 72));
+      const alterVorgabe = opts.alter != null ? String(opts.alter).trim() : '';
+      const alter = alterVorgabe || String(U.zufallsInt(16, 72));
+      const berufVorgabe = typeof opts.beruf === 'string' ? opts.beruf.trim() : '';
+      const beruf = berufVorgabe || berufFuerEpoche(epoche);
       const ziel = zielFuerEpoche(epoche);
-      const beruf = berufFuerEpoche(epoche);
-      const stimme = U.zufaellig(L.STIMME);
+      const stimme = stimmeFuerAlter(alter);
       const waffe = waffeFuerBerufUndEpoche(beruf, epoche);
       const statur = staturAusAlterUndBeruf(alter, beruf);
       const waffenwerte = dualeWaffenwerte(waffe, statur);
@@ -501,7 +566,6 @@ window.HTBAH = window.HTBAH || {};
         `<p><strong>Eindruck:</strong> ${U.htmlEsc(U.zufaellig(L.EINDRUCK))}.</p>`,
         `<p><strong>Merkmal:</strong> ${U.htmlEsc(U.zufaellig(L.MERKMAL))}.</p>`,
         `<p><strong>Waffenloser Nahkampf (Fäuste, Tritte):</strong> ${U.htmlEsc(schadenWaffenlos)}.</p>`,
-        `<p><strong>Stimme:</strong> ${U.htmlEsc(stimme)}.</p>`,
         `<p><strong>Geheimnis:</strong> ${U.htmlEsc(geheimnis)}.</p>`,
       ].join('');
 

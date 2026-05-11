@@ -9,6 +9,8 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       mentionController: null,
       speichernTimer: null,
       fokusVorModal: null,
+      aktiveKampagneIdLokal: '',
+      aktiveKampagneName: '',
     };
   },
   computed: {
@@ -21,10 +23,20 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
     vollbildLabel() {
       return this.istVollbild ? 'Vollbild beenden' : 'Vollbild';
     },
+    titel() {
+      return this.aktiveKampagneName
+        ? `Abenteuerbuch — ${this.aktiveKampagneName}`
+        : 'Abenteuerbuch';
+    },
   },
   watch: {
     'uiZustand.abenteuerbuchOffen'(istOffen) {
       if (istOffen) {
+        this.aktualisiereAktiveKampagne();
+        if (!this.aktiveKampagneIdLokal) {
+          this.uiZustand.abenteuerbuchOffen = false;
+          return;
+        }
         this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         this.$nextTick(() => {
           this.initialisierePosition();
@@ -98,12 +110,23 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       }
       this.speichernFlushen();
     },
+    aktualisiereAktiveKampagne() {
+      const zustand = window.HTBAH.ladeSpielleiterZustand();
+      const id = typeof zustand.aktiveKampagneId === 'string' ? zustand.aktiveKampagneId : '';
+      const kampagne = id
+        ? (Array.isArray(zustand.kampagnen) ? zustand.kampagnen : []).find((k) => k && k.id === id)
+        : null;
+      this.aktiveKampagneIdLokal = kampagne ? kampagne.id : '';
+      this.aktiveKampagneName = kampagne ? String(kampagne.name || '') : '';
+    },
     editorInitialisieren() {
       if (!window.Quill || !this.$refs.editorHost) {
         return;
       }
 
-      const html = window.HTBAH.ladeSpielleitungAbenteuerbuchHtml() || '';
+      const html = this.aktiveKampagneIdLokal
+        ? window.HTBAH.ladeKampagnenAbenteuerbuchHtml(this.aktiveKampagneIdLokal) || ''
+        : '';
 
       if (!this.quill) {
         this.quill = new window.Quill(this.$refs.editorHost, {
@@ -145,8 +168,11 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       }, 450);
     },
     speichernFlushen() {
-      if (this.quill) {
-        window.HTBAH.speichereSpielleitungAbenteuerbuchHtml(this.quill.root.innerHTML);
+      if (this.quill && this.aktiveKampagneIdLokal) {
+        window.HTBAH.speichereKampagnenAbenteuerbuchHtml(
+          this.aktiveKampagneIdLokal,
+          this.quill.root.innerHTML,
+        );
       }
     },
   },
@@ -165,7 +191,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
         <div
           class="regelwerk-modal-header d-flex justify-content-between align-items-center p-3 flex-shrink-0"
           @pointerdown="starteZiehen">
-          <h4 class="mb-0">📔 Abenteuerbuch</h4>
+          <h4 class="mb-0">📔 {{ titel }}</h4>
           <div class="d-flex gap-2 align-items-center">
             <button
               type="button"

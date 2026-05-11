@@ -43,6 +43,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     'update:zufallFraktionEpoche',
     'update:zufallRaetselEpoche',
     'npc-refresh-field',
+    'npc-wizard',
+    'bestien-wizard',
   ],
   data() {
     return {
@@ -431,7 +433,17 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
               <ul class="dropdown-menu dropdown-menu-end">
                 <li>
                   <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('random')">
-                    Zufallsvorschlag
+                    🎲 Zufallsvorschlag
+                  </button>
+                </li>
+                <li v-if="anlage.typ === 'npc'">
+                  <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('npc-wizard')">
+                    🧙 Wizard …
+                  </button>
+                </li>
+                <li v-if="anlage.typ === 'bestie'">
+                  <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('bestien-wizard')">
+                    🧙 Wizard …
                   </button>
                 </li>
               </ul>
@@ -474,39 +486,29 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         <template v-if="anlage.typ === 'npc'">
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
-            <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
-              <div class="col-md-6">
-                <label class="form-label small text-secondary mb-1">Epoche für Zufallsvorschlag</label>
-                <select class="form-select form-select-sm" :value="zufallNpcEpoche" @change="$emit('update:zufallNpcEpoche', $event.target.value)">
-                  <option value="mittelalter">Mittelalter</option>
-                  <option value="gegenwart">Gegenwart</option>
-                  <option value="zukunft">Zukunft</option>
-                </select>
-              </div>
-            </div>
             <div class="row g-2">
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Name</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.name" placeholder="Name" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Name neu würfeln" @click="npcFeldNeuWuerfeln('name', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Spitzname</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.spitzname" placeholder="Spitzname" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Spitzname neu würfeln" @click="npcFeldNeuWuerfeln('spitzname', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Geschlecht</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.geschlecht" placeholder="Geschlecht" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Geschlecht neu würfeln" @click="npcFeldNeuWuerfeln('geschlecht', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Name</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.name" placeholder="Name" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Name neu würfeln" @click="npcFeldNeuWuerfeln('name', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Spitzname</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.spitzname" placeholder="Spitzname" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Spitzname neu würfeln" @click="npcFeldNeuWuerfeln('spitzname', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Geschlecht</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.geschlecht" placeholder="Geschlecht" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Geschlecht neu würfeln" @click="npcFeldNeuWuerfeln('geschlecht', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6">
                 <label class="form-label small text-secondary mb-1">Alter</label>
                 <div class="input-group">
                   <input class="form-control" v-model="anlage.zeile.alter" placeholder="Alter" />
-                  <button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Alter neu würfeln (einzeln)" @click="npcFeldNeuWuerfeln('alter', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
-                  <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" :disabled="!zufallsgeneratorBereit || !randomSichtbar" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Optionen</span></button>
+                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Alter neu würfeln (einzeln)" @click="npcFeldNeuWuerfeln('alter', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
+                  <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Optionen</span></button>
                   <ul class="dropdown-menu dropdown-menu-end">
                     <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('alter', 'einzeln')">Nur Alter neu</button></li>
                     <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('alter', 'mitAbhaengigen')">Alter + {{ npcAbhaengigkeitsLabel('alter') }}</button></li>
                   </ul>
                 </div>
               </div>
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Familienstand</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.familienstand" placeholder="Familienstand" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Familienstand neu würfeln" @click="npcFeldNeuWuerfeln('familienstand', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Familienstand</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.familienstand" placeholder="Familienstand" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Familienstand neu würfeln" @click="npcFeldNeuWuerfeln('familienstand', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6">
                 <label class="form-label small text-secondary mb-1">Beruf</label>
                 <div class="input-group">
                   <input class="form-control" v-model="anlage.zeile.beruf" placeholder="Beruf" />
-                  <button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Beruf neu würfeln (einzeln)" @click="npcFeldNeuWuerfeln('beruf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
-                  <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" :disabled="!zufallsgeneratorBereit || !randomSichtbar" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Optionen</span></button>
+                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Beruf neu würfeln (einzeln)" @click="npcFeldNeuWuerfeln('beruf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
+                  <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Optionen</span></button>
                   <ul class="dropdown-menu dropdown-menu-end">
                     <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('beruf', 'einzeln')">Nur Beruf neu</button></li>
                     <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('beruf', 'mitAbhaengigen')">Beruf + {{ npcAbhaengigkeitsLabel('beruf') }}</button></li>
@@ -522,21 +524,21 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                 <label class="form-label small text-secondary mb-1">Statur</label>
                 <div class="input-group">
                   <input class="form-control" v-model="anlage.zeile.statur" placeholder="Statur" />
-                  <button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Statur neu würfeln (einzeln)" @click="npcFeldNeuWuerfeln('statur', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
-                  <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" :disabled="!zufallsgeneratorBereit || !randomSichtbar" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Optionen</span></button>
+                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Statur neu würfeln (einzeln)" @click="npcFeldNeuWuerfeln('statur', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
+                  <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Optionen</span></button>
                   <ul class="dropdown-menu dropdown-menu-end">
                     <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('statur', 'einzeln')">Nur Statur neu</button></li>
                     <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('statur', 'mitAbhaengigen')">Statur + {{ npcAbhaengigkeitsLabel('statur') }}</button></li>
                   </ul>
                 </div>
               </div>
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Stimme</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.stimme" placeholder="Stimme" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Stimme neu würfeln" @click="npcFeldNeuWuerfeln('stimme', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Stimme</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.stimme" placeholder="Stimme" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Stimme neu würfeln" @click="npcFeldNeuWuerfeln('stimme', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
             </div>
           </section>
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">⚔️ Werte & Kampf</h6>
             <div class="row g-2">
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Lebenspunkte</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder="Lebenspunkte" inputmode="numeric" autocomplete="off" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Lebenspunkte neu würfeln" @click="npcFeldNeuWuerfeln('lebenspunkte', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Lebenspunkte</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder="Lebenspunkte" inputmode="numeric" autocomplete="off" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Lebenspunkte neu würfeln" @click="npcFeldNeuWuerfeln('lebenspunkte', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
@@ -544,11 +546,11 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                 <label class="form-label small text-secondary mb-1">Waffe</label>
                 <div class="input-group">
                   <input class="form-control" v-model="anlage.zeile.waffe" placeholder="Waffe" />
-                  <button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Waffe neu würfeln (mit Schadenswerten)" @click="npcFeldNeuWuerfeln('waffe', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button>
+                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Waffe neu würfeln (mit Schadenswerten)" @click="npcFeldNeuWuerfeln('waffe', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button>
                 </div>
               </div>
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Schadenswert Nahkampf</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder="Schadenswert Nahkampf" autocomplete="off" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Nahkampfschaden neu würfeln" @click="npcFeldNeuWuerfeln('schadenswertNahkampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Schadenswert Fernkampf</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder="Schadenswert Fernkampf" autocomplete="off" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Fernkampfschaden neu würfeln" @click="npcFeldNeuWuerfeln('schadenswertFernkampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Schadenswert Nahkampf</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder="Schadenswert Nahkampf" autocomplete="off" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Nahkampfschaden neu würfeln" @click="npcFeldNeuWuerfeln('schadenswertNahkampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Schadenswert Fernkampf</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder="Schadenswert Fernkampf" autocomplete="off" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Fernkampfschaden neu würfeln" @click="npcFeldNeuWuerfeln('schadenswertFernkampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6" v-if="istBearbeitung">
                 <label class="form-label small text-secondary mb-1">Initiative</label>
                 <div class="input-group">
@@ -608,18 +610,18 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧭 Zugehörigkeit & Kontext</h6>
             <div class="row g-2">
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Gesinnung</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.gesinnung" placeholder="Gesinnung" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Gesinnung neu würfeln" @click="npcFeldNeuWuerfeln('gesinnung', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Gesinnung</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.gesinnung" placeholder="Gesinnung" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Gesinnung neu würfeln" @click="npcFeldNeuWuerfeln('gesinnung', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6 htbah-npc-feld-anheben">
                 <label class="form-label small text-secondary mb-1" for="wb-zfn-glaube">Glaube</label>
                 <div class="input-group">
                   <input id="wb-zfn-glaube" class="form-control" v-model="anlage.zeile.glaube" :list="pantheonNamenListe.length ? 'wb-zfn-glaube-datalist' : undefined" placeholder="Leer, aus Liste wählen oder Freitext" autocomplete="off" />
-                  <button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Glaube neu würfeln" @click="npcFeldNeuWuerfeln('glaube', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
+                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Glaube neu würfeln" @click="npcFeldNeuWuerfeln('glaube', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
                 </div>
                 <datalist v-if="pantheonNamenListe.length" id="wb-zfn-glaube-datalist">
                   <option v-for="n in pantheonNamenListe" :key="'wb-pg-' + n" :value="n"></option>
                 </datalist>
               </div>
-              <div class="col-md-6 htbah-npc-feld-anheben"><label class="form-label small text-secondary mb-1">Fraktion</label><div class="input-group"><select class="form-select" v-model="anlage.zeile.fraktion"><option value="">— keine —</option><option v-for="f in fraktionenMitNamen" :key="f.id" :value="f.name">{{ f.name }}</option></select><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Fraktion neu würfeln" @click="npcFeldNeuWuerfeln('fraktion', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6 htbah-npc-feld-anheben"><label class="form-label small text-secondary mb-1">Fraktion</label><div class="input-group"><select class="form-select" v-model="anlage.zeile.fraktion"><option value="">— keine —</option><option v-for="f in fraktionenMitNamen" :key="f.id" :value="f.name">{{ f.name }}</option></select><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Fraktion neu würfeln" @click="npcFeldNeuWuerfeln('fraktion', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6">
                 <label class="form-label small text-secondary mb-1" for="wb-zfn-ort">Aufenthaltsort</label>
                 <div class="input-group">
@@ -630,7 +632,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                     :list="orteNamenListe.length ? 'wb-zfn-ort-datalist' : undefined"
                     placeholder="Ort wählen oder Freitext"
                     autocomplete="off" />
-                  <button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Aufenthaltsort neu würfeln" @click="npcFeldNeuWuerfeln('aufenthaltsort', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
+                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Aufenthaltsort neu würfeln" @click="npcFeldNeuWuerfeln('aufenthaltsort', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
                 </div>
                 <datalist v-if="orteNamenListe.length" id="wb-zfn-ort-datalist">
                   <option v-for="ort in orteNamenListe" :key="'wb-zfn-ort-' + ort" :value="ort"></option>
@@ -641,8 +643,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🎯 Motivation</h6>
             <div class="row g-2">
-              <div class="col-12"><label class="form-label small text-secondary mb-1">Geheimnis</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.geheimnis" placeholder="Geheimnis" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Geheimnis neu würfeln" @click="npcFeldNeuWuerfeln('geheimnis', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
-              <div class="col-12"><label class="form-label small text-secondary mb-1">Ziel</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.ziel" placeholder="Ziel (z. B. Wohlstand, Lebenswandel)" /><button type="button" class="btn btn-outline-secondary" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Ziel neu würfeln" @click="npcFeldNeuWuerfeln('ziel', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-12"><label class="form-label small text-secondary mb-1">Geheimnis</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.geheimnis" placeholder="Geheimnis" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Geheimnis neu würfeln" @click="npcFeldNeuWuerfeln('geheimnis', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-12"><label class="form-label small text-secondary mb-1">Ziel</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.ziel" placeholder="Ziel (z. B. Wohlstand, Lebenswandel)" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Ziel neu würfeln" @click="npcFeldNeuWuerfeln('ziel', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
             </div>
           </section>
         </template>

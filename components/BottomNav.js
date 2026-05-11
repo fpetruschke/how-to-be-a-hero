@@ -60,8 +60,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     };
   },
   created() {
-    this.atmosphaere = window.HTBAH.ladeAtmosphaereZustand();
-    this.badgePos = window.HTBAH.ladeAtmosphaereBadgePosition();
+    this.synchronisiereKampagnenbasierteDaten();
     this.ladeWuerfelBeutelFenster();
   },
   computed: {
@@ -163,6 +162,18 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     spielleiterKampagnenAktiv() {
       const p = this.$route.path || '';
       return p === '/spielleiter' || p.startsWith('/spielleiter/kampagne/');
+    },
+    aktiveKampagneId() {
+      void this.$route.fullPath;
+      const z = window.HTBAH.ladeSpielleiterZustand();
+      return typeof z.aktiveKampagneId === 'string' && z.aktiveKampagneId ? z.aktiveKampagneId : '';
+    },
+    istInKampagneRoute() {
+      const p = this.$route.path || '';
+      return /^\/spielleiter\/kampagne\/[^/]+/.test(p) || /^\/kampagne\/[^/]+/.test(p);
+    },
+    hatAktiveKampagne() {
+      return this.istInKampagneRoute && !!this.aktiveKampagneId;
     },
     presetVerwaltungAktiv() {
       const p = this.$route.path || '';
@@ -291,6 +302,18 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     '$route.fullPath'() {
       if (this.sicherheitsmechanismenModalOffen) {
         this.sicherheitsmechanismenModalOffen = false;
+      }
+    },
+    aktiveKampagneId() {
+      this.synchronisiereKampagnenbasierteDaten();
+    },
+    hatAktiveKampagne(neu) {
+      if (neu) {
+        this.synchronisiereKampagnenbasierteDaten();
+        return;
+      }
+      if (this.wuerfelModalTab === 'atmosphaere') {
+        this.wuerfelModalTab = 'wuerfel';
       }
     },
     zeigeNav() {
@@ -726,8 +749,22 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     abenteuerbuchOeffnen() {
       this.uiZustand.abenteuerbuchOffen = true;
     },
+    synchronisiereKampagnenbasierteDaten() {
+      const id = this.aktiveKampagneId;
+      if (!id) {
+        this.atmosphaere = {};
+        this.badgePos = null;
+        return;
+      }
+      this.atmosphaere = window.HTBAH.ladeKampagnenAtmosphaereZustand(id);
+      this.badgePos = window.HTBAH.ladeKampagnenAtmosphaereBadgePosition(id);
+    },
     speichereAtmosphaere() {
-      window.HTBAH.speichereAtmosphaereZustand(this.atmosphaere);
+      const id = this.aktiveKampagneId;
+      if (!id) {
+        return;
+      }
+      window.HTBAH.speichereKampagnenAtmosphaereZustand(id, this.atmosphaere);
     },
     atmosphaereAllesWuerfeln() {
       const AZ = window.HTBAH.AtmosphaereZufall;
@@ -916,7 +953,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const zielTab =
         tab === 'atmosphaere' || tab === 'begegnung' || tab === 'wuerfel' ? tab : 'wuerfel';
       const gmTab = zielTab === 'atmosphaere' || zielTab === 'begegnung';
-      this.wuerfelModalTab = !this.istSpielleitung && gmTab ? 'wuerfel' : zielTab;
+      const atmosphaereVerbieten = zielTab === 'atmosphaere' && !this.hatAktiveKampagne;
+      this.wuerfelModalTab =
+        (!this.istSpielleitung && gmTab) || atmosphaereVerbieten ? 'wuerfel' : zielTab;
       this.wuerfelBeutelAusloeserElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.ladeDiceFarbwahl();
       this.wuerfelBeutelOffen = true;
@@ -1363,7 +1402,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         }
       }
       this._badgeDrag = null;
-      window.HTBAH.speichereAtmosphaereBadgePosition(this.badgePos);
+      const id = this.aktiveKampagneId;
+      if (!id) {
+        return;
+      }
+      window.HTBAH.speichereKampagnenAtmosphaereBadgePosition(id, this.badgePos);
     },
     setzeWuerfelModus(modus) {
       this.wuerfelModus = modus === 'w100' ? 'w100' : 'w10';
@@ -1683,7 +1726,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 <span class="htbah-nav-item-emoji" aria-hidden="true">📦</span>
                 <span class="htbah-nav-item-label">Presets</span>
               </router-link>
-              <button type="button" title="Abenteuerbuch" class="htbah-nav-item" @click="abenteuerbuchOeffnen">
+              <button
+                v-if="hatAktiveKampagne"
+                type="button"
+                title="Abenteuerbuch"
+                class="htbah-nav-item"
+                @click="abenteuerbuchOeffnen">
                 <span class="htbah-nav-item-emoji" aria-hidden="true">📔</span>
                 <span class="htbah-nav-item-label">Abenteuerbuch</span>
               </button>
@@ -1756,7 +1804,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               :class="{ 'router-link-active': presetVerwaltungAktiv }">
               📦
             </router-link>
-            <button type="button" title="Abenteuerbuch" @click="abenteuerbuchOeffnen">
+            <button
+              v-if="hatAktiveKampagne"
+              type="button"
+              title="Abenteuerbuch"
+              @click="abenteuerbuchOeffnen">
               📔
             </button>
           </template>
@@ -1801,7 +1853,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
     <teleport to="body">
       <div
-        v-if="zeigeNav && istSpielleitung"
+        v-if="zeigeNav && istSpielleitung && hatAktiveKampagne"
         ref="atmosphaereBadgeEl"
         class="htbah-atmosphaere-badge"
         :class="{ 'htbah-atmosphaere-badge--custom-pos': badgePos && badgePos.mode === 'fixed' }"
@@ -1933,7 +1985,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     Würfel
                   </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li v-if="hatAktiveKampagne" class="nav-item" role="presentation">
                   <button
                     type="button"
                     class="nav-link"

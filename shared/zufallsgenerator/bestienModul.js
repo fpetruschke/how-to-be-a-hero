@@ -173,39 +173,74 @@ window.HTBAH = window.HTBAH || {};
     return { handeln, wissen, soziales };
   }
 
+  const KATEGORIE_LABELS = {
+    [KAT.NORM]: 'normales Tier',
+    [KAT.FANTASY]: 'magisches / Fantasy-Tier',
+    [KAT.MUTANT]: 'mutiertes Wesen',
+    [KAT.MONSTER]: 'Monster',
+  };
+
+  function bekannteKategorie(k) {
+    if (k === KAT.NORM || k === KAT.FANTASY || k === KAT.MUTANT || k === KAT.MONSTER) {
+      return k;
+    }
+    return null;
+  }
+
+  function namenslisteFuerKategorieUndEpoche(kategorie, epoche) {
+    const k = bekannteKategorie(kategorie) || KAT.NORM;
+    const key = listenSchluesselFuerName(epoche || E.MITTELALTER, k);
+    const arr = L[key];
+    return Array.isArray(arr) ? arr.slice() : [];
+  }
+
   window.HTBAH.ZufallsgeneratorBestienModul = {
     EPOCHE: E,
     KATEGORIEN: KAT,
+    KATEGORIE_LABELS,
+    /** Namensvorschläge für UI-Autocomplete passend zur Kategorie + Epoche. */
+    namenslisteFuerKategorieUndEpoche(kategorie, epoche) {
+      return namenslisteFuerKategorieUndEpoche(kategorie, epoche);
+    },
     /**
-     * @param {{ epoche?: string, orteNamen?: string[] }} opts
+     * Generiert eine Bestie. Vorgaben (kategorie, epoche, name, aggressivitaetSkala)
+     * werden übernommen, falls gesetzt; ansonsten zufällig erzeugt.
+     * @param {{
+     *   epoche?: string,
+     *   kategorie?: string,
+     *   name?: string,
+     *   aggressivitaetSkala?: number,
+     *   orteNamen?: string[],
+     * }} opts
      */
     generiere(opts) {
-      const epoche = (opts && opts.epoche) || E.MITTELALTER;
-      const kategorie = kategorieGewichtet(epoche);
-      const name = nameFuer(epoche, kategorie);
+      opts = opts || {};
+      const epoche = opts.epoche || E.MITTELALTER;
+      const kategorieVorgabe = bekannteKategorie(opts.kategorie);
+      const kategorie = kategorieVorgabe || kategorieGewichtet(epoche);
+      const nameVorgabe = typeof opts.name === 'string' ? opts.name.trim() : '';
+      const name = nameVorgabe || nameFuer(epoche, kategorie);
       const angriff = angriffWert(kategorie);
       const verteidigung = verteidigungWert(kategorie);
       const lebenspunkte = lebenspunkteWert(kategorie);
       const staerke = optionalText('STAERKEN', 0.72);
       const schwaeche = optionalText('SCHWAECHEN', 0.72);
       const geheimnis = optionalText('GEHEIMNISSE', 0.8);
-      const aggressivitaetSkala = aggressivitaetFuer(kategorie);
+      const aggressivitaetVorgabe = Number(opts.aggressivitaetSkala);
+      const aggressivitaetSkala = Number.isFinite(aggressivitaetVorgabe)
+        ? Math.min(10, Math.max(1, Math.round(aggressivitaetVorgabe)))
+        : aggressivitaetFuer(kategorie);
       const waffenwerte = waffenwerteFuerBestie(kategorie);
       const begabung = begabungswerteVerteilen();
       const lebensraum = lebensraumFuer(epoche);
-      const katLabels = {
-        [KAT.NORM]: 'normales Tier',
-        [KAT.FANTASY]: 'magisches / Fantasy-Tier',
-        [KAT.MUTANT]: 'mutiertes Wesen',
-        [KAT.MONSTER]: 'Monster',
-      };
       const beschreibungHtml = beschreibungHtmlBauen({
         name,
         lebensraum,
-        kategorieLabel: katLabels[kategorie] || 'Bestie',
+        kategorieLabel: KATEGORIE_LABELS[kategorie] || 'Bestie',
       });
       return {
         kategorie,
+        epoche,
         name,
         waffe: U.zufaellig(['Klauen', 'Biss', 'Stachel', 'Magischer Stoß', 'Schweifhieb']),
         schadenswertNahkampf: waffenwerte.nah,
@@ -220,7 +255,7 @@ window.HTBAH = window.HTBAH || {};
         handeln: begabung.handeln,
         wissen: begabung.wissen,
         soziales: begabung.soziales,
-        aufenthaltsort: aufenthaltsortAusOrteListe(opts && opts.orteNamen),
+        aufenthaltsort: aufenthaltsortAusOrteListe(opts.orteNamen),
         fraktionen: [],
         beschreibungHtml,
       };

@@ -10,8 +10,45 @@ function htbahDiceAssetUrl(relMitPunktSlash) {
 }
 
 const HTBAH_WB_DICE_BOX_MODULE_URL = htbahDiceAssetUrl('./assets/js/dice-box.es.min.js');
-const HTBAH_WB_DICE_INIT_TIMEOUT_MS = 7000;
+const HTBAH_WB_DICE_ASSET_PATH = htbahDiceAssetUrl('./assets/dice-box/assets/');
+const HTBAH_WB_DICE_INIT_TIMEOUT_MS = 15000;
+const HTBAH_WB_DICE_INIT_RETRIES = 2;
+const HTBAH_WB_DICE_INIT_RETRY_DELAY_MS = 350;
 const HTBAH_WB_APP_ORIGIN = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
+
+/**
+ * Globale Init-Schlange: stellt sicher, dass DiceBox.init() der zugrunde liegenden
+ * Engine nie parallel läuft. Mehrere parallele init()-Aufrufe haben in der Praxis
+ * Race-Conditions am gemeinsamen Worker/OffscreenCanvas der Bibliothek erzeugt,
+ * die als „Laden der 3D-Würfel fehlgeschlagen“ in Erscheinung getreten sind.
+ */
+let HTBAH_WB_DICE_INIT_QUEUE = Promise.resolve();
+function htbahDiceInitInWarteschlange(initAufruf) {
+  const naechster = HTBAH_WB_DICE_INIT_QUEUE.catch(() => undefined).then(() => initAufruf());
+  HTBAH_WB_DICE_INIT_QUEUE = naechster.catch(() => undefined);
+  return naechster;
+}
+
+function htbahDiceWarte(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function htbahInitiereDiceBoxMitRetry(boxFabrik) {
+  let letzterFehler = null;
+  for (let versuch = 0; versuch <= HTBAH_WB_DICE_INIT_RETRIES; versuch += 1) {
+    try {
+      const box = boxFabrik();
+      await htbahDiceInitInWarteschlange(() => box.init());
+      return box;
+    } catch (err) {
+      letzterFehler = err;
+      if (versuch < HTBAH_WB_DICE_INIT_RETRIES) {
+        await htbahDiceWarte(HTBAH_WB_DICE_INIT_RETRY_DELAY_MS * (versuch + 1));
+      }
+    }
+  }
+  throw letzterFehler || new Error('DiceBox-Initialisierung fehlgeschlagen.');
+}
 
 window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
   props: {
@@ -193,15 +230,14 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       this.diceInitPromise = this.ladeDiceBoxKlasse()
         .then(async (DiceBox) => {
           this.diceFehler = '';
-          const box = new DiceBox(`#${this.diceContainerId}`, {
-            assetPath: 'assets/dice-box/assets/',
+          const box = await htbahInitiereDiceBoxMitRetry(() => new DiceBox(`#${this.diceContainerId}`, {
+            assetPath: HTBAH_WB_DICE_ASSET_PATH,
             origin: HTBAH_WB_APP_ORIGIN,
             theme: 'default',
             themeColor: this.diceThemeColor,
             offscreen: true,
             scale: 16,
-          });
-          await box.init();
+          }));
           this.diceBox = Vue.markRaw(box);
           this.diceReady = true;
           return this.diceBox;
@@ -240,58 +276,70 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       }
       const DiceBox = await this.ladeDiceBoxKlasse();
       if (!this.diceInitPromiseZehner) {
-        this.diceInitPromiseZehner = (async () => {
-          const boxZ = new DiceBox(`#${this.diceContainerIdZehner}`, {
-            assetPath: 'assets/dice-box/assets/',
+        this.diceInitPromiseZehner = htbahInitiereDiceBoxMitRetry(() =>
+          new DiceBox(`#${this.diceContainerIdZehner}`, {
+            assetPath: HTBAH_WB_DICE_ASSET_PATH,
             origin: HTBAH_WB_APP_ORIGIN,
             theme: 'default',
             themeColor: this.diceThemeColorTens,
             offscreen: true,
             scale: 16,
-          });
-          await boxZ.init();
-          this.diceBoxZehner = Vue.markRaw(boxZ);
-          this.diceReadyZehner = true;
-          return boxZ;
-        })()
-          .catch(() => {
+          }),
+        )
+          .then((boxZ) => {
+            this.diceBoxZehner = Vue.markRaw(boxZ);
+            this.diceReadyZehner = true;
+            return boxZ;
+          })
+          .catch((err) => {
             this.diceReadyZehner = false;
             this.diceBoxZehner = null;
-            return null;
+            return Promise.reject(err);
           })
           .finally(() => {
             this.diceInitPromiseZehner = null;
           });
       }
       if (!this.diceInitPromiseEiner) {
-        this.diceInitPromiseEiner = (async () => {
-          const boxE = new DiceBox(`#${this.diceContainerIdEiner}`, {
-            assetPath: 'assets/dice-box/assets/',
+        this.diceInitPromiseEiner = htbahInitiereDiceBoxMitRetry(() =>
+          new DiceBox(`#${this.diceContainerIdEiner}`, {
+            assetPath: HTBAH_WB_DICE_ASSET_PATH,
             origin: HTBAH_WB_APP_ORIGIN,
             theme: 'default',
             themeColor: this.diceThemeColorOnes,
             offscreen: true,
             scale: 16,
-          });
-          await boxE.init();
-          this.diceBoxEiner = Vue.markRaw(boxE);
-          this.diceReadyEiner = true;
-          return boxE;
-        })()
-          .catch(() => {
+          }),
+        )
+          .then((boxE) => {
+            this.diceBoxEiner = Vue.markRaw(boxE);
+            this.diceReadyEiner = true;
+            return boxE;
+          })
+          .catch((err) => {
             this.diceReadyEiner = false;
             this.diceBoxEiner = null;
-            return null;
+            return Promise.reject(err);
           })
           .finally(() => {
             this.diceInitPromiseEiner = null;
           });
       }
-      const [z, e] = await Promise.all([this.diceInitPromiseZehner, this.diceInitPromiseEiner]);
-      if (!z || !e) {
+      try {
+        const [z, e] = await Promise.all([this.diceInitPromiseZehner, this.diceInitPromiseEiner]);
+        if (!z || !e) {
+          return null;
+        }
+        this.diceFehler = '';
+        return { zehner: z, einer: e };
+      } catch (err) {
+        const meldung =
+          err && typeof err.message === 'string' && err.message.trim()
+            ? err.message.trim()
+            : 'Unbekannter Initialisierungsfehler';
+        this.diceFehler = `3D-Würfel konnten nicht geladen werden (${meldung}). Standard-Wurf bleibt aktiv.`;
         return null;
       }
-      return { zehner: z, einer: e };
     },
     ergebnisseAusDiceRoll(rollWert) {
       if (!Array.isArray(rollWert)) {
@@ -513,7 +561,7 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
         </div>
         </div>
       </div>
-      <div class="d-flex flex-wrap gap-2" v-if="ergebnisse.length && !prozentwurfDetails">
+      <div class="d-flex flex-wrap gap-2 mb-2" v-if="ergebnisse.length && !prozentwurfDetails">
         <span
           class="wuerfel-ergebnis-chip"
           :class="modus === 'w10' ? 'wuerfel-ergebnis-chip-w10' : 'wuerfel-ergebnis-chip-w100'"
@@ -528,10 +576,10 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
           </template>
         </span>
       </div>
-      <div v-if="dice3dAktiv && !istProzentwurf" class="htbah-dice-box-wrap mb-2">
+      <div v-if="dice3dAktiv && !istProzentwurf" class="htbah-dice-box-wrap">
         <div :id="diceContainerId" ref="diceBoxElement" class="htbah-dice-box"></div>
       </div>
-      <div v-if="dice3dAktiv && istProzentwurf" class="row g-2 mb-2">
+      <div v-if="dice3dAktiv && istProzentwurf" class="row g-2">
         <div class="col-12 col-md-6">
           <div class="htbah-dice-box-wrap">
             <div :id="diceContainerIdZehner" ref="diceBoxZehnerElement" class="htbah-dice-box"></div>
@@ -543,9 +591,9 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
           </div>
         </div>
       </div>
-      <small v-if="diceFehler" class="text-warning d-block mb-2">{{ diceFehler }}</small>
-      <small v-else-if="wuerfelnLaeuft">{{ wuerfelRolltText }}</small>
-      <small v-else-if="!prozentwurfDetails">Noch kein Wurf.</small>
+      <small v-if="diceFehler" class="text-warning d-block mt-2">{{ diceFehler }}</small>
+      <small v-else-if="wuerfelnLaeuft" class="d-block mt-2">{{ wuerfelRolltText }}</small>
+      <small v-else-if="!prozentwurfDetails && !ergebnisse.length" class="d-block mt-2">Noch kein Wurf.</small>
       <div v-if="modus === 'w10' && ergebnisse.length" class="small text-body-secondary mt-2">
         Summe: <strong>{{ ergebnisSumme }}</strong>
       </div>

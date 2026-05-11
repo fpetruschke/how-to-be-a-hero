@@ -7,10 +7,7 @@ const SPEICHER_KEY_THEME = 'htbah_theme';
 const SPEICHER_KEY_CHARAKTER_BILD_LEGACY = 'htbah_character_image';
 const SPEICHER_KEY_SPIELLEITER = 'htbah_spielleiter_kampagnen';
 const SPEICHER_KEY_ZUFALLSTABELLEN = 'htbah_zufallstabellen';
-const SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH = 'htbah_spielleitung_abenteuerbuch';
 const SPEICHER_KEY_WELTENBAU = 'htbah_weltenbau';
-const SPEICHER_KEY_ATMOSPHAERE = 'htbah_atmosphaere';
-const SPEICHER_KEY_ATMOSPHAERE_BADGE = 'htbah_atmosphaere_badge_pos';
 const SPEICHER_KEY_WUERFEL_AUDIO = 'htbah_wuerfel_audio';
 /** @deprecated nur Migration; neuer Speicher: SPEICHER_KEY_WUERFEL_AUDIO */
 const SPEICHER_KEY_WUERFEL_SOUND_LEGACY = 'htbah_wuerfel_sound';
@@ -168,10 +165,17 @@ function normalisiereSpielleiterKampagne(g) {
   const mitglieder = Array.isArray(g.mitglieder)
     ? g.mitglieder.map(normalisiereSpielleiterMitglied).filter(Boolean)
     : [];
+  const abenteuerbuchHtml =
+    typeof g.abenteuerbuchHtml === 'string' ? g.abenteuerbuchHtml : '';
+  const atmosphaere = normalisiereAtmosphaereZustand(g.atmosphaere);
+  const atmosphaereBadgePos = normalisiereAtmosphaereBadgePosition(g.atmosphaereBadgePos);
   return {
     id: typeof g.id === 'string' && g.id ? g.id : neueEntropieId(),
     name: typeof g.name === 'string' && g.name.trim() ? g.name.trim() : 'Kampagne',
     mitglieder,
+    abenteuerbuchHtml,
+    atmosphaere,
+    atmosphaereBadgePos,
   };
 }
 
@@ -678,17 +682,7 @@ function normalisiereAtmosphaereZustand(roh) {
   };
 }
 
-function ladeAtmosphaereZustand() {
-  const roh = htbahSpeicher.leseJson(SPEICHER_KEY_ATMOSPHAERE, null);
-  return normalisiereAtmosphaereZustand(roh);
-}
-
-function speichereAtmosphaereZustand(zustand) {
-  htbahSpeicher.schreibeJson(SPEICHER_KEY_ATMOSPHAERE, normalisiereAtmosphaereZustand(zustand));
-}
-
-function ladeAtmosphaereBadgePosition() {
-  const roh = htbahSpeicher.leseJson(SPEICHER_KEY_ATMOSPHAERE_BADGE, null);
+function normalisiereAtmosphaereBadgePosition(roh) {
   if (!roh || typeof roh !== 'object') {
     return null;
   }
@@ -698,29 +692,66 @@ function ladeAtmosphaereBadgePosition() {
   return null;
 }
 
-function speichereAtmosphaereBadgePosition(pos) {
-  if (!pos || pos.mode !== 'fixed' || typeof pos.left !== 'number' || typeof pos.top !== 'number') {
-    htbahSpeicher.loescheKey(SPEICHER_KEY_ATMOSPHAERE_BADGE);
-    return;
+function findeKampagneById(zustand, kampagneId) {
+  if (!zustand || !Array.isArray(zustand.kampagnen) || typeof kampagneId !== 'string' || !kampagneId) {
+    return null;
   }
-  htbahSpeicher.schreibeJson(SPEICHER_KEY_ATMOSPHAERE_BADGE, {
-    mode: 'fixed',
-    left: pos.left,
-    top: pos.top,
+  return zustand.kampagnen.find((k) => k && k.id === kampagneId) || null;
+}
+
+function aktualisiereKampagneFeld(kampagneId, mutator) {
+  if (typeof kampagneId !== 'string' || !kampagneId || typeof mutator !== 'function') {
+    return false;
+  }
+  const zustand = ladeSpielleiterZustand();
+  const kampagne = findeKampagneById(zustand, kampagneId);
+  if (!kampagne) {
+    return false;
+  }
+  mutator(kampagne);
+  speichereSpielleiterZustand(zustand);
+  return true;
+}
+
+function ladeKampagnenAtmosphaereZustand(kampagneId) {
+  const kampagne = findeKampagneById(ladeSpielleiterZustand(), kampagneId);
+  return normalisiereAtmosphaereZustand(kampagne && kampagne.atmosphaere);
+}
+
+function speichereKampagnenAtmosphaereZustand(kampagneId, zustand) {
+  return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
+    kampagne.atmosphaere = normalisiereAtmosphaereZustand(zustand);
   });
 }
 
-function ladeSpielleitungAbenteuerbuchHtml() {
-  return htbahSpeicher.leseText(SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH, '') || '';
+function ladeKampagnenAtmosphaereBadgePosition(kampagneId) {
+  const kampagne = findeKampagneById(ladeSpielleiterZustand(), kampagneId);
+  return normalisiereAtmosphaereBadgePosition(kampagne && kampagne.atmosphaereBadgePos);
 }
 
-function speichereSpielleitungAbenteuerbuchHtml(html) {
-  const s = typeof html === 'string' ? html : '';
-  htbahSpeicher.schreibeText(SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH, s);
+function speichereKampagnenAtmosphaereBadgePosition(kampagneId, pos) {
+  return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
+    kampagne.atmosphaereBadgePos = normalisiereAtmosphaereBadgePosition(pos);
+  });
 }
 
-function loescheSpielleitungAbenteuerbuch() {
-  htbahSpeicher.loescheKey(SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH);
+function ladeKampagnenAbenteuerbuchHtml(kampagneId) {
+  const kampagne = findeKampagneById(ladeSpielleiterZustand(), kampagneId);
+  return kampagne && typeof kampagne.abenteuerbuchHtml === 'string'
+    ? kampagne.abenteuerbuchHtml
+    : '';
+}
+
+function speichereKampagnenAbenteuerbuchHtml(kampagneId, html) {
+  return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
+    kampagne.abenteuerbuchHtml = typeof html === 'string' ? html : '';
+  });
+}
+
+function loescheKampagnenAbenteuerbuch(kampagneId) {
+  return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
+    kampagne.abenteuerbuchHtml = '';
+  });
 }
 
 function normalisiereWeltenbauEintrag(e) {
@@ -1605,13 +1636,85 @@ async function sperreBildschirmAusrichtungWennMoeglich(ziel) {
   }
 }
 
+const HTBAH_ORIENT_KLASSE_AKTIV = 'htbah-orient-erzwungen';
+const HTBAH_ORIENT_KLASSE_DREHUNG_CW = 'htbah-orient-drehung-cw';
+const HTBAH_ORIENT_KLASSE_DREHUNG_CCW = 'htbah-orient-drehung-ccw';
+
+function ermittleAktuelleBildschirmAusrichtung() {
+  if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.type === 'string') {
+    return screen.orientation.type;
+  }
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    return window.matchMedia('(orientation: landscape)').matches ? 'landscape-primary' : 'portrait-primary';
+  }
+  if (typeof window !== 'undefined') {
+    return window.innerWidth > window.innerHeight ? 'landscape-primary' : 'portrait-primary';
+  }
+  return 'portrait-primary';
+}
+
+function aktualisiereOrientierungCssFallback(modus) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  const html = document.documentElement;
+  if (!html) {
+    return;
+  }
+  html.classList.remove(
+    HTBAH_ORIENT_KLASSE_AKTIV,
+    HTBAH_ORIENT_KLASSE_DREHUNG_CW,
+    HTBAH_ORIENT_KLASSE_DREHUNG_CCW,
+  );
+  const normalisiert = normalisiereOrientierungModus(modus);
+  if (normalisiert === 'frei') {
+    return;
+  }
+  const aktuelle = ermittleAktuelleBildschirmAusrichtung();
+  const istLandscape = typeof aktuelle === 'string' && aktuelle.indexOf('landscape') === 0;
+  const passt =
+    (normalisiert === 'portrait' && !istLandscape) ||
+    (normalisiert === 'landscape' && istLandscape);
+  if (passt) {
+    return;
+  }
+  // Drehrichtung so wählen, dass beim Zurückkippen zum gewünschten Modus der Inhalt wieder aufrecht steht.
+  let drehKlasse = null;
+  if (normalisiert === 'portrait') {
+    drehKlasse =
+      aktuelle === 'landscape-secondary'
+        ? HTBAH_ORIENT_KLASSE_DREHUNG_CCW
+        : HTBAH_ORIENT_KLASSE_DREHUNG_CW;
+  } else if (normalisiert === 'landscape') {
+    drehKlasse =
+      aktuelle === 'portrait-secondary'
+        ? HTBAH_ORIENT_KLASSE_DREHUNG_CW
+        : HTBAH_ORIENT_KLASSE_DREHUNG_CCW;
+  }
+  if (!drehKlasse) {
+    return;
+  }
+  html.classList.add(HTBAH_ORIENT_KLASSE_AKTIV, drehKlasse);
+}
+
+async function versucheOrientierungSperreSonstCssFallback(modus) {
+  const gesperrt = await sperreBildschirmAusrichtungWennMoeglich(modus);
+  if (gesperrt) {
+    // Native Sperre hat übernommen – CSS-Fallback wird nicht zusätzlich benötigt.
+    aktualisiereOrientierungCssFallback('frei');
+  } else {
+    aktualisiereOrientierungCssFallback(modus);
+  }
+}
+
 function wendeOrientierungModusAn(modus) {
   const normalisiert = normalisiereOrientierungModus(modus);
   if (normalisiert === 'frei') {
     entsperreBildschirmAusrichtungWennMoeglich();
+    aktualisiereOrientierungCssFallback('frei');
     return;
   }
-  void sperreBildschirmAusrichtungWennMoeglich(normalisiert);
+  void versucheOrientierungSperreSonstCssFallback(normalisiert);
 }
 
 function speichereOrientierungModus(modus) {
@@ -1769,10 +1872,7 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   legacyCharakterBild: SPEICHER_KEY_CHARAKTER_BILD_LEGACY,
   spielleiter: SPEICHER_KEY_SPIELLEITER,
   zufallstabellen: SPEICHER_KEY_ZUFALLSTABELLEN,
-  spielleitungAbenteuerbuch: SPEICHER_KEY_SPIELLEITER_ABENTEUERBUCH,
   weltenbau: SPEICHER_KEY_WELTENBAU,
-  atmosphaere: SPEICHER_KEY_ATMOSPHAERE,
-  atmosphaereBadge: SPEICHER_KEY_ATMOSPHAERE_BADGE,
   wuerfelAudio: SPEICHER_KEY_WUERFEL_AUDIO,
   diceColors: SPEICHER_KEY_DICE_COLORS,
   wuerfelBeutelFenster: SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER,
@@ -1823,15 +1923,15 @@ window.HTBAH = {
   speichereZufallstabellenZustand,
   erstellePantheonExportPaket,
   pantheonImportAusPaket,
-  ladeSpielleitungAbenteuerbuchHtml,
-  speichereSpielleitungAbenteuerbuchHtml,
-  loescheSpielleitungAbenteuerbuch,
+  ladeKampagnenAbenteuerbuchHtml,
+  speichereKampagnenAbenteuerbuchHtml,
+  loescheKampagnenAbenteuerbuch,
   ladeWeltenbauZustand,
   speichereWeltenbauZustand,
-  ladeAtmosphaereZustand,
-  speichereAtmosphaereZustand,
-  ladeAtmosphaereBadgePosition,
-  speichereAtmosphaereBadgePosition,
+  ladeKampagnenAtmosphaereZustand,
+  speichereKampagnenAtmosphaereZustand,
+  ladeKampagnenAtmosphaereBadgePosition,
+  speichereKampagnenAtmosphaereBadgePosition,
   bildbetrachter: bildbetrachterZustand,
   bildbetrachterOeffnen,
   bildbetrachterSchliessen,
@@ -2164,6 +2264,19 @@ wendeOrientierungModusAn(ladeOrientierungModus());
 window.addEventListener('orientationchange', () => {
   wendeOrientierungModusAn(ladeOrientierungModus());
 });
+window.addEventListener('resize', () => {
+  // CSS-Fallback ggf. neu evaluieren, wenn sich Viewport-Dimensionen ändern (z. B. Drehung im Browser-Tab).
+  aktualisiereOrientierungCssFallback(ladeOrientierungModus());
+});
+if (
+  typeof screen !== 'undefined' &&
+  screen.orientation &&
+  typeof screen.orientation.addEventListener === 'function'
+) {
+  screen.orientation.addEventListener('change', () => {
+    wendeOrientierungModusAn(ladeOrientierungModus());
+  });
+}
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     wendeOrientierungModusAn(ladeOrientierungModus());

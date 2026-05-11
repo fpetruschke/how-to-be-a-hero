@@ -71,6 +71,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
   components: {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
     ZufallstabellenZeileModal: window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal,
+    NpcWizardModal: window.HTBAH_KOMPONENTEN.NpcWizardModal,
+    BestienWizardModal: window.HTBAH_KOMPONENTEN.BestienWizardModal,
     ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
   },
@@ -96,6 +98,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       zufallGegenstandKleidung: true,
       zufallFraktionEpoche: 'mittelalter',
       zufallRaetselEpoche: 'mittelalter',
+      /** Ziel des aktuell geöffneten NPC-Wizards: 'haupt' | 'overlay' | null */
+      npcWizardZiel: null,
+      bestienWizardZiel: null,
       /** Stabile Funktion für :ref (wie InventarModal), kein String-ref im Modal */
       zeileQuillHostRefFn: null,
       overlayZeileQuillHostRefFn: null,
@@ -1877,6 +1882,121 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         Object.assign(this.bearbeitungOverlay.zeile, patch);
       }
     },
+    npcWizardOeffnen() {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'npc' || this.bearbeitungIndex >= 0) {
+        return;
+      }
+      this.npcWizardZiel = 'haupt';
+      const ref = this.$refs.npcWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') {
+        ref.oeffnen();
+      }
+    },
+    overlayNpcWizardOeffnen() {
+      if (!this.bearbeitungOverlay || this.bearbeitungOverlay.typ !== 'npc' || this.bearbeitungOverlayIndex >= 0) {
+        return;
+      }
+      this.npcWizardZiel = 'overlay';
+      const ref = this.$refs.npcWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') {
+        ref.oeffnen();
+      }
+    },
+    npcWizardUebernehmenIntern(payload) {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'npc' || !this.bearbeitung.zeile || this.bearbeitungIndex >= 0) {
+        return;
+      }
+      const G = window.HTBAH && window.HTBAH.Zufallsgenerator;
+      if (!G || typeof G.npc !== 'function') {
+        return;
+      }
+      const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
+      const fraktionNamen = (this.zustand.fraktionen || []).map((f) => (f && f.name ? String(f.name) : ''));
+      const pantheonNamen = (this.zustand.pantheon || []).map((p) => (p && p.name ? String(p.name) : ''));
+      const epoche = payload && payload.epoche ? String(payload.epoche) : 'mittelalter';
+      this.zufallNpcEpoche = epoche;
+      const felder = G.npc({
+        epoche,
+        geschlecht: payload && payload.geschlecht ? String(payload.geschlecht) : '',
+        alter: payload && payload.alter ? String(payload.alter) : '',
+        beruf: payload && payload.beruf ? String(payload.beruf) : '',
+        orteNamen,
+        fraktionNamen,
+        pantheonNamen,
+      });
+      Object.assign(this.bearbeitung.zeile, felder);
+      this.$nextTick(() => this.quillAusBearbeitungSetzen());
+    },
+    npcWizardUebernehmen(payload) {
+      const ziel = this.npcWizardZiel;
+      this.npcWizardZiel = null;
+      if (ziel === 'overlay') {
+        this.withModalKontext('overlay', () => this.npcWizardUebernehmenIntern(payload));
+      } else {
+        this.npcWizardUebernehmenIntern(payload);
+      }
+    },
+    bestienWizardOeffnen() {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'bestie' || this.bearbeitungIndex >= 0) {
+        return;
+      }
+      this.bestienWizardZiel = 'haupt';
+      const ref = this.$refs.bestienWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') {
+        ref.oeffnen();
+      }
+    },
+    overlayBestienWizardOeffnen() {
+      if (
+        !this.bearbeitungOverlay ||
+        this.bearbeitungOverlay.typ !== 'bestie' ||
+        this.bearbeitungOverlayIndex >= 0
+      ) {
+        return;
+      }
+      this.bestienWizardZiel = 'overlay';
+      const ref = this.$refs.bestienWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') {
+        ref.oeffnen();
+      }
+    },
+    bestienWizardUebernehmenIntern(payload) {
+      if (
+        !this.bearbeitung ||
+        this.bearbeitung.typ !== 'bestie' ||
+        !this.bearbeitung.zeile ||
+        this.bearbeitungIndex >= 0
+      ) {
+        return;
+      }
+      const G = window.HTBAH && window.HTBAH.Zufallsgenerator;
+      if (!G || typeof G.bestie !== 'function') {
+        return;
+      }
+      const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
+      const epoche = payload && payload.epoche ? String(payload.epoche) : 'mittelalter';
+      const felder = G.bestie({
+        epoche,
+        kategorie: payload && payload.kategorie ? String(payload.kategorie) : '',
+        name: payload && payload.name ? String(payload.name) : '',
+        aggressivitaetSkala:
+          payload && Number.isFinite(Number(payload.aggressivitaetSkala))
+            ? Number(payload.aggressivitaetSkala)
+            : undefined,
+        orteNamen,
+      });
+      Object.assign(this.bearbeitung.zeile, felder);
+      this.$nextTick(() => this.quillAusBearbeitungSetzen());
+    },
+    bestienWizardUebernehmen(payload) {
+      const ziel = this.bestienWizardZiel;
+      this.bestienWizardZiel = null;
+      if (ziel === 'overlay') {
+        this.withModalKontext('overlay', () => this.bestienWizardUebernehmenIntern(payload));
+      } else {
+        this.bestienWizardUebernehmenIntern(payload);
+      }
+    },
     zeileSpeichern() {
       this.zeileSpeichernIntern({ schliessenNachSpeichern: true });
     },
@@ -3252,6 +3372,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @edit-blur="zeileBearbeitungBeiBlurSpeichern"
         @random="zufallsvorschlagUebernehmen"
         @npc-refresh-field="npcFeldNeuWuerfeln"
+        @npc-wizard="npcWizardOeffnen"
+        @bestien-wizard="bestienWizardOeffnen"
         @media-upload="onBearbeitungsMedienDateienGewaehlt"
         @media-remove="mediumAusBearbeitungEntfernen"
         @media-set-primary="setzeBearbeitungPrimaryMedium"
@@ -3283,6 +3405,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @edit-blur="overlayZeileBearbeitungBeiBlurSpeichern"
         @random="overlayZufallsvorschlagUebernehmen"
         @npc-refresh-field="overlayNpcFeldNeuWuerfeln"
+        @npc-wizard="overlayNpcWizardOeffnen"
+        @bestien-wizard="overlayBestienWizardOeffnen"
         @media-upload="overlayMediaUpload"
         @media-remove="overlayMediaRemove"
         @media-set-primary="overlayMediaSetPrimary"
@@ -3367,6 +3491,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       </div>
 
       <bestaetigen-modal ref="zufallstabellenBestaetigen" modal-id="htbahZufallstabellenBestaetigen" />
+
+      <npc-wizard-modal
+        ref="npcWizardModal"
+        modal-id="htbahZufallstabellenNpcWizard"
+        @generieren="npcWizardUebernehmen" />
+
+      <bestien-wizard-modal
+        ref="bestienWizardModal"
+        modal-id="htbahZufallstabellenBestienWizard"
+        @generieren="bestienWizardUebernehmen" />
     </div>
   `,
 };

@@ -50,15 +50,6 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '📚',
     buttonLabel: 'Zufallstabellen löschen',
   },
-  abenteuerbuch: {
-    key: 'htbah_spielleitung_abenteuerbuch',
-    titel: 'Abenteuerbuch löschen?',
-    beschreibung:
-      'Alle formatierten Einträge im Spielleiter-Abenteuerbuch (Text und Formatierung) werden aus dem lokalen Speicher entfernt.',
-    erfolg: 'Abenteuerbuch wurde gelöscht.',
-    buttonSymbol: '📔',
-    buttonLabel: 'Abenteuerbuch löschen',
-  },
   weltenbau: {
     key: 'htbah_weltenbau',
     titel: 'Weltenbau-Bilder löschen?',
@@ -68,17 +59,15 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '🗺️',
     buttonLabel: 'Weltenbau-Bilder löschen',
   },
-  wuerfelbeutelUndAtmosphaere: {
+  wuerfelbeutelLayout: {
     keys: [
       'htbah_dice_colors',
       'htbah_wuerfel_beutel_fenster',
-      'htbah_atmosphaere',
-      'htbah_atmosphaere_badge_pos',
     ],
-    titel: 'Würfelbeutel-Layout & Atmosphäre löschen?',
+    titel: 'Würfelbeutel-Layout löschen?',
     beschreibung:
-      '3D-Würfel (Aktivierung und Farbe), gespeicherte Größe und Position des Würfelbeutel-Fensters sowie die im Würfelbeutel gespeicherte Atmosphäre inklusive Badge-Position werden entfernt.',
-    erfolg: 'Würfelbeutel-Layout und Atmosphäre wurden gelöscht.',
+      '3D-Würfel (Aktivierung und Farbe) sowie gespeicherte Größe und Position des Würfelbeutel-Fensters werden entfernt. Wetter/Tageszeit ist Teil der jeweiligen Kampagne und bleibt unter „Spielleiter-Kampagnen“ gespeichert.',
+    erfolg: 'Würfelbeutel-Layout wurde gelöscht.',
     buttonSymbol: '🎲',
     buttonLabel: 'Würfelbecher-Einstellungen löschen',
   },
@@ -94,7 +83,7 @@ const SPEICHER_BEREICHE = {
     key: 'htbah_spielleiter_kampagnen',
     titel: 'Spielleiter-Kampagnen löschen?',
     beschreibung:
-      'Alle gespeicherten Kampagnen und Charaktere in der Spielleiter-Ansicht werden entfernt.',
+      'Alle gespeicherten Kampagnen und Charaktere in der Spielleiter-Ansicht werden entfernt — inklusive der jeweils zugehörigen Abenteuerbücher, Wetter/Tageszeit-Daten und Badge-Positionen.',
     erfolg: 'Spielleiter-Kampagnen wurden gelöscht.',
     buttonSymbol: '👥',
     buttonLabel: 'Spielleiter-Kampagnen löschen',
@@ -110,12 +99,9 @@ const SPEICHER_BEREICHE = {
       'htbah_theme',
       'htbah_spielleiter_kampagnen',
       'htbah_zufallstabellen',
-      'htbah_spielleitung_abenteuerbuch',
       'htbah_weltenbau',
       'htbah_wuerfel_audio',
       'htbah_wuerfel_sound',
-      'htbah_atmosphaere',
-      'htbah_atmosphaere_badge_pos',
       'htbah_dice_colors',
       'htbah_wuerfel_beutel_fenster',
       'htbah_wuerfelbecher_bundle',
@@ -123,7 +109,7 @@ const SPEICHER_BEREICHE = {
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Kampagnen, Zufallstabellen, das Abenteuerbuch der Spielleitung, unter „Weltenbau“ gespeicherte Bilder, deine Theme-Auswahl, die Würfel-Audio-Einstellungen, die Atmosphäre im Würfelbeutel, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen, unter „Weltenbau“ gespeicherte Bilder, deine Theme-Auswahl, die Würfel-Audio-Einstellungen, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
@@ -133,8 +119,6 @@ const SPEICHER_BEREICHE = {
 const WUERFELBECHER_KEYS = [
   'htbah_dice_colors',
   'htbah_wuerfel_beutel_fenster',
-  'htbah_atmosphaere',
-  'htbah_atmosphaere_badge_pos',
   'htbah_wuerfel_audio',
   'htbah_wuerfel_sound',
 ];
@@ -205,7 +189,7 @@ const DATEN_EXPORT_BEREICHE = [
   {
     id: 'kampagnen',
     key: 'htbah_spielleiter_kampagnen',
-    label: 'Kampagnen',
+    label: 'Kampagnen (inkl. Abenteuerbuch & Wetter)',
   },
   {
     id: 'charakterbildLegacy',
@@ -216,11 +200,6 @@ const DATEN_EXPORT_BEREICHE = [
     id: 'zufallstabellen',
     key: 'htbah_zufallstabellen',
     label: 'Zufallstabellen',
-  },
-  {
-    id: 'abenteuerbuch',
-    key: 'htbah_spielleitung_abenteuerbuch',
-    label: 'Abenteuerbuch',
   },
   {
     id: 'weltenbau',
@@ -1147,9 +1126,9 @@ window.HTBAH_SEITEN.Einstellungen = {
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
             type="button"
-            :symbol="speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonSymbol"
-            @click="oeffneLoeschDialog('wuerfelbeutelUndAtmosphaere')">
-            {{ speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonLabel }}
+            :symbol="speicherBereiche.wuerfelbeutelLayout.buttonSymbol"
+            @click="oeffneLoeschDialog('wuerfelbeutelLayout')">
+            {{ speicherBereiche.wuerfelbeutelLayout.buttonLabel }}
           </icon-text-button>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
@@ -1198,13 +1177,6 @@ window.HTBAH_SEITEN.Einstellungen = {
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
             type="button"
-            :symbol="speicherBereiche.abenteuerbuch.buttonSymbol"
-            @click="oeffneLoeschDialog('abenteuerbuch')">
-            {{ speicherBereiche.abenteuerbuch.buttonLabel }}
-          </icon-text-button>
-          <icon-text-button
-            class="btn btn-outline-danger w-100 mb-2"
-            type="button"
             :symbol="speicherBereiche.weltenbau.buttonSymbol"
             @click="oeffneLoeschDialog('weltenbau')">
             {{ speicherBereiche.weltenbau.buttonLabel }}
@@ -1212,9 +1184,9 @@ window.HTBAH_SEITEN.Einstellungen = {
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
             type="button"
-            :symbol="speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonSymbol"
-            @click="oeffneLoeschDialog('wuerfelbeutelUndAtmosphaere')">
-            {{ speicherBereiche.wuerfelbeutelUndAtmosphaere.buttonLabel }}
+            :symbol="speicherBereiche.wuerfelbeutelLayout.buttonSymbol"
+            @click="oeffneLoeschDialog('wuerfelbeutelLayout')">
+            {{ speicherBereiche.wuerfelbeutelLayout.buttonLabel }}
           </icon-text-button>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"

@@ -230,6 +230,34 @@ body.htbah-mit-lp-banner #app {
   }
 }
 
+/*
+ * Erzwungene Ausrichtung (Fallback per CSS-Transform):
+ * Wird aktiviert, wenn die screen.orientation.lock()-API nicht greift (z. B. im normalen Browser-Tab
+ * auf einem Smartphone). Der <body> wird dann passend rotiert, sodass die gewählte Ausrichtung visuell
+ * erzwungen wird, auch wenn das Gerät selbst gedreht ist.
+ */
+html.htbah-orient-erzwungen {
+  overflow: hidden;
+}
+
+html.htbah-orient-erzwungen body {
+  width: 100vh;
+  height: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow: auto;
+  transform-origin: 0 0;
+}
+
+html.htbah-orient-erzwungen.htbah-orient-drehung-cw body {
+  transform: translateX(100vw) rotate(90deg);
+}
+
+html.htbah-orient-erzwungen.htbah-orient-drehung-ccw body {
+  transform: translateY(100vh) rotate(-90deg);
+}
+
 .card {
   background: var(--card-bg);
   color: var(--card-color);
@@ -843,10 +871,13 @@ input::placeholder {
 
 .htbah-map-element-color-picker {
   position: absolute;
-  right: 76px;
-  top: 8px;
-  width: 30px;
-  height: 30px;
+  right: calc(
+    var(--htbah-map-action-btn-offset) +
+    (var(--htbah-map-action-btn-size) + var(--htbah-map-action-btn-gap)) * 2
+  );
+  top: var(--htbah-map-action-btn-offset);
+  width: var(--htbah-map-action-btn-size);
+  height: var(--htbah-map-action-btn-size);
   border-radius: 999px;
   overflow: hidden;
   z-index: 6;
@@ -1023,12 +1054,23 @@ input::placeholder {
   z-index: 7;
 }
 
+/* Canvas-Element-relative Skalierung der Aktions-Buttons (Lock, Delete, …).
+   --htbah-element-min-dim wird per inline style auf jedem Map-Element gesetzt
+   und repräsentiert die min(Breite, Höhe) des Elements in px. */
+.htbah-map-ort-bild,
+.htbah-map-node {
+  --htbah-map-action-btn-size: clamp(26px, calc(var(--htbah-element-min-dim, 120px) * 0.26), 64px);
+  --htbah-map-action-btn-offset: clamp(6px, calc(var(--htbah-element-min-dim, 120px) * 0.05), 14px);
+  --htbah-map-action-btn-gap: clamp(4px, calc(var(--htbah-element-min-dim, 120px) * 0.04), 10px);
+  --htbah-map-action-btn-icon: clamp(14px, calc(var(--htbah-element-min-dim, 120px) * 0.14), 30px);
+}
+
 .htbah-map-element-lock-button {
   position: absolute;
-  right: 8px;
-  top: 8px;
-  width: 30px;
-  height: 30px;
+  right: var(--htbah-map-action-btn-offset);
+  top: var(--htbah-map-action-btn-offset);
+  width: var(--htbah-map-action-btn-size);
+  height: var(--htbah-map-action-btn-size);
   border: 0;
   border-radius: 999px;
   display: inline-flex;
@@ -1043,7 +1085,7 @@ input::placeholder {
     background-color 180ms ease;
   z-index: 5;
   touch-action: none;
-  font-size: 15px;
+  font-size: var(--htbah-map-action-btn-icon);
   line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
@@ -1064,10 +1106,14 @@ input::placeholder {
 
 .htbah-map-element-delete-button {
   position: absolute;
-  right: 42px;
-  top: 8px;
-  width: 30px;
-  height: 30px;
+  right: calc(
+    var(--htbah-map-action-btn-offset) +
+    var(--htbah-map-action-btn-size) +
+    var(--htbah-map-action-btn-gap)
+  );
+  top: var(--htbah-map-action-btn-offset);
+  width: var(--htbah-map-action-btn-size);
+  height: var(--htbah-map-action-btn-size);
   border: 0;
   border-radius: 999px;
   background: rgba(220, 53, 69, 0.96);
@@ -1079,7 +1125,7 @@ input::placeholder {
   z-index: 5;
   cursor: pointer;
   touch-action: none;
-  font-size: 14px;
+  font-size: var(--htbah-map-action-btn-icon);
   line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
@@ -1094,8 +1140,8 @@ input::placeholder {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 18px;
-  height: 18px;
+  width: clamp(16px, calc(var(--htbah-element-min-dim, 120px) * 0.16), 36px);
+  height: clamp(16px, calc(var(--htbah-element-min-dim, 120px) * 0.16), 36px);
   border: 0;
   background: linear-gradient(135deg, transparent 0 45%, rgba(13, 110, 253, 0.95) 46% 100%);
   cursor: nwse-resize;
@@ -1158,8 +1204,8 @@ input::placeholder {
 }
 
 .htbah-map-node-kreis .htbah-map-element-lock-button {
-  top: -8px;
-  right: -8px;
+  top: calc(var(--htbah-map-action-btn-offset) * -1);
+  right: calc(var(--htbah-map-action-btn-offset) * -1);
   z-index: 8;
 }
 
@@ -3336,6 +3382,76 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   font-weight: 800;
   margin-bottom: .4rem;
   color: var(--bs-secondary-color);
+}
+
+.htbah-input-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.htbah-input-icon-btn > .material-symbols-outlined {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.htbah-input-icon-btn.dropdown-toggle-split::after {
+  margin-left: 0;
+  vertical-align: middle;
+}
+
+/* Wizard-Modal liegt über dem schwebenden ZufallstabellenZeileModal (z-index 2000). */
+#htbahZufallstabellenNpcWizard.modal,
+#htbahZufallstabellenBestienWizard.modal {
+  z-index: 2080;
+}
+
+/* Bootstrap fügt das Backdrop frisch zum body hinzu; wir heben dynamisch via Body-Klasse das letzte an. */
+body.htbah-npc-wizard-offen .modal-backdrop,
+body.htbah-bestien-wizard-offen .modal-backdrop {
+  z-index: 2070;
+}
+
+.htbah-npc-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.htbah-npc-wizard-steps {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  counter-reset: htbah-wizard-step;
+}
+
+.htbah-npc-wizard-step {
+  position: relative;
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: .55rem;
+  padding: .55rem .65rem;
+  background: var(--bs-body-bg);
+  transition: border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+
+.htbah-npc-wizard-step.active {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 .15rem rgba(13, 110, 253, 0.18);
+}
+
+.htbah-npc-wizard-step.done {
+  border-color: var(--bs-success-border-subtle, rgba(25, 135, 84, 0.4));
+  background: var(--bs-success-bg-subtle, rgba(25, 135, 84, 0.06));
+}
+
+.htbah-npc-wizard-step.locked {
+  opacity: .55;
+}
+
+.htbah-npc-wizard-step.locked .form-control,
+.htbah-npc-wizard-step.locked .btn {
+  pointer-events: none;
 }
 
 @media (max-width: 991.98px) {

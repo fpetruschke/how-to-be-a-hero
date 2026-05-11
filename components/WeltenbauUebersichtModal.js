@@ -1822,6 +1822,13 @@ var HTBAH_REFACTOR_UTILS =
             : istKreisEntitaet
               ? 3
               : undefined;
+        const finaleBreite = istKreisEntitaet ? kreisDurchmesser : breite;
+        const finaleHoehe = istKreisEntitaet
+          ? kreisDurchmesser
+          : basisMinHeight != null
+            ? Math.max(basisMinHeight, hoehe)
+            : hoehe;
+        const minDimension = Math.max(20, Math.round(Math.min(finaleBreite || 0, finaleHoehe || 0)));
         return {
           ...(node.style || {}),
           left: `${Math.round((node.position && node.position.x) || 0)}px`,
@@ -1842,6 +1849,7 @@ var HTBAH_REFACTOR_UTILS =
           )}px`,
           '--htbah-node-avatar-size': avatarGroesse ? `${avatarGroesse}px` : undefined,
           '--htbah-node-scale': String(itemScale),
+          '--htbah-element-min-dim': `${minDimension}px`,
         };
       },
       nodeBreite(node) {
@@ -1921,10 +1929,12 @@ var HTBAH_REFACTOR_UTILS =
         const pfeilHoehe = Math.max(minHoehe, Math.round(Number(bild && bild.height) || 220));
         const pfeilLinienstaerke = Math.max(4, Math.round(pfeilHoehe * 0.12));
         const pfeilSpitzenHoehe = Math.max(12, Math.round(pfeilHoehe * 0.42));
+        const breite = Math.max(minBreite, Math.round(Number(bild.width) || 320));
+        const minDimension = Math.max(20, Math.min(breite, pfeilHoehe));
         return {
           left: `${Math.round(Number(bild.x) || 0)}px`,
           top: `${Math.round(Number(bild.y) || 0)}px`,
-          width: `${Math.max(minBreite, Math.round(Number(bild.width) || 320))}px`,
+          width: `${breite}px`,
           height: `${pfeilHoehe}px`,
           transform: istDrehbar ? `rotate(${winkel}deg)` : undefined,
           transformOrigin: istDrehbar ? 'center center' : undefined,
@@ -1939,6 +1949,7 @@ var HTBAH_REFACTOR_UTILS =
             bild && bild.ankerTyp === 'notiz' && /^#[0-9a-fA-F]{6}$/.test(String(bild.notizBgColor || '').trim())
               ? String(bild.notizBgColor).trim()
               : '#fff8bf',
+          '--htbah-element-min-dim': `${minDimension}px`,
         };
       },
       pfeilWinkelBadgeText(bild) {
