@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Pre-Push-Hook
+#
+# Stellt sicher, dass `assets/beispiel-kampagnen/index.json` zum Inhalt des
+# Verzeichnisses passt (alle `*.json`-Beispiel-Kampagnen werden im Manifest
+# referenziert). Bei Drift wird der vorherige Working-Tree-Zustand wieder
+# hergestellt und der Push abgebrochen — der Hook verändert deine Commits
+# nicht heimlich.
+#
+# Aktivierung pro Clone:   ./bin/setup-hooks
+# Notbremse einmalig:      git push --no-verify
+#
+# MEZ/MESZ-konsistent zur restlichen `bin/`-Konvention.
+
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+GENERATOR="bin/aktualisiere-beispiel-kampagnen-index"
+DIR="assets/beispiel-kampagnen"
+INDEX="$DIR/index.json"
+
+# Hook ist kein harter Blocker, falls Helfer/Ordner gar nicht existieren –
+# z.B. auf älteren Branches ohne dieses Feature.
+if [[ ! -x "$GENERATOR" ]]; then
+  exit 0
+fi
+if [[ ! -d "$DIR" ]]; then
+  exit 0
+fi
+
+BACKUP="$(mktemp)"
+trap 'rm -f "$BACKUP"' EXIT
+
+if [[ -f "$INDEX" ]]; then
+  cp "$INDEX" "$BACKUP"
+fi
+
+"$GENERATOR" >/dev/null
+
+drift=false
+if [[ -f "$INDEX" && -f "$BACKUP" ]]; then
+  if ! cmp -s "$INDEX" "$BACKUP"; then
+    drift=true
+  fi
+elif [[ -f "$INDEX" || -f "$BACKUP" ]]; then
+  drift=true
+fi
+
+if ! $drift; then
+  exit 0
+fi
+
+# Drift erkannt → Working Tree zurückspielen, damit der Hook nichts mutiert
+if [[ -f "$BACKUP" ]]; then
+  cp "$BACKUP" "$INDEX"
+else
+  rm -f "$INDEX"
+fi
+
+cat >&2 <<'EOF'
+
+✗ Pre-push abgebrochen: assets/beispiel-kampagnen/index.json passt nicht
+  zum Inhalt des Verzeichnisses (vermutlich wurde ein Commit mit
+  `--no-verify` durchgeführt, sodass der pre-commit-Hook übersprungen wurde).
+
+Einfachster Fix — einmal sauber neu committen, der pre-commit-Hook erledigt
+den Rest:
+
+    git add assets/beispiel-kampagnen/
+    git commit -m "chore: beispiel-kampagnen index aktualisieren"
+    git push
+
+(Hook lebt unter .githooks/pre-push, aktiviert per ./bin/setup-hooks.
+ Notbremse einmalig: git push --no-verify)
+
+EOF
+
+exit 1

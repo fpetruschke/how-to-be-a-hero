@@ -1,0 +1,131 @@
+#!/usr/bin/env node
+/**
+ * Scannt `assets/beispiel-kampagnen/` nach `*.json`-Dateien (außer `index.json`
+ * selbst) und schreibt aus ihren Metadaten ein frisches `index.json`.
+ *
+ * Jede Kampagnen-Datei muss das Importformat `lokaler-speicher` verwenden und
+ * sollte zusätzlich ein optionales Top-Level-Objekt `beispiel` enthalten:
+ *
+ *   {
+ *     "htbahExportVersion": 1,
+ *     "typ": "lokaler-speicher",
+ *     "daten": [ ... ],
+ *     "beispiel": {
+ *       "titel": "Mein Beispiel",
+ *       "untertitel": "kurze Einordnung (optional)",
+ *       "beschreibung": "1–2 Sätze für die Kampagnen-Auswahl (optional)",
+ *       "quelleUrl": "https://...",         // optional
+ *       "quelleLabel": "anzeigetext",       // optional
+ *       "autoren": "Name(n)",               // optional
+ *       "kontext": "Wettbewerb XY, 2024",   // optional
+ *       "lizenz": "CC BY-NC-SA 4.0"         // optional
+ *     }
+ *   }
+ *
+ * Aufruf:   ./bin/aktualisiere-beispiel-kampagnen-index
+ */
+
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const ROOT_DIR = path.resolve(__dirname, '..');
+const VERZEICHNIS = path.join(ROOT_DIR, 'assets', 'beispiel-kampagnen');
+const INDEX_PFAD = path.join(VERZEICHNIS, 'index.json');
+
+function fehler(text) {
+  console.error(`Fehler: ${text}`);
+  process.exitCode = 1;
+}
+
+function leseJsonDatei(dateiPfad) {
+  try {
+    const roh = fs.readFileSync(dateiPfad, 'utf8');
+    return { ok: true, daten: JSON.parse(roh) };
+  } catch (err) {
+    return { ok: false, fehler: err && err.message ? err.message : String(err) };
+  }
+}
+
+function eintragAusKampagne(dateiname, paket) {
+  if (!paket || typeof paket !== 'object') {
+    return { ok: false, fehler: 'kein Objekt' };
+  }
+  if (paket.typ !== 'lokaler-speicher' || !Array.isArray(paket.daten)) {
+    return {
+      ok: false,
+      fehler:
+        'Erwartet `typ: "lokaler-speicher"` und Array `daten` (Format wie der App-Export).',
+    };
+  }
+  const m = paket.beispiel && typeof paket.beispiel === 'object' ? paket.beispiel : {};
+  const titel =
+    typeof m.titel === 'string' && m.titel.trim()
+      ? m.titel.trim()
+      : dateiname.replace(/\.json$/i, '');
+  const eintrag = {
+    datei: dateiname,
+    titel,
+  };
+  const optional = [
+    'untertitel',
+    'beschreibung',
+    'quelleUrl',
+    'quelleLabel',
+    'autoren',
+    'kontext',
+    'lizenz',
+  ];
+  optional.forEach((schluessel) => {
+    if (typeof m[schluessel] === 'string' && m[schluessel].trim()) {
+      eintrag[schluessel] = m[schluessel].trim();
+    }
+  });
+  return { ok: true, eintrag };
+}
+
+function main() {
+  if (!fs.existsSync(VERZEICHNIS) || !fs.statSync(VERZEICHNIS).isDirectory()) {
+    fehler(`Verzeichnis fehlt: ${VERZEICHNIS}`);
+    return;
+  }
+
+  const dateien = fs
+    .readdirSync(VERZEICHNIS)
+    .filter((name) => /\.json$/i.test(name))
+    .filter((name) => name.toLowerCase() !== 'index.json')
+    .sort((a, b) => a.localeCompare(b, 'de'));
+
+  const eintraege = [];
+  const warnungen = [];
+
+  dateien.forEach((dateiname) => {
+    const pfad = path.join(VERZEICHNIS, dateiname);
+    const ergebnis = leseJsonDatei(pfad);
+    if (!ergebnis.ok) {
+      warnungen.push(`${dateiname}: ungültiges JSON (${ergebnis.fehler}). Übersprungen.`);
+      return;
+    }
+    const eintrag = eintragAusKampagne(dateiname, ergebnis.daten);
+    if (!eintrag.ok) {
+      warnungen.push(`${dateiname}: ${eintrag.fehler}. Übersprungen.`);
+      return;
+    }
+    eintraege.push(eintrag.eintrag);
+  });
+
+  fs.writeFileSync(INDEX_PFAD, JSON.stringify(eintraege, null, 2) + '\n', 'utf8');
+
+  console.log(`Schrieb ${path.relative(ROOT_DIR, INDEX_PFAD)} mit ${eintraege.length} Einträgen:`);
+  eintraege.forEach((e) => console.log(`  - ${e.datei}: ${e.titel}`));
+  if (!eintraege.length) {
+    console.log('  (keine)');
+  }
+  if (warnungen.length) {
+    console.warn('\nHinweise:');
+    warnungen.forEach((w) => console.warn(`  • ${w}`));
+  }
+}
+
+main();

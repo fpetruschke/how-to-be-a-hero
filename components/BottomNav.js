@@ -205,6 +205,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     musikNavAktiv() {
       return this.musikboardOffen;
     },
+    zeichenBrettNavAktiv() {
+      return !!(this.uiZustand && this.uiZustand.zeichenBrettOffen);
+    },
     /** Frische Listen aus dem Speicher (Reaktivität über Tab/Route). */
     begegnungListenAusSpeicher() {
       void this.$route.fullPath;
@@ -748,6 +751,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     abenteuerbuchOeffnen() {
       this.uiZustand.abenteuerbuchOffen = true;
+    },
+    zeichenBrettOeffnen() {
+      this.uiZustand.zeichenBrettOffen = true;
     },
     synchronisiereKampagnenbasierteDaten() {
       const id = this.aktiveKampagneId;
@@ -1742,6 +1748,15 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </button>
             <button
               type="button"
+              title="Zeichen-Brett"
+              class="htbah-nav-item"
+              :class="{ 'htbah-nav-button-active': zeichenBrettNavAktiv }"
+              @click="zeichenBrettOeffnen">
+              <span class="htbah-nav-item-emoji" aria-hidden="true">✏️</span>
+              <span class="htbah-nav-item-label">Zeichnen</span>
+            </button>
+            <button
+              type="button"
               title="Würfel"
               class="htbah-nav-item"
               :class="{ 'htbah-nav-button-active': wuerfelNavAktiv }"
@@ -1813,6 +1828,13 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </button>
           </template>
           <button type="button" title="Regelwerk" @click="regelwerkOeffnen">📜</button>
+          <button
+            type="button"
+            title="Zeichen-Brett"
+            :class="{ 'htbah-nav-button-active': zeichenBrettNavAktiv }"
+            @click="zeichenBrettOeffnen">
+            ✏️
+          </button>
           <button
             type="button"
             title="Würfel"

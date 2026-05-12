@@ -165,6 +165,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const cfg = TABLE_TYPE_CONFIG[this.detailAnsicht.typ] || TABLE_TYPE_CONFIG.gegenstand;
       return cfg.detail;
     },
+    detailAnsichtKannInWeltOeffnen() {
+      if (!this.detailAnsicht || !this.detailAnsicht.zeile) {
+        return false;
+      }
+      const typ = this.detailAnsicht.typ;
+      if (!['npc', 'bestie', 'ort', 'raetsel', 'gegenstand'].includes(typ)) {
+        return false;
+      }
+      const id = this.detailAnsicht.zeile.id;
+      return !!(id && String(id).trim());
+    },
     detailAnsichtFelder() {
       if (!this.detailAnsicht) {
         return [];
@@ -1328,6 +1339,41 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         oeffneBearbeiten();
       }
     },
+    detailAnsichtInWeltOeffnen() {
+      if (!this.detailAnsichtKannInWeltOeffnen) {
+        return;
+      }
+      const d = this.detailAnsicht;
+      const typ = d.typ;
+      const id = String(d.zeile.id || '').trim();
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      const oeffneEntitaet =
+        mentionApi && typeof mentionApi.oeffneEntitaetGlobal === 'function'
+          ? mentionApi.oeffneEntitaetGlobal
+          : null;
+      if (!oeffneEntitaet) {
+        window.HTBAH.ui.alert({
+          titel: 'Interaktive Welt nicht verfügbar',
+          beschreibung: 'Die Verknüpfung zur Interaktiven Welt ist aktuell nicht geladen.',
+        });
+        return;
+      }
+      const el = this.$refs.detailAnsichtModalElement;
+      const fokussiereUndNavigiere = () => {
+        oeffneEntitaet({ entityType: typ, entityId: id, openMode: 'focus' });
+        this.navigiereZuInteraktiverWelt();
+      };
+      if (this.detailAnsichtModalInstanz && el) {
+        const einmal = () => {
+          el.removeEventListener('hidden.bs.modal', einmal);
+          fokussiereUndNavigiere();
+        };
+        el.addEventListener('hidden.bs.modal', einmal);
+        this.detailAnsichtModalInstanz.hide();
+      } else {
+        fokussiereUndNavigiere();
+      }
+    },
     npcWaffenWerteText(row) {
       const schadenswertNahkampf = String(
         row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '',
@@ -1996,6 +2042,92 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       } else {
         this.bestienWizardUebernehmenIntern(payload);
       }
+    },
+    inInteraktiverWeltOeffnenIntern() {
+      if (!this.bearbeitung || !this.bearbeitung.zeile) {
+        return false;
+      }
+      const typ = this.bearbeitung.typ;
+      if (!['npc', 'bestie', 'ort', 'raetsel', 'gegenstand'].includes(typ)) {
+        return false;
+      }
+      if (this.bearbeitungIndex < 0) {
+        return false;
+      }
+      const id = String(this.bearbeitung.zeile.id || '').trim();
+      if (!id) {
+        return false;
+      }
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      const oeffneEntitaet =
+        mentionApi && typeof mentionApi.oeffneEntitaetGlobal === 'function'
+          ? mentionApi.oeffneEntitaetGlobal
+          : null;
+      if (!oeffneEntitaet) {
+        window.HTBAH.ui.alert({
+          titel: 'Interaktive Welt nicht verfügbar',
+          beschreibung: 'Die Verknüpfung zur Interaktiven Welt ist aktuell nicht geladen.',
+        });
+        return false;
+      }
+      this.zeileBearbeitungBeiBlurSpeichern();
+      oeffneEntitaet({ entityType: typ, entityId: id, openMode: 'focus' });
+      return true;
+    },
+    zeileInWeltOeffnen() {
+      if (!this.inInteraktiverWeltOeffnenIntern()) {
+        return;
+      }
+      this.schliesseZeileModal();
+      this.navigiereZuInteraktiverWelt();
+    },
+    overlayZeileInWeltOeffnen() {
+      const erfolg = this.withModalKontext('overlay', () => this.inInteraktiverWeltOeffnenIntern());
+      if (!erfolg) {
+        return;
+      }
+      this.overlaySchliesseZeileModal();
+      this.navigiereZuInteraktiverWelt();
+    },
+    navigiereZuInteraktiverWelt() {
+      const kampagnenPfad = window.HTBAH && typeof window.HTBAH.kampagnenPfad === 'function'
+        ? window.HTBAH.kampagnenPfad
+        : null;
+      if (!kampagnenPfad || !this.$router || typeof this.$router.push !== 'function') {
+        return;
+      }
+      const aktuelleKampagneId =
+        this.$route && this.$route.params && this.$route.params.kampagneSlug
+          ? this.kampagneIdAusSlug(this.$route.params.kampagneSlug)
+          : '';
+      const ziel = kampagnenPfad('welt', aktuelleKampagneId);
+      if (this.$route && this.$route.path === ziel) {
+        return;
+      }
+      const nav = this.$router.push(ziel);
+      if (nav && typeof nav.catch === 'function') {
+        nav.catch(() => {});
+      }
+    },
+    kampagneIdAusSlug(slugRaw) {
+      const slug = typeof slugRaw === 'string' ? decodeURIComponent(slugRaw) : '';
+      if (!slug) {
+        return '';
+      }
+      const zustand =
+        window.HTBAH && typeof window.HTBAH.ladeSpielleiterZustand === 'function'
+          ? window.HTBAH.ladeSpielleiterZustand()
+          : null;
+      const kampagnen = zustand && Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
+      const slugAusName =
+        window.HTBAH && typeof window.HTBAH.kampagnenSlugAusName === 'function'
+          ? window.HTBAH.kampagnenSlugAusName
+          : null;
+      if (!slugAusName) {
+        return '';
+      }
+      const treffer = kampagnen.find((k) => slugAusName(k && k.name) === slug);
+      return treffer && treffer.id ? treffer.id : '';
     },
     zeileSpeichern() {
       this.zeileSpeichernIntern({ schliessenNachSpeichern: true });
@@ -3343,6 +3475,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               <div v-else class="mt-3 pt-3 border-top small text-secondary">Keine Medien hinterlegt.</div>
             </div>
             <div class="modal-footer py-2 border-0 border-top flex-wrap gap-2">
+              <button
+                v-if="detailAnsichtKannInWeltOeffnen"
+                type="button"
+                class="btn btn-outline-secondary"
+                title="In interaktiver Welt öffnen"
+                aria-label="In interaktiver Welt öffnen"
+                @click="detailAnsichtInWeltOeffnen">
+                🌍 In Welt öffnen
+              </button>
               <button type="button" class="btn btn-outline-primary" @click="detailAnsichtBearbeiten">
                 Bearbeiten
               </button>
@@ -3374,6 +3515,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @npc-refresh-field="npcFeldNeuWuerfeln"
         @npc-wizard="npcWizardOeffnen"
         @bestien-wizard="bestienWizardOeffnen"
+        @welt-open="zeileInWeltOeffnen"
         @media-upload="onBearbeitungsMedienDateienGewaehlt"
         @media-remove="mediumAusBearbeitungEntfernen"
         @media-set-primary="setzeBearbeitungPrimaryMedium"
@@ -3407,6 +3549,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @npc-refresh-field="overlayNpcFeldNeuWuerfeln"
         @npc-wizard="overlayNpcWizardOeffnen"
         @bestien-wizard="overlayBestienWizardOeffnen"
+        @welt-open="overlayZeileInWeltOeffnen"
         @media-upload="overlayMediaUpload"
         @media-remove="overlayMediaRemove"
         @media-set-primary="overlayMediaSetPrimary"

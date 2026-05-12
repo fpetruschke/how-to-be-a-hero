@@ -8,12 +8,60 @@ function normalisierterKampagnenName(name) {
     .toLocaleLowerCase('de');
 }
 
+const SL_BEISPIEL_KAMPAGNEN_VERZEICHNIS = 'assets/beispiel-kampagnen';
+const SL_BEISPIEL_KAMPAGNEN_INDEX_URL = `${SL_BEISPIEL_KAMPAGNEN_VERZEICHNIS}/index.json`;
+
+function normalisiereBeispielManifestEintrag(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return null;
+  }
+  const datei = typeof roh.datei === 'string' ? roh.datei.trim() : '';
+  if (!datei || !/\.json$/i.test(datei)) {
+    return null;
+  }
+  const titel =
+    typeof roh.titel === 'string' && roh.titel.trim()
+      ? roh.titel.trim()
+      : datei.replace(/\.json$/i, '');
+  const eintrag = { datei, titel };
+  ['untertitel', 'beschreibung', 'quelleUrl', 'quelleLabel', 'autoren', 'kontext', 'lizenz'].forEach(
+    (schluessel) => {
+      const wert = roh[schluessel];
+      if (typeof wert === 'string' && wert.trim()) {
+        eintrag[schluessel] = wert.trim();
+      }
+    },
+  );
+  return eintrag;
+}
+
 window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
   data() {
     return {
       zustand: window.HTBAH.ladeSpielleiterZustand(),
       neueKampagneNameEntwurf: '',
+      beispielManifest: [],
+      beispielManifestLaedt: false,
+      beispielManifestFehler: '',
+      ausgewaehltesBeispielDatei: '',
+      beispielLaeuftDatei: '',
     };
+  },
+  computed: {
+    aktuellesBeispiel() {
+      if (!this.ausgewaehltesBeispielDatei) {
+        return null;
+      }
+      return (
+        this.beispielManifest.find((b) => b.datei === this.ausgewaehltesBeispielDatei) || null
+      );
+    },
+    beispielLaedtGerade() {
+      return Boolean(this.beispielLaeuftDatei);
+    },
+  },
+  mounted() {
+    this.ladeBeispielManifest();
   },
   methods: {
     kampagnenNameExistiert(name, ausgenommeneId = '') {
@@ -133,6 +181,216 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
     mitgliedBild(mitglied) {
       return mitglied && typeof mitglied.charakterBild === 'string' ? mitglied.charakterBild : '';
     },
+    async ladeBeispielManifest() {
+      this.beispielManifestLaedt = true;
+      this.beispielManifestFehler = '';
+      try {
+        const response = await fetch(SL_BEISPIEL_KAMPAGNEN_INDEX_URL, { cache: 'no-cache' });
+        if (response.status === 404) {
+          this.beispielManifest = [];
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const roh = await response.json();
+        if (!Array.isArray(roh)) {
+          throw new Error('Manifest muss ein Array sein.');
+        }
+        this.beispielManifest = roh.map(normalisiereBeispielManifestEintrag).filter(Boolean);
+      } catch (err) {
+        this.beispielManifest = [];
+        this.beispielManifestFehler = err && err.message ? err.message : String(err);
+      } finally {
+        this.beispielManifestLaedt = false;
+      }
+    },
+    beispielQuellenZeile(beispiel) {
+      if (!beispiel) {
+        return '';
+      }
+      const teile = [];
+      if (beispiel.quelleUrl) {
+        const label = beispiel.quelleLabel || beispiel.quelleUrl;
+        teile.push(
+          `Quelle: <a href="${beispiel.quelleUrl}" target="_blank" rel="noopener noreferrer">${label}</a>`,
+        );
+      } else if (beispiel.quelleLabel) {
+        teile.push(`Quelle: ${beispiel.quelleLabel}`);
+      }
+      if (beispiel.autoren) {
+        teile.push(`Verfasst von ${beispiel.autoren}`);
+      }
+      if (beispiel.kontext) {
+        teile.push(beispiel.kontext);
+      }
+      if (beispiel.lizenz) {
+        teile.push(`Lizenz: ${beispiel.lizenz}`);
+      }
+      return teile.join(' · ');
+    },
+    async beispielKampagneLaden() {
+      const beispiel = this.aktuellesBeispiel;
+      if (!beispiel || this.beispielLaeuftDatei) {
+        return;
+      }
+      const quellenZeile = this.beispielQuellenZeile(beispiel);
+      const beschreibungTeile = [
+        `<p>Die Kampagne <strong>„${beispiel.titel}“</strong> wird <em>additiv</em> hinzugefügt — ` +
+          'vorhandene Kampagnen und Zufallstabellen-Einträge bleiben unverändert. Bereits ' +
+          'vorhandene Beispiel-Einträge (gleiche ID) werden übersprungen.</p>',
+      ];
+      if (quellenZeile) {
+        beschreibungTeile.push(`<p class="mb-0 small text-body-secondary">${quellenZeile}.</p>`);
+      }
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: `„${beispiel.titel}“ laden?`,
+        beschreibung: beschreibungTeile.join(''),
+        bestaetigenText: 'Hinzufügen',
+        bestaetigenButtonClass: 'btn-primary',
+      });
+      if (!bestaetigt) {
+        return;
+      }
+
+      this.beispielLaeuftDatei = beispiel.datei;
+      try {
+        const url = `${SL_BEISPIEL_KAMPAGNEN_VERZEICHNIS}/${beispiel.datei}`;
+        const response = await fetch(url, { cache: 'no-cache' });
+        if (!response.ok) {
+          throw new Error(`Datei nicht erreichbar (HTTP ${response.status}).`);
+        }
+        const paket = await response.json();
+        if (!paket || paket.typ !== 'lokaler-speicher' || !Array.isArray(paket.daten)) {
+          throw new Error('Ungültiges Paketformat (erwartet typ: "lokaler-speicher").');
+        }
+        const ergebnis = this.beispielPaketAdditivAnwenden(paket);
+        if (!ergebnis.kampagneId) {
+          throw new Error('Im Paket wurde keine Kampagne gefunden.');
+        }
+
+        const zusammenfassung = [];
+        if (ergebnis.kampagneStatus === 'neu') {
+          zusammenfassung.push('Kampagne hinzugefügt');
+        } else if (ergebnis.kampagneStatus === 'vorhanden') {
+          zusammenfassung.push('Kampagne war bereits vorhanden');
+        }
+        if (ergebnis.zufallNeu > 0) {
+          zusammenfassung.push(`${ergebnis.zufallNeu} Zufallstabellen-Einträge hinzugefügt`);
+        }
+        if (ergebnis.zufallVorhanden > 0) {
+          zusammenfassung.push(`${ergebnis.zufallVorhanden} bereits vorhanden (übersprungen)`);
+        }
+        window.HTBAH.ui.notify({
+          text: `„${beispiel.titel}“: ${zusammenfassung.join(', ') || 'nichts geändert'}.`,
+          typ: 'success',
+        });
+
+        this.$router.push(window.HTBAH.kampagnenPfad('gruppe', ergebnis.kampagneId));
+      } catch (err) {
+        await window.HTBAH.ui.alert({
+          titel: 'Laden fehlgeschlagen',
+          beschreibung: `Das Beispiel „${beispiel.titel}“ konnte nicht geladen werden: ${
+            err && err.message ? err.message : err
+          }`,
+          bestaetigenButtonClass: 'btn-danger',
+        });
+      } finally {
+        this.beispielLaeuftDatei = '';
+      }
+    },
+    beispielPaketAdditivAnwenden(paket) {
+      const ergebnis = {
+        kampagneId: '',
+        kampagneStatus: '',
+        zufallNeu: 0,
+        zufallVorhanden: 0,
+      };
+
+      const kampBereich = paket.daten.find(
+        (d) => d && d.key === 'htbah_spielleiter_kampagnen',
+      );
+      if (kampBereich && kampBereich.vorhanden && typeof kampBereich.wert === 'string') {
+        let kampPaket = null;
+        try {
+          kampPaket = JSON.parse(kampBereich.wert);
+        } catch {
+          kampPaket = null;
+        }
+        const beispielKampagne =
+          kampPaket && Array.isArray(kampPaket.kampagnen) && kampPaket.kampagnen[0]
+            ? kampPaket.kampagnen[0]
+            : null;
+        if (beispielKampagne && typeof beispielKampagne.id === 'string' && beispielKampagne.id) {
+          if (!Array.isArray(this.zustand.kampagnen)) {
+            this.zustand.kampagnen = [];
+          }
+          const vorhanden = this.zustand.kampagnen.find(
+            (k) => k && k.id === beispielKampagne.id,
+          );
+          if (vorhanden) {
+            ergebnis.kampagneStatus = 'vorhanden';
+            ergebnis.kampagneId = vorhanden.id;
+          } else {
+            this.zustand.kampagnen.push(beispielKampagne);
+            ergebnis.kampagneStatus = 'neu';
+            ergebnis.kampagneId = beispielKampagne.id;
+          }
+          this.zustand.aktiveKampagneId = ergebnis.kampagneId;
+        }
+      }
+
+      const zufBereich = paket.daten.find(
+        (d) => d && d.key === 'htbah_zufallstabellen',
+      );
+      if (zufBereich && zufBereich.vorhanden && typeof zufBereich.wert === 'string') {
+        let zufPaket = null;
+        try {
+          zufPaket = JSON.parse(zufBereich.wert);
+        } catch {
+          zufPaket = null;
+        }
+        if (zufPaket && typeof zufPaket === 'object') {
+          const aktuell = window.HTBAH.ladeZufallstabellenZustand();
+          const kategorien = [
+            'npcs',
+            'orte',
+            'gegenstaende',
+            'fraktionen',
+            'pantheon',
+            'raetsel',
+            'bestien',
+          ];
+          kategorien.forEach((kat) => {
+            const eingang = Array.isArray(zufPaket[kat]) ? zufPaket[kat] : [];
+            if (!Array.isArray(aktuell[kat])) {
+              aktuell[kat] = [];
+            }
+            const vorhandenIds = new Set(
+              aktuell[kat]
+                .map((e) => (e && typeof e.id === 'string' ? e.id : ''))
+                .filter(Boolean),
+            );
+            eingang.forEach((eintrag) => {
+              if (!eintrag || typeof eintrag.id !== 'string' || !eintrag.id) {
+                return;
+              }
+              if (vorhandenIds.has(eintrag.id)) {
+                ergebnis.zufallVorhanden += 1;
+                return;
+              }
+              aktuell[kat].push(eintrag);
+              vorhandenIds.add(eintrag.id);
+              ergebnis.zufallNeu += 1;
+            });
+          });
+          window.HTBAH.speichereZufallstabellenZustand(aktuell);
+        }
+      }
+
+      this.persist();
+      return ergebnis;
+    },
   },
   template: `
     <div class="container content py-3">
@@ -165,6 +423,77 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
             </icon-text-button>
           </div>
         </div>
+      </div>
+
+      <div v-if="beispielManifest.length" class="card p-3 mb-3 text-start htbah-beispiel-kampagnen-card">
+        <h5 class="mb-2 d-flex align-items-center gap-2">
+          <span aria-hidden="true">📖</span>
+          <span>Beispiel-Kampagne laden</span>
+        </h5>
+        <p class="small text-body-secondary mb-2">
+          Wähle eine Kampagne aus und füge sie <strong>additiv</strong> zu deinen Daten hinzu.
+          Vorhandene Kampagnen und Zufallstabellen-Einträge bleiben unverändert; gleiche IDs werden übersprungen.
+        </p>
+        <div class="row g-2 align-items-stretch mb-2">
+          <div class="col-12 col-sm">
+            <div class="form-floating">
+              <select
+                id="sl-uebersicht-beispiel-auswahl"
+                class="form-select"
+                v-model="ausgewaehltesBeispielDatei"
+                :disabled="beispielLaedtGerade">
+                <option value="">— Beispiel-Kampagne wählen —</option>
+                <option
+                  v-for="b in beispielManifest"
+                  :key="'sl-bsp-opt-' + b.datei"
+                  :value="b.datei">
+                  {{ b.titel }}
+                </option>
+              </select>
+              <label for="sl-uebersicht-beispiel-auswahl">Beispiel-Kampagne</label>
+            </div>
+          </div>
+          <div class="col-12 col-sm-auto d-grid">
+            <icon-text-button
+              class="btn-primary w-100"
+              icon="auto_stories"
+              :disabled="!ausgewaehltesBeispielDatei || beispielLaedtGerade"
+              :aria-label="aktuellesBeispiel ? 'Beispiel-Kampagne „' + aktuellesBeispiel.titel + '“ laden' : 'Beispiel-Kampagne laden'"
+              @click="beispielKampagneLaden">
+              {{ beispielLaedtGerade ? 'Lade …' : 'Laden' }}
+            </icon-text-button>
+          </div>
+        </div>
+        <div v-if="aktuellesBeispiel" class="border rounded p-2 small text-body-secondary">
+          <p v-if="aktuellesBeispiel.untertitel" class="mb-1">{{ aktuellesBeispiel.untertitel }}</p>
+          <p v-if="aktuellesBeispiel.beschreibung" class="mb-2">{{ aktuellesBeispiel.beschreibung }}</p>
+          <p v-if="aktuellesBeispiel.quelleUrl || aktuellesBeispiel.quelleLabel" class="mb-1">
+            <strong>Quelle:</strong>
+            <a
+              v-if="aktuellesBeispiel.quelleUrl"
+              :href="aktuellesBeispiel.quelleUrl"
+              target="_blank"
+              rel="noopener noreferrer">{{ aktuellesBeispiel.quelleLabel || aktuellesBeispiel.quelleUrl }}</a>
+            <span v-else>{{ aktuellesBeispiel.quelleLabel }}</span>
+          </p>
+          <p v-if="aktuellesBeispiel.autoren || aktuellesBeispiel.kontext" class="mb-1">
+            <template v-if="aktuellesBeispiel.autoren">
+              <strong>Verfasst von:</strong> {{ aktuellesBeispiel.autoren }}
+            </template>
+            <template v-if="aktuellesBeispiel.kontext">
+              <span v-if="aktuellesBeispiel.autoren"> · </span>{{ aktuellesBeispiel.kontext }}
+            </template>
+          </p>
+          <p v-if="aktuellesBeispiel.lizenz" class="mb-0">
+            <strong>Lizenz:</strong> {{ aktuellesBeispiel.lizenz }}
+          </p>
+        </div>
+      </div>
+      <div
+        v-else-if="beispielManifestFehler"
+        class="alert alert-warning small mb-3 text-start"
+        role="status">
+        Beispiel-Kampagnen konnten nicht geladen werden: {{ beispielManifestFehler }}
       </div>
 
       <div class="card p-3 mb-0 text-start">

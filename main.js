@@ -13,6 +13,7 @@ const SPEICHER_KEY_WUERFEL_AUDIO = 'htbah_wuerfel_audio';
 const SPEICHER_KEY_WUERFEL_SOUND_LEGACY = 'htbah_wuerfel_sound';
 const SPEICHER_KEY_DICE_COLORS = 'htbah_dice_colors';
 const SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER = 'htbah_wuerfel_beutel_fenster';
+const SPEICHER_KEY_ZEICHEN_BRETT = 'htbah_zeichen_brett';
 const SPEICHER_KEY_MENTION_NAV_TARGET = 'htbah_mention_nav_target';
 const SPEICHER_KEY_ORIENTATION_MODE = 'htbah_orientation_mode';
 
@@ -1593,9 +1594,43 @@ function setzeTheme(theme) {
   return gueltigesTheme;
 }
 
+const ORIENT_GUELTIGE_UNTER_MODI = new Set([
+  'landscape-primary',
+  'landscape-secondary',
+  'portrait-primary',
+  'portrait-secondary',
+]);
+
+const ORIENT_WINKEL_MAP = {
+  'portrait-primary': 0,
+  'landscape-primary': 90,
+  'portrait-secondary': 180,
+  'landscape-secondary': 270,
+};
+
+function bestimmeOrientierungsGruppe(modus) {
+  if (typeof modus !== 'string') {
+    return 'frei';
+  }
+  if (modus.indexOf('landscape') === 0) {
+    return 'landscape';
+  }
+  if (modus.indexOf('portrait') === 0) {
+    return 'portrait';
+  }
+  return 'frei';
+}
+
 function normalisiereOrientierungModus(modus) {
-  if (modus === 'landscape' || modus === 'portrait') {
+  if (ORIENT_GUELTIGE_UNTER_MODI.has(modus)) {
     return modus;
+  }
+  // Legacy-Werte aus älteren Versionen sinnvoll auf eine konkrete Untervariante mappen.
+  if (modus === 'landscape') {
+    return 'landscape-primary';
+  }
+  if (modus === 'portrait') {
+    return 'portrait-primary';
   }
   return 'frei';
 }
@@ -1639,6 +1674,7 @@ async function sperreBildschirmAusrichtungWennMoeglich(ziel) {
 const HTBAH_ORIENT_KLASSE_AKTIV = 'htbah-orient-erzwungen';
 const HTBAH_ORIENT_KLASSE_DREHUNG_CW = 'htbah-orient-drehung-cw';
 const HTBAH_ORIENT_KLASSE_DREHUNG_CCW = 'htbah-orient-drehung-ccw';
+const HTBAH_ORIENT_KLASSE_DREHUNG_180 = 'htbah-orient-drehung-180';
 
 function ermittleAktuelleBildschirmAusrichtung() {
   if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.type === 'string') {
@@ -1665,31 +1701,31 @@ function aktualisiereOrientierungCssFallback(modus) {
     HTBAH_ORIENT_KLASSE_AKTIV,
     HTBAH_ORIENT_KLASSE_DREHUNG_CW,
     HTBAH_ORIENT_KLASSE_DREHUNG_CCW,
+    HTBAH_ORIENT_KLASSE_DREHUNG_180,
   );
   const normalisiert = normalisiereOrientierungModus(modus);
   if (normalisiert === 'frei') {
     return;
   }
   const aktuelle = ermittleAktuelleBildschirmAusrichtung();
-  const istLandscape = typeof aktuelle === 'string' && aktuelle.indexOf('landscape') === 0;
-  const passt =
-    (normalisiert === 'portrait' && !istLandscape) ||
-    (normalisiert === 'landscape' && istLandscape);
-  if (passt) {
+  if (aktuelle === normalisiert) {
     return;
   }
-  // Drehrichtung so wählen, dass beim Zurückkippen zum gewünschten Modus der Inhalt wieder aufrecht steht.
+  const aktuellerWinkel = ORIENT_WINKEL_MAP[aktuelle];
+  const zielWinkel = ORIENT_WINKEL_MAP[normalisiert];
+  if (typeof aktuellerWinkel !== 'number' || typeof zielWinkel !== 'number') {
+    return;
+  }
+  // Delta in Grad gegen den Uhrzeigersinn, das den Inhalt von der aktuellen Geräte-Lage
+  // zurück in die gewünschte Ausrichtung dreht.
+  const delta = (((zielWinkel - aktuellerWinkel) % 360) + 360) % 360;
   let drehKlasse = null;
-  if (normalisiert === 'portrait') {
-    drehKlasse =
-      aktuelle === 'landscape-secondary'
-        ? HTBAH_ORIENT_KLASSE_DREHUNG_CCW
-        : HTBAH_ORIENT_KLASSE_DREHUNG_CW;
-  } else if (normalisiert === 'landscape') {
-    drehKlasse =
-      aktuelle === 'portrait-secondary'
-        ? HTBAH_ORIENT_KLASSE_DREHUNG_CW
-        : HTBAH_ORIENT_KLASSE_DREHUNG_CCW;
+  if (delta === 90) {
+    drehKlasse = HTBAH_ORIENT_KLASSE_DREHUNG_CCW;
+  } else if (delta === 180) {
+    drehKlasse = HTBAH_ORIENT_KLASSE_DREHUNG_180;
+  } else if (delta === 270) {
+    drehKlasse = HTBAH_ORIENT_KLASSE_DREHUNG_CW;
   }
   if (!drehKlasse) {
     return;
@@ -1717,8 +1753,24 @@ function wendeOrientierungModusAn(modus) {
   void versucheOrientierungSperreSonstCssFallback(normalisiert);
 }
 
+function aufloeseOrientierungZielUnterModus(generischerModus) {
+  // Bei generischer Auswahl ('landscape'/'portrait') die aktuelle Geräte-Lage übernehmen,
+  // damit ein bereits "kopfüber" gehaltenes Device nicht zwangsweise um 180° zurückgedreht wird.
+  const aktuelle = ermittleAktuelleBildschirmAusrichtung();
+  const aktuelleGruppe = bestimmeOrientierungsGruppe(aktuelle);
+  if (aktuelleGruppe === generischerModus && ORIENT_GUELTIGE_UNTER_MODI.has(aktuelle)) {
+    return aktuelle;
+  }
+  return generischerModus === 'landscape' ? 'landscape-primary' : 'portrait-primary';
+}
+
 function speichereOrientierungModus(modus) {
-  const normalisiert = normalisiereOrientierungModus(modus);
+  let normalisiert;
+  if (modus === 'landscape' || modus === 'portrait') {
+    normalisiert = aufloeseOrientierungZielUnterModus(modus);
+  } else {
+    normalisiert = normalisiereOrientierungModus(modus);
+  }
   htbahSpeicher.schreibeText(SPEICHER_KEY_ORIENTATION_MODE, normalisiert);
   wendeOrientierungModusAn(normalisiert);
   return normalisiert;
@@ -1876,6 +1928,7 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   wuerfelAudio: SPEICHER_KEY_WUERFEL_AUDIO,
   diceColors: SPEICHER_KEY_DICE_COLORS,
   wuerfelBeutelFenster: SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER,
+  zeichenBrett: SPEICHER_KEY_ZEICHEN_BRETT,
   mentionNavigationTarget: SPEICHER_KEY_MENTION_NAV_TARGET,
 });
 
@@ -1941,6 +1994,7 @@ window.HTBAH = {
   speichereAppRolle,
   ladeOrientierungModus,
   speichereOrientierungModus,
+  bestimmeOrientierungsGruppe,
   speicher: htbahSpeicher,
   speicherKeys: HTBAH_SPEICHER_KEYS,
 };
@@ -2163,6 +2217,7 @@ router.beforeEach((to) => {
 const uiZustand = Vue.reactive({
   regelwerkOffen: false,
   abenteuerbuchOffen: false,
+  zeichenBrettOffen: false,
 });
 
 const lebenspunkteStatus = Vue.reactive({
@@ -2221,8 +2276,10 @@ const app = Vue.createApp({
     <eingabe-modal ref="globalEingabeModal" />
     <ui-toast-host ref="globalToastHost" />
     <lokaler-speicher-hinweis-modal />
+    <entwicklungshinweis-modal />
     <regelwerk-modal :ui-zustand="uiZustand"></regelwerk-modal>
     <abenteuerbuch-modal :ui-zustand="uiZustand"></abenteuerbuch-modal>
+    <zeichen-brett-modal :ui-zustand="uiZustand"></zeichen-brett-modal>
     <bildbetrachter-host />
     <bottom-nav :ui-zustand="uiZustand"></bottom-nav>
   `,
@@ -2246,10 +2303,15 @@ router.afterEach((to) => {
 });
 app.component('regelwerk-modal', window.HTBAH_KOMPONENTEN.RegelwerkModal);
 app.component('abenteuerbuch-modal', window.HTBAH_KOMPONENTEN.AbenteuerbuchModal);
+app.component('zeichen-brett-modal', window.HTBAH_KOMPONENTEN.ZeichenBrettModal);
 app.component('sicherheitsmechanismen-modal', window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal);
 app.component(
   'lokaler-speicher-hinweis-modal',
   window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal,
+);
+app.component(
+  'entwicklungshinweis-modal',
+  window.HTBAH_KOMPONENTEN.EntwicklungshinweisModal,
 );
 app.component('bottom-nav', window.HTBAH_KOMPONENTEN.BottomNav);
 app.component('bestaetigen-modal', window.HTBAH_KOMPONENTEN.BestaetigenModal);

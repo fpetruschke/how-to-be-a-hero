@@ -28,6 +28,7 @@
   --modal-backdrop: rgba(2, 6, 23, 0.75);
   --modal-bg: #1e293b;
   --htbah-z-modal-base: 2000;
+  --htbah-z-modal-zeichen-brett: 2050;
   --htbah-z-modal-wuerfel: 2060;
   --htbah-z-modal-generator: 4060;
   --htbah-z-modal-map: 4070;
@@ -241,13 +242,22 @@ html.htbah-orient-erzwungen {
 }
 
 html.htbah-orient-erzwungen body {
-  width: 100vh;
-  height: 100vw;
   position: fixed;
   top: 0;
   left: 0;
   overflow: auto;
   transform-origin: 0 0;
+}
+
+html.htbah-orient-erzwungen.htbah-orient-drehung-cw body,
+html.htbah-orient-erzwungen.htbah-orient-drehung-ccw body {
+  width: 100vh;
+  height: 100vw;
+}
+
+html.htbah-orient-erzwungen.htbah-orient-drehung-180 body {
+  width: 100vw;
+  height: 100vh;
 }
 
 html.htbah-orient-erzwungen.htbah-orient-drehung-cw body {
@@ -256,6 +266,10 @@ html.htbah-orient-erzwungen.htbah-orient-drehung-cw body {
 
 html.htbah-orient-erzwungen.htbah-orient-drehung-ccw body {
   transform: translateY(100vh) rotate(-90deg);
+}
+
+html.htbah-orient-erzwungen.htbah-orient-drehung-180 body {
+  transform: translate(100vw, 100vh) rotate(180deg);
 }
 
 .card {
@@ -1776,6 +1790,195 @@ input::placeholder {
   background: var(--card-bg);
 }
 
+/* Zeichen-Brett: freischwebendes, resizables Fenster mit Canvas */
+.htbah-zeichen-brett-layer {
+  z-index: var(--htbah-z-modal-zeichen-brett);
+}
+
+.htbah-zeichen-brett-window.regelwerk-modal-window {
+  width: min(94vw, 760px);
+  height: min(88vh, 620px);
+  max-height: min(94dvh, 820px);
+  overflow: hidden;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-brett-toolbar {
+  background: var(--card-bg);
+  border-color: var(--border-color) !important;
+  row-gap: 0.5rem;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-brett-toolbar .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-brett-toolbar .material-symbols-outlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  vertical-align: middle;
+  font-size: 1.15rem;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-werkzeuggruppe {
+  flex-wrap: wrap;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-werkzeuggruppe > label {
+  display: inline-flex;
+  align-items: center;
+}
+
+.htbah-zeichen-werkzeug-split {
+  position: relative;
+}
+
+.htbah-zeichen-werkzeug-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 14rem;
+  padding: 0.35rem;
+  background: var(--modal-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.htbah-zeichen-werkzeug-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.htbah-zeichen-werkzeug-menu-item:hover,
+.htbah-zeichen-werkzeug-menu-item:focus-visible {
+  background: rgba(99, 102, 241, 0.18);
+  outline: none;
+}
+
+.htbah-zeichen-werkzeug-menu-item.aktiv {
+  background: rgba(59, 130, 246, 0.25);
+  color: var(--text-color);
+  font-weight: 600;
+}
+
+.htbah-zeichen-werkzeug-menu-item .material-symbols-outlined {
+  font-size: 1.2rem;
+}
+
+.htbah-zeichen-brett-canvas--auswahl {
+  cursor: default;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-color {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0.15rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-presets {
+  flex-wrap: wrap;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-preset {
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-preset:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 1px;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-range {
+  min-width: 90px;
+  max-width: 200px;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-pinsel-vorschau {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 50%;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.htbah-zeichen-brett-window .htbah-zeichen-pinsel-punkt {
+  display: block;
+  border-radius: 50%;
+}
+
+.htbah-zeichen-brett-canvas-host {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: #f1f5f9;
+  background-image:
+    linear-gradient(45deg, rgba(15, 23, 42, 0.06) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(15, 23, 42, 0.06) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(15, 23, 42, 0.06) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(15, 23, 42, 0.06) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.htbah-zeichen-brett-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  background: #ffffff;
+}
+
+.htbah-zeichen-brett-tipp {
+  position: absolute;
+  left: 0.6rem;
+  bottom: 0.6rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.78);
+  color: #1f2937;
+  border-radius: 0.4rem;
+  pointer-events: none;
+  max-width: calc(100% - 4rem);
+}
+
+@media (max-width: 575.98px) {
+  .htbah-zeichen-brett-tipp {
+    display: none;
+  }
+}
+
 .modal-content {
   background: var(--modal-bg);
   color: var(--text-color);
@@ -1837,6 +2040,43 @@ input::placeholder {
   }
 
   #htbahLokalerSpeicherHinweisModal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Entwicklungshinweis: gleiches Responsive-Verhalten wie der Speicherhinweis */
+@media (max-width: 575.98px) {
+  #htbahEntwicklungshinweisModal.modal.show {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  #htbahEntwicklungshinweisModal .modal-dialog {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #htbahEntwicklungshinweisModal .modal-content {
+    max-height: min(100dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #htbahEntwicklungshinweisModal .modal-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;

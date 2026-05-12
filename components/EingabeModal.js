@@ -16,6 +16,9 @@ window.HTBAH_KOMPONENTEN.EingabeModal = {
     inputId() {
       return `${this.modalId}Input`;
     },
+    hatSichtbarenPlaceholder() {
+      return typeof this.placeholder === 'string' && this.placeholder.trim() !== '';
+    },
   },
   data() {
     return {
@@ -143,14 +146,25 @@ window.HTBAH_KOMPONENTEN.EingabeModal = {
           </div>
           <div class="modal-body text-start">
             <p v-if="beschreibung" class="mb-2">{{ beschreibung }}</p>
-            <div class="form-floating">
+            <template v-if="hatSichtbarenPlaceholder">
+              <label :for="inputId" class="form-label mb-1">{{ label }}</label>
               <input
                 :id="inputId"
                 ref="inputElement"
                 type="text"
                 class="form-control"
                 v-model="wert"
-                :placeholder="placeholder || ' '"
+                :placeholder="placeholder"
+                @keydown.enter.prevent="beiTasteEnter" />
+            </template>
+            <div v-else class="form-floating">
+              <input
+                :id="inputId"
+                ref="inputElement"
+                type="text"
+                class="form-control"
+                v-model="wert"
+                placeholder=" "
                 @keydown.enter.prevent="beiTasteEnter" />
               <label :for="inputId">{{ label }}</label>
             </div>

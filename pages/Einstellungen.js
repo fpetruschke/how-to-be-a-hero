@@ -266,6 +266,19 @@ window.HTBAH_SEITEN.Einstellungen = {
     themeSymbol() {
       return this.istHellesTheme ? 'light_mode' : 'dark_mode';
     },
+    orientierungGruppe() {
+      const m = this.orientierungModus;
+      if (typeof m !== 'string') {
+        return 'frei';
+      }
+      if (m.indexOf('landscape') === 0) {
+        return 'landscape';
+      }
+      if (m.indexOf('portrait') === 0) {
+        return 'portrait';
+      }
+      return 'frei';
+    },
     appRolle() {
       void this.$route.fullPath;
       return window.HTBAH.ladeAppRolle();
@@ -903,9 +916,9 @@ window.HTBAH_SEITEN.Einstellungen = {
           <button
             type="button"
             class="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1 flex-fill"
-            :class="orientierungModus === 'frei' ? 'btn-primary' : 'btn-outline-secondary'"
+            :class="orientierungGruppe === 'frei' ? 'btn-primary' : 'btn-outline-secondary'"
             role="radio"
-            :aria-checked="orientierungModus === 'frei' ? 'true' : 'false'"
+            :aria-checked="orientierungGruppe === 'frei' ? 'true' : 'false'"
             @click="setzeOrientierungModus('frei')">
             <span class="material-symbols-outlined" aria-hidden="true">screen_rotation</span>
             <span>frei</span>
@@ -913,9 +926,9 @@ window.HTBAH_SEITEN.Einstellungen = {
           <button
             type="button"
             class="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1 flex-fill"
-            :class="orientierungModus === 'landscape' ? 'btn-primary' : 'btn-outline-secondary'"
+            :class="orientierungGruppe === 'landscape' ? 'btn-primary' : 'btn-outline-secondary'"
             role="radio"
-            :aria-checked="orientierungModus === 'landscape' ? 'true' : 'false'"
+            :aria-checked="orientierungGruppe === 'landscape' ? 'true' : 'false'"
             @click="setzeOrientierungModus('landscape')">
             <span class="material-symbols-outlined" aria-hidden="true">stay_current_landscape</span>
             <span>Landscape</span>
@@ -923,9 +936,9 @@ window.HTBAH_SEITEN.Einstellungen = {
           <button
             type="button"
             class="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1 flex-fill"
-            :class="orientierungModus === 'portrait' ? 'btn-primary' : 'btn-outline-secondary'"
+            :class="orientierungGruppe === 'portrait' ? 'btn-primary' : 'btn-outline-secondary'"
             role="radio"
-            :aria-checked="orientierungModus === 'portrait' ? 'true' : 'false'"
+            :aria-checked="orientierungGruppe === 'portrait' ? 'true' : 'false'"
             @click="setzeOrientierungModus('portrait')">
             <span class="material-symbols-outlined" aria-hidden="true">stay_current_portrait</span>
             <span>Portrait</span>

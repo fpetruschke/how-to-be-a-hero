@@ -45,6 +45,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     'npc-refresh-field',
     'npc-wizard',
     'bestien-wizard',
+    'welt-open',
   ],
   data() {
     return {
@@ -85,6 +86,17 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     },
     kannDuplizieren() {
       return this.istBearbeitung && this.anlage && this.anlage.typ === 'bestie';
+    },
+    kannInWeltOeffnen() {
+      if (this.randomSichtbar) {
+        return false;
+      }
+      const typ = this.anlage && this.anlage.typ;
+      if (!['npc', 'bestie', 'ort', 'raetsel', 'gegenstand'].includes(typ)) {
+        return false;
+      }
+      const id = this.anlage && this.anlage.zeile && this.anlage.zeile.id;
+      return !!(id && String(id).trim());
     },
   },
   watch: {
@@ -404,6 +416,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         modus: modus === 'einzeln' ? 'einzeln' : 'mitAbhaengigen',
       });
     },
+    inWeltOeffnen() {
+      if (!this.kannInWeltOeffnen) {
+        return;
+      }
+      this.$emit('welt-open');
+    },
   },
   template: `
     <div v-if="anlage.offen && anlage.zeile" class="regelwerk-modal-layer">
@@ -487,7 +505,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
             <div class="row g-2">
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Name</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.name" placeholder="Name" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Name neu würfeln" @click="npcFeldNeuWuerfeln('name', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Name</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.name" placeholder="Name" /><button v-if="kannInWeltOeffnen" type="button" class="btn btn-outline-secondary htbah-input-icon-btn" title="In interaktiver Welt öffnen" aria-label="In interaktiver Welt öffnen" @click="inWeltOeffnen">🌍</button><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Name neu würfeln" @click="npcFeldNeuWuerfeln('name', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6"><label class="form-label small text-secondary mb-1">Spitzname</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.spitzname" placeholder="Spitzname" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Spitzname neu würfeln" @click="npcFeldNeuWuerfeln('spitzname', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6"><label class="form-label small text-secondary mb-1">Geschlecht</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.geschlecht" placeholder="Geschlecht" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Geschlecht neu würfeln" @click="npcFeldNeuWuerfeln('geschlecht', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6">
@@ -652,7 +670,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
             <div class="row g-2">
-              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
+              <div class="col-md-6"><div class="input-group"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div><button v-if="kannInWeltOeffnen" type="button" class="btn btn-outline-secondary htbah-input-icon-btn" title="In interaktiver Welt öffnen" aria-label="In interaktiver Welt öffnen" @click="inWeltOeffnen">🌍</button></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.groesse" placeholder=" " /><label>Größe</label></div></div>
             </div>
           </section>
@@ -771,7 +789,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             </div>
             <div class="row g-2">
               <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.art" placeholder=" " /><label>Art (z. B. Licht- & Spiegelpuzzle)</label></div></div>
-              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.titel" placeholder=" " /><label>Titel / Stichwort</label></div></div>
+              <div class="col-md-6"><div class="input-group"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.titel" placeholder=" " /><label>Titel / Stichwort</label></div><button v-if="kannInWeltOeffnen" type="button" class="btn btn-outline-secondary htbah-input-icon-btn" title="In interaktiver Welt öffnen" aria-label="In interaktiver Welt öffnen" @click="inWeltOeffnen">🌍</button></div></div>
               <div class="col-md-6">
                 <label class="form-label small text-secondary mb-1" for="wb-zr-ort">Aufenthaltsort (optional)</label>
                 <input
@@ -807,7 +825,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
             <div class="row g-2">
               <div class="col-md-6"><label class="form-label small text-secondary mb-1">Kategorie</label><select class="form-select" v-model="anlage.zeile.kategorie"><option value="normales_tier">Normales Tier</option><option value="fantasy_tier">Magisch / Fantasy</option><option value="mutiert">Mutiert</option><option value="monster">Monster</option></select></div>
-              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name der Bestie</label></div></div>
+              <div class="col-12"><div class="input-group"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name der Bestie</label></div><button v-if="kannInWeltOeffnen" type="button" class="btn btn-outline-secondary htbah-input-icon-btn" title="In interaktiver Welt öffnen" aria-label="In interaktiver Welt öffnen" @click="inWeltOeffnen">🌍</button></div></div>
             </div>
           </section>
           <section class="htbah-entitaet-bereich">
@@ -945,7 +963,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
               <div class="col-md-6"><div class="form-check mt-3"><input class="form-check-input" type="checkbox" :checked="zufallGegenstandKleidung" @change="$emit('update:zufallGegenstandKleidung', $event.target.checked)" id="wb-zg-kleid" /><label class="form-check-label small" for="wb-zg-kleid">Kleidung als Kategorie zulassen</label></div></div>
             </div>
             <div class="row g-2">
-              <div class="col-12"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
+              <div class="col-12"><div class="input-group"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div><button v-if="kannInWeltOeffnen" type="button" class="btn btn-outline-secondary htbah-input-icon-btn" title="In interaktiver Welt öffnen" aria-label="In interaktiver Welt öffnen" @click="inWeltOeffnen">🌍</button></div></div>
             </div>
           </section>
           <section class="htbah-entitaet-bereich">

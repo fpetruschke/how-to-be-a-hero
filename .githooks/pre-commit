@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Pre-Commit-Hook
+#
+# Hält `assets/beispiel-kampagnen/` mit `index.json` synchron, damit ein
+# normales `git commit -m "..."` reicht. Der Hook
+#
+#   • bricht ab, wenn untracked `.json`-Dateien im Ordner liegen (Datei
+#     vergessen mit `git add`),
+#   • bricht ab, wenn gelöschte `.json`-Dateien noch nicht gestaged sind,
+#   • regeneriert sonst `index.json` automatisch und nimmt sie mit in den
+#     gerade entstehenden Commit.
+#
+# Bypass einmalig:   git commit --no-verify
+# Aktivierung pro Clone:  ./bin/setup-hooks
+
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+DIR="assets/beispiel-kampagnen"
+INDEX="$DIR/index.json"
+GENERATOR="bin/aktualisiere-beispiel-kampagnen-index"
+
+# Feature noch nicht im Branch vorhanden → kein Eingriff
+if [[ ! -d "$DIR" || ! -x "$GENERATOR" ]]; then
+  exit 0
+fi
+
+# --- 1) Untracked .json-Dateien im Ordner (außer index.json) -----------------
+untracked="$(
+  git ls-files --others --exclude-standard -- "$DIR" \
+    | { grep -E '\.json$' || true; } \
+    | { grep -v "^${DIR}/index\.json$" || true; }
+)"
+if [[ -n "$untracked" ]]; then
+  cat >&2 <<EOF
+
+✗ Pre-commit abgebrochen: neue .json-Datei(en) in ${DIR}/ sind nicht gestaged.
+
+$(printf '%s\n' "$untracked" | sed 's/^/    /')
+
+Bitte stagen — oder löschen / .gitignoren, falls nicht gewünscht:
+
+    git add ${DIR}/
+
+(Bypass einmalig: git commit --no-verify)
+
+EOF
+  exit 1
+fi
+
+# --- 2) Unstaged Löschungen tracked .json-Dateien im Ordner ------------------
+deleted="$(
+  git ls-files --deleted -- "$DIR" \
+    | { grep -E '\.json$' || true; }
+)"
+if [[ -n "$deleted" ]]; then
+  cat >&2 <<EOF
+
+✗ Pre-commit abgebrochen: gelöschte .json-Datei(en) in ${DIR}/ sind nicht gestaged.
+
+$(printf '%s\n' "$deleted" | sed 's/^/    /')
+
+Bitte stagen:
+
+    git add -A ${DIR}/
+
+(Bypass einmalig: git commit --no-verify)
+
+EOF
+  exit 1
+fi
+
+# --- 3) index.json regenerieren und in den Commit ziehen ---------------------
+"$GENERATOR" >/dev/null
+# Bei jedem Lauf einfach mit-stagen — wenn nichts neu ist, ist es ein No-Op.
+git add "$INDEX"
+
+exit 0
