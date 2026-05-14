@@ -15,8 +15,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   /** CSS-Referenz: 1in = 96px, 1in = 2,54cm — entspricht der Browser-Einheit „cm“ im Layout. */
   const CSS_PX_PRO_CM = 96 / 2.54;
   const KARO_KANTE_CM = 0.5;
-  const ZEICHEN_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck', 'radiergummi'];
-  const ALLE_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck', 'radiergummi', 'auswahl'];
+  const ZEICHEN_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck', 'radiergummi', 'fuell', 'pipette'];
+  const ALLE_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck', 'radiergummi', 'fuell', 'pipette', 'hand', 'auswahl'];
 
   const WERKZEUG_META = {
     strich: { label: 'Freihand-Strich', kurz: 'Strich', icon: 'gesture' },
@@ -24,8 +24,93 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     kreis: { label: 'Kreis / Ellipse', kurz: 'Kreis', icon: 'radio_button_unchecked' },
     dreieck: { label: 'Dreieck', kurz: 'Dreieck', icon: 'change_history' },
     radiergummi: { label: 'Radiergummi', kurz: 'Radierer', icon: 'ink_eraser' },
+    fuell: { label: 'Füllen', kurz: 'Füllen', icon: 'format_color_fill' },
+    pipette: { label: 'Pipette', kurz: 'Pipette', icon: 'colorize' },
+    hand: { label: 'Hand — Ansicht verschieben', kurz: 'Hand', icon: 'pan_tool' },
     auswahl: { label: 'Auswahl-Werkzeug', kurz: 'Auswahl', icon: 'highlight_alt' },
   };
+
+  const FUELL_FARBTOLERANZ = 44;
+  /** Obergrenze gefüllter Pixel (Viewport-Bitmap); Karo zählt nicht mehr mit. */
+  const MAX_FUELL_PIXEL = 2_500_000;
+
+  function hexZuRgb(hex) {
+    const h = normalisiereFarbe(hex);
+    const n = parseInt(h.slice(1), 16);
+    if (!Number.isFinite(n)) return [17, 24, 39, 255];
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 255];
+  }
+
+  function rgbZuHex(r, g, b) {
+    const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    return `#${[clamp(r), clamp(g), clamp(b)]
+      .map((v) => v.toString(16).padStart(2, '0'))
+      .join('')}`;
+  }
+
+  /** @returns {boolean} ob Pixel di zum Start (zr,zg,zb,za) innerhalb der Toleranz passt */
+  function fuellPixelPasstZumStart(d, di, zr, zg, zb, za, tol) {
+    return (
+      Math.abs(d[di] - zr) + Math.abs(d[di + 1] - zg) + Math.abs(d[di + 2] - zb) + Math.abs(d[di + 3] - za) * 0.35 <=
+      tol
+    );
+  }
+
+  /**
+   * Flood-Fill auf ImageData (RGBA). Gibt BBox in Pixelkoordinaten zurück oder null.
+   * @param {ImageData} imageData
+   */
+  function floodFuellAufImageData(imageData, startX, startY, fillRgb, tol, maxPx) {
+    const w = imageData.width;
+    const h = imageData.height;
+    const d = imageData.data;
+    if (startX < 0 || startY < 0 || startX >= w || startY >= h) return null;
+    const si = (startY * w + startX) * 4;
+    const zr = d[si];
+    const zg = d[si + 1];
+    const zb = d[si + 2];
+    const za = d[si + 3];
+    const fr = fillRgb[0];
+    const fg = fillRgb[1];
+    const fb = fillRgb[2];
+    const fa = fillRgb[3];
+    if (Math.abs(zr - fr) + Math.abs(zg - fg) + Math.abs(zb - fb) + Math.abs(za - fa) * 0.35 <= 4) {
+      return null;
+    }
+    const stack = [[startX, startY]];
+    const seen = new Uint8Array(w * h);
+    let minx = startX;
+    let maxx = startX;
+    let miny = startY;
+    let maxy = startY;
+    let cnt = 0;
+    while (stack.length && cnt < maxPx) {
+      const p = stack.pop();
+      const x = p[0];
+      const y = p[1];
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const vi = y * w + x;
+      if (seen[vi]) continue;
+      const di = vi * 4;
+      if (!fuellPixelPasstZumStart(d, di, zr, zg, zb, za, tol)) continue;
+      seen[vi] = 1;
+      cnt += 1;
+      if (x < minx) minx = x;
+      if (x > maxx) maxx = x;
+      if (y < miny) miny = y;
+      if (y > maxy) maxy = y;
+      d[di] = fr;
+      d[di + 1] = fg;
+      d[di + 2] = fb;
+      d[di + 3] = fa;
+      stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+    if (!cnt) return null;
+    if (stack.length > 0) {
+      return { zuGross: true, minx, miny, maxx, maxy, count: cnt };
+    }
+    return { zuGross: false, minx, miny, maxx, maxy, count: cnt };
+  }
 
   function neueId() {
     if (window.HTBAH && typeof window.HTBAH.neueEntropieId === 'function') {
@@ -35,7 +120,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   }
 
   function leseSpeicherKey() {
-    return window.HTBAH?.speicherKeys?.zeichenBrett || SPEICHER_KEY_FALLBACK;
+    return window.HTBAH?.speicherKeys?.zeichenModal || SPEICHER_KEY_FALLBACK;
   }
 
   function ladeRoh() {
@@ -113,6 +198,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       }
       return { i: id, t: typ, c, d, x, y, w, h };
     }
+    if (typ === 'm') {
+      const x = Number(roh.x);
+      const y = Number(roh.y);
+      const w = Number(roh.w);
+      const h = Number(roh.h);
+      const src = typeof roh.src === 'string' ? roh.src.trim() : '';
+      if (!src || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(w) || !Number.isFinite(h)) {
+        return null;
+      }
+      return { i: id, t: 'm', c: normalisiereFarbe(roh.c || '#111827'), d: 1, x, y, w, h, src };
+    }
     return null;
   }
 
@@ -135,6 +231,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       };
       if (el.t === 's') {
         basis.p = el.p.map((v) => Math.round(v * 10) / 10);
+      } else if (el.t === 'm') {
+        basis.x = Math.round(el.x * 10) / 10;
+        basis.y = Math.round(el.y * 10) / 10;
+        basis.w = Math.round(el.w * 10) / 10;
+        basis.h = Math.round(el.h * 10) / 10;
+        basis.src = el.src;
       } else {
         basis.x = Math.round(el.x * 10) / 10;
         basis.y = Math.round(el.y * 10) / 10;
@@ -163,6 +265,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
   function boundingBox(el) {
     if (!el) return null;
+    if (el.t === 'm') {
+      const norm = normalisiereBox(el.x, el.y, el.w, el.h);
+      return { x: norm.x, y: norm.y, w: norm.w, h: norm.h };
+    }
     if (el.t === 's') {
       let minX = Infinity;
       let minY = Infinity;
@@ -288,6 +394,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       if (distanzPunktZuStrecke(wx, wy, pkt[4], pkt[5], pkt[0], pkt[1]) <= grenze) return true;
       return false;
     }
+    if (el.t === 'm') {
+      const norm = normalisiereBox(el.x, el.y, el.w, el.h);
+      return wx >= norm.x - tol && wx <= norm.x + norm.w + tol && wy >= norm.y - tol && wy <= norm.y + norm.h + tol;
+    }
     return false;
   }
 
@@ -408,7 +518,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     }
   }
 
-  window.HTBAH_KOMPONENTEN.ZeichenBrettModal = {
+  window.HTBAH_KOMPONENTEN.ZeichenModal = {
     props: ['uiZustand'],
     data() {
       return {
@@ -440,6 +550,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         ]),
         /** Karoraster in Weltkoordinaten: bei 100 % Zoom entspricht eine Kante 0,5 cm auf dem Bildschirm; läuft mit Pan und Zoom mit. */
         karopapierGitter: false,
+        /** CSS-Pixel auf dem Canvas; Vorschau-Rahmen nur bei Werkzeug „Strich“. */
+        stiftVorschauPos: null,
         WERKZEUG_META,
         ZEICHEN_WERKZEUGE,
       };
@@ -457,6 +569,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       this._lassoBox = null;
       this._pinchStart = null;
       this._panMaus = null;
+      this._rasterBildCache = new Map();
     },
     computed: {
       fensterStil() {
@@ -477,8 +590,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       istAuswahlModus() {
         return this.werkzeug === 'auswahl';
       },
+      istHandModus() {
+        return this.werkzeug === 'hand';
+      },
       istRadierModus() {
         return this.werkzeug === 'radiergummi';
+      },
+      istPipetteModus() {
+        return this.werkzeug === 'pipette';
+      },
+      istFuellModus() {
+        return this.werkzeug === 'fuell';
       },
       kannUndo() {
         return this.undoStack.length > 0;
@@ -509,7 +631,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
     },
     watch: {
-      'uiZustand.zeichenBrettOffen'(istOffen) {
+      'uiZustand.zeichenModalOffen'(istOffen) {
         if (istOffen) {
           this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
           this.ladeAusSpeicher();
@@ -525,6 +647,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.werkzeugMenuOffen = false;
         this.beendeZiehen();
         this.beendeResize();
+        this.stiftVorschauPos = null;
         this.unbindCanvas();
         this.flushSpeichern();
         this.stelleFokusWiederHer();
@@ -534,13 +657,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       dicke() {
         if (this.zustandGeladen) this.persistDebounce();
+        if (this.werkzeug === 'strich' && this.stiftVorschauPos) this.zeichneAlles();
       },
       werkzeug(neu) {
         if (this.zustandGeladen) this.persistDebounce();
+        let neuZeichnen = false;
+        if (neu !== 'strich') {
+          if (this.stiftVorschauPos) neuZeichnen = true;
+          this.stiftVorschauPos = null;
+        }
         if (neu !== 'auswahl' && this.hatAuswahl) {
           this.auswahl = [];
-          this.zeichneAlles();
+          neuZeichnen = true;
         }
+        if (neuZeichnen) this.zeichneAlles();
       },
       karopapierGitter() {
         if (this.zustandGeladen) this.persistDebounce();
@@ -587,7 +717,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.flushSpeichern();
         this.beendeZiehen();
         this.beendeResize();
-        this.uiZustand.zeichenBrettOffen = false;
+        this.uiZustand.zeichenModalOffen = false;
       },
       onFensterEscape() {
         if (this.werkzeugMenuOffen) {
@@ -739,6 +869,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.redoStack = [];
       },
       undo() {
+        this.rasterBildCacheLeeren();
         if (!this.kannUndo) return;
         this.redoStack.push(klone(this.elemente));
         while (this.redoStack.length > MAX_HISTORY) this.redoStack.shift();
@@ -748,6 +879,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.persistDebounce();
       },
       redo() {
+        this.rasterBildCacheLeeren();
         if (!this.kannRedo) return;
         this.undoStack.push(klone(this.elemente));
         while (this.undoStack.length > MAX_HISTORY) this.undoStack.shift();
@@ -759,7 +891,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       bindCanvas() {
         const canvas = this.$refs.canvas;
         if (!canvas) return;
-        this._ctx = canvas.getContext('2d');
+        this._ctx = canvas.getContext('2d', { willReadFrequently: true });
         this._aktivePointers = new Map();
         canvas.addEventListener('pointerdown', this.onPointerDown);
         canvas.addEventListener('pointermove', this.onPointerMove);
@@ -800,6 +932,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this._pinchStart = null;
         this._panMaus = null;
         this._ctx = null;
+        this.stiftVorschauPos = null;
+        this.rasterBildCacheLeeren();
       },
       beiCanvasGroesseGeaendert() {
         const canvas = this.$refs.canvas;
@@ -821,7 +955,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         event.preventDefault();
       },
       onTastatur(event) {
-        if (!this.uiZustand.zeichenBrettOffen) return;
+        if (!this.uiZustand.zeichenModalOffen) return;
         const fenster = this.$refs.fensterElement;
         const aktiv = document.activeElement;
         const istImFenster = !!fenster && (aktiv === fenster || (aktiv instanceof Node && fenster.contains(aktiv)));
@@ -914,9 +1048,26 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return;
         }
 
+        if (this.werkzeug === 'hand') {
+          if (event.button === 0 || event.pointerType === 'touch' || event.pointerType === 'pen') {
+            this._dragModus = 'pan';
+            this._panMaus = { start: pos, ansichtStart: { ...this.ansicht } };
+            return;
+          }
+        }
+
         const welt = this.canvasZuWelt(pos.x, pos.y);
         this._dragStartWelt = welt;
         this._dragLetzteWelt = welt;
+
+        if (this.werkzeug === 'pipette') {
+          this.pipetteFarbeAnCss(pos.x, pos.y);
+          return;
+        }
+        if (this.werkzeug === 'fuell') {
+          void this.fuellAnWelpunkt(welt.x, welt.y).catch(() => {});
+          return;
+        }
 
         if (this.werkzeug === 'auswahl') {
           const trefferId = this.findeElementUnterPunkt(welt.x, welt.y);
@@ -958,9 +1109,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.zeichneAlles();
       },
       onPointerMove(event) {
-        if (!this._aktivePointers) return;
-        if (!this._aktivePointers.has(event.pointerId)) return;
+        const canvas = this.$refs.canvas;
+        if (!canvas) return;
         const pos = this.pointerKoordinate(event);
+        if (this.werkzeug === 'strich') {
+          this.stiftVorschauPos = { x: pos.x, y: pos.y };
+        } else {
+          this.stiftVorschauPos = null;
+        }
+
+        if (!this._aktivePointers) return;
+        if (!this._aktivePointers.has(event.pointerId)) {
+          if (this.werkzeug === 'strich') this.zeichneAlles();
+          return;
+        }
         const eintrag = this._aktivePointers.get(event.pointerId);
         eintrag.x = pos.x;
         eintrag.y = pos.y;
@@ -1045,16 +1207,34 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       onPointerLeave(event) {
         if (this._aktivePointers && this._aktivePointers.has(event.pointerId)) {
           this.onPointerUp(event);
+          return;
+        }
+        if (this.werkzeug === 'strich' && this.stiftVorschauPos) {
+          this.stiftVorschauPos = null;
+          this.zeichneAlles();
         }
       },
       onWheel(event) {
-        if (!event.ctrlKey && !event.metaKey) return;
-        event.preventDefault();
-        const pos = this.pointerKoordinate(event);
-        const richtung = event.deltaY < 0 ? 1 : -1;
-        const faktor = Math.pow(1.15, richtung);
-        this.zoomeAnPunkt(pos.x, pos.y, faktor);
-        this.persistDebounce();
+        const handZoom = this.werkzeug === 'hand' && !event.shiftKey;
+        if (event.ctrlKey || event.metaKey || handZoom) {
+          event.preventDefault();
+          const pos = this.pointerKoordinate(event);
+          const richtung = event.deltaY < 0 ? 1 : -1;
+          const faktor = Math.pow(1.15, richtung);
+          this.zoomeAnPunkt(pos.x, pos.y, faktor);
+          this.persistDebounce();
+          return;
+        }
+        if (event.shiftKey) {
+          event.preventDefault();
+          const nutzeX = Math.abs(event.deltaX) > Math.abs(event.deltaY);
+          let d = nutzeX ? event.deltaX : event.deltaY;
+          if (event.deltaMode === 1) d *= 16;
+          else if (event.deltaMode === 2) d *= this.canvasBreite || 800;
+          this.ansicht.offsetX -= d;
+          this.zeichneAlles();
+          this.persistDebounce();
+        }
       },
       brichDragAb() {
         if (this._dragModus === 'zeichnen') {
@@ -1079,6 +1259,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this._dragModus = null;
       },
       erzeugeElementFuerWerkzeug(welt) {
+        if (this.werkzeug === 'pipette' || this.werkzeug === 'fuell') return null;
         const basis = { i: neueId(), c: this.farbe, d: this.dicke };
         if (this.werkzeug === 'strich') {
           return { ...basis, t: 's', p: [welt.x, welt.y] };
@@ -1277,6 +1458,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.elemente = this.elemente.filter((el) => !ausw.has(el.i));
         this.auswahl = [];
         this.zeichneAlles();
+        this.rasterBildCacheLeeren();
         this.persistDebounce();
       },
       zoomeAnPunkt(cx, cy, faktor) {
@@ -1349,8 +1531,44 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         for (const el of this.elemente) {
           this.zeichneElement(ctx, el);
         }
+        this.zeichneStiftspitzenRahmen(ctx, canvas, dpr);
         this.zeichneAuswahlOverlay(ctx);
         this.zeichneLasso(ctx);
+      },
+      zeichneStiftspitzenRahmen(ctx, canvas, dpr) {
+        if (this.werkzeug !== 'strich' || !this.stiftVorschauPos) return;
+        const cx = this.stiftVorschauPos.x;
+        const cy = this.stiftVorschauPos.y;
+        if (!Number.isFinite(cx) || !Number.isFinite(cy)) return;
+        const ix = Math.min(canvas.width - 1, Math.max(0, Math.floor(cx * dpr)));
+        const iy = Math.min(canvas.height - 1, Math.max(0, Math.floor(cy * dpr)));
+
+        let ringFarbe = 'rgba(15,23,42,0.92)';
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        try {
+          const probe = ctx.getImageData(ix, iy, 1, 1).data;
+          const lum = 0.2126 * probe[0] + 0.7152 * probe[1] + 0.0722 * probe[2];
+          ringFarbe = lum > 158 ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.94)';
+        } catch {
+          /* getImageData kann u.a. bei tainted canvas fehlschlagen */
+        }
+        ctx.restore();
+
+        const s = this.ansicht.scale || 1;
+        const wx = (cx - this.ansicht.offsetX) / s;
+        const wy = (cy - this.ansicht.offsetY) / s;
+        const r = Math.max(0.5, this.dicke / 2);
+        const randW = Math.max(1.5 / (s * dpr), 0.4 / s);
+
+        ctx.save();
+        ctx.strokeStyle = ringFarbe;
+        ctx.lineWidth = randW;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(wx, wy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       },
       zeichneKaropapierRasterWelt(ctx) {
         const s = this.ansicht.scale || 1;
@@ -1398,7 +1616,152 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       karopapierGitterUmschalten() {
         this.karopapierGitter = !this.karopapierGitter;
       },
+      rasterBildCacheLeeren() {
+        if (this._rasterBildCache) this._rasterBildCache.clear();
+      },
+      holeRasterBild(el) {
+        if (!this._rasterBildCache) this._rasterBildCache = new Map();
+        let img = this._rasterBildCache.get(el.i);
+        if (!img) {
+          img = new Image();
+          img.onload = () => {
+            this.zeichneAlles();
+          };
+          img.onerror = () => {};
+          img.src = el.src;
+          this._rasterBildCache.set(el.i, img);
+        }
+        return img;
+      },
+      async warteRasterBilderFuerFuell() {
+        const ps = [];
+        for (const el of this.elemente) {
+          if (el.t !== 'm') continue;
+          const img = this.holeRasterBild(el);
+          if (img && !img.complete) {
+            ps.push(
+              new Promise((resolve) => {
+                img.onload = resolve;
+                img.onerror = resolve;
+              }),
+            );
+          }
+        }
+        await Promise.all(ps);
+      },
+      zeichneKompositAufCtx(ctx, dpr, opts) {
+        const ohneKaro = !!(opts && opts.ohneKaro);
+        const canvas = ctx.canvas;
+        if (!canvas) return;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.setTransform(
+          this.ansicht.scale * dpr,
+          0,
+          0,
+          this.ansicht.scale * dpr,
+          this.ansicht.offsetX * dpr,
+          this.ansicht.offsetY * dpr,
+        );
+        if (this.karopapierGitter && !ohneKaro) {
+          this.zeichneKaropapierRasterWelt(ctx);
+        }
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        for (const el of this.elemente) {
+          this.zeichneElement(ctx, el);
+        }
+      },
+      pipetteFarbeAnCss(cssX, cssY) {
+        this.zeichneAlles();
+        const canvas = this.$refs.canvas;
+        const ctx = this._ctx;
+        if (!canvas || !ctx) return;
+        const dpr = this._dpr || 1;
+        const ix = Math.min(canvas.width - 1, Math.max(0, Math.floor(cssX * dpr)));
+        const iy = Math.min(canvas.height - 1, Math.max(0, Math.floor(cssY * dpr)));
+        const px = ctx.getImageData(ix, iy, 1, 1).data;
+        this.farbe = rgbZuHex(px[0], px[1], px[2]);
+        if (this.zustandGeladen) this.persistDebounce();
+      },
+      async fuellAnWelpunkt(wx, wy) {
+        const canvas = this.$refs.canvas;
+        if (!canvas || !this._ctx) return;
+        const dpr = this._dpr || 1;
+        try {
+          await this.warteRasterBilderFuerFuell();
+          const off = document.createElement('canvas');
+          off.width = canvas.width;
+          off.height = canvas.height;
+          const octx = off.getContext('2d', { willReadFrequently: true });
+          if (!octx) return;
+          this.zeichneKompositAufCtx(octx, dpr, { ohneKaro: true });
+          const cssx = wx * this.ansicht.scale + this.ansicht.offsetX;
+          const cssy = wy * this.ansicht.scale + this.ansicht.offsetY;
+          const ix = Math.min(off.width - 1, Math.max(0, Math.floor(cssx * dpr)));
+          const iy = Math.min(off.height - 1, Math.max(0, Math.floor(cssy * dpr)));
+          const idat = octx.getImageData(0, 0, off.width, off.height);
+          const fillRgb = hexZuRgb(this.farbe);
+          const erg = floodFuellAufImageData(idat, ix, iy, fillRgb, FUELL_FARBTOLERANZ, MAX_FUELL_PIXEL);
+          if (!erg) return;
+          if (erg.zuGross) {
+            await window.HTBAH.ui.alert({
+              titel: 'Füllen',
+              beschreibung:
+                'Der zu füllende Bereich ist sehr groß. Zoome näher heran, teile die Fläche mit Linien oder fülle in Abschnitten.',
+            });
+            return;
+          }
+          octx.putImageData(idat, 0, 0);
+          const bw = erg.maxx - erg.minx + 1;
+          const bh = erg.maxy - erg.miny + 1;
+          const patch = document.createElement('canvas');
+          patch.width = bw;
+          patch.height = bh;
+          const pctx = patch.getContext('2d');
+          if (!pctx) return;
+          pctx.drawImage(off, erg.minx, erg.miny, bw, bh, 0, 0, bw, bh);
+          const src = patch.toDataURL('image/png');
+          const s = this.ansicht.scale || 1;
+          const ox = this.ansicht.offsetX;
+          const oy = this.ansicht.offsetY;
+          const worldX0 = erg.minx / dpr / s - ox / s;
+          const worldY0 = erg.miny / dpr / s - oy / s;
+          const worldW = bw / dpr / s;
+          const worldH = bh / dpr / s;
+          this.verlaufSchnappschuss();
+          this.elemente.push({
+            i: neueId(),
+            t: 'm',
+            c: normalisiereFarbe(this.farbe),
+            d: 1,
+            x: worldX0,
+            y: worldY0,
+            w: worldW,
+            h: worldH,
+            src,
+          });
+          this.rasterBildCacheLeeren();
+          this.zeichneAlles();
+          this.persistDebounce();
+        } catch {
+          await window.HTBAH.ui.alert({
+            titel: 'Füllen',
+            beschreibung: 'Die Fläche konnte nicht gefüllt werden.',
+          });
+        }
+      },
       zeichneElement(ctx, el) {
+        if (el.t === 'm') {
+          const img = this.holeRasterBild(el);
+          if (!img || !img.complete || !img.naturalWidth) return;
+          ctx.save();
+          ctx.drawImage(img, el.x, el.y, el.w, el.h);
+          ctx.restore();
+          return;
+        }
         ctx.beginPath();
         ctx.strokeStyle = el.c;
         ctx.lineWidth = el.d;
@@ -1439,6 +1802,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           ctx.lineTo(p[4], p[5]);
           ctx.closePath();
           ctx.stroke();
+          return;
         }
       },
       zeichneAuswahlOverlay(ctx) {
@@ -1522,6 +1886,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.auswahl = [];
         this.undoStack = [];
         this.redoStack = [];
+        this.rasterBildCacheLeeren();
         this.zeichneAlles();
         this.flushSpeichern();
       },
@@ -1539,7 +1904,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (!this.elemente.length) {
           await window.HTBAH.ui.alert({
             titel: 'Nichts zu exportieren',
-            beschreibung: 'Auf dem Zeichenbrett befinden sich noch keine Elemente.',
+            beschreibung: 'Auf der Zeichenfläche befinden sich noch keine Elemente.',
           });
           return;
         }
@@ -1589,15 +1954,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
     },
     template: `
-      <div v-if="uiZustand.zeichenBrettOffen" class="regelwerk-modal-layer htbah-zeichen-brett-layer">
+      <div v-if="uiZustand.zeichenModalOffen" class="regelwerk-modal-layer htbah-zeichen-modal-layer">
         <div
           ref="fensterElement"
-          class="regelwerk-modal-window card shadow htbah-zeichen-brett-window"
+          class="regelwerk-modal-window card shadow htbah-zeichen-modal-window"
           :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
           :style="fensterStil"
           role="dialog"
           aria-modal="true"
-          aria-label="Zeichen-Brett"
+          aria-label="Zeichnen"
           tabindex="-1"
           @keydown.esc.stop.prevent="onFensterEscape">
           <div
@@ -1605,7 +1970,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             @pointerdown="starteZiehen">
             <h5 class="mb-0 d-flex align-items-center gap-2">
               <span aria-hidden="true">✏️</span>
-              <span>Zeichen-Brett</span>
+              <span>Zeichnen</span>
             </h5>
             <div class="d-flex gap-2 align-items-center">
               <button
@@ -1620,7 +1985,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             </div>
           </div>
 
-          <div class="htbah-zeichen-brett-toolbar d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom flex-shrink-0">
+          <div class="htbah-zeichen-modal-toolbar d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom flex-shrink-0">
             <div class="htbah-zeichen-werkzeuggruppe d-flex align-items-center gap-1">
               <div class="btn-group htbah-zeichen-werkzeug-split">
                 <button
@@ -1628,7 +1993,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   class="btn btn-sm"
                   :class="aktivesZeichenWerkzeug === werkzeug ? 'btn-primary' : 'btn-outline-primary'"
                   :title="aktivesZeichenWerkzeugMeta.label + ' verwenden'"
-                  :aria-pressed="werkzeug !== 'auswahl'"
+                  :aria-pressed="ZEICHEN_WERKZEUGE.includes(werkzeug) ? 'true' : 'false'"
                   @click="werkzeugSetzen(aktivesZeichenWerkzeug)">
                   <span class="material-symbols-outlined">{{ aktivesZeichenWerkzeugMeta.icon }}</span>
                   <span class="d-none d-md-inline ms-1">{{ aktivesZeichenWerkzeugMeta.kurz }}</span>
@@ -1662,6 +2027,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   </button>
                 </div>
               </div>
+              <button
+                type="button"
+                class="btn btn-sm"
+                :class="istHandModus ? 'btn-primary' : 'btn-outline-primary'"
+                :title="WERKZEUG_META.hand.label"
+                :aria-label="WERKZEUG_META.hand.label"
+                :aria-pressed="istHandModus ? 'true' : 'false'"
+                @click="werkzeugSetzen('hand')">
+                <span class="material-symbols-outlined">{{ WERKZEUG_META.hand.icon }}</span>
+              </button>
               <button
                 type="button"
                 class="btn btn-sm"
@@ -1787,23 +2162,35 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             </div>
           </div>
 
-          <div ref="canvasHost" class="htbah-zeichen-brett-canvas-host">
+          <div ref="canvasHost" class="htbah-zeichen-modal-canvas-host">
             <canvas
               ref="canvas"
-              class="htbah-zeichen-brett-canvas"
+              class="htbah-zeichen-modal-canvas"
               :class="{
-                'htbah-zeichen-brett-canvas--auswahl': istAuswahlModus,
+                'htbah-zeichen-modal-canvas--auswahl': istAuswahlModus,
+                'htbah-zeichen-modal-canvas--hand': istHandModus,
+                'htbah-zeichen-modal-canvas--pipette': istPipetteModus,
+                'htbah-zeichen-modal-canvas--fuell': istFuellModus,
               }"
               :style="{ touchAction: 'none' }"></canvas>
-            <div class="htbah-zeichen-brett-tipp small text-muted">
+            <div class="htbah-zeichen-modal-tipp small text-muted">
               <template v-if="istAuswahlModus">
                 Klicken oder Rahmen ziehen zum Auswählen · Shift = Auswahl erweitern · Ziehen verschiebt · Strg+C/X/V · Entf löscht
+              </template>
+              <template v-else-if="istHandModus">
+                Mit Maus oder Finger ziehen, um die Ansicht zu verschieben · Mausrad: zoomen · Shift + Mausrad: horizontal · Zwei Finger: zoomen
+              </template>
+              <template v-else-if="istPipetteModus">
+                Klicken, um die Farbe unter dem Cursor zu übernehmen
+              </template>
+              <template v-else-if="istFuellModus">
+                Klicken, um eine zusammenhängende Fläche mit der aktuellen Farbe zu füllen (von Linien begrenzt; Karomuster zählt nicht)
               </template>
               <template v-else-if="istRadierModus">
                 Radiergummi: über Linien ziehen · Größe = Pinseldicke · Strg+Z rückgängig
               </template>
               <template v-else>
-                Strg + Mausrad zum Zoomen · Mit zwei Fingern zoomen &amp; verschieben · Mittlere Maustaste oder Alt+Ziehen zum Verschieben
+                Strg + Mausrad zum Zoomen · Shift + Mausrad horizontal verschieben · Hand-Werkzeug: ziehen und Mausrad zoomen · Pipette / Füllen im Werkzeugmenü · Mit zwei Fingern zoomen &amp; verschieben · Mittlere Maustaste oder Alt+Ziehen zum Verschieben
               </template>
             </div>
           </div>

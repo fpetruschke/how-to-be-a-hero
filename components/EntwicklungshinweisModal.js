@@ -8,6 +8,7 @@ window.HTBAH_KOMPONENTEN.EntwicklungshinweisModal = {
       modalInstanz: null,
       oeffnenRetryTimeoutId: null,
       wirdEntfernt: false,
+      infoboxSichtbar: true,
     };
   },
   mounted() {
@@ -36,6 +37,9 @@ window.HTBAH_KOMPONENTEN.EntwicklungshinweisModal = {
         SPEICHER_KEY_ENTWICKLUNGSHINWEIS_VERSTANDEN_AM,
         this.heutigesDatum(),
       );
+    },
+    beiModalShown() {
+      this.infoboxSichtbar = true;
     },
     oeffnenWennBootstrapBereit(versuch = 0) {
       if (this.wirdEntfernt) {
@@ -91,7 +95,8 @@ window.HTBAH_KOMPONENTEN.EntwicklungshinweisModal = {
       aria-labelledby="htbahEntwicklungshinweisModalLabel"
       aria-hidden="true"
       data-bs-backdrop="static"
-      data-bs-keyboard="false">
+      data-bs-keyboard="false"
+      @shown.bs.modal="beiModalShown">
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content shadow border-warning">
           <div class="modal-header text-bg-warning">
@@ -101,16 +106,26 @@ window.HTBAH_KOMPONENTEN.EntwicklungshinweisModal = {
             </h5>
           </div>
           <div class="modal-body text-start">
-            <p class="mb-3 d-flex align-items-start gap-2">
-              <span class="material-symbols-outlined text-warning flex-shrink-0" aria-hidden="true">warning</span>
-              <span>
-                Diese Anwendung befindet sich in
-                <strong>aktiver Entwicklung</strong>.
-                Es werden laufend Änderungen vorgenommen, die jederzeit dazu
-                führen können, dass Deine bisherigen
-                <strong>Speicherstände nicht mehr mit der Anwendung funktionieren</strong>.
-              </span>
-            </p>
+            <div
+              v-if="infoboxSichtbar"
+              class="alert alert-warning alert-dismissible fade show mb-3"
+              role="alert">
+              <p class="mb-0 pe-4 d-flex align-items-start gap-2">
+                <span class="material-symbols-outlined text-warning flex-shrink-0" aria-hidden="true">warning</span>
+                <span>
+                  Diese Anwendung befindet sich in
+                  <strong>aktiver Entwicklung</strong>.
+                  Es werden laufend Änderungen vorgenommen, die jederzeit dazu
+                  führen können, dass Deine bisherigen
+                  <strong>Speicherstände nicht mehr mit der Anwendung funktionieren</strong>.
+                </span>
+              </p>
+              <button
+                type="button"
+                class="btn-close"
+                aria-label="Hinweis ausblenden"
+                @click="infoboxSichtbar = false"></button>
+            </div>
             <p class="mb-0">
               Konkret kann es passieren, dass nach einem Update einzelne
               Charaktere, Zufallstabellen oder Weltenbau-Einträge nicht mehr

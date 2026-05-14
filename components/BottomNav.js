@@ -12,6 +12,8 @@ function htbahAssetUrl(relMitPunktSlash) {
 
 const HTBAH_DICE_BOX_MODULE_URL = htbahAssetUrl('./assets/js/dice-box.es.min.js');
 const HTBAH_DICE_INIT_TIMEOUT_MS = 7000;
+/** Sound nach Start des 3D-Wurfs — sonst ertönt er vor sichtbarer Würfelbewegung. */
+const HTBAH_WUERFEL_SOUND_VERZOEGERUNG_3D_MS = 750;
 const HTBAH_APP_ORIGIN = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
 
 window.HTBAH_KOMPONENTEN.BottomNav = {
@@ -30,6 +32,8 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       badgePos: null,
       _badgeDrag: null,
       begegnungZiehung: null,
+      /** Erzwingt Neu-Auslesen der Zufallstabellen nach Speichern (gleiche Kampagne). */
+      zufallstabellenSpeicherTick: 0,
       diceBox: null,
       diceBoxZehner: null,
       diceBoxEiner: null,
@@ -48,6 +52,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       prozentwurfDetails: null,
       letzterWurfAnzahl: 1,
       wuerfelnLaeuft: false,
+      wuerfelSound3dVerzoegerungTimeoutId: null,
       wuerfelBeutelOffen: false,
       wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       wuerfelBeutelAusloeserElement: null,
@@ -205,19 +210,29 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     musikNavAktiv() {
       return this.musikboardOffen;
     },
-    zeichenBrettNavAktiv() {
-      return !!(this.uiZustand && this.uiZustand.zeichenBrettOffen);
+    zeichenModalNavAktiv() {
+      return !!(this.uiZustand && this.uiZustand.zeichenModalOffen);
     },
     /** Frische Listen aus dem Speicher (Reaktivität über Tab/Route). */
     begegnungListenAusSpeicher() {
       void this.$route.fullPath;
+      void this.aktiveKampagneId;
       void this.wuerfelModalTab;
+      void this.zufallstabellenSpeicherTick;
       const z = window.HTBAH.ladeZufallstabellenZustand() || {};
       return {
         npcs: Array.isArray(z.npcs) ? z.npcs : [],
         bestien: Array.isArray(z.bestien) ? z.bestien : [],
         pantheon: Array.isArray(z.pantheon) ? z.pantheon : [],
       };
+    },
+    /** Reiter „Begegnung“: nur mit aktiver Kampagne und mindestens NPC oder Bestie (nicht Pantheon allein). */
+    begegnungReiterMoeglich() {
+      if (!this.hatAktiveKampagne) {
+        return false;
+      }
+      const { npcs, bestien } = this.begegnungListenAusSpeicher;
+      return npcs.length > 0 || bestien.length > 0;
     },
     begegnungHatBegegnungsEintrag() {
       const { npcs, bestien, pantheon } = this.begegnungListenAusSpeicher;
@@ -315,7 +330,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.synchronisiereKampagnenbasierteDaten();
         return;
       }
-      if (this.wuerfelModalTab === 'atmosphaere') {
+      if (this.wuerfelModalTab === 'atmosphaere' || this.wuerfelModalTab === 'begegnung') {
+        this.wuerfelModalTab = 'wuerfel';
+      }
+    },
+    begegnungReiterMoeglich(neu) {
+      if (!neu && this.wuerfelModalTab === 'begegnung') {
         this.wuerfelModalTab = 'wuerfel';
       }
     },
@@ -413,6 +433,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.$nextTick(() => this.bindNavReserveObserver());
     this.ladeDiceFarbwahl();
     window.addEventListener('htbah:wuerfel-einstellungen-geaendert', this.onWuerfelEinstellungenGlobalGeaendert);
+    window.addEventListener('htbah:kampagne-daten-geaendert', this.onHtbahKampagneZufallstabellenGeaendert);
   },
   beforeUnmount() {
     this.sicherheitsmechanismenModalOffen = false;
@@ -432,12 +453,14 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.diceInitPromiseZehner = null;
     this.diceInitPromiseEiner = null;
     this.diceModulLadenPromise = null;
+    this.abbrecheAnstehenden3dWuerfelSound();
     window.removeEventListener('resize', this.wuerfelBeutelBeiViewportResize);
     window.removeEventListener('keydown', this.onWuerfelBeutelKeydown);
     window.removeEventListener(
       'htbah:wuerfel-einstellungen-geaendert',
       this.onWuerfelEinstellungenGlobalGeaendert,
     );
+    window.removeEventListener('htbah:kampagne-daten-geaendert', this.onHtbahKampagneZufallstabellenGeaendert);
     window.removeEventListener('resize', this.musikboardBeiViewportResize);
     window.removeEventListener('keydown', this.onMusikboardKeydown);
     this.speichereWuerfelBeutelFenster();
@@ -460,6 +483,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         /* DiceBox kann beim Abbau werfen */
       }
     },
+    abbrecheAnstehenden3dWuerfelSound() {
+      if (this.wuerfelSound3dVerzoegerungTimeoutId != null) {
+        window.clearTimeout(this.wuerfelSound3dVerzoegerungTimeoutId);
+        this.wuerfelSound3dVerzoegerungTimeoutId = null;
+      }
+    },
     warte(ms) {
       return new Promise((resolve) => {
         window.setTimeout(resolve, ms);
@@ -474,6 +503,18 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     onWuerfelEinstellungenGlobalGeaendert() {
       this.ladeDiceFarbwahl();
+    },
+    onHtbahKampagneZufallstabellenGeaendert(ev) {
+      const d = ev && ev.detail;
+      if (!d || d.art !== 'zufallstabellen') {
+        return;
+      }
+      const kid = typeof d.kampagneId === 'string' ? d.kampagneId.trim() : '';
+      const aktiv = typeof this.aktiveKampagneId === 'string' ? this.aktiveKampagneId.trim() : '';
+      if (kid && aktiv && kid !== aktiv) {
+        return;
+      }
+      this.zufallstabellenSpeicherTick += 1;
     },
     speichereDiceFarbwahl() {
       window.HTBAH.setzeWuerfelAnzeigeProfil({
@@ -767,8 +808,8 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     abenteuerbuchOeffnen() {
       this.uiZustand.abenteuerbuchOffen = true;
     },
-    zeichenBrettOeffnen() {
-      this.uiZustand.zeichenBrettOffen = true;
+    zeichenModalOeffnen() {
+      this.uiZustand.zeichenModalOffen = true;
     },
     synchronisiereKampagnenbasierteDaten() {
       const id = this.aktiveKampagneId;
@@ -975,8 +1016,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         tab === 'atmosphaere' || tab === 'begegnung' || tab === 'wuerfel' ? tab : 'wuerfel';
       const gmTab = zielTab === 'atmosphaere' || zielTab === 'begegnung';
       const atmosphaereVerbieten = zielTab === 'atmosphaere' && !this.hatAktiveKampagne;
+      const begegnungVerbieten = zielTab === 'begegnung' && !this.begegnungReiterMoeglich;
       this.wuerfelModalTab =
-        (!this.istSpielleitung && gmTab) || atmosphaereVerbieten ? 'wuerfel' : zielTab;
+        (!this.istSpielleitung && gmTab) || atmosphaereVerbieten || begegnungVerbieten
+          ? 'wuerfel'
+          : zielTab;
       this.wuerfelBeutelAusloeserElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.ladeDiceFarbwahl();
       this.wuerfelBeutelOffen = true;
@@ -1454,6 +1498,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.wuerfelModus === 'w100' ? 2 : Math.max(1, Math.min(50, Number(this.anzahlW10) || 1));
       this.letzterWurfAnzahl = wuerfelAnzahl;
       try {
+        this.abbrecheAnstehenden3dWuerfelSound();
         if (!this.dice3dAktiv) {
           this.diceFehler = '';
           if (this.wuerfelModus === 'w100') {
@@ -1471,7 +1516,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           window.HTBAH.spieleWuerfelSounds(this.ergebnisse.length);
           return;
         }
-        window.HTBAH.spieleWuerfelSounds(wuerfelAnzahl);
+        this.wuerfelSound3dVerzoegerungTimeoutId = window.setTimeout(() => {
+          this.wuerfelSound3dVerzoegerungTimeoutId = null;
+          window.HTBAH.spieleWuerfelSounds(wuerfelAnzahl);
+        }, HTBAH_WUERFEL_SOUND_VERZOEGERUNG_3D_MS);
         const box = await Promise.race([
           this.stelleDiceBoxBereit(),
           this.warte(HTBAH_DICE_INIT_TIMEOUT_MS).then(() => '__timeout__'),
@@ -1763,10 +1811,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </button>
             <button
               type="button"
-              title="Zeichen-Brett"
+              title="Zeichnen"
               class="htbah-nav-item"
-              :class="{ 'htbah-nav-button-active': zeichenBrettNavAktiv }"
-              @click="zeichenBrettOeffnen">
+              :class="{ 'htbah-nav-button-active': zeichenModalNavAktiv }"
+              @click="zeichenModalOeffnen">
               <span class="htbah-nav-item-emoji" aria-hidden="true">✏️</span>
               <span class="htbah-nav-item-label">Zeichnen</span>
             </button>
@@ -1845,9 +1893,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           <button type="button" title="Regelwerk" @click="regelwerkOeffnen">📜</button>
           <button
             type="button"
-            title="Zeichen-Brett"
-            :class="{ 'htbah-nav-button-active': zeichenBrettNavAktiv }"
-            @click="zeichenBrettOeffnen">
+            title="Zeichnen"
+            :class="{ 'htbah-nav-button-active': zeichenModalNavAktiv }"
+            @click="zeichenModalOeffnen">
             ✏️
           </button>
           <button
@@ -2031,7 +2079,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     Wetter &amp; Tageszeit
                   </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li v-if="begegnungReiterMoeglich" class="nav-item" role="presentation">
                   <button
                     type="button"
                     class="nav-link"

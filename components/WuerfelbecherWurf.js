@@ -10,11 +10,12 @@ function htbahDiceAssetUrl(relMitPunktSlash) {
 }
 
 const HTBAH_WB_DICE_BOX_MODULE_URL = htbahDiceAssetUrl('./assets/js/dice-box.es.min.js');
-const HTBAH_WB_DICE_ASSET_PATH = htbahDiceAssetUrl('./assets/dice-box/assets/');
-const HTBAH_WB_DICE_INIT_TIMEOUT_MS = 15000;
-const HTBAH_WB_DICE_ROLL_TIMEOUT_MS = 12000;
+/** Relativ zu `origin` — keine absolute URL (DiceBox concatiniert origin + assetPath). */
+const HTBAH_WB_DICE_ASSET_PATH = 'assets/dice-box/assets/';
 const HTBAH_WB_DICE_INIT_RETRIES = 2;
 const HTBAH_WB_DICE_INIT_RETRY_DELAY_MS = 350;
+/** Sound nach Start des 3D-Wurfs — sonst ertönt er vor sichtbarer Würfelbewegung. */
+const HTBAH_WB_WUERFEL_SOUND_VERZOEGERUNG_3D_MS = 750;
 const HTBAH_WB_APP_ORIGIN = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
 
 /**
@@ -83,6 +84,7 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       diceThemeColorTens: window.HTBAH.ladeWuerfelAnzeigeProfil().themeTens || '#3b7a36',
       prozentwurfDetails: null,
       letzterWurfAnzahl: 1,
+      wuerfelSound3dVerzoegerungTimeoutId: null,
     };
   },
   computed: {
@@ -184,8 +186,15 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
     this.diceReady = false;
     this.diceReadyZehner = false;
     this.diceReadyEiner = false;
+    this.abbrecheAnstehenden3dWuerfelSound();
   },
   methods: {
+    abbrecheAnstehenden3dWuerfelSound() {
+      if (this.wuerfelSound3dVerzoegerungTimeoutId != null) {
+        window.clearTimeout(this.wuerfelSound3dVerzoegerungTimeoutId);
+        this.wuerfelSound3dVerzoegerungTimeoutId = null;
+      }
+    },
     entsorgeDiceBoxInstanz(rawBox) {
       if (!rawBox || typeof rawBox !== 'object') {
         return;
@@ -197,9 +206,6 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       } catch {
         /* Bibliothek kann beim Abbau werfen — Ressourcenfreigabe trotzdem versuchen */
       }
-    },
-    warte(ms) {
-      return new Promise((resolve) => window.setTimeout(resolve, ms));
     },
     onWuerfelEinstellungenGlobalGeaendert() {
       const profil = window.HTBAH.ladeWuerfelAnzeigeProfil();
@@ -434,26 +440,19 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
         gesamt,
       };
     },
-    async rolleProzentwurf3d(box) {
-      const rollMitTimeout = async (boxInstanz, notation, themeColor, timeoutMs = 6000) =>
-        Promise.race([
-          boxInstanz.roll(notation, { themeColor }),
-          this.warte(timeoutMs).then(() => '__timeout__'),
-        ]);
+    async rolleProzentwurf3d() {
       const prozentBoxes = await this.stelleProzentwurfDiceBoxesBereit();
       if (!prozentBoxes || !prozentBoxes.zehner || !prozentBoxes.einer) {
         this.diceFehler = '3D-Prozentwurf konnte nicht initialisiert werden. Fallback aktiv.';
         return [];
       }
       try {
+        const notationZehner = this.normalisiereNotationFuerDiceEngine('1W100');
+        const notationEiner = this.normalisiereNotationFuerDiceEngine('1W10');
         const [zRoll, eRoll] = await Promise.all([
-          rollMitTimeout(prozentBoxes.zehner, '1W100', this.diceThemeColorTens),
-          rollMitTimeout(prozentBoxes.einer, '1W10', this.diceThemeColorOnes),
+          prozentBoxes.zehner.roll(notationZehner, { themeColor: this.diceThemeColorTens }),
+          prozentBoxes.einer.roll(notationEiner, { themeColor: this.diceThemeColorOnes }),
         ]);
-        if (zRoll === '__timeout__' || eRoll === '__timeout__') {
-          this.diceFehler = '3D-Prozentwurf dauerte zu lange. Fallback aktiv.';
-          return [];
-        }
         const zArr = this.ergebnisseAusDiceRoll(zRoll);
         const eArr = this.ergebnisseAusDiceRoll(eRoll);
         if (zArr.length && eArr.length) {
@@ -499,16 +498,21 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       );
       this.letzterWurfAnzahl = anzahl;
       try {
-        window.HTBAH.spieleWuerfelSounds(anzahl);
+        this.abbrecheAnstehenden3dWuerfelSound();
         if (!this.wuerfel3dVerwenden) {
+          window.HTBAH.spieleWuerfelSounds(anzahl);
           this.diceFehler = '';
           this.ergebnisse = this.fallbackWurf(notation);
           this.$emit('gewuerfelt', this.ergebnisse);
           return this.ergebnisse;
         }
+        this.wuerfelSound3dVerzoegerungTimeoutId = window.setTimeout(() => {
+          this.wuerfelSound3dVerzoegerungTimeoutId = null;
+          window.HTBAH.spieleWuerfelSounds(anzahl);
+        }, HTBAH_WB_WUERFEL_SOUND_VERZOEGERUNG_3D_MS);
         if (this.istProzentwurf) {
           try {
-            const extrahiert = await this.rolleProzentwurf3d(null);
+            const extrahiert = await this.rolleProzentwurf3d();
             if (extrahiert.length > 0) {
               const details = this.baueProzentwurfAusZweiW10(extrahiert);
               this.prozentwurfDetails = details;
@@ -520,31 +524,19 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
             /* fallback unten */
           }
         } else {
-          const box = await Promise.race([
-            this.stelleDiceBoxBereit(),
-            this.warte(HTBAH_WB_DICE_INIT_TIMEOUT_MS).then(() => '__timeout__'),
-          ]);
-          if (box === '__timeout__') {
-            this.diceFehler = '3D-Würfel initialisieren zu langsam. Standard-Wurf bleibt aktiv.';
-          }
+          const box = await this.stelleDiceBoxBereit();
           if (box && this.diceReady && typeof box.roll === 'function') {
             try {
-              const rollRoh = await Promise.race([
-                box.roll(this.normalisiereNotationFuerDiceEngine(effektiveNotation), {
-                  themeColor: this.diceThemeColor,
-                }),
-                this.warte(HTBAH_WB_DICE_ROLL_TIMEOUT_MS).then(() => '__roll_timeout__'),
-              ]);
-              if (rollRoh === '__roll_timeout__') {
-                this.diceFehler = '3D-Wurf dauerte zu lange. Standard-Wurf bleibt aktiv.';
-              } else {
-                const extrahiert = this.ergebnisseAusDiceRoll(rollRoh);
-                if (extrahiert.length > 0) {
-                  this.prozentwurfDetails = null;
-                  this.ergebnisse = extrahiert;
-                  this.$emit('gewuerfelt', this.ergebnisse);
-                  return this.ergebnisse;
-                }
+              const rollRoh = await box.roll(
+                this.normalisiereNotationFuerDiceEngine(effektiveNotation),
+                { themeColor: this.diceThemeColor },
+              );
+              const extrahiert = this.ergebnisseAusDiceRoll(rollRoh);
+              if (extrahiert.length > 0) {
+                this.prozentwurfDetails = null;
+                this.ergebnisse = extrahiert;
+                this.$emit('gewuerfelt', this.ergebnisse);
+                return this.ergebnisse;
               }
             } catch {
               /* fallback unten */

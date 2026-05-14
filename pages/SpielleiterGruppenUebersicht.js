@@ -161,15 +161,15 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         return;
       }
       const gid = g.id;
-      window.HTBAH.loescheZufallstabellenUndWeltenbauFuerKampagne(gid);
-      this.zustand.kampagnen = this.zustand.kampagnen.filter((x) => x.id !== gid);
-      delete this.zustand.mitgliedWahlProKampagne[gid];
-      if (this.zustand.aktiveKampagneId === gid) {
-        this.zustand.aktiveKampagneId = this.zustand.kampagnen[0]
-          ? this.zustand.kampagnen[0].id
-          : null;
+      const ergebnis = window.HTBAH.loescheSpielleiterKampagneKomplett(gid);
+      if (!ergebnis || !ergebnis.ok) {
+        window.HTBAH.ui.notify({
+          text: 'Die Kampagne konnte nicht gelöscht werden.',
+          typ: 'danger',
+        });
+        return;
       }
-      this.persist();
+      this.zustand = window.HTBAH.ladeSpielleiterZustand();
       this.zeigeStatus('Kampagne gelöscht.');
     },
     mitgliedName(mitglied) {

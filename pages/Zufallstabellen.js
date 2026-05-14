@@ -143,7 +143,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.zeileQuillHostRef(el);
     };
     this.overlayZeileQuillHostRefFn = (el) => {
-      this.withModalKontext('overlay', () => this.zeileQuillHostRef(el));
+      this.overlayZeileQuillHostRef(el);
     };
   },
   computed: {
@@ -728,7 +728,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (index < 0 || typeof this[entry[1]] !== 'function') {
         return false;
       }
-      if (this.bearbeitung && !this.bearbeitungOverlay) {
+      /* Immer Overlay stapeln, solange schon ein Zeilen-Modal offen ist (Haupt oder bereits Overlay).
+         Sonst feuert der Overlay-:ref nach $nextTick mit wiederhergestelltem Haupt-Kontext → eine zeileQuillInstanz
+         für zwei Modale → Endlosschleife / Einfrieren. */
+      if (this.bearbeitung) {
         this.zeileModalOeffnenAlsOverlay(typ, liste[index], index);
         return true;
       }
@@ -1924,6 +1927,93 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       return this.bearbeitung.zeile.notizenHtml || '';
     },
+    htmlFuerQuillAusBearbeitungOverlay() {
+      if (!this.bearbeitungOverlay) {
+        return '';
+      }
+      if (this.bearbeitungOverlay.typ === 'gegenstand') {
+        return this.bearbeitungOverlay.zeile.beschreibungHtml || '';
+      }
+      if (this.bearbeitungOverlay.typ === 'fraktion') {
+        return this.bearbeitungOverlay.zeile.beschreibungHtml || '';
+      }
+      if (this.bearbeitungOverlay.typ === 'bestie') {
+        return this.bearbeitungOverlay.zeile.beschreibungHtml || '';
+      }
+      return this.bearbeitungOverlay.zeile.notizenHtml || '';
+    },
+    overlayZeileQuillHostRef(el) {
+      if (!el) {
+        if (this.overlayZeileMentionController && typeof this.overlayZeileMentionController.destroy === 'function') {
+          this.overlayZeileMentionController.destroy();
+        }
+        this.overlayZeileMentionController = null;
+        this.overlayZeileQuillInstanz = null;
+        this.overlayZeileQuillHostElement = null;
+        return;
+      }
+      if (!this.bearbeitungOverlay) {
+        return;
+      }
+      this.$nextTick(() => {
+        if (!this.bearbeitungOverlay) {
+          return;
+        }
+        this.overlayZeileQuillAufHostEinrichten(el);
+      });
+    },
+    overlayZeileQuillAufHostEinrichten(el, quillRetry) {
+      const r = typeof quillRetry === 'number' ? quillRetry : 0;
+      if (!el || !this.bearbeitungOverlay) {
+        return;
+      }
+      if (!window.Quill) {
+        if (r < 40) {
+          setTimeout(() => this.overlayZeileQuillAufHostEinrichten(el, r + 1), 25);
+        }
+        return;
+      }
+      if (
+        this.overlayZeileQuillInstanz &&
+        this.overlayZeileQuillHostElement === el &&
+        el.contains(this.overlayZeileQuillInstanz.root)
+      ) {
+        return;
+      }
+      this.zeileQuillHostDomLeeren(el);
+      this.overlayZeileQuillInstanz = null;
+      this.overlayZeileQuillHostElement = el;
+      this.overlayZeileQuillInstanz = new window.Quill(el, {
+        theme: 'snow',
+        placeholder: 'Text formatieren…',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline'],
+            [{ color: [] }, { background: [] }],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['blockquote', 'code-block'],
+            [{ header: [1, 2, false] }],
+            ['clean'],
+          ],
+        },
+      });
+      if (this.overlayZeileMentionController && typeof this.overlayZeileMentionController.destroy === 'function') {
+        this.overlayZeileMentionController.destroy();
+      }
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      if (mentionApi && typeof mentionApi.installMentions === 'function') {
+        this.overlayZeileMentionController = mentionApi.installMentions(this.overlayZeileQuillInstanz, {
+          getItems: (query) => this.mentionItemsFuerQuill(query),
+          onEntityClick: (target) => this.oeffneEntitaetAusMention(target),
+        });
+      }
+      this.overlayZeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitungOverlay();
+      this.overlayZeileQuillInstanz.on('selection-change', (range, oldRange) => {
+        if (this.bearbeitungOverlay && this.bearbeitungOverlayIndex >= 0 && oldRange && !range) {
+          this.overlayZeileBearbeitungBeiBlurSpeichern();
+        }
+      });
+    },
     zeileQuillHostRef(el) {
       if (!el) {
         this.zeileQuillInstanz = null;
@@ -2571,6 +2661,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     this.zeileMentionController = null;
     this.zeileQuillInstanz = null;
     this.zeileQuillHostElement = null;
+    if (this.overlayZeileMentionController && typeof this.overlayZeileMentionController.destroy === 'function') {
+      this.overlayZeileMentionController.destroy();
+    }
+    this.overlayZeileMentionController = null;
+    this.overlayZeileQuillInstanz = null;
+    this.overlayZeileQuillHostElement = null;
   },
   template: `
     <div :class="rootKlassen">

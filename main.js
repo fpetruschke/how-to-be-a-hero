@@ -13,7 +13,7 @@ const SPEICHER_KEY_WUERFEL_AUDIO = 'htbah_wuerfel_audio';
 const SPEICHER_KEY_WUERFEL_SOUND_LEGACY = 'htbah_wuerfel_sound';
 const SPEICHER_KEY_DICE_COLORS = 'htbah_dice_colors';
 const SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER = 'htbah_wuerfel_beutel_fenster';
-const SPEICHER_KEY_ZEICHEN_BRETT = 'htbah_zeichen_brett';
+const SPEICHER_KEY_ZEICHEN_MODAL = 'htbah_zeichen_brett';
 const SPEICHER_KEY_MENTION_NAV_TARGET = 'htbah_mention_nav_target';
 const SPEICHER_KEY_ORIENTATION_MODE = 'htbah_orientation_mode';
 const SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN = 'htbah_interaktive_welt_stats_anzeigen';
@@ -644,6 +644,100 @@ function loescheZufallstabellenUndWeltenbauFuerKampagne(kampagneId) {
   htbahSpeicher.loescheKey(weltenbauSpeicherKeyFuerKampagne(kid));
 }
 
+const ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET = new Set([
+  'npcs',
+  'orte',
+  'gegenstaende',
+  'fraktionen',
+  'pantheon',
+  'raetsel',
+  'bestien',
+]);
+
+/**
+ * @param {string} kampagneId
+ * @param {string | null} listenSchluessel Eine Liste (z. B. 'orte') oder null für die gesamte Zufallstabellen-Datei dieser Kampagne.
+ */
+function loescheZufallstabellenListeFuerKampagne(kampagneId, listenSchluessel) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return false;
+  }
+  if (listenSchluessel == null) {
+    htbahSpeicher.loescheKey(zufallstabellenSpeicherKeyFuerKampagne(kid));
+    htbahDispatchKampagneDatenGeaendert({ art: 'zufallstabellen', kampagneId: kid });
+    return true;
+  }
+  if (!ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET.has(listenSchluessel)) {
+    return false;
+  }
+  const z = ladeZufallstabellenZustand(kid);
+  z[listenSchluessel] = [];
+  speichereZufallstabellenZustand(z, kid);
+  return true;
+}
+
+/**
+ * @param {string} kampagneId
+ * @param {'alles' | 'galerie' | 'interaktive_welt' | 'generatoren'} bereich
+ */
+function loescheWeltenbauBereichFuerKampagne(kampagneId, bereich) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return false;
+  }
+  if (bereich === 'alles') {
+    htbahSpeicher.loescheKey(weltenbauSpeicherKeyFuerKampagne(kid));
+    htbahDispatchKampagneDatenGeaendert({ art: 'weltenbau', kampagneId: kid });
+    return true;
+  }
+  const wb = ladeWeltenbauZustand(kid);
+  if (bereich === 'galerie') {
+    wb.eintraege = [];
+  } else if (bereich === 'generatoren') {
+    wb.generatorUrls = {};
+    wb.generatorAufrufe = {};
+  } else if (bereich === 'interaktive_welt') {
+    wb.mapLayouts = {};
+    wb.mapBildLayouts = {};
+    wb.mapFreieBilder = {};
+    wb.mapFreieNotizen = {};
+    wb.mapFreiePfeile = {};
+    wb.mapHintergruende = {};
+    wb.mapEinstellungen = {};
+    wb.mapElementLocks = {};
+  } else {
+    return false;
+  }
+  speichereWeltenbauZustand(wb, kid);
+  return true;
+}
+
+function loescheSpielleiterKampagneKomplett(kampagneId) {
+  const gid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!gid) {
+    return { ok: false, grund: 'Keine Kampagne.' };
+  }
+  const zustand = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
+  if (!kampagnen.some((k) => k && k.id === gid)) {
+    return { ok: false, grund: 'Kampagne nicht gefunden.' };
+  }
+  loescheZufallstabellenUndWeltenbauFuerKampagne(gid);
+  htbahDispatchKampagneDatenGeaendert({ art: 'zufallstabellen', kampagneId: gid });
+  htbahDispatchKampagneDatenGeaendert({ art: 'weltenbau', kampagneId: gid });
+  zustand.kampagnen = kampagnen.filter((x) => !x || x.id !== gid);
+  if (!zustand.mitgliedWahlProKampagne || typeof zustand.mitgliedWahlProKampagne !== 'object') {
+    zustand.mitgliedWahlProKampagne = {};
+  }
+  delete zustand.mitgliedWahlProKampagne[gid];
+  if (zustand.aktiveKampagneId === gid) {
+    zustand.aktiveKampagneId = zustand.kampagnen[0] ? zustand.kampagnen[0].id : null;
+  }
+  speichereSpielleiterZustand(zustand);
+  return { ok: true };
+}
+
 function ladeZufallstabellenZustand(kampagneId) {
   const kid = ermittleKampagneIdFuerKampagnenSpeicher(kampagneId);
   if (!kid) {
@@ -1149,6 +1243,471 @@ function speichereWeltenbauZustand(zustand, kampagneId) {
   }
   const speicherKey = weltenbauSpeicherKeyFuerKampagne(kid);
   htbahSpeicher.schreibeJson(speicherKey, zustand);
+  htbahDispatchKampagneDatenGeaendert({ art: 'weltenbau', kampagneId: kid });
+}
+
+const EXPORT_TYP_SPIELLEITER_KAMPAGNE_TEIL = 'htbah-spielleiter-kampagne-teil';
+const EXPORT_TYP_ZUFALLSTABELLEN_KAMPAGNE = 'htbah-zufallstabellen-kampagne';
+const EXPORT_TYP_ZUFALLSTABELLEN_KATEGORIE = 'htbah-zufallstabellen-kategorie';
+const EXPORT_TYP_WELTENBAU_KAMPAGNE = 'htbah-weltenbau-kampagne';
+const EXPORT_TYP_WELTENBAU_BEREICH = 'htbah-weltenbau-bereich';
+const EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_BUNDLE = 'htbah-export-ls-kampagne-komplett-bundle';
+const EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_OHNE_GRUPPE = 'htbah-export-ls-kampagne-komplett-ohne-gruppe';
+
+function normalisiereZufallstabellenZeilenListeExportImport(schluessel, arr) {
+  if (!ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET.has(schluessel) || !Array.isArray(arr)) {
+    return [];
+  }
+  const mapper = {
+    npcs: normalisiereZufallstabellenNpcZeile,
+    orte: normalisiereZufallstabellenOrtZeile,
+    gegenstaende: normalisiereZufallstabellenGegenstandZeile,
+    fraktionen: normalisiereZufallstabellenFraktionZeile,
+    pantheon: normalisiereZufallstabellenPantheonZeile,
+    raetsel: normalisiereZufallstabellenRaetselZeile,
+    bestien: normalisiereZufallstabellenBestieZeile,
+  };
+  const fn = mapper[schluessel];
+  return fn ? arr.map(fn).filter(Boolean) : [];
+}
+
+function spielleiterKampagneIndexNachId(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return -1;
+  }
+  const sl = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen : [];
+  return kampagnen.findIndex((g) => g && g.id === kid);
+}
+
+function erstelleSpielleiterKampagneTeilExportPaket(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return null;
+  }
+  const sl = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen : [];
+  const g = kampagnen.find((x) => x && x.id === kid);
+  if (!g) {
+    return null;
+  }
+  const mwp =
+    sl.mitgliedWahlProKampagne && typeof sl.mitgliedWahlProKampagne === 'object'
+      ? sl.mitgliedWahlProKampagne
+      : {};
+  const mitgliedWahlMitgliedId = typeof mwp[kid] === 'string' ? mwp[kid] : '';
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_SPIELLEITER_KAMPAGNE_TEIL,
+    kampagneId: kid,
+    exportiertAm: new Date().toISOString(),
+    kampagne: JSON.parse(JSON.stringify(g)),
+    mitgliedWahlMitgliedId,
+  };
+}
+
+function erstelleSpielleiterKampagneTeilOhneMitgliederExportPaket(kampagneId) {
+  const pak = erstelleSpielleiterKampagneTeilExportPaket(kampagneId);
+  if (!pak || !pak.kampagne || typeof pak.kampagne !== 'object') {
+    return null;
+  }
+  return {
+    ...pak,
+    kampagne: {
+      ...pak.kampagne,
+      mitglieder: [],
+    },
+    mitgliedWahlMitgliedId: '',
+    exportOhneImportierteMitglieder: true,
+  };
+}
+
+function importiereSpielleiterKampagneTeilPaket(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (!roh || typeof roh !== 'object' || roh.htbahExportVersion !== 1 || roh.typ !== EXPORT_TYP_SPIELLEITER_KAMPAGNE_TEIL) {
+    return { ok: false, fehler: 'Ungültige Datei (Spielleiter-Kampagne erwartet).' };
+  }
+  const idx = spielleiterKampagneIndexNachId(ziel);
+  if (idx < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  const sl = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen.slice() : [];
+  const merged = normalisiereSpielleiterKampagne({
+    ...(roh.kampagne && typeof roh.kampagne === 'object' ? roh.kampagne : {}),
+    id: ziel,
+  });
+  if (!merged) {
+    return { ok: false, fehler: 'Kampagnendaten ungültig.' };
+  }
+  kampagnen[idx] = merged;
+  if (!sl.mitgliedWahlProKampagne || typeof sl.mitgliedWahlProKampagne !== 'object') {
+    sl.mitgliedWahlProKampagne = {};
+  }
+  if (Object.prototype.hasOwnProperty.call(roh, 'mitgliedWahlMitgliedId')) {
+    if (typeof roh.mitgliedWahlMitgliedId === 'string' && roh.mitgliedWahlMitgliedId) {
+      sl.mitgliedWahlProKampagne[ziel] = roh.mitgliedWahlMitgliedId;
+    } else {
+      delete sl.mitgliedWahlProKampagne[ziel];
+    }
+  }
+  sl.kampagnen = kampagnen;
+  speichereSpielleiterZustand(sl);
+  return { ok: true };
+}
+
+function erstelleZufallstabellenKampagneExportPaket(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || spielleiterKampagneIndexNachId(kid) < 0) {
+    return null;
+  }
+  const daten = JSON.parse(JSON.stringify(ladeZufallstabellenZustand(kid)));
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_ZUFALLSTABELLEN_KAMPAGNE,
+    kampagneId: kid,
+    exportiertAm: new Date().toISOString(),
+    daten,
+  };
+}
+
+function importiereZufallstabellenKampagnePaket(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (spielleiterKampagneIndexNachId(ziel) < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  if (!roh || typeof roh !== 'object' || roh.htbahExportVersion !== 1 || roh.typ !== EXPORT_TYP_ZUFALLSTABELLEN_KAMPAGNE) {
+    return { ok: false, fehler: 'Ungültige Datei (Zufallstabellen-Kampagne erwartet).' };
+  }
+  if (!roh.daten || typeof roh.daten !== 'object') {
+    return { ok: false, fehler: 'Zufallstabellen-Daten fehlen.' };
+  }
+  const speicherKey = zufallstabellenSpeicherKeyFuerKampagne(ziel);
+  htbahSpeicher.schreibeJson(speicherKey, roh.daten);
+  const normalized = ladeZufallstabellenZustand(ziel);
+  speichereZufallstabellenZustand(normalized, ziel);
+  return { ok: true };
+}
+
+function erstelleZufallstabellenKategorieExportPaket(kampagneId, kategorie) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || !ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET.has(kategorie) || spielleiterKampagneIndexNachId(kid) < 0) {
+    return null;
+  }
+  const z = ladeZufallstabellenZustand(kid);
+  const zeilen = Array.isArray(z[kategorie]) ? JSON.parse(JSON.stringify(z[kategorie])) : [];
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_ZUFALLSTABELLEN_KATEGORIE,
+    kampagneId: kid,
+    kategorie,
+    exportiertAm: new Date().toISOString(),
+    zeilen,
+  };
+}
+
+function importiereZufallstabellenKategoriePaket(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (spielleiterKampagneIndexNachId(ziel) < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  if (!roh || typeof roh !== 'object' || roh.htbahExportVersion !== 1 || roh.typ !== EXPORT_TYP_ZUFALLSTABELLEN_KATEGORIE) {
+    return { ok: false, fehler: 'Ungültige Datei (Zufallstabellen-Kategorie erwartet).' };
+  }
+  const kat = typeof roh.kategorie === 'string' ? roh.kategorie : '';
+  if (!ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET.has(kat)) {
+    return { ok: false, fehler: 'Unbekannte Tabellen-Kategorie.' };
+  }
+  const z = ladeZufallstabellenZustand(ziel);
+  z[kat] = normalisiereZufallstabellenZeilenListeExportImport(kat, roh.zeilen);
+  speichereZufallstabellenZustand(z, ziel);
+  return { ok: true };
+}
+
+function erstelleWeltenbauKampagneExportPaket(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || spielleiterKampagneIndexNachId(kid) < 0) {
+    return null;
+  }
+  const daten = JSON.parse(JSON.stringify(ladeWeltenbauZustand(kid)));
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_WELTENBAU_KAMPAGNE,
+    kampagneId: kid,
+    exportiertAm: new Date().toISOString(),
+    daten,
+  };
+}
+
+function importiereWeltenbauKampagnePaket(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (spielleiterKampagneIndexNachId(ziel) < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  if (!roh || typeof roh !== 'object' || roh.htbahExportVersion !== 1 || roh.typ !== EXPORT_TYP_WELTENBAU_KAMPAGNE) {
+    return { ok: false, fehler: 'Ungültige Datei (Weltenbau-Kampagne erwartet).' };
+  }
+  if (!roh.daten || typeof roh.daten !== 'object') {
+    return { ok: false, fehler: 'Weltenbau-Daten fehlen.' };
+  }
+  const speicherKey = weltenbauSpeicherKeyFuerKampagne(ziel);
+  htbahSpeicher.schreibeJson(speicherKey, roh.daten);
+  const normalized = ladeWeltenbauZustand(ziel);
+  speichereWeltenbauZustand(normalized, ziel);
+  return { ok: true };
+}
+
+function erstelleWeltenbauBereichExportPaket(kampagneId, bereich) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || spielleiterKampagneIndexNachId(kid) < 0) {
+    return null;
+  }
+  if (bereich !== 'galerie' && bereich !== 'interaktive_welt' && bereich !== 'generatoren') {
+    return null;
+  }
+  const wb = ladeWeltenbauZustand(kid);
+  let daten = {};
+  if (bereich === 'galerie') {
+    daten = { eintraege: JSON.parse(JSON.stringify(wb.eintraege || [])) };
+  } else if (bereich === 'generatoren') {
+    daten = {
+      generatorUrls: JSON.parse(JSON.stringify(wb.generatorUrls || {})),
+      generatorAufrufe: JSON.parse(JSON.stringify(wb.generatorAufrufe || {})),
+    };
+  } else {
+    daten = {
+      mapLayouts: JSON.parse(JSON.stringify(wb.mapLayouts || {})),
+      mapBildLayouts: JSON.parse(JSON.stringify(wb.mapBildLayouts || {})),
+      mapFreieBilder: JSON.parse(JSON.stringify(wb.mapFreieBilder || {})),
+      mapFreieNotizen: JSON.parse(JSON.stringify(wb.mapFreieNotizen || {})),
+      mapFreiePfeile: JSON.parse(JSON.stringify(wb.mapFreiePfeile || {})),
+      mapHintergruende: JSON.parse(JSON.stringify(wb.mapHintergruende || {})),
+      mapEinstellungen: JSON.parse(JSON.stringify(wb.mapEinstellungen || {})),
+      mapElementLocks: JSON.parse(JSON.stringify(wb.mapElementLocks || {})),
+    };
+  }
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_WELTENBAU_BEREICH,
+    kampagneId: kid,
+    bereich,
+    exportiertAm: new Date().toISOString(),
+    daten,
+  };
+}
+
+function importiereWeltenbauBereichPaket(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (spielleiterKampagneIndexNachId(ziel) < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  if (!roh || typeof roh !== 'object' || roh.htbahExportVersion !== 1 || roh.typ !== EXPORT_TYP_WELTENBAU_BEREICH) {
+    return { ok: false, fehler: 'Ungültige Datei (Weltenbau-Bereich erwartet).' };
+  }
+  const bereich = roh.bereich;
+  if (bereich !== 'galerie' && bereich !== 'interaktive_welt' && bereich !== 'generatoren') {
+    return { ok: false, fehler: 'Unbekannter Weltenbau-Bereich.' };
+  }
+  const d = roh.daten && typeof roh.daten === 'object' ? roh.daten : {};
+  const wb = ladeWeltenbauZustand(ziel);
+  if (bereich === 'galerie') {
+    wb.eintraege = Array.isArray(d.eintraege)
+      ? d.eintraege.map(normalisiereWeltenbauEintrag).filter(Boolean)
+      : [];
+  } else if (bereich === 'generatoren') {
+    wb.generatorUrls = normalisiereWeltenbauGeneratorUrls(d.generatorUrls);
+    wb.generatorAufrufe = d.generatorAufrufe && typeof d.generatorAufrufe === 'object' ? d.generatorAufrufe : {};
+  } else {
+    wb.mapLayouts = d.mapLayouts && typeof d.mapLayouts === 'object' ? d.mapLayouts : {};
+    wb.mapBildLayouts = normalisiereWeltenbauMapBildLayouts(d.mapBildLayouts);
+    wb.mapFreieBilder = d.mapFreieBilder && typeof d.mapFreieBilder === 'object' ? d.mapFreieBilder : {};
+    wb.mapFreieNotizen = normalisiereWeltenbauMapFreieNotizen(d.mapFreieNotizen);
+    wb.mapFreiePfeile = normalisiereWeltenbauMapFreiePfeile(d.mapFreiePfeile);
+    wb.mapHintergruende = normalisiereWeltenbauMapHintergruende(d.mapHintergruende);
+    wb.mapEinstellungen = normalisiereWeltenbauMapEinstellungen(d.mapEinstellungen);
+    wb.mapElementLocks = normalisiereWeltenbauMapElementLocks(d.mapElementLocks);
+  }
+  speichereWeltenbauZustand(wb, ziel);
+  return { ok: true };
+}
+
+/**
+ * Prüft, ob eine JSON-Datei zum gewählten kampagnenbezogenen Import passt (vor Bestätigungsdialog).
+ * @param {'spielleiter'|'spielleiter_ohne_gruppe'|'komplett_ohne_gruppe'|'ztf'|'ztf_kat'|'wb'|'wb_bereich'} ctxArt
+ * @param {object} roh
+ * @param {{ kategorie?: string, wbBereich?: string }} [extras]
+ */
+function validiereKampagneDatenImportDatei(ctxArt, roh, extras) {
+  const ex = extras && typeof extras === 'object' ? extras : {};
+  if (!roh || typeof roh !== 'object' || roh.htbahExportVersion !== 1 || typeof roh.typ !== 'string') {
+    return { ok: false, fehler: 'Ungültige oder alte Export-Datei (Version 1 erwartet).' };
+  }
+  if (ctxArt === 'spielleiter') {
+    if (roh.typ !== EXPORT_TYP_SPIELLEITER_KAMPAGNE_TEIL) {
+      return { ok: false, fehler: 'Keine Spielleiter-Kampagnen-Datei (falscher Dateityp).' };
+    }
+    return { ok: true };
+  }
+  if (ctxArt === 'spielleiter_ohne_gruppe') {
+    if (roh.typ !== EXPORT_TYP_SPIELLEITER_KAMPAGNE_TEIL) {
+      return { ok: false, fehler: 'Keine Spielleiter-Kampagnen-Datei (falscher Dateityp).' };
+    }
+    return { ok: true };
+  }
+  if (ctxArt === 'komplett_ohne_gruppe') {
+    if (roh.typ !== EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_OHNE_GRUPPE) {
+      return { ok: false, fehler: 'Kein Komplett-Export ohne importierte Charaktere.' };
+    }
+    if (!roh.spielleiterTeil || !roh.zufallstabellenKampagne || !roh.weltenbauKampagne) {
+      return { ok: false, fehler: 'Komplett-Paket unvollständig.' };
+    }
+    return { ok: true };
+  }
+  if (ctxArt === 'ztf') {
+    if (roh.typ !== EXPORT_TYP_ZUFALLSTABELLEN_KAMPAGNE) {
+      return { ok: false, fehler: 'Keine Zufallstabellen-Kampagnen-Datei (falscher Dateityp).' };
+    }
+    if (!roh.daten || typeof roh.daten !== 'object') {
+      return { ok: false, fehler: 'Zufallstabellen-Daten fehlen in der Datei.' };
+    }
+    return { ok: true };
+  }
+  if (ctxArt === 'ztf_kat') {
+    if (roh.typ !== EXPORT_TYP_ZUFALLSTABELLEN_KATEGORIE) {
+      return { ok: false, fehler: 'Keine Zufallstabellen-Kategorie-Datei (falscher Dateityp).' };
+    }
+    const kat = typeof ex.kategorie === 'string' ? ex.kategorie : '';
+    if (!ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET.has(kat) || roh.kategorie !== kat) {
+      return { ok: false, fehler: 'Die Datei enthält eine andere Tabellen-Kategorie als erwartet.' };
+    }
+    return { ok: true };
+  }
+  if (ctxArt === 'wb') {
+    if (roh.typ !== EXPORT_TYP_WELTENBAU_KAMPAGNE) {
+      return { ok: false, fehler: 'Keine Weltenbau-Kampagnen-Datei (falscher Dateityp).' };
+    }
+    if (!roh.daten || typeof roh.daten !== 'object') {
+      return { ok: false, fehler: 'Weltenbau-Daten fehlen in der Datei.' };
+    }
+    return { ok: true };
+  }
+  if (ctxArt === 'wb_bereich') {
+    if (roh.typ !== EXPORT_TYP_WELTENBAU_BEREICH) {
+      return { ok: false, fehler: 'Keine Weltenbau-Bereichs-Datei (falscher Dateityp).' };
+    }
+    const br = typeof ex.wbBereich === 'string' ? ex.wbBereich : '';
+    if (br !== roh.bereich) {
+      return { ok: false, fehler: 'Die Datei gehört zu einem anderen Weltenbau-Bereich.' };
+    }
+    return { ok: true };
+  }
+  return { ok: false, fehler: 'Unbekannte Import-Aktion.' };
+}
+
+function erstelleKampagneKomplettBackupBundle(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || spielleiterKampagneIndexNachId(kid) < 0) {
+    return null;
+  }
+  const spielleiterTeil = erstelleSpielleiterKampagneTeilExportPaket(kid);
+  const ztf = erstelleZufallstabellenKampagneExportPaket(kid);
+  const wb = erstelleWeltenbauKampagneExportPaket(kid);
+  if (!spielleiterTeil || !ztf || !wb) {
+    return null;
+  }
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_BUNDLE,
+    kampagneId: kid,
+    exportiertAm: new Date().toISOString(),
+    spielleiterTeil,
+    zufallstabellenKampagne: ztf,
+    weltenbauKampagne: wb,
+  };
+}
+
+function erstelleKampagneKomplettOhneGruppeBackupBundle(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || spielleiterKampagneIndexNachId(kid) < 0) {
+    return null;
+  }
+  const spielleiterTeil = erstelleSpielleiterKampagneTeilOhneMitgliederExportPaket(kid);
+  const ztf = erstelleZufallstabellenKampagneExportPaket(kid);
+  const wb = erstelleWeltenbauKampagneExportPaket(kid);
+  if (!spielleiterTeil || !ztf || !wb) {
+    return null;
+  }
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_OHNE_GRUPPE,
+    kampagneId: kid,
+    exportiertAm: new Date().toISOString(),
+    spielleiterTeil,
+    zufallstabellenKampagne: ztf,
+    weltenbauKampagne: wb,
+  };
+}
+
+function importiereKampagneKomplettBackupBundle(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (
+    !roh ||
+    typeof roh !== 'object' ||
+    roh.htbahExportVersion !== 1 ||
+    (roh.typ !== EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_BUNDLE &&
+      roh.typ !== EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_OHNE_GRUPPE)
+  ) {
+    return { ok: false, fehler: 'Ungültiger Komplett-Export dieser Kampagne.' };
+  }
+  if (typeof roh.kampagneId === 'string' && roh.kampagneId && roh.kampagneId !== ziel) {
+    return { ok: false, fehler: 'Kampagnen-ID der Datei passt nicht zum Import-Slot.' };
+  }
+  const r0 = importiereSpielleiterKampagneTeilPaket(ziel, roh.spielleiterTeil);
+  if (!r0.ok) {
+    return r0;
+  }
+  const r1 = importiereZufallstabellenKampagnePaket(ziel, roh.zufallstabellenKampagne);
+  if (!r1.ok) {
+    return r1;
+  }
+  return importiereWeltenbauKampagnePaket(ziel, roh.weltenbauKampagne);
+}
+
+function importierePantheonPaketInKampagne(kampagneId, roh) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (spielleiterKampagneIndexNachId(kid) < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  const r = pantheonImportAusPaket(roh);
+  if (!r.ok) {
+    return r;
+  }
+  const z = ladeZufallstabellenZustand(kid);
+  z.pantheon = r.pantheon;
+  speichereZufallstabellenZustand(z, kid);
+  return { ok: true };
 }
 
 const ZST_DUPLIZIER_TYP_ZU_LISTE = Object.freeze({
@@ -2312,7 +2871,7 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   wuerfelAudio: SPEICHER_KEY_WUERFEL_AUDIO,
   diceColors: SPEICHER_KEY_DICE_COLORS,
   wuerfelBeutelFenster: SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER,
-  zeichenBrett: SPEICHER_KEY_ZEICHEN_BRETT,
+  zeichenModal: SPEICHER_KEY_ZEICHEN_MODAL,
   mentionNavigationTarget: SPEICHER_KEY_MENTION_NAV_TARGET,
   interaktiveWeltStatsAnzeigen: SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN,
 });
@@ -2369,6 +2928,25 @@ window.HTBAH = {
   erstelleSpielleiterKampagne,
   dupliziereZufallstabellenEntitaeten,
   loescheZufallstabellenUndWeltenbauFuerKampagne,
+  loescheZufallstabellenListeFuerKampagne,
+  loescheWeltenbauBereichFuerKampagne,
+  loescheSpielleiterKampagneKomplett,
+  erstelleSpielleiterKampagneTeilExportPaket,
+  erstelleSpielleiterKampagneTeilOhneMitgliederExportPaket,
+  importiereSpielleiterKampagneTeilPaket,
+  erstelleZufallstabellenKampagneExportPaket,
+  importiereZufallstabellenKampagnePaket,
+  erstelleZufallstabellenKategorieExportPaket,
+  importiereZufallstabellenKategoriePaket,
+  erstelleWeltenbauKampagneExportPaket,
+  importiereWeltenbauKampagnePaket,
+  erstelleWeltenbauBereichExportPaket,
+  importiereWeltenbauBereichPaket,
+  validiereKampagneDatenImportDatei,
+  erstelleKampagneKomplettBackupBundle,
+  erstelleKampagneKomplettOhneGruppeBackupBundle,
+  importiereKampagneKomplettBackupBundle,
+  importierePantheonPaketInKampagne,
   ladeKampagnenAtmosphaereZustand,
   speichereKampagnenAtmosphaereZustand,
   ladeKampagnenAtmosphaereBadgePosition,
@@ -2607,7 +3185,7 @@ router.beforeEach((to) => {
 const uiZustand = Vue.reactive({
   regelwerkOffen: false,
   abenteuerbuchOffen: false,
-  zeichenBrettOffen: false,
+  zeichenModalOffen: false,
 });
 
 const lebenspunkteStatus = Vue.reactive({
@@ -2669,7 +3247,7 @@ const app = Vue.createApp({
     <entwicklungshinweis-modal />
     <regelwerk-modal :ui-zustand="uiZustand"></regelwerk-modal>
     <abenteuerbuch-modal :ui-zustand="uiZustand"></abenteuerbuch-modal>
-    <zeichen-brett-modal :ui-zustand="uiZustand"></zeichen-brett-modal>
+    <zeichen-modal :ui-zustand="uiZustand"></zeichen-modal>
     <bildbetrachter-host />
     <bottom-nav :ui-zustand="uiZustand"></bottom-nav>
   `,
@@ -2693,7 +3271,7 @@ router.afterEach((to) => {
 });
 app.component('regelwerk-modal', window.HTBAH_KOMPONENTEN.RegelwerkModal);
 app.component('abenteuerbuch-modal', window.HTBAH_KOMPONENTEN.AbenteuerbuchModal);
-app.component('zeichen-brett-modal', window.HTBAH_KOMPONENTEN.ZeichenBrettModal);
+app.component('zeichen-modal', window.HTBAH_KOMPONENTEN.ZeichenModal);
 app.component('sicherheitsmechanismen-modal', window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal);
 app.component(
   'lokaler-speicher-hinweis-modal',

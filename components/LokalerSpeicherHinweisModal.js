@@ -8,6 +8,7 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
       modalInstanz: null,
       oeffnenRetryTimeoutId: null,
       wirdEntfernt: false,
+      infoboxSichtbar: true,
     };
   },
   mounted() {
@@ -30,6 +31,9 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
     },
     verstandenSpeichern() {
       window.HTBAH?.speicher?.schreibeText(SPEICHER_KEY_VERSTANDEN_AM, this.heutigesDatum());
+    },
+    beiModalShown() {
+      this.infoboxSichtbar = true;
     },
     oeffnenWennBootstrapBereit(versuch = 0) {
       if (this.wirdEntfernt) {
@@ -76,7 +80,8 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
       aria-labelledby="htbahLokalerSpeicherHinweisModalLabel"
       aria-hidden="true"
       data-bs-backdrop="static"
-      data-bs-keyboard="false">
+      data-bs-keyboard="false"
+      @shown.bs.modal="beiModalShown">
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content shadow">
           <div class="modal-header">
@@ -85,15 +90,25 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
             </h5>
           </div>
           <div class="modal-body text-start">
-            <p class="mb-3">
-              Bitte beachte: Alle Daten werden
-              <strong>nur</strong>
-              in dem Browser auf
-              <strong>diesem Gerät</strong>
-              gespeichert – mit dem Du genau diese Anwendung gerade aufrufst.
-              Es gibt keinen Server, auf dem wir Deine Charaktere oder sonstige
-              Einträge sichern; <strong>alles bleibt lokal in diesem Browser</strong>.
-            </p>
+            <div
+              v-if="infoboxSichtbar"
+              class="alert alert-info alert-dismissible fade show mb-3"
+              role="alert">
+              <p class="mb-0 pe-4">
+                Bitte beachte: Alle Daten werden
+                <strong>nur</strong>
+                in dem Browser auf
+                <strong>diesem Gerät</strong>
+                gespeichert – mit dem Du genau diese Anwendung gerade aufrufst.
+                Es gibt keinen Server, auf dem wir Deine Charaktere oder sonstige
+                Einträge sichern; <strong>alles bleibt lokal in diesem Browser</strong>.
+              </p>
+              <button
+                type="button"
+                class="btn-close"
+                aria-label="Hinweis ausblenden"
+                @click="infoboxSichtbar = false"></button>
+            </div>
             <p class="mb-3">
               Damit Du nichts verlierst (z.&nbsp;B. bei Browser-Wechsel, neuem
               Gerät oder wenn Speicher geleert wird), lohnt es sich,

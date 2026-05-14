@@ -87,6 +87,14 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       .replace(/'/g, '&#39;');
   }
 
+  function hrefSiehtNachEntityLinkAus(href) {
+    if (typeof href !== 'string' || !href.trim()) {
+      return false;
+    }
+    const trimmed = href.trim();
+    return trimmed.startsWith(ENTITY_LINK_PREFIX) || trimmed.startsWith('htbah://entity/');
+  }
+
   function parseEntityLink(href) {
     if (typeof href !== 'string' || !href) {
       return null;
@@ -313,6 +321,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const state = {
       active: false,
       applying: false,
+      /** Verhindert synchrone Rekursion selection-change → searchAtCursor → render → getSelection → selection-change */
+      selectionSync: false,
       query: '',
       denotationIndex: -1,
       selectedIndex: 0,
@@ -345,8 +355,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         .join('');
       container.innerHTML = html;
       container.style.display = 'block';
-      const range = quill.getSelection(true);
+      const range = quill.getSelection(false);
       if (!range) {
+        hide();
         return;
       }
       const bounds = quill.getBounds(range.index);
@@ -380,7 +391,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     }
 
     function searchAtCursor() {
-      const range = quill.getSelection(true);
+      const range = quill.getSelection(false);
       if (!range) {
         hide();
         return;
@@ -390,6 +401,14 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       if (!match) {
         hide();
         return;
+      }
+      const atIndex = range.index - String(match[1] || '').length - 1;
+      if (atIndex >= 0 && typeof quill.getFormat === 'function') {
+        const fmt = quill.getFormat(atIndex, 1);
+        if (fmt && fmt.link) {
+          hide();
+          return;
+        }
       }
       const query = String(match[1] || '').trim().toLowerCase();
       const items = getItems(query).slice(0, 12);
@@ -416,12 +435,20 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     }
 
     function onSelectionChange(range) {
-      if (!range) {
-        hide();
+      if (state.selectionSync) {
         return;
       }
-      if (state.active) {
-        searchAtCursor();
+      state.selectionSync = true;
+      try {
+        if (!range) {
+          hide();
+          return;
+        }
+        if (state.active) {
+          searchAtCursor();
+        }
+      } finally {
+        state.selectionSync = false;
       }
     }
 
@@ -455,20 +482,40 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       }
     }
 
+    function onRootEntityLinkMouseDown(event) {
+      const target = event.target;
+      const anchor = target && typeof target.closest === 'function' ? target.closest('a[href]') : null;
+      if (!anchor) {
+        return;
+      }
+      const href = anchor.getAttribute('href') || anchor.href || '';
+      if (parseEntityLink(href) || hrefSiehtNachEntityLinkAus(href)) {
+        event.preventDefault();
+      }
+    }
+
     function onRootLinkInteraction(event) {
       const target = event.target;
       const anchor = target && typeof target.closest === 'function' ? target.closest('a[href]') : null;
       if (!anchor) {
         return;
       }
-      const parsed = parseEntityLink(anchor.getAttribute('href') || anchor.href || '');
+      const href = anchor.getAttribute('href') || anchor.href || '';
+      const parsed = parseEntityLink(href);
       if (!parsed) {
+        if (hrefSiehtNachEntityLinkAus(href)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
         return;
       }
       event.preventDefault();
       event.stopPropagation();
       if (onEntityClick) {
-        onEntityClick(parsed);
+        const nav = parsed;
+        window.setTimeout(() => {
+          onEntityClick(nav);
+        }, 0);
       }
     }
 
@@ -491,9 +538,10 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       applySelection(state.items[index]);
     });
     quill.root.addEventListener('keydown', onKeyDown);
+    /* mousedown: nur Default verhindern (sonst navigiert der Browser zu https://htbah.local/… und blockiert). */
+    quill.root.addEventListener('mousedown', onRootEntityLinkMouseDown);
+    /* Nur click für onEntityClick (doppeltes Feuern mit mousedown vermeiden). */
     quill.root.addEventListener('click', onRootLinkInteraction);
-    quill.root.addEventListener('mousedown', onRootLinkInteraction);
-    quill.root.addEventListener('touchstart', onRootLinkInteraction, { passive: false });
     document.addEventListener('pointerdown', onOutsidePointer);
     quill.on('text-change', onTextChange);
     quill.on('selection-change', onSelectionChange);
@@ -502,9 +550,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       destroy() {
         hide();
         quill.root.removeEventListener('keydown', onKeyDown);
+        quill.root.removeEventListener('mousedown', onRootEntityLinkMouseDown);
         quill.root.removeEventListener('click', onRootLinkInteraction);
-        quill.root.removeEventListener('mousedown', onRootLinkInteraction);
-        quill.root.removeEventListener('touchstart', onRootLinkInteraction);
         document.removeEventListener('pointerdown', onOutsidePointer);
         container.remove();
       },

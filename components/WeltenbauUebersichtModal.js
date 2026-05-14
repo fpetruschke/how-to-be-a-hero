@@ -222,7 +222,7 @@ var HTBAH_REFACTOR_UTILS =
     },
     created() {
       this.zeileQuillHostRefFn = (el) => this.zeileQuillHostRef(el);
-      this.overlayZeileQuillHostRefFn = (el) => this.withAnlageKontext('overlay', () => this.zeileQuillHostRef(el));
+      this.overlayZeileQuillHostRefFn = (el) => this.overlayZeileQuillHostRef(el);
       this.charakterQuillHostRefFn = (el) => this.charakterQuillHostRef(el);
     },
     computed: {
@@ -775,7 +775,7 @@ var HTBAH_REFACTOR_UTILS =
           this.oeffneCharakterModal({ data: { entityType: 'charakter', entityId: id } });
           return true;
         }
-        if (this.anlage.offen && !this.anlageOverlay.offen) {
+        if (this.anlage && this.anlage.offen) {
           this.detail = { entityType: typ, entityId: id };
           this.starteBearbeitungAusDetail({ alsOverlay: true });
           return !!this.anlageOverlay.offen;
@@ -1835,33 +1835,33 @@ var HTBAH_REFACTOR_UTILS =
           this.markiereCharakterStartfokusAngewendet();
           return;
         }
-        const nodes = (this.graph && Array.isArray(this.graph.nodes) ? this.graph.nodes : []).filter(
-          (n) => n && n.data && n.data.entityType === 'charakter' && n.position,
-        );
-        if (!nodes.length) {
+        const alleNodes = this.graph && Array.isArray(this.graph.nodes) ? this.graph.nodes : [];
+        const startfokusEntityPrioritaet = [
+          'charakter',
+          'ort',
+          'fraktion',
+          'npc',
+          'bestie',
+          'gegenstand',
+          'raetsel',
+        ];
+        let zielNode = null;
+        for (let pi = 0; pi < startfokusEntityPrioritaet.length; pi += 1) {
+          const typ = startfokusEntityPrioritaet[pi];
+          const treffer = alleNodes.find(
+            (n) => n && n.data && n.data.entityType === typ && n.position,
+          );
+          if (treffer) {
+            zielNode = treffer;
+            break;
+          }
+        }
+        if (!zielNode) {
           this.markiereCharakterStartfokusAngewendet();
           return;
         }
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        nodes.forEach((node) => {
-          const x0 = Number(node.position.x || 0);
-          const y0 = Number(node.position.y || 0);
-          const x1 = x0 + this.nodeBreite(node);
-          const y1 = y0 + this.nodeHoehe(node);
-          minX = Math.min(minX, x0, x1);
-          minY = Math.min(minY, y0, y1);
-          maxX = Math.max(maxX, x0, x1);
-          maxY = Math.max(maxY, y0, y1);
-        });
-        if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
-          this.markiereCharakterStartfokusAngewendet();
-          return;
-        }
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
+        const centerX = Number(zielNode.position.x || 0) + this.nodeBreite(zielNode) / 2;
+        const centerY = Number(zielNode.position.y || 0) + this.nodeHoehe(zielNode) / 2;
         this.mapViewportPersistPause = true;
         this.wendeMapCenterWeltAn(centerX, centerY);
         this.$nextTick(() => {
@@ -2959,6 +2959,10 @@ var HTBAH_REFACTOR_UTILS =
             return;
           }
           this.aktualisiereZustand();
+        } else if (d.art === 'weltenbau') {
+          if (!d.kampagneId || d.kampagneId !== this.gruppeId) {
+            return;
+          }
         } else if (d.art === 'spielleiter') {
           this.spielleiterTick += 1;
         } else {
@@ -4301,6 +4305,91 @@ var HTBAH_REFACTOR_UTILS =
         }
         return this.anlage.zeile.beschreibungHtml || '';
       },
+      htmlFuerQuillAusBearbeitungOverlay() {
+        if (!this.anlageOverlay || !this.anlageOverlay.offen || !this.anlageOverlay.zeile || !this.anlageOverlay.typ) {
+          return '';
+        }
+        if (
+          this.anlageOverlay.typ === 'npc' ||
+          this.anlageOverlay.typ === 'ort' ||
+          this.anlageOverlay.typ === 'raetsel'
+        ) {
+          return this.anlageOverlay.zeile.notizenHtml || '';
+        }
+        return this.anlageOverlay.zeile.beschreibungHtml || '';
+      },
+      overlayZeileQuillHostRef(el) {
+        if (!el) {
+          if (this.overlayZeileMentionController && typeof this.overlayZeileMentionController.destroy === 'function') {
+            this.overlayZeileMentionController.destroy();
+          }
+          this.overlayZeileMentionController = null;
+          this.overlayZeileQuillInstanz = null;
+          this.overlayZeileQuillHostElement = null;
+          return;
+        }
+        if (!this.anlageOverlay || !this.anlageOverlay.offen || !this.anlageOverlay.zeile) {
+          return;
+        }
+        this.$nextTick(() => {
+          if (!this.anlageOverlay || !this.anlageOverlay.offen || !this.anlageOverlay.zeile) {
+            return;
+          }
+          this.overlayZeileQuillAufHostEinrichten(el);
+        });
+      },
+      overlayZeileQuillAufHostEinrichten(el, retry) {
+        const r = typeof retry === 'number' ? retry : 0;
+        if (!el || !this.anlageOverlay || !this.anlageOverlay.offen || !this.anlageOverlay.zeile) {
+          return;
+        }
+        if (!window.Quill) {
+          if (r < 40) {
+            window.setTimeout(() => this.overlayZeileQuillAufHostEinrichten(el, r + 1), 25);
+          }
+          return;
+        }
+        if (
+          this.overlayZeileQuillInstanz &&
+          this.overlayZeileQuillHostElement === el &&
+          el.contains(this.overlayZeileQuillInstanz.root)
+        ) {
+          return;
+        }
+        el.innerHTML = '';
+        this.overlayZeileQuillInstanz = null;
+        this.overlayZeileQuillHostElement = el;
+        this.overlayZeileQuillInstanz = new window.Quill(el, {
+          theme: 'snow',
+          placeholder: 'Text formatieren…',
+          modules: {
+            toolbar: [
+              ['bold', 'italic', 'underline'],
+              [{ color: [] }, { background: [] }],
+              [{ list: 'ordered' }, { list: 'bullet' }],
+              ['blockquote', 'code-block'],
+              [{ header: [1, 2, false] }],
+              ['clean'],
+            ],
+          },
+        });
+        if (this.overlayZeileMentionController && typeof this.overlayZeileMentionController.destroy === 'function') {
+          this.overlayZeileMentionController.destroy();
+        }
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.installMentions === 'function') {
+          this.overlayZeileMentionController = mentionApi.installMentions(this.overlayZeileQuillInstanz, {
+            getItems: (query) => this.mentionItemsFuerQuill(query),
+            onEntityClick: (target) => this.oeffneEntitaetAusMention(target),
+          });
+        }
+        this.overlayZeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitungOverlay();
+        this.overlayZeileQuillInstanz.on('selection-change', (range, oldRange) => {
+          if (this.anlageOverlay.offen && this.anlageOverlay.index >= 0 && oldRange && !range) {
+            this.anlageOverlayBeiBlurSpeichern();
+          }
+        });
+      },
       zeileQuillHostRef(el) {
         if (!el) {
           this.zeileQuillInstanz = null;
@@ -4686,8 +4775,17 @@ var HTBAH_REFACTOR_UTILS =
         }
         if (!el) {
           const eintrag = this.notizQuillInstanzen[elementId];
-          if (eintrag && eintrag.quill) {
-            eintrag.quill.off('text-change', eintrag.textChangeHandler);
+          if (eintrag) {
+            if (eintrag.quill && eintrag.textChangeHandler) {
+              eintrag.quill.off('text-change', eintrag.textChangeHandler);
+            }
+            if (Array.isArray(eintrag.cleanupFns)) {
+              eintrag.cleanupFns.forEach((fn) => {
+                if (typeof fn === 'function') {
+                  fn();
+                }
+              });
+            }
           }
           delete this.notizQuillInstanzen[elementId];
           delete this.notizQuillEditorRefs[elementId];
@@ -4853,17 +4951,30 @@ var HTBAH_REFACTOR_UTILS =
             });
           }
         }
-        const textChangeHandler = () => {
-          const html = quill.root.innerHTML;
-          this.speichereNotizHtml(elementId, html);
+        const html = typeof bild.notizHtml === 'string' ? bild.notizHtml : '';
+        quill.root.innerHTML = html;
+        const textChangeHandler = (delta, oldDelta, source) => {
+          if (source !== 'user') {
+            return;
+          }
+          const htmlNeu = quill.root.innerHTML;
+          this.speichereNotizHtml(elementId, htmlNeu);
           const ref = this.notizQuillInstanzen[elementId];
           if (ref) {
-            ref.lastHtml = html;
+            ref.lastHtml = htmlNeu;
           }
         };
         quill.on('text-change', textChangeHandler);
-        const html = typeof bild.notizHtml === 'string' ? bild.notizHtml : '';
-        quill.root.innerHTML = html;
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.installMentions === 'function') {
+          const mentionCtrl = mentionApi.installMentions(quill, {
+            getItems: (query) => this.mentionItemsFuerQuill(query),
+            onEntityClick: (target) => this.oeffneEntitaetAusMention(target),
+          });
+          if (mentionCtrl && typeof mentionCtrl.destroy === 'function') {
+            cleanupFns.push(() => mentionCtrl.destroy());
+          }
+        }
         quill.enable(!istReadOnly);
         this.notizQuillInstanzen[elementId] = {
           quill,
@@ -5286,10 +5397,14 @@ var HTBAH_REFACTOR_UTILS =
       if (this.zeileMentionController && typeof this.zeileMentionController.destroy === 'function') {
         this.zeileMentionController.destroy();
       }
+      if (this.overlayZeileMentionController && typeof this.overlayZeileMentionController.destroy === 'function') {
+        this.overlayZeileMentionController.destroy();
+      }
       if (this.charakterMentionController && typeof this.charakterMentionController.destroy === 'function') {
         this.charakterMentionController.destroy();
       }
       this.zeileMentionController = null;
+      this.overlayZeileMentionController = null;
       this.charakterMentionController = null;
       if (this.sucheBlurTimer) {
         globalThis.clearTimeout(this.sucheBlurTimer);

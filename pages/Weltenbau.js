@@ -49,6 +49,13 @@ const WELTENBAU_GENERATOREN = [
     nurExternerTab: true,
   },
   {
+    id: 'taverns',
+    titel: '🍻 Taverns',
+    startUrl: 'https://watabou.itch.io/taverns',
+    sourceUrl: 'https://watabou.itch.io/taverns',
+    nurExternerTab: true,
+  },
+  {
     id: 'neighbourhood',
     titel: '🏡 Nachbarschaft',
     startUrl: 'https://html-classic.itch.zone/html/11441280/bin/index.html',
