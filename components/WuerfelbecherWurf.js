@@ -12,6 +12,7 @@ function htbahDiceAssetUrl(relMitPunktSlash) {
 const HTBAH_WB_DICE_BOX_MODULE_URL = htbahDiceAssetUrl('./assets/js/dice-box.es.min.js');
 const HTBAH_WB_DICE_ASSET_PATH = htbahDiceAssetUrl('./assets/dice-box/assets/');
 const HTBAH_WB_DICE_INIT_TIMEOUT_MS = 15000;
+const HTBAH_WB_DICE_ROLL_TIMEOUT_MS = 12000;
 const HTBAH_WB_DICE_INIT_RETRIES = 2;
 const HTBAH_WB_DICE_INIT_RETRY_DELAY_MS = 350;
 const HTBAH_WB_APP_ORIGIN = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
@@ -56,6 +57,8 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
     modus: { type: String, default: 'w100' },
     chipPraefix: { type: String, default: '' },
     autoInit: { type: Boolean, default: true },
+    /** Kein 3D (z. B. unsichtbarer Würfelbecher in d-none): sofortiger Standard-Wurf, kein WebGL-Init */
+    ohne3d: { type: Boolean, default: false },
     prozentwurfModifikator: { type: Number, default: 0 },
   },
   data() {
@@ -85,6 +88,9 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
   computed: {
     ergebnisSumme() {
       return this.ergebnisse.reduce((summe, wert) => summe + wert, 0);
+    },
+    wuerfel3dVerwenden() {
+      return this.dice3dAktiv && !this.ohne3d;
     },
     istProzentwurf() {
       return this.modus === 'w100';
@@ -154,7 +160,7 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
   },
   mounted() {
     window.addEventListener('htbah:wuerfel-einstellungen-geaendert', this.onWuerfelEinstellungenGlobalGeaendert);
-    if (this.autoInit && this.dice3dAktiv) {
+    if (this.autoInit && this.wuerfel3dVerwenden) {
         this.$nextTick(() => {
           if (this.istProzentwurf) {
             this.stelleProzentwurfDiceBoxesBereit();
@@ -169,8 +175,29 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       'htbah:wuerfel-einstellungen-geaendert',
       this.onWuerfelEinstellungenGlobalGeaendert,
     );
+    this.entsorgeDiceBoxInstanz(this.diceBox);
+    this.entsorgeDiceBoxInstanz(this.diceBoxZehner);
+    this.entsorgeDiceBoxInstanz(this.diceBoxEiner);
+    this.diceBox = null;
+    this.diceBoxZehner = null;
+    this.diceBoxEiner = null;
+    this.diceReady = false;
+    this.diceReadyZehner = false;
+    this.diceReadyEiner = false;
   },
   methods: {
+    entsorgeDiceBoxInstanz(rawBox) {
+      if (!rawBox || typeof rawBox !== 'object') {
+        return;
+      }
+      try {
+        if (typeof rawBox.clear === 'function') {
+          rawBox.clear();
+        }
+      } catch {
+        /* Bibliothek kann beim Abbau werfen — Ressourcenfreigabe trotzdem versuchen */
+      }
+    },
     warte(ms) {
       return new Promise((resolve) => window.setTimeout(resolve, ms));
     },
@@ -180,7 +207,7 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       this.diceThemeColorOnes = profil.themeOnes || profil.theme;
       this.diceThemeColorTens = profil.themeTens || '#3b7a36';
       this.diceThemeColor = this.istProzentwurf ? this.diceThemeColorOnes : (profil.themeOnes || profil.theme);
-      if (this.dice3dAktiv) {
+      if (this.wuerfel3dVerwenden) {
         this.$nextTick(() => {
           if (this.istProzentwurf) {
             this.stelleProzentwurfDiceBoxesBereit();
@@ -214,7 +241,7 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       return this.diceModulLadenPromise;
     },
     async stelleDiceBoxBereit() {
-      if (!this.dice3dAktiv) {
+      if (!this.wuerfel3dVerwenden) {
         return null;
       }
       if (this.diceReady && this.diceBox) {
@@ -258,7 +285,7 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       return this.diceInitPromise;
     },
     async stelleProzentwurfDiceBoxesBereit() {
-      if (!this.dice3dAktiv) {
+      if (!this.wuerfel3dVerwenden) {
         return null;
       }
       if (
@@ -473,7 +500,7 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
       this.letzterWurfAnzahl = anzahl;
       try {
         window.HTBAH.spieleWuerfelSounds(anzahl);
-        if (!this.dice3dAktiv) {
+        if (!this.wuerfel3dVerwenden) {
           this.diceFehler = '';
           this.ergebnisse = this.fallbackWurf(notation);
           this.$emit('gewuerfelt', this.ergebnisse);
@@ -502,14 +529,22 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
           }
           if (box && this.diceReady && typeof box.roll === 'function') {
             try {
-              const extrahiert = this.ergebnisseAusDiceRoll(
-                await box.roll(this.normalisiereNotationFuerDiceEngine(effektiveNotation), { themeColor: this.diceThemeColor }),
-              );
-              if (extrahiert.length > 0) {
-                this.prozentwurfDetails = null;
-                this.ergebnisse = extrahiert;
-                this.$emit('gewuerfelt', this.ergebnisse);
-                return this.ergebnisse;
+              const rollRoh = await Promise.race([
+                box.roll(this.normalisiereNotationFuerDiceEngine(effektiveNotation), {
+                  themeColor: this.diceThemeColor,
+                }),
+                this.warte(HTBAH_WB_DICE_ROLL_TIMEOUT_MS).then(() => '__roll_timeout__'),
+              ]);
+              if (rollRoh === '__roll_timeout__') {
+                this.diceFehler = '3D-Wurf dauerte zu lange. Standard-Wurf bleibt aktiv.';
+              } else {
+                const extrahiert = this.ergebnisseAusDiceRoll(rollRoh);
+                if (extrahiert.length > 0) {
+                  this.prozentwurfDetails = null;
+                  this.ergebnisse = extrahiert;
+                  this.$emit('gewuerfelt', this.ergebnisse);
+                  return this.ergebnisse;
+                }
               }
             } catch {
               /* fallback unten */
@@ -576,10 +611,10 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
           </template>
         </span>
       </div>
-      <div v-if="dice3dAktiv && !istProzentwurf" class="htbah-dice-box-wrap">
+      <div v-if="wuerfel3dVerwenden && !istProzentwurf" class="htbah-dice-box-wrap">
         <div :id="diceContainerId" ref="diceBoxElement" class="htbah-dice-box"></div>
       </div>
-      <div v-if="dice3dAktiv && istProzentwurf" class="row g-2">
+      <div v-if="wuerfel3dVerwenden && istProzentwurf" class="row g-2">
         <div class="col-12 col-md-6">
           <div class="htbah-dice-box-wrap">
             <div :id="diceContainerIdZehner" ref="diceBoxZehnerElement" class="htbah-dice-box"></div>

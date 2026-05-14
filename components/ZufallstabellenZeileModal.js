@@ -85,7 +85,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       return ['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand'].includes(typ);
     },
     kannDuplizieren() {
-      return this.istBearbeitung && this.anlage && this.anlage.typ === 'bestie';
+      const typ = this.anlage && this.anlage.typ;
+      return (
+        this.istBearbeitung &&
+        !!typ &&
+        ['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand'].includes(typ)
+      );
     },
     kannInWeltOeffnen() {
       if (this.randomSichtbar) {
@@ -589,10 +594,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   </button>
                   <button
                     type="button"
-                    class="btn btn-outline-secondary"
+                    class="btn btn-outline-danger htbah-input-icon-btn"
+                    title="Initiative leeren"
+                    aria-label="Initiative leeren"
                     :disabled="!String(anlage.zeile.initiative || '').trim()"
                     @click="initiativeZuruecksetzen">
-                    Reset
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
                   </button>
                 </div>
                 <div class="mt-2">
@@ -860,10 +867,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   </button>
                   <button
                     type="button"
-                    class="btn btn-outline-secondary"
+                    class="btn btn-outline-danger htbah-input-icon-btn"
+                    title="Initiative leeren"
+                    aria-label="Initiative leeren"
                     :disabled="!String(anlage.zeile.initiative || '').trim()"
                     @click="initiativeZuruecksetzen">
-                    Reset
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
                   </button>
                 </div>
                 <div class="mt-2">

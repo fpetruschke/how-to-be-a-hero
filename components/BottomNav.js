@@ -419,6 +419,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.unbindNavReserveObserver();
     document.documentElement.style.removeProperty('--htbah-bottom-nav-reserve');
     document.documentElement.style.removeProperty('--htbah-top-nav-reserve');
+    this.entsorgeDiceBoxInstanz(this.diceBox);
+    this.entsorgeDiceBoxInstanz(this.diceBoxZehner);
+    this.entsorgeDiceBoxInstanz(this.diceBoxEiner);
     this.diceBox = null;
     this.diceBoxZehner = null;
     this.diceBoxEiner = null;
@@ -445,6 +448,18 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.badgeZiehenCleanup();
   },
   methods: {
+    entsorgeDiceBoxInstanz(rawBox) {
+      if (!rawBox || typeof rawBox !== 'object') {
+        return;
+      }
+      try {
+        if (typeof rawBox.clear === 'function') {
+          rawBox.clear();
+        }
+      } catch {
+        /* DiceBox kann beim Abbau werfen */
+      }
+    },
     warte(ms) {
       return new Promise((resolve) => {
         window.setTimeout(resolve, ms);

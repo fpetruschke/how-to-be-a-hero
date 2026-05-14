@@ -69,7 +69,7 @@ var HTBAH_REFACTOR_UTILS =
     data() {
       return {
         modal: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(), detailsOffen: false },
-        zustand: window.HTBAH.ladeZufallstabellenZustand(),
+        zustand: window.HTBAH.ladeZufallstabellenZustand(this.gruppeId),
         detail: null,
         graph: { nodes: [], edges: [], layoutAlle: {}, gruppeKey: 'default' },
         map: {
@@ -174,6 +174,10 @@ var HTBAH_REFACTOR_UTILS =
           fenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
         },
         spielleiterTick: 0,
+        interaktiveWeltStatsAnzeigen:
+          window.HTBAH && typeof window.HTBAH.ladeInteraktiveWeltStatsAnzeigen === 'function'
+            ? window.HTBAH.ladeInteraktiveWeltStatsAnzeigen()
+            : false,
         zufallNpcEpoche: 'mittelalter',
         zufallGegenstandEpoche: 'mittelalter',
         zufallGegenstandKleidung: true,
@@ -318,7 +322,7 @@ var HTBAH_REFACTOR_UTILS =
       },
       mapHintergrundDataUrl() {
         void this.mapHintergrundTick;
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const map = wb && wb.mapHintergruende && typeof wb.mapHintergruende === 'object' ? wb.mapHintergruende : {};
         const key = this.gruppeId || 'default';
         const dataUrl = map[key];
@@ -365,7 +369,7 @@ var HTBAH_REFACTOR_UTILS =
             };
           })
           .filter(Boolean);
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const alleEintraege = Array.isArray(wb && wb.eintraege) ? wb.eintraege : [];
         const eintragById = new Map(alleEintraege.map((eintrag) => [eintrag && eintrag.id, eintrag]));
         const freieBilder = this.ladeFreieBildAuswahl()
@@ -799,6 +803,7 @@ var HTBAH_REFACTOR_UTILS =
         }
         this.$nextTick(() => {
           this.fokussiereEntitaetNode(target.entityType, target.entityId, { zielZoom: 1.08 });
+          this.markiereCharakterStartfokusAngewendet();
         });
       },
       fokussiereEntitaetNode(entityType, entityId, optionen) {
@@ -836,6 +841,7 @@ var HTBAH_REFACTOR_UTILS =
         if (erfolg) {
           this.$nextTick(() => {
             this.fokussiereEntitaetNode(detail.entityType, detail.entityId, { zielZoom: 1.08 });
+            this.markiereCharakterStartfokusAngewendet();
           });
           event.preventDefault();
         }
@@ -1071,31 +1077,31 @@ var HTBAH_REFACTOR_UTILS =
         this.$emit('schliessen');
       },
       aktualisiereZustand() {
-        this.zustand = window.HTBAH.ladeZufallstabellenZustand();
+        this.zustand = window.HTBAH.ladeZufallstabellenZustand(this.gruppeId);
       },
       speichereZustand() {
-        window.HTBAH.speichereZufallstabellenZustand(this.zustand);
+        window.HTBAH.speichereZufallstabellenZustand(this.zustand, this.gruppeId);
       },
       ladeLayouts() {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         return wb && wb.mapLayouts && typeof wb.mapLayouts === 'object' ? wb.mapLayouts : {};
       },
       speichereLayout(layoutMap) {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         wb.mapLayouts = layoutMap;
-        window.HTBAH.speichereWeltenbauZustand(wb);
+        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
       },
       ladeBildLayouts() {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         return wb && wb.mapBildLayouts && typeof wb.mapBildLayouts === 'object' ? wb.mapBildLayouts : {};
       },
       speichereBildLayouts(layoutMap) {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         wb.mapBildLayouts = layoutMap;
-        window.HTBAH.speichereWeltenbauZustand(wb);
+        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
       },
       ladeFreieBildAuswahl() {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
         const map = wb && wb.mapFreieBilder && typeof wb.mapFreieBilder === 'object' ? wb.mapFreieBilder : {};
         const liste = Array.isArray(map[gruppeKey]) ? map[gruppeKey] : [];
@@ -1116,7 +1122,7 @@ var HTBAH_REFACTOR_UTILS =
           .filter(Boolean);
       },
       ladeFreieNotizen() {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
         const map = wb && wb.mapFreieNotizen && typeof wb.mapFreieNotizen === 'object' ? wb.mapFreieNotizen : {};
         const liste = Array.isArray(map[gruppeKey]) ? map[gruppeKey] : [];
@@ -1139,17 +1145,17 @@ var HTBAH_REFACTOR_UTILS =
           .filter(Boolean);
       },
       speichereFreieNotizen(liste) {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
         const map = wb && wb.mapFreieNotizen && typeof wb.mapFreieNotizen === 'object' ? wb.mapFreieNotizen : {};
         wb.mapFreieNotizen = {
           ...map,
           [gruppeKey]: Array.isArray(liste) ? liste.slice() : [],
         };
-        window.HTBAH.speichereWeltenbauZustand(wb);
+        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
       },
       ladeFreiePfeile() {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
         const map = wb && wb.mapFreiePfeile && typeof wb.mapFreiePfeile === 'object' ? wb.mapFreiePfeile : {};
         const liste = Array.isArray(map[gruppeKey]) ? map[gruppeKey] : [];
@@ -1168,24 +1174,24 @@ var HTBAH_REFACTOR_UTILS =
           .filter(Boolean);
       },
       speichereFreiePfeile(liste) {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
         const map = wb && wb.mapFreiePfeile && typeof wb.mapFreiePfeile === 'object' ? wb.mapFreiePfeile : {};
         wb.mapFreiePfeile = {
           ...map,
           [gruppeKey]: Array.isArray(liste) ? liste.slice() : [],
         };
-        window.HTBAH.speichereWeltenbauZustand(wb);
+        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
       },
       speichereFreieBildAuswahl(liste) {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
         const map = wb && wb.mapFreieBilder && typeof wb.mapFreieBilder === 'object' ? wb.mapFreieBilder : {};
         wb.mapFreieBilder = {
           ...map,
           [gruppeKey]: Array.isArray(liste) ? liste.slice() : [],
         };
-        window.HTBAH.speichereWeltenbauZustand(wb);
+        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
       },
       uebernehmeBildLayouts() {
         const gruppeKey = this.gruppeId || 'default';
@@ -1196,7 +1202,7 @@ var HTBAH_REFACTOR_UTILS =
         this.mapBildLayoutsLokal = JSON.parse(JSON.stringify(gruppeLayouts));
       },
       ladeMapEinstellungen() {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
         const key = this.gruppeId || 'default';
         const gruppe = alle[key] && typeof alle[key] === 'object' ? alle[key] : {};
@@ -1244,7 +1250,7 @@ var HTBAH_REFACTOR_UTILS =
         };
       },
       ladeElementLocks() {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
         const map =
           wb && wb.mapElementLocks && typeof wb.mapElementLocks === 'object'
@@ -1272,7 +1278,7 @@ var HTBAH_REFACTOR_UTILS =
         );
       },
       speichereElementLocksDirekt(lockMap) {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
         const alle =
           wb && wb.mapElementLocks && typeof wb.mapElementLocks === 'object'
@@ -1282,7 +1288,7 @@ var HTBAH_REFACTOR_UTILS =
           ...alle,
           [gruppeKey]: { ...(lockMap || {}) },
         };
-        window.HTBAH.speichereWeltenbauZustand(wb);
+        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
       },
       uebernehmeMapEinstellungen() {
         this.mapViewportPersistPause = true;
@@ -1307,7 +1313,7 @@ var HTBAH_REFACTOR_UTILS =
         if (!key) {
           return;
         }
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
         const gruppeKey = this.gruppeId || 'default';
         const gruppe = alle[gruppeKey] && typeof alle[gruppeKey] === 'object' ? alle[gruppeKey] : {};
@@ -1318,7 +1324,7 @@ var HTBAH_REFACTOR_UTILS =
             [key]: value,
           },
         };
-        window.HTBAH.speichereWeltenbauZustand(wb);
+        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
       },
       mapEinstellungenZuruecksetzen() {
         const defaults = MAP_STANDARD_EINSTELLUNGEN;
@@ -1334,17 +1340,17 @@ var HTBAH_REFACTOR_UTILS =
         });
         this.sichtbarkeitsFilter = { ...defaults.sichtbarkeitsFilter };
         this.elementLocks = {};
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
         const gruppeKey = this.gruppeId || 'default';
         const next = { ...alle };
         delete next[gruppeKey];
         wb.mapEinstellungen = next;
-        window.HTBAH.speichereWeltenbauZustand(wb);
+        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
       },
       speichereMapHintergrund(dataUrl) {
         const key = this.gruppeId || 'default';
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const map = wb && wb.mapHintergruende && typeof wb.mapHintergruende === 'object' ? wb.mapHintergruende : {};
         const nextMap = { ...map };
         if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
@@ -1353,7 +1359,7 @@ var HTBAH_REFACTOR_UTILS =
           delete nextMap[key];
         }
         wb.mapHintergruende = nextMap;
-        window.HTBAH.speichereWeltenbauZustand(wb);
+        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
         this.mapHintergrundTick += 1;
       },
       hintergrundDateiInputClick() {
@@ -1442,7 +1448,7 @@ var HTBAH_REFACTOR_UTILS =
         this.hintergrundUploadLaeuft = false;
       },
       verfuegbareWeltenbauBilder() {
-        const wb = window.HTBAH.ladeWeltenbauZustand();
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const liste = Array.isArray(wb && wb.eintraege) ? wb.eintraege : [];
         return liste.filter((eintrag) => eintrag && typeof eintrag.dataUrl === 'string' && eintrag.dataUrl.startsWith('data:image/'));
       },
@@ -1795,6 +1801,73 @@ var HTBAH_REFACTOR_UTILS =
         const centerX = Number(zielNode.position.x || 0) + this.nodeBreite(zielNode) / 2;
         const centerY = Number(zielNode.position.y || 0) + this.nodeHoehe(zielNode) / 2;
         this.wendeMapCenterWeltAn(centerX, centerY);
+      },
+      markiereCharakterStartfokusAngewendet() {
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
+        const gruppeKey = this.gruppeId || 'default';
+        const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
+        const gruppe = alle[gruppeKey] && typeof alle[gruppeKey] === 'object' ? alle[gruppeKey] : {};
+        if (gruppe.charakterStartfokusAngewendet === true) {
+          return;
+        }
+        this.speichereMapEinstellung('charakterStartfokusAngewendet', true);
+      },
+      wendeCharakterErstfokusWennNoetig() {
+        if (!this.offen) {
+          return;
+        }
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (mentionApi && typeof mentionApi.peekNavigationTarget === 'function' && mentionApi.peekNavigationTarget()) {
+          return;
+        }
+        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
+        const gruppeKey = this.gruppeId || 'default';
+        const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
+        const gruppe = alle[gruppeKey] && typeof alle[gruppeKey] === 'object' ? alle[gruppeKey] : {};
+        if (gruppe.charakterStartfokusAngewendet === true) {
+          return;
+        }
+        const legacyHatKartenausschnitt =
+          !('charakterStartfokusAngewendet' in gruppe) &&
+          (Object.prototype.hasOwnProperty.call(gruppe, 'mapCenterX') ||
+            Object.prototype.hasOwnProperty.call(gruppe, 'zoomScale'));
+        if (legacyHatKartenausschnitt) {
+          this.markiereCharakterStartfokusAngewendet();
+          return;
+        }
+        const nodes = (this.graph && Array.isArray(this.graph.nodes) ? this.graph.nodes : []).filter(
+          (n) => n && n.data && n.data.entityType === 'charakter' && n.position,
+        );
+        if (!nodes.length) {
+          this.markiereCharakterStartfokusAngewendet();
+          return;
+        }
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        nodes.forEach((node) => {
+          const x0 = Number(node.position.x || 0);
+          const y0 = Number(node.position.y || 0);
+          const x1 = x0 + this.nodeBreite(node);
+          const y1 = y0 + this.nodeHoehe(node);
+          minX = Math.min(minX, x0, x1);
+          minY = Math.min(minY, y0, y1);
+          maxX = Math.max(maxX, x0, x1);
+          maxY = Math.max(maxY, y0, y1);
+        });
+        if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+          this.markiereCharakterStartfokusAngewendet();
+          return;
+        }
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        this.mapViewportPersistPause = true;
+        this.wendeMapCenterWeltAn(centerX, centerY);
+        this.$nextTick(() => {
+          this.mapViewportPersistPause = false;
+        });
+        this.markiereCharakterStartfokusAngewendet();
       },
       nodeStil(node) {
         const itemScale = Math.max(0, (Number(this.map.itemScale) || 100) / 100);
@@ -2863,6 +2936,60 @@ var HTBAH_REFACTOR_UTILS =
         const t = typeof wert === 'string' ? wert.trim() : '';
         return t;
       },
+      synceInteraktiveWeltStatsFlag() {
+        if (window.HTBAH && typeof window.HTBAH.ladeInteraktiveWeltStatsAnzeigen === 'function') {
+          this.interaktiveWeltStatsAnzeigen = window.HTBAH.ladeInteraktiveWeltStatsAnzeigen();
+        }
+      },
+      speichereInteraktiveWeltStatsEinstellung() {
+        if (!window.HTBAH || typeof window.HTBAH.speichereInteraktiveWeltStatsAnzeigen !== 'function') {
+          return;
+        }
+        this.interaktiveWeltStatsAnzeigen = window.HTBAH.speichereInteraktiveWeltStatsAnzeigen(
+          this.interaktiveWeltStatsAnzeigen,
+        );
+      },
+      onKampagneDatenExternGeaendert(ev) {
+        if (!this.offen) {
+          return;
+        }
+        const d = ev && ev.detail ? ev.detail : {};
+        if (d.art === 'zufallstabellen') {
+          if (!d.kampagneId || d.kampagneId !== this.gruppeId) {
+            return;
+          }
+          this.aktualisiereZustand();
+        } else if (d.art === 'spielleiter') {
+          this.spielleiterTick += 1;
+        } else {
+          return;
+        }
+        this.$nextTick(() => {
+          if (this.offen) {
+            this.refreshGraph();
+          }
+        });
+      },
+      mapKampfStatsIniText(node) {
+        const ini = node && node.data ? node.data.initiative : '';
+        const t = this.initiativeBadgeText(ini);
+        return t || '—';
+      },
+      mapKampfStatsLpText(node) {
+        const d = node && node.data;
+        if (!d || !d.payload) {
+          return '—';
+        }
+        if (d.entityType === 'charakter') {
+          return String(this.normalisiereLp(d.payload.lebenspunkte));
+        }
+        const raw = d.payload.lebenspunkte;
+        if (raw == null) {
+          return '—';
+        }
+        const s = String(raw).trim();
+        return s || '—';
+      },
       verarbeiteCharakterLebenspunkteAenderung(vorher, nach) {
         if (!this.charakterModal.charakter) {
           return;
@@ -3886,19 +4013,36 @@ var HTBAH_REFACTOR_UTILS =
         return true;
       },
       dupliziereAnlageAusModal() {
-        if (!this.anlage || this.anlage.typ !== 'bestie' || !this.anlage.zeile) {
+        if (!this.anlage || !this.anlage.typ || !this.anlage.zeile || !this.anlage.zeile.id) {
           return;
         }
-        const kopie = JSON.parse(JSON.stringify(this.anlage.zeile));
-        kopie.id = window.HTBAH.neueEntropieId();
-        const basisName = String(kopie.name || '').trim();
-        kopie.name = basisName ? `${basisName} (Kopie)` : 'Neue Bestie (Kopie)';
-        this.zustand.bestien = [...(this.zustand.bestien || []), kopie];
-        this.speichereZustand();
+        const typ = this.anlage.typ;
+        const id = this.anlage.zeile.id;
+        const api = window.HTBAH && window.HTBAH.dupliziereZufallstabellenEntitaeten;
+        if (typeof api !== 'function') {
+          return;
+        }
+        const res = api({
+          quelleKampagneId: this.gruppeId,
+          zielKampagneId: this.gruppeId,
+          eintraege: [{ typ, id }],
+        });
+        if (!res || !res.ok) {
+          window.HTBAH.ui.notify({
+            text: (res && res.fehler) || 'Duplizieren fehlgeschlagen.',
+            typ: 'danger',
+            dauerMs: 6400,
+          });
+          return;
+        }
+        this.aktualisiereZustand();
+        const neuId = res.ergebnisse && res.ergebnisse[0] ? res.ergebnisse[0].neuId : '';
         this.schliesseAnlageModal();
         this.$nextTick(() => {
           this.refreshGraph();
-          this.$nextTick(() => this.fokussiereNeuGespeicherteEntitaet('bestie', kopie.id));
+          if (neuId) {
+            this.$nextTick(() => this.fokussiereNeuGespeicherteEntitaet(typ, neuId));
+          }
         });
       },
       oeffneDetail(node) {
@@ -4999,6 +5143,7 @@ var HTBAH_REFACTOR_UTILS =
     watch: {
       offen(neu) {
         if (neu) {
+          this.synceInteraktiveWeltStatsFlag();
           this.mapHintergrundTick += 1;
           this.mapFreieElementeTick += 1;
           this.aktualisiereZustand();
@@ -5011,7 +5156,12 @@ var HTBAH_REFACTOR_UTILS =
             }
             this.uebernehmeMapEinstellungen();
             this.verlaufZuruecksetzen();
-            this.$nextTick(() => this.verarbeiteMentionNavigationTarget());
+            this.$nextTick(() => {
+              this.$nextTick(() => {
+                this.wendeCharakterErstfokusWennNoetig();
+                this.verarbeiteMentionNavigationTarget();
+              });
+            });
           });
         } else {
           this.persistiereLokaleOrtBildLayouts();
@@ -5040,11 +5190,17 @@ var HTBAH_REFACTOR_UTILS =
         this.mapHintergrundTick += 1;
         this.mapFreieElementeTick += 1;
         if (this.offen) {
+          this.aktualisiereZustand();
           this.uebernehmeBildLayouts();
           this.$nextTick(() => {
             this.refreshGraph();
             this.uebernehmeMapEinstellungen();
             this.verlaufZuruecksetzen();
+            this.$nextTick(() => {
+              this.$nextTick(() => {
+                this.wendeCharakterErstfokusWennNoetig();
+              });
+            });
           });
         }
       },
@@ -5121,8 +5277,12 @@ var HTBAH_REFACTOR_UTILS =
       window.addEventListener('keydown', this.onGlobalKeydown);
       window.addEventListener('htbah:mention-nav-target-updated', this.verarbeiteMentionNavigationTarget);
       window.addEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
+      window.addEventListener('htbah:interaktive-welt-stats-anzeigen-geaendert', this.synceInteraktiveWeltStatsFlag);
+      window.addEventListener('htbah:kampagne-daten-geaendert', this.onKampagneDatenExternGeaendert);
     },
     beforeUnmount() {
+      this.beendeZiehen();
+      this.beendeResize();
       if (this.zeileMentionController && typeof this.zeileMentionController.destroy === 'function') {
         this.zeileMentionController.destroy();
       }
@@ -5148,6 +5308,8 @@ var HTBAH_REFACTOR_UTILS =
       window.removeEventListener('keydown', this.onGlobalKeydown);
       window.removeEventListener('htbah:mention-nav-target-updated', this.verarbeiteMentionNavigationTarget);
       window.removeEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
+      window.removeEventListener('htbah:interaktive-welt-stats-anzeigen-geaendert', this.synceInteraktiveWeltStatsFlag);
+      window.removeEventListener('htbah:kampagne-daten-geaendert', this.onKampagneDatenExternGeaendert);
       if (this.anlageOverlay.offen) {
         this.schliesseAnlageOverlayModal();
       }
@@ -5284,6 +5446,24 @@ var HTBAH_REFACTOR_UTILS =
                     max="16"
                     step="1"
                     v-model.number="map.edgeWidth" />
+                  <hr class="my-2" />
+                  <div class="small text-secondary fw-semibold mb-2">Figuren</div>
+                  <div class="form-check form-switch mb-2">
+                    <input
+                      id="wb-kampf-stats-anzeigen"
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      v-model="interaktiveWeltStatsAnzeigen"
+                      @change="speichereInteraktiveWeltStatsEinstellung" />
+                    <label class="form-check-label d-flex align-items-center gap-1 flex-wrap" for="wb-kampf-stats-anzeigen">
+                      <span class="material-symbols-outlined" style="font-size: 1.1rem" aria-hidden="true">swords</span>
+                      <span>Kampfwerte anzeigen (Initiative, LP)</span>
+                    </label>
+                  </div>
+                  <p class="small text-body-secondary mb-0">
+                    Nur lesend unter Charakteren, NPCs und Bestien. Werte folgen den gespeicherten Kampagnendaten.
+                  </p>
                   <hr class="my-2" />
                   <div class="card border-0 bg-body-secondary-subtle p-2 mb-2">
                     <div class="small text-secondary fw-semibold mb-2">Alle Elemente/Bilder</div>
@@ -5583,13 +5763,29 @@ var HTBAH_REFACTOR_UTILS =
                       </div>
                       <div v-if="node.data.statusEmoji" class="htbah-map-charakter-status">{{ node.data.statusEmoji }}</div>
                     </div>
-                    <div class="htbah-map-node-kreis-label">
-                      <span>{{ node.data && node.data.label ? node.data.label : 'Eintrag' }}</span>
-                      <span
-                        v-if="node.data && initiativeBadgeText(node.data.initiative)"
-                        class="badge rounded-pill text-bg-info ms-1">
-                        INI {{ initiativeBadgeText(node.data.initiative) }}
-                      </span>
+                    <div class="htbah-map-node-kreis-meta">
+                      <div class="htbah-map-node-kreis-label">
+                        <span>{{ node.data && node.data.label ? node.data.label : 'Eintrag' }}</span>
+                        <span
+                          v-if="node.data && initiativeBadgeText(node.data.initiative) && !interaktiveWeltStatsAnzeigen"
+                          class="badge rounded-pill text-bg-info ms-1">
+                          INI {{ initiativeBadgeText(node.data.initiative) }}
+                        </span>
+                      </div>
+                      <div
+                        v-if="interaktiveWeltStatsAnzeigen"
+                        class="htbah-map-node-kampf-stats"
+                        role="group"
+                        :aria-label="'Kampfwerte ' + (node.data && node.data.label ? node.data.label : '')">
+                        <span class="htbah-map-node-kampf-stats-zeile" title="Initiative">
+                          <span class="material-symbols-outlined htbah-map-node-kampf-stats-ico" aria-hidden="true">swords</span>
+                          <span class="tabular-nums">{{ mapKampfStatsIniText(node) }}</span>
+                        </span>
+                        <span class="htbah-map-node-kampf-stats-zeile" title="Lebenspunkte">
+                          <span class="material-symbols-outlined htbah-map-node-kampf-stats-ico" aria-hidden="true">favorite</span>
+                          <span class="tabular-nums">{{ mapKampfStatsLpText(node) }}</span>
+                        </span>
+                      </div>
                     </div>
                   </template>
                   <template v-else>
@@ -5613,7 +5809,7 @@ var HTBAH_REFACTOR_UTILS =
                           {{ Number(node.data.multiOrtCount) }} Orte
                         </span>
                         <span
-                          v-if="node.data && initiativeBadgeText(node.data.initiative)"
+                          v-if="node.data && initiativeBadgeText(node.data.initiative) && !interaktiveWeltStatsAnzeigen"
                           class="badge rounded-pill text-bg-info ms-1">
                           INI {{ initiativeBadgeText(node.data.initiative) }}
                         </span>
@@ -5833,10 +6029,12 @@ var HTBAH_REFACTOR_UTILS =
                   </button>
                   <button
                     type="button"
-                    class="btn btn-outline-secondary"
+                    class="btn btn-outline-danger htbah-input-icon-btn"
+                    title="Initiative leeren"
+                    aria-label="Initiative leeren"
                     :disabled="!String(charakterModal.charakter.initiative || '').trim()"
                     @click="charakterInitiativeZuruecksetzen">
-                    Reset
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
                   </button>
                 </div>
               </div>
@@ -5921,7 +6119,7 @@ var HTBAH_REFACTOR_UTILS =
             @pointerdown="starteCharakterResize($event)"></div>
         </div>
         <div class="d-none" aria-hidden="true">
-          <wuerfelbecher-wurf ref="charakterInitiativeWuerfelbecher" modus="w10" :auto-init="false" />
+          <wuerfelbecher-wurf ref="charakterInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
         </div>
       </div>
     `,

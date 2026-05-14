@@ -54,6 +54,7 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
         window.clearTimeout(eintrag.timer);
       }
     });
+    this.eintraege = [];
   },
   template: `
     <teleport to="body">

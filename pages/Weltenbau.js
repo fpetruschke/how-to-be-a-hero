@@ -111,6 +111,45 @@ function normalisiereGeneratorZeitstempelMap(roh) {
   return map;
 }
 
+function weltenbauKomponentenZustandAusSpeicher(kampagneId) {
+  const zustandRoh = window.HTBAH.ladeWeltenbauZustand(kampagneId);
+  return {
+    version: 4,
+    eintraege: Array.isArray(zustandRoh && zustandRoh.eintraege) ? zustandRoh.eintraege : [],
+    generatorUrls: normalisiereGeneratorUrlMap(zustandRoh && zustandRoh.generatorUrls),
+    generatorAufrufe: normalisiereGeneratorZeitstempelMap(zustandRoh && zustandRoh.generatorAufrufe),
+    mapLayouts: zustandRoh && zustandRoh.mapLayouts && typeof zustandRoh.mapLayouts === 'object' ? zustandRoh.mapLayouts : {},
+    mapBildLayouts:
+      zustandRoh && zustandRoh.mapBildLayouts && typeof zustandRoh.mapBildLayouts === 'object'
+        ? zustandRoh.mapBildLayouts
+        : {},
+    mapFreieBilder:
+      zustandRoh && zustandRoh.mapFreieBilder && typeof zustandRoh.mapFreieBilder === 'object'
+        ? zustandRoh.mapFreieBilder
+        : {},
+    mapFreieNotizen:
+      zustandRoh && zustandRoh.mapFreieNotizen && typeof zustandRoh.mapFreieNotizen === 'object'
+        ? zustandRoh.mapFreieNotizen
+        : {},
+    mapFreiePfeile:
+      zustandRoh && zustandRoh.mapFreiePfeile && typeof zustandRoh.mapFreiePfeile === 'object'
+        ? zustandRoh.mapFreiePfeile
+        : {},
+    mapHintergruende:
+      zustandRoh && zustandRoh.mapHintergruende && typeof zustandRoh.mapHintergruende === 'object'
+        ? zustandRoh.mapHintergruende
+        : {},
+    mapEinstellungen:
+      zustandRoh && zustandRoh.mapEinstellungen && typeof zustandRoh.mapEinstellungen === 'object'
+        ? zustandRoh.mapEinstellungen
+        : {},
+    mapElementLocks:
+      zustandRoh && zustandRoh.mapElementLocks && typeof zustandRoh.mapElementLocks === 'object'
+        ? zustandRoh.mapElementLocks
+        : {},
+  };
+}
+
 /** Rohdatei-Limit vor dem Laden (Browser- & Speicher-Schutz). */
 const WELTENBAU_MAX_ROH_DATEI_BYTES = 40 * 1024 * 1024;
 
@@ -122,50 +161,17 @@ window.HTBAH_SEITEN.Weltenbau = {
     SpielleiterGruppe: window.HTBAH_SEITEN.SpielleiterGruppe,
   },
   data() {
-    const zustandRoh = window.HTBAH.ladeWeltenbauZustand();
-    const zustand = {
-      version: 4,
-      eintraege: Array.isArray(zustandRoh && zustandRoh.eintraege) ? zustandRoh.eintraege : [],
-      generatorUrls: normalisiereGeneratorUrlMap(zustandRoh && zustandRoh.generatorUrls),
-      generatorAufrufe: normalisiereGeneratorZeitstempelMap(zustandRoh && zustandRoh.generatorAufrufe),
-      mapLayouts: zustandRoh && zustandRoh.mapLayouts && typeof zustandRoh.mapLayouts === 'object' ? zustandRoh.mapLayouts : {},
-      mapBildLayouts:
-        zustandRoh && zustandRoh.mapBildLayouts && typeof zustandRoh.mapBildLayouts === 'object'
-          ? zustandRoh.mapBildLayouts
-          : {},
-      mapFreieBilder:
-        zustandRoh && zustandRoh.mapFreieBilder && typeof zustandRoh.mapFreieBilder === 'object'
-          ? zustandRoh.mapFreieBilder
-          : {},
-      mapFreieNotizen:
-        zustandRoh && zustandRoh.mapFreieNotizen && typeof zustandRoh.mapFreieNotizen === 'object'
-          ? zustandRoh.mapFreieNotizen
-          : {},
-      mapFreiePfeile:
-        zustandRoh && zustandRoh.mapFreiePfeile && typeof zustandRoh.mapFreiePfeile === 'object'
-          ? zustandRoh.mapFreiePfeile
-          : {},
-      mapHintergruende:
-        zustandRoh && zustandRoh.mapHintergruende && typeof zustandRoh.mapHintergruende === 'object'
-          ? zustandRoh.mapHintergruende
-          : {},
-      mapEinstellungen:
-        zustandRoh && zustandRoh.mapEinstellungen && typeof zustandRoh.mapEinstellungen === 'object'
-          ? zustandRoh.mapEinstellungen
-          : {},
-      mapElementLocks:
-        zustandRoh && zustandRoh.mapElementLocks && typeof zustandRoh.mapElementLocks === 'object'
-          ? zustandRoh.mapElementLocks
-          : {},
-    };
+    const slInit = window.HTBAH.ladeSpielleiterZustand();
+    const startKampagneId =
+      (typeof slInit.aktiveKampagneId === 'string' && slInit.aktiveKampagneId) ||
+      ((slInit.kampagnen || [])[0] && slInit.kampagnen[0].id) ||
+      '';
+    const zustand = weltenbauKomponentenZustandAusSpeicher(startKampagneId);
     return {
       generatoren: WELTENBAU_GENERATOREN,
       zustand,
       weltenbauMapModalOffen: false,
-      ausgewaehlteKampagneId:
-        (window.HTBAH.ladeSpielleiterZustand().aktiveKampagneId ||
-          ((window.HTBAH.ladeSpielleiterZustand().kampagnen || [])[0] || {}).id ||
-          ''),
+      ausgewaehlteKampagneId: startKampagneId,
       importWarteschlange: [],
       zeigeImportHinweis: false,
       generatorModal: {
@@ -249,16 +255,18 @@ window.HTBAH_SEITEN.Weltenbau = {
         this.syncKampagneAusRoute();
       },
     },
-    ausgewaehlteKampagneId(neu) {
+    ausgewaehlteKampagneId(neu, alt) {
       if (!neu) {
         return;
       }
       const z = window.HTBAH.ladeSpielleiterZustand();
-      if (z.aktiveKampagneId === neu) {
-        return;
+      if (z.aktiveKampagneId !== neu) {
+        z.aktiveKampagneId = neu;
+        window.HTBAH.speichereSpielleiterZustand(z);
       }
-      z.aktiveKampagneId = neu;
-      window.HTBAH.speichereSpielleiterZustand(z);
+      if (neu !== alt) {
+        this.zustand = weltenbauKomponentenZustandAusSpeicher(neu);
+      }
     },
     '$route.fullPath'() {
       this.pruefeMentionNavigationTarget();
@@ -309,7 +317,7 @@ window.HTBAH_SEITEN.Weltenbau = {
     },
     onWeltenbauMapModalSchliessen() {
       this.weltenbauMapModalOffen = false;
-      const wb = window.HTBAH.ladeWeltenbauZustand();
+      const wb = window.HTBAH.ladeWeltenbauZustand(this.ausgewaehlteKampagneId);
       this.zustand = {
         ...this.zustand,
         mapLayouts: wb && wb.mapLayouts && typeof wb.mapLayouts === 'object' ? wb.mapLayouts : {},
@@ -326,8 +334,10 @@ window.HTBAH_SEITEN.Weltenbau = {
       };
     },
     persist() {
-      const aktuell = window.HTBAH.ladeWeltenbauZustand();
-      window.HTBAH.speichereWeltenbauZustand({
+      const kid = this.ausgewaehlteKampagneId;
+      const aktuell = window.HTBAH.ladeWeltenbauZustand(kid);
+      window.HTBAH.speichereWeltenbauZustand(
+        {
         ...aktuell,
         ...this.zustand,
         // Diese Felder werden direkt im Interaktive-Welt-Modal gepflegt.
@@ -340,7 +350,9 @@ window.HTBAH_SEITEN.Weltenbau = {
         mapHintergruende: aktuell.mapHintergruende || {},
         mapEinstellungen: aktuell.mapEinstellungen || {},
         mapElementLocks: aktuell.mapElementLocks || {},
-      });
+        },
+        kid,
+      );
     },
     zeigeStatus(text, typ = 'success') {
       window.HTBAH.ui.notify({ text, typ, dauerMs: 7200 });
@@ -1009,7 +1021,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         <div class="alert alert-info py-2 px-3 small mb-2" role="note">
           Nutze die Tabellen für schnelle Ideen und spontane Ereignisse. Die Inhalte werden in der Interaktiven Welt verfügbar.
         </div>
-        <zufallstabellen-seite eingebettet />
+        <zufallstabellen-seite eingebettet :kampagne-id="ausgewaehlteKampagneId" />
       </template>
 
       <template v-else-if="aktiveWeltenbauTab === 'generatoren'">

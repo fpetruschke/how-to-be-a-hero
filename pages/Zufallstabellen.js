@@ -67,6 +67,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       type: Boolean,
       default: false,
     },
+    kampagneId: {
+      type: String,
+      default: '',
+    },
   },
   components: {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
@@ -123,6 +127,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       /** { typ, zeile } — Zeile als Deep-Kopie, nur Anzeige */
       detailAnsicht: null,
       detailAnsichtModalInstanz: null,
+      /** Einmal-Listener auf hidden.bs.modal — bei Route-Wechsel entfernen, sonst Leak */
+      detailAnsichtModalHiddenKetteHandler: null,
+      entitaetenAuswahlModus: false,
+      /** Schlüssel `${typ}:${id}` → true */
+      entitaetenAuswahl: {},
+      duplizierenZielKampagneId: '',
+      duplizierenNeueKampagneName: '',
+      /** Panel „Inhalte duplizieren“ (Ziel-Kampagne, Auswahlmodus) */
+      duplizierenPanelOffen: false,
     };
   },
   created() {
@@ -134,6 +147,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     };
   },
   computed: {
+    kampagneIdEffektiv() {
+      if (typeof this.kampagneId === 'string' && this.kampagneId.trim()) {
+        return this.kampagneId.trim();
+      }
+      const sl = window.HTBAH.ladeSpielleiterZustand();
+      return typeof sl.aktiveKampagneId === 'string' && sl.aktiveKampagneId.trim()
+        ? sl.aktiveKampagneId.trim()
+        : '';
+    },
     rootKlassen() {
       return this.eingebettet ? '' : 'container content py-3';
     },
@@ -157,6 +179,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     },
     zufallsgeneratorBereit() {
       return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
+    },
+    spielleiterKampagnenFuerDuplikat() {
+      const sl = window.HTBAH.ladeSpielleiterZustand();
+      return Array.isArray(sl.kampagnen) ? sl.kampagnen.filter((k) => k && k.id) : [];
+    },
+    entitaetenAuswahlSchluesselListe() {
+      return Object.keys(this.entitaetenAuswahl || {}).filter((k) => this.entitaetenAuswahl[k]);
+    },
+    entitaetenAuswahlAnzahl() {
+      return this.entitaetenAuswahlSchluesselListe.length;
     },
     detailAnsichtTitel() {
       if (!this.detailAnsicht) {
@@ -603,6 +635,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       });
     },
   },
+  watch: {
+    kampagneIdEffektiv(neu, alt) {
+      if (neu === alt) {
+        return;
+      }
+      this.zustand = window.HTBAH.ladeZufallstabellenZustand(neu);
+      this.duplizierenZielKampagneId = neu || '';
+      this.entitaetenAuswahl = {};
+      this.entitaetenAuswahlModus = false;
+    },
+  },
   methods: {
     entitaetTypLabelFuerMentions(typ) {
       const map = {
@@ -807,7 +850,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
     },
     persist() {
-      window.HTBAH.speichereZufallstabellenZustand(this.zustand);
+      window.HTBAH.speichereZufallstabellenZustand(this.zustand, this.kampagneIdEffektiv);
     },
     typSingularAusTabellenTyp(tabellenTyp) {
       const map = {
@@ -862,7 +905,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (!entitaeten.length) {
         return;
       }
-      const wb = window.HTBAH.ladeWeltenbauZustand();
+      const wb = window.HTBAH.ladeWeltenbauZustand(this.kampagneIdEffektiv);
       const layouts = this.bereinigeWeltenbauMapFeld(wb.mapLayouts, entitaeten);
       const bildLayouts = this.bereinigeWeltenbauMapFeld(wb.mapBildLayouts, entitaeten);
       const locks = this.bereinigeWeltenbauMapFeld(wb.mapElementLocks, entitaeten);
@@ -872,7 +915,165 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       wb.mapLayouts = layouts.map;
       wb.mapBildLayouts = bildLayouts.map;
       wb.mapElementLocks = locks.map;
-      window.HTBAH.speichereWeltenbauZustand(wb);
+      window.HTBAH.speichereWeltenbauZustand(wb, this.kampagneIdEffektiv);
+    },
+    entitaetenAuswahlSchluessel(typ, id) {
+      return `${typ}:${id}`;
+    },
+    istEntitaetAusgewaehlt(typ, id) {
+      return !!this.entitaetenAuswahl[this.entitaetenAuswahlSchluessel(typ, id)];
+    },
+    setzeEntitaetAuswahl(typ, id, wert) {
+      const k = this.entitaetenAuswahlSchluessel(typ, id);
+      const neu = { ...this.entitaetenAuswahl };
+      if (wert) {
+        neu[k] = true;
+      } else {
+        delete neu[k];
+      }
+      this.entitaetenAuswahl = neu;
+    },
+    toggleEntitaetAuswahl(typ, id) {
+      this.setzeEntitaetAuswahl(typ, id, !this.istEntitaetAusgewaehlt(typ, id));
+    },
+    sichtbareEntitaetenSchluesselFuerAuswahl() {
+      const pushListe = (typ, rows) => {
+        (rows || []).forEach((row) => {
+          if (row && row.id) {
+            out.push({ typ, id: row.id });
+          }
+        });
+      };
+      const out = [];
+      pushListe('ort', this.anzeigeOrte);
+      pushListe('fraktion', this.anzeigeFraktionen);
+      pushListe('npc', this.anzeigeNpcs);
+      pushListe('gegenstand', this.anzeigeGegenstaende);
+      pushListe('pantheon', this.anzeigePantheon);
+      pushListe('raetsel', this.anzeigeRaetsel);
+      pushListe('bestie', this.anzeigeBestien);
+      return out;
+    },
+    alleSichtbarenEntitaetenAuswahlUmschalten() {
+      const sichtbar = this.sichtbareEntitaetenSchluesselFuerAuswahl();
+      const alleMarkiert =
+        sichtbar.length > 0 && sichtbar.every((e) => this.istEntitaetAusgewaehlt(e.typ, e.id));
+      const neu = { ...this.entitaetenAuswahl };
+      if (alleMarkiert) {
+        sichtbar.forEach((e) => {
+          delete neu[this.entitaetenAuswahlSchluessel(e.typ, e.id)];
+        });
+      } else {
+        sichtbar.forEach((e) => {
+          neu[this.entitaetenAuswahlSchluessel(e.typ, e.id)] = true;
+        });
+      }
+      this.entitaetenAuswahl = neu;
+    },
+    entitaetenAuswahlModusUmschalten() {
+      this.entitaetenAuswahlModus = !this.entitaetenAuswahlModus;
+      if (!this.entitaetenAuswahlModus) {
+        this.entitaetenAuswahl = {};
+      }
+    },
+    duplizierenNeueKampagneAnlegen() {
+      const nameRoh = (this.duplizierenNeueKampagneName || '').trim();
+      const api = window.HTBAH && window.HTBAH.erstelleSpielleiterKampagne;
+      if (typeof api !== 'function') {
+        return;
+      }
+      const res = api({ name: nameRoh || undefined });
+      if (!res || !res.ok) {
+        window.HTBAH.ui.notify({
+          text:
+            res && res.fehler === 'name_exists'
+              ? 'Eine Kampagne mit diesem Namen existiert bereits.'
+              : 'Kampagne konnte nicht angelegt werden.',
+          typ: 'danger',
+          dauerMs: 7200,
+        });
+        return;
+      }
+      this.duplizierenZielKampagneId = res.id;
+      this.duplizierenNeueKampagneName = '';
+      window.HTBAH.ui.notify({ text: 'Neue Kampagne angelegt und als Ziel gewählt.', typ: 'success' });
+    },
+    dupliziereEntitaetenMitZiel(eintraege, opts) {
+      const o = opts && typeof opts === 'object' ? opts : {};
+      const api = window.HTBAH && window.HTBAH.dupliziereZufallstabellenEntitaeten;
+      if (typeof api !== 'function') {
+        return;
+      }
+      const ziel = (this.duplizierenZielKampagneId || '').trim() || this.kampagneIdEffektiv;
+      if (!ziel) {
+        window.HTBAH.ui.notify({ text: 'Bitte eine Ziel-Kampagne wählen.', typ: 'warning' });
+        return;
+      }
+      const quelle = this.kampagneIdEffektiv;
+      if (!quelle) {
+        window.HTBAH.ui.notify({ text: 'Keine aktive Kampagne.', typ: 'warning' });
+        return;
+      }
+      const res = api({
+        quelleKampagneId: quelle,
+        zielKampagneId: ziel,
+        eintraege,
+      });
+      if (!res || !res.ok) {
+        window.HTBAH.ui.notify({
+          text: (res && res.fehler) || 'Duplizieren fehlgeschlagen.',
+          typ: 'danger',
+          dauerMs: 7200,
+        });
+        return;
+      }
+      if (o.schliesseModal === 'overlay') {
+        this.overlaySchliesseZeileModal();
+      } else if (o.schliesseModal) {
+        this.schliesseZeileModal();
+      }
+      if (ziel === this.kampagneIdEffektiv) {
+        this.zustand = window.HTBAH.ladeZufallstabellenZustand(this.kampagneIdEffektiv);
+      }
+      this.entitaetenAuswahl = {};
+      const n = res.angelegt != null ? res.angelegt : (res.ergebnisse || []).length;
+      window.HTBAH.ui.notify({
+        text: n === 1 ? 'Eine Entität wurde dupliziert.' : `${n} Entitäten wurden dupliziert.`,
+        typ: 'success',
+      });
+    },
+    onHauptZeileModalDuplicate() {
+      if (!this.bearbeitung || !this.bearbeitung.zeile || !this.bearbeitung.zeile.id) {
+        return;
+      }
+      this.dupliziereEntitaetenMitZiel([{ typ: this.bearbeitung.typ, id: this.bearbeitung.zeile.id }], {
+        schliesseModal: true,
+      });
+    },
+    onOverlayZeileModalDuplicate() {
+      if (!this.bearbeitungOverlay || !this.bearbeitungOverlay.zeile || !this.bearbeitungOverlay.zeile.id) {
+        return;
+      }
+      this.dupliziereEntitaetenMitZiel(
+        [{ typ: this.bearbeitungOverlay.typ, id: this.bearbeitungOverlay.zeile.id }],
+        { schliesseModal: 'overlay' },
+      );
+    },
+    onAusgewaehlteEntitaetenDuplizieren() {
+      const eintraege = this.entitaetenAuswahlSchluesselListe
+        .map((k) => {
+          const p = k.indexOf(':');
+          if (p < 1) {
+            return null;
+          }
+          return { typ: k.slice(0, p), id: k.slice(p + 1) };
+        })
+        .filter(Boolean);
+      if (!eintraege.length) {
+        window.HTBAH.ui.notify({ text: 'Keine Einträge ausgewählt.', typ: 'warning' });
+        return;
+      }
+      this.dupliziereEntitaetenMitZiel(eintraege, {});
     },
     textVorschau(html) {
       return htbahTextVorschau(html);
@@ -1267,6 +1468,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (!row) {
         return;
       }
+      this.entferneDetailAnsichtModalHiddenKette();
       const zeileKopie = JSON.parse(JSON.stringify(row));
       if (!Array.isArray(zeileKopie.medien)) {
         zeileKopie.medien = [];
@@ -1284,6 +1486,33 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     onDetailAnsichtModalHidden() {
       this.detailAnsicht = null;
       this.detailAnsichtModalInstanz = null;
+    },
+    entferneDetailAnsichtModalHiddenKette() {
+      const el = this.$refs.detailAnsichtModalElement;
+      if (el && this.detailAnsichtModalHiddenKetteHandler) {
+        el.removeEventListener('hidden.bs.modal', this.detailAnsichtModalHiddenKetteHandler);
+      }
+      this.detailAnsichtModalHiddenKetteHandler = null;
+    },
+    fuehreNachDetailAnsichtModalAusgeblendetAus(callback) {
+      this.entferneDetailAnsichtModalHiddenKette();
+      const el = this.$refs.detailAnsichtModalElement;
+      if (!this.detailAnsichtModalInstanz || !el || typeof callback !== 'function') {
+        if (typeof callback === 'function') {
+          callback();
+        }
+        return;
+      }
+      const handler = () => {
+        el.removeEventListener('hidden.bs.modal', handler);
+        if (this.detailAnsichtModalHiddenKetteHandler === handler) {
+          this.detailAnsichtModalHiddenKetteHandler = null;
+        }
+        callback();
+      };
+      this.detailAnsichtModalHiddenKetteHandler = handler;
+      el.addEventListener('hidden.bs.modal', handler);
+      this.detailAnsichtModalInstanz.hide();
     },
     detailAnsichtBearbeiten() {
       const d = this.detailAnsicht;
@@ -1310,7 +1539,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       const idx = this.indexNachId(liste, id);
       const row = idx >= 0 ? liste[idx] : zeile;
-      const el = this.$refs.detailAnsichtModalElement;
       const oeffneBearbeiten = () => {
         if (typ === 'npc') {
           this.npcBearbeiten(row, idx);
@@ -1328,13 +1556,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           this.gegenstandBearbeiten(row, idx);
         }
       };
-      if (this.detailAnsichtModalInstanz && el) {
-        const einmal = () => {
-          el.removeEventListener('hidden.bs.modal', einmal);
-          oeffneBearbeiten();
-        };
-        el.addEventListener('hidden.bs.modal', einmal);
-        this.detailAnsichtModalInstanz.hide();
+      if (this.detailAnsichtModalInstanz && this.$refs.detailAnsichtModalElement) {
+        this.fuehreNachDetailAnsichtModalAusgeblendetAus(oeffneBearbeiten);
       } else {
         oeffneBearbeiten();
       }
@@ -1358,18 +1581,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         });
         return;
       }
-      const el = this.$refs.detailAnsichtModalElement;
       const fokussiereUndNavigiere = () => {
         oeffneEntitaet({ entityType: typ, entityId: id, openMode: 'focus' });
         this.navigiereZuInteraktiverWelt();
       };
-      if (this.detailAnsichtModalInstanz && el) {
-        const einmal = () => {
-          el.removeEventListener('hidden.bs.modal', einmal);
-          fokussiereUndNavigiere();
-        };
-        el.addEventListener('hidden.bs.modal', einmal);
-        this.detailAnsichtModalInstanz.hide();
+      if (this.detailAnsichtModalInstanz && this.$refs.detailAnsichtModalElement) {
+        this.fuehreNachDetailAnsichtModalAusgeblendetAus(fokussiereUndNavigiere);
       } else {
         fokussiereUndNavigiere();
       }
@@ -2234,7 +2451,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
     },
     pantheonExportieren() {
-      const paket = window.HTBAH.erstellePantheonExportPaket();
+      const paket = window.HTBAH.erstellePantheonExportPaket(this.kampagneIdEffektiv);
       const datum = new Date();
       const yyyy = String(datum.getFullYear());
       const mm = String(datum.getMonth() + 1).padStart(2, '0');
@@ -2345,6 +2562,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     window.addEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
   },
   beforeUnmount() {
+    this.entferneDetailAnsichtModalHiddenKette();
     window.removeEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
     this.overlaySchliesseZeileModal();
     if (this.zeileMentionController && typeof this.zeileMentionController.destroy === 'function') {
@@ -2375,6 +2593,85 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             placeholder="Alle Tabellen durchsuchen …"
             autocomplete="off"
             aria-label="Alle Tabellen durchsuchen" />
+          <button
+            type="button"
+            class="btn btn-outline-secondary htbah-input-icon-btn"
+            :class="{ active: duplizierenPanelOffen }"
+            :aria-expanded="duplizierenPanelOffen ? 'true' : 'false'"
+            aria-controls="zst-inhalte-duplizieren-panel"
+            title="Inhalte duplizieren"
+            @click="duplizierenPanelOffen = !duplizierenPanelOffen">
+            <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+            <span class="visually-hidden">Inhalte duplizieren</span>
+          </button>
+        </div>
+        <div
+          v-show="duplizierenPanelOffen"
+          id="zst-inhalte-duplizieren-panel"
+          class="card mt-2 text-start">
+          <div class="card-body py-3">
+            <h6 class="h6 mb-3 fw-semibold">Inhalte duplizieren</h6>
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-md-4">
+                <label class="form-label small text-secondary mb-0" for="zst-duplikat-ziel-kampagne">Ziel-Kampagne</label>
+                <select
+                  id="zst-duplikat-ziel-kampagne"
+                  v-model="duplizierenZielKampagneId"
+                  class="form-select form-select-sm"
+                  aria-label="Ziel-Kampagne für Duplikate">
+                  <option v-for="k in spielleiterKampagnenFuerDuplikat" :key="'zst-dup-k-' + k.id" :value="k.id">
+                    {{ k.name }}
+                  </option>
+                </select>
+              </div>
+              <div class="col-12 col-md-5">
+                <label class="form-label small text-secondary mb-0" for="zst-duplikat-neue-kampagne-name">Neue Kampagne</label>
+                <div class="input-group input-group-sm">
+                  <input
+                    id="zst-duplikat-neue-kampagne-name"
+                    v-model.trim="duplizierenNeueKampagneName"
+                    type="text"
+                    class="form-control"
+                    placeholder="Name …"
+                    autocomplete="off"
+                    @keydown.enter.prevent="duplizierenNeueKampagneAnlegen" />
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary htbah-input-icon-btn"
+                    title="Kampagne erstellen und als Ziel wählen"
+                    aria-label="Kampagne erstellen und als Ziel wählen"
+                    @click="duplizierenNeueKampagneAnlegen">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                  </button>
+                </div>
+              </div>
+              <div class="col-12 col-md-3 d-flex flex-wrap gap-2 align-items-center justify-content-md-end">
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  :class="entitaetenAuswahlModus ? 'btn-primary' : 'btn-outline-secondary'"
+                  @click="entitaetenAuswahlModusUmschalten">
+                  {{ entitaetenAuswahlModus ? 'Auswahl beenden' : 'Auswahlmodus' }}
+                </button>
+                <template v-if="entitaetenAuswahlModus">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="alleSichtbarenEntitaetenAuswahlUmschalten">
+                    Alle sichtbaren
+                  </button>
+                  <span class="small text-secondary">{{ entitaetenAuswahlAnzahl }} markiert</span>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-primary"
+                    :disabled="!entitaetenAuswahlAnzahl"
+                    @click="onAusgewaehlteEntitaetenDuplizieren">
+                    Duplizieren
+                  </button>
+                </template>
+              </div>
+            </div>
+            <p class="small text-secondary mb-0 mt-2">
+              Duplikate übernehmen Tabellendaten und gespeicherte Positionen in der interaktiven Welt. Im Bearbeiten-Dialog steht ebenfalls „Duplizieren“ (Ziel wie hier gewählt).
+            </p>
+          </div>
         </div>
         <p v-if="globaleSucheAktiv" class="small text-secondary mb-0 mt-2">
           Pro Kategorie siehst du die Treffer oder den Hinweis, dass es dort keine gibt.
@@ -2410,6 +2707,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
+                  <th v-if="entitaetenAuswahlModus" class="text-center zufallstabellen-auswahl-spalte" scope="col">
+                    <span class="visually-hidden">Auswahl</span>
+                  </th>
                   <th>Name</th>
                   <th>Größe</th>
                   <th>Lage</th>
@@ -2420,7 +2720,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeOrte.length">
-                  <td colspan="6" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 7 : 6" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.orte || []).length, sucheOrte) }}
                   </td>
                 </tr>
@@ -2429,6 +2729,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
                   @click="detailAnsichtOeffnen('ort', row)">
+                  <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
+                    <input
+                      class="form-check-input m-0"
+                      type="checkbox"
+                      :checked="istEntitaetAusgewaehlt('ort', row.id)"
+                      :aria-label="'Ort auswählen: ' + karteWert(row.name)"
+                      @change="toggleEntitaetAuswahl('ort', row.id)" />
+                  </td>
                   <td>
                     {{ karteWert(row.name) }}
                     <span v-if="initiativeBadgeText(row.initiative)" class="badge rounded-pill text-bg-info ms-1">
@@ -2471,6 +2779,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               :key="'ort-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
               <div class="card-body p-2" @click="detailAnsichtOeffnen('ort', row)">
+                <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
+                  <input
+                    :id="'zst-ort-sel-' + row.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="istEntitaetAusgewaehlt('ort', row.id)"
+                    @change="toggleEntitaetAuswahl('ort', row.id)" />
+                  <label class="form-check-label small" :for="'zst-ort-sel-' + row.id">Auswählen</label>
+                </div>
                 <div class="fw-semibold mb-1">
                   {{ karteWert(row.name) }}
                   <span v-if="initiativeBadgeText(row.initiative)" class="badge rounded-pill text-bg-info ms-1">
@@ -2542,6 +2859,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
+                  <th v-if="entitaetenAuswahlModus" class="text-center zufallstabellen-auswahl-spalte" scope="col">
+                    <span class="visually-hidden">Auswahl</span>
+                  </th>
                   <th>Art</th>
                   <th>Name</th>
                   <th>Orte</th>
@@ -2553,7 +2873,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeFraktionen.length">
-                  <td colspan="7" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 8 : 7" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.fraktionen || []).length, sucheFraktionen) }}
                   </td>
                 </tr>
@@ -2562,6 +2882,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
                   @click="detailAnsichtOeffnen('fraktion', row)">
+                  <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
+                    <input
+                      class="form-check-input m-0"
+                      type="checkbox"
+                      :checked="istEntitaetAusgewaehlt('fraktion', row.id)"
+                      :aria-label="'Fraktion auswählen: ' + karteWert(row.name)"
+                      @change="toggleEntitaetAuswahl('fraktion', row.id)" />
+                  </td>
                   <td>{{ karteWert(row.art) }}</td>
                   <td>{{ karteWert(row.name) }}</td>
                   <td class="small">{{ karteWert(fraktionOrteText(row)) }}</td>
@@ -2600,6 +2928,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               :key="'fraktion-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
               <div class="card-body p-2" @click="detailAnsichtOeffnen('fraktion', row)">
+                <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
+                  <input
+                    :id="'zst-fraktion-sel-' + row.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="istEntitaetAusgewaehlt('fraktion', row.id)"
+                    @change="toggleEntitaetAuswahl('fraktion', row.id)" />
+                  <label class="form-check-label small" :for="'zst-fraktion-sel-' + row.id">Auswählen</label>
+                </div>
                 <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
                 <div class="small"><span class="text-secondary">Art:</span> {{ karteWert(row.art) }}</div>
                 <div class="small"><span class="text-secondary">Orte:</span> {{ karteWert(fraktionOrteText(row)) }}</div>
@@ -2679,6 +3016,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
+                  <th v-if="entitaetenAuswahlModus" class="text-center zufallstabellen-auswahl-spalte" scope="col">
+                    <span class="visually-hidden">Auswahl</span>
+                  </th>
                   <th>Name</th>
                   <th>Spitzname</th>
                   <th>Geschlecht</th>
@@ -2702,7 +3042,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeNpcs.length">
-                  <td colspan="19" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 20 : 19" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.npcs || []).length, sucheNpcs) }}
                   </td>
                 </tr>
@@ -2712,6 +3052,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   class="zufallstabellen-tabellenzeile-klickbar"
                   :class="statusZeilenKlasse(row)"
                   @click="detailAnsichtOeffnen('npc', row)">
+                  <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
+                    <input
+                      class="form-check-input m-0"
+                      type="checkbox"
+                      :checked="istEntitaetAusgewaehlt('npc', row.id)"
+                      :aria-label="'NPC auswählen: ' + karteWert(row.name)"
+                      @change="toggleEntitaetAuswahl('npc', row.id)" />
+                  </td>
                   <td>
                     {{ karteWert(row.name) }}
                     <span v-if="initiativeBadgeText(row.initiative)" class="badge rounded-pill text-bg-info ms-1">
@@ -2771,6 +3119,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2"
               :class="statusCardKlasse(row)">
               <div class="card-body p-2" @click="detailAnsichtOeffnen('npc', row)">
+                <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
+                  <input
+                    :id="'zst-npc-sel-' + row.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="istEntitaetAusgewaehlt('npc', row.id)"
+                    @change="toggleEntitaetAuswahl('npc', row.id)" />
+                  <label class="form-check-label small" :for="'zst-npc-sel-' + row.id">Auswählen</label>
+                </div>
                 <div class="fw-semibold mb-1">
                   {{ karteWert(row.name) }}
                   <span v-if="initiativeBadgeText(row.initiative)" class="badge rounded-pill text-bg-info ms-1">
@@ -2852,6 +3209,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
+                  <th v-if="entitaetenAuswahlModus" class="text-center zufallstabellen-auswahl-spalte" scope="col">
+                    <span class="visually-hidden">Auswahl</span>
+                  </th>
                   <th>Name</th>
                   <th>Kampfwerte</th>
                   <th>Aufenthaltsort</th>
@@ -2861,7 +3221,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeGegenstaende.length">
-                  <td colspan="5" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 6 : 5" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.gegenstaende || []).length, sucheGegenstaende) }}
                   </td>
                 </tr>
@@ -2870,6 +3230,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
                   @click="detailAnsichtOeffnen('gegenstand', row)">
+                  <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
+                    <input
+                      class="form-check-input m-0"
+                      type="checkbox"
+                      :checked="istEntitaetAusgewaehlt('gegenstand', row.id)"
+                      :aria-label="'Gegenstand auswählen: ' + karteWert(row.name)"
+                      @change="toggleEntitaetAuswahl('gegenstand', row.id)" />
+                  </td>
                   <td>{{ karteWert(row.name) }}</td>
                   <td class="small text-nowrap">{{ gegenstandWaffenWerteText(row) }}</td>
                   <td>{{ karteWert(row.aufenthaltsort) }}</td>
@@ -2906,6 +3274,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               :key="'gegenstand-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
               <div class="card-body p-2" @click="detailAnsichtOeffnen('gegenstand', row)">
+                <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
+                  <input
+                    :id="'zst-gegenstand-sel-' + row.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="istEntitaetAusgewaehlt('gegenstand', row.id)"
+                    @change="toggleEntitaetAuswahl('gegenstand', row.id)" />
+                  <label class="form-check-label small" :for="'zst-gegenstand-sel-' + row.id">Auswählen</label>
+                </div>
                 <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
                 <div class="small"><span class="text-secondary">Kampfwerte:</span> {{ gegenstandWaffenWerteText(row) }}</div>
                 <div class="small"><span class="text-secondary">Ort:</span> {{ karteWert(row.aufenthaltsort) }}</div>
@@ -2983,6 +3360,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
+                  <th v-if="entitaetenAuswahlModus" class="text-center zufallstabellen-auswahl-spalte" scope="col">
+                    <span class="visually-hidden">Auswahl</span>
+                  </th>
                   <th>Name</th>
                   <th>Domäne</th>
                   <th>Charakter</th>
@@ -2993,7 +3373,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigePantheon.length">
-                  <td colspan="6" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 7 : 6" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.pantheon || []).length, suchePantheon) }}
                   </td>
                 </tr>
@@ -3002,6 +3382,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
                   @click="detailAnsichtOeffnen('pantheon', row)">
+                  <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
+                    <input
+                      class="form-check-input m-0"
+                      type="checkbox"
+                      :checked="istEntitaetAusgewaehlt('pantheon', row.id)"
+                      :aria-label="'Gottheit auswählen: ' + karteWert(row.name)"
+                      @change="toggleEntitaetAuswahl('pantheon', row.id)" />
+                  </td>
                   <td>{{ karteWert(row.name) }}</td>
                   <td class="small">{{ karteWert(row.domaene) }}</td>
                   <td class="small">{{ karteWert(row.charakter) }}</td>
@@ -3039,6 +3427,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               :key="'pantheon-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
               <div class="card-body p-2" @click="detailAnsichtOeffnen('pantheon', row)">
+                <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
+                  <input
+                    :id="'zst-pantheon-sel-' + row.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="istEntitaetAusgewaehlt('pantheon', row.id)"
+                    @change="toggleEntitaetAuswahl('pantheon', row.id)" />
+                  <label class="form-check-label small" :for="'zst-pantheon-sel-' + row.id">Auswählen</label>
+                </div>
                 <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
                 <div class="small"><span class="text-secondary">Domäne:</span> {{ karteWert(row.domaene) }}</div>
                 <div class="small"><span class="text-secondary">Charakter:</span> {{ karteWert(row.charakter) }}</div>
@@ -3107,6 +3504,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
+                  <th v-if="entitaetenAuswahlModus" class="text-center zufallstabellen-auswahl-spalte" scope="col">
+                    <span class="visually-hidden">Auswahl</span>
+                  </th>
                   <th>Art</th>
                   <th>Titel</th>
                   <th>Ort</th>
@@ -3120,7 +3520,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeRaetsel.length">
-                  <td colspan="9" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 10 : 9" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.raetsel || []).length, sucheRaetsel) }}
                   </td>
                 </tr>
@@ -3129,6 +3529,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
                   @click="detailAnsichtOeffnen('raetsel', row)">
+                  <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
+                    <input
+                      class="form-check-input m-0"
+                      type="checkbox"
+                      :checked="istEntitaetAusgewaehlt('raetsel', row.id)"
+                      :aria-label="'Rätsel auswählen: ' + karteWert(row.titel)"
+                      @change="toggleEntitaetAuswahl('raetsel', row.id)" />
+                  </td>
                   <td class="small">{{ karteWert(row.art) }}</td>
                   <td>{{ karteWert(row.titel) }}</td>
                   <td class="small">{{ karteWert(row.aufenthaltsort) }}</td>
@@ -3174,6 +3582,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               :key="'raetsel-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
               <div class="card-body p-2" @click="detailAnsichtOeffnen('raetsel', row)">
+                <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
+                  <input
+                    :id="'zst-raetsel-sel-' + row.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="istEntitaetAusgewaehlt('raetsel', row.id)"
+                    @change="toggleEntitaetAuswahl('raetsel', row.id)" />
+                  <label class="form-check-label small" :for="'zst-raetsel-sel-' + row.id">Auswählen</label>
+                </div>
                 <div class="fw-semibold mb-1">{{ karteWert(row.titel) }}</div>
                 <div class="small"><span class="text-secondary">Art:</span> {{ karteWert(row.art) }}</div>
                 <div class="small"><span class="text-secondary">Ort:</span> {{ karteWert(row.aufenthaltsort) }}</div>
@@ -3264,6 +3681,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             <table class="table table-sm table-striped mb-0 align-middle">
               <thead>
                 <tr>
+                  <th v-if="entitaetenAuswahlModus" class="text-center zufallstabellen-auswahl-spalte" scope="col">
+                    <span class="visually-hidden">Auswahl</span>
+                  </th>
                   <th>Art</th>
                   <th>Name</th>
                   <th>Angriff</th>
@@ -3280,7 +3700,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeBestien.length">
-                  <td colspan="12" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 13 : 12" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.bestien || []).length, sucheBestien) }}
                   </td>
                 </tr>
@@ -3290,6 +3710,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   class="zufallstabellen-tabellenzeile-klickbar"
                   :class="statusZeilenKlasse(row)"
                   @click="detailAnsichtOeffnen('bestie', row)">
+                  <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
+                    <input
+                      class="form-check-input m-0"
+                      type="checkbox"
+                      :checked="istEntitaetAusgewaehlt('bestie', row.id)"
+                      :aria-label="'Bestie auswählen: ' + karteWert(row.name)"
+                      @change="toggleEntitaetAuswahl('bestie', row.id)" />
+                  </td>
                   <td class="small">{{ bestieKategorieLabel(row.kategorie) }}</td>
                   <td>
                     {{ karteWert(row.name) }}
@@ -3342,6 +3770,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2"
               :class="statusCardKlasse(row)">
               <div class="card-body p-2" @click="detailAnsichtOeffnen('bestie', row)">
+                <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
+                  <input
+                    :id="'zst-bestie-sel-' + row.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="istEntitaetAusgewaehlt('bestie', row.id)"
+                    @change="toggleEntitaetAuswahl('bestie', row.id)" />
+                  <label class="form-check-label small" :for="'zst-bestie-sel-' + row.id">Auswählen</label>
+                </div>
                 <div class="fw-semibold mb-1">
                   {{ karteWert(row.name) }}
                   <span v-if="initiativeBadgeText(row.initiative)" class="badge rounded-pill text-bg-info ms-1">
@@ -3521,6 +3958,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @media-set-primary="setzeBearbeitungPrimaryMedium"
         @media-open="mediumImBildbetrachterOeffnen"
         @media-download="mediumHerunterladen"
+        @duplicate="onHauptZeileModalDuplicate"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"
         @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
         @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
@@ -3555,6 +3993,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @media-set-primary="overlayMediaSetPrimary"
         @media-open="mediumImBildbetrachterOeffnen"
         @media-download="overlayMediaDownload"
+        @duplicate="onOverlayZeileModalDuplicate"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"
         @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
         @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"

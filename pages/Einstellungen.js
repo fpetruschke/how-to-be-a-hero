@@ -45,7 +45,7 @@ const SPEICHER_BEREICHE = {
     key: 'htbah_zufallstabellen',
     titel: 'Zufallstabellen löschen?',
     beschreibung:
-      'Alle gespeicherten Einträge in den Zufallstabellen (NPCs, Orte, Fraktionen, Pantheon, Gegenstände, Rätsel, Bestarium) werden entfernt.',
+      'Alle gespeicherten Einträge in den Zufallstabellen je Kampagne (NPCs, Orte, Fraktionen, Pantheon, Gegenstände, Rätsel, Bestarium) werden entfernt.',
     erfolg: 'Zufallstabellen wurden gelöscht.',
     buttonSymbol: '📚',
     buttonLabel: 'Zufallstabellen löschen',
@@ -54,7 +54,7 @@ const SPEICHER_BEREICHE = {
     key: 'htbah_weltenbau',
     titel: 'Weltenbau-Bilder löschen?',
     beschreibung:
-      'Alle unter „Weltenbau“ importierten Karten- und Generator-Bilder werden aus dem lokalen Speicher entfernt.',
+      'Alle unter „Weltenbau“ und in der interaktiven Welt je Kampagne gespeicherten Daten (Bilder, Karten, Generatoren) werden aus dem lokalen Speicher entfernt.',
     erfolg: 'Weltenbau-Bilder wurden gelöscht.',
     buttonSymbol: '🗺️',
     buttonLabel: 'Weltenbau-Bilder löschen',
@@ -106,10 +106,11 @@ const SPEICHER_BEREICHE = {
       'htbah_wuerfel_beutel_fenster',
       'htbah_wuerfelbecher_bundle',
       'htbah_orientation_mode',
+      'htbah_interaktive_welt_stats_anzeigen',
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen, unter „Weltenbau“ gespeicherte Bilder, deine Theme-Auswahl, die Würfel-Audio-Einstellungen, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen und Weltenbau-Daten je Kampagne, deine Theme-Auswahl, die Würfel-Audio-Einstellungen, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
@@ -199,12 +200,12 @@ const DATEN_EXPORT_BEREICHE = [
   {
     id: 'zufallstabellen',
     key: 'htbah_zufallstabellen',
-    label: 'Zufallstabellen',
+    label: 'Zufallstabellen (je Kampagne)',
   },
   {
     id: 'weltenbau',
     key: 'htbah_weltenbau',
-    label: 'Weltenbau',
+    label: 'Weltenbau / interaktive Welt (je Kampagne)',
   },
   {
     id: 'theme',
@@ -244,6 +245,8 @@ window.HTBAH_SEITEN.Einstellungen = {
       browserSpeicherFehler: '',
       browserSpeicherLaden: false,
       browserSpeicherInitialErmittelt: false,
+      /** @type {null | { ok: boolean, htbahBytes: number, gesamtBytes: number, htbahSchluesselAnzahl: number, originLocalStorageSchluesselAnzahl: number }} */
+      localStorageStatistik: null,
       datenExportBereiche: DATEN_EXPORT_BEREICHE,
       exportAuswahl: neueBereichsAuswahl(DATEN_EXPORT_BEREICHE),
       importAuswahl: {},
@@ -330,6 +333,20 @@ window.HTBAH_SEITEN.Einstellungen = {
         return 'bg-warning text-dark';
       }
       return 'bg-success';
+    },
+    localStorageHtbahText() {
+      const s = this.localStorageStatistik;
+      if (!s || !s.ok || !HTBAH_REFACTOR_UTILS) {
+        return '';
+      }
+      return HTBAH_REFACTOR_UTILS.formatBytesDecimal(s.htbahBytes);
+    },
+    localStorageGesamtText() {
+      const s = this.localStorageStatistik;
+      if (!s || !s.ok || !HTBAH_REFACTOR_UTILS) {
+        return '';
+      }
+      return HTBAH_REFACTOR_UTILS.formatBytesDecimal(s.gesamtBytes);
     },
     wuerfelAudioLautProzent() {
       return Math.round(Math.min(1, Math.max(0, Number(this.wuerfelAudioLautstaerke) || 0)) * 100);
@@ -455,10 +472,17 @@ window.HTBAH_SEITEN.Einstellungen = {
       this.browserSpeicherFehler = '';
       this.browserSpeicherLaden = true;
       this.browserSpeicherInitialErmittelt = true;
+      const lsMessen =
+        window.HTBAH &&
+        window.HTBAH.speicher &&
+        typeof window.HTBAH.speicher.messeLocalStorageByteStatistik === 'function'
+          ? window.HTBAH.speicher.messeLocalStorageByteStatistik()
+          : null;
+      this.localStorageStatistik = lsMessen;
       if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
         this.browserSpeicher = null;
         this.browserSpeicherFehler =
-          'Speicher-Schätzung ist nicht verfügbar (z. B. unsichere Verbindung oder älterer Browser).';
+          'Geschätztes Browser-Kontingent ist nicht verfügbar (z. B. unsichere Verbindung oder älterer Browser). Gemessene localStorage-Werte siehst Du trotzdem unten.';
         this.browserSpeicherLaden = false;
         return;
       }
@@ -470,7 +494,8 @@ window.HTBAH_SEITEN.Einstellungen = {
         this.browserSpeicher = { usage, quota };
       } catch {
         this.browserSpeicher = null;
-        this.browserSpeicherFehler = 'Die Speicherwerte konnten nicht gelesen werden.';
+        this.browserSpeicherFehler =
+          'Die geschätzten Speicherwerte des Browsers konnten nicht gelesen werden. Gemessene localStorage-Werte siehst Du trotzdem unten.';
       }
       this.browserSpeicherLaden = false;
     },
@@ -513,6 +538,24 @@ window.HTBAH_SEITEN.Einstellungen = {
         window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
       } else if (Array.isArray(bereich.keys)) {
         window.HTBAH.speicher.loescheKeys(bereich.keys);
+        if (this.zuLoeschenderBereich === 'alles') {
+          window.HTBAH.speicher.loescheKeysMitPraefix(
+            window.HTBAH.speicherKeys.zufallstabellenProKampagnePraefix,
+          );
+          window.HTBAH.speicher.loescheKeysMitPraefix(
+            window.HTBAH.speicherKeys.weltenbauProKampagnePraefix,
+          );
+        }
+      } else if (this.zuLoeschenderBereich === 'zufallstabellen') {
+        window.HTBAH.speicher.loescheKeysMitPraefix(
+          window.HTBAH.speicherKeys.zufallstabellenProKampagnePraefix,
+        );
+        window.HTBAH.speicher.loescheKey(bereich.key);
+      } else if (this.zuLoeschenderBereich === 'weltenbau') {
+        window.HTBAH.speicher.loescheKeysMitPraefix(
+          window.HTBAH.speicherKeys.weltenbauProKampagnePraefix,
+        );
+        window.HTBAH.speicher.loescheKey(bereich.key);
       } else {
         window.HTBAH.speicher.loescheKey(bereich.key);
       }
@@ -613,6 +656,56 @@ window.HTBAH_SEITEN.Einstellungen = {
               Object.keys(eintraege).length > 0
                 ? JSON.stringify({ typ: 'wuerfelbecher-bundle', version: 1, eintraege })
                 : null,
+          };
+        }
+        if (bereich.id === 'zufallstabellen') {
+          const sl = window.HTBAH.ladeSpielleiterZustand();
+          const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen : [];
+          const proKampagne = {};
+          kampagnen.forEach((k) => {
+            if (k && typeof k.id === 'string' && k.id) {
+              proKampagne[k.id] = window.HTBAH.ladeZufallstabellenZustand(k.id);
+            }
+          });
+          const wert =
+            Object.keys(proKampagne).length > 0
+              ? JSON.stringify({
+                  typ: 'htbah-zufallstabellen-pro-kampagne',
+                  version: 1,
+                  proKampagne,
+                })
+              : null;
+          return {
+            id: bereich.id,
+            key: bereich.key,
+            label: bereich.label,
+            vorhanden: Boolean(wert),
+            wert,
+          };
+        }
+        if (bereich.id === 'weltenbau') {
+          const sl = window.HTBAH.ladeSpielleiterZustand();
+          const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen : [];
+          const proKampagne = {};
+          kampagnen.forEach((k) => {
+            if (k && typeof k.id === 'string' && k.id) {
+              proKampagne[k.id] = window.HTBAH.ladeWeltenbauZustand(k.id);
+            }
+          });
+          const wert =
+            Object.keys(proKampagne).length > 0
+              ? JSON.stringify({
+                  typ: 'htbah-weltenbau-pro-kampagne',
+                  version: 1,
+                  proKampagne,
+                })
+              : null;
+          return {
+            id: bereich.id,
+            key: bereich.key,
+            label: bereich.label,
+            vorhanden: Boolean(wert),
+            wert,
           };
         }
         const wert = window.HTBAH.speicher.leseText(bereich.key, null);
@@ -777,6 +870,56 @@ window.HTBAH_SEITEN.Einstellungen = {
             }
           } else {
             window.HTBAH.loescheCharakterById(charakterId);
+          }
+          return;
+        }
+        if (bereich.key === 'htbah_zufallstabellen') {
+          if (bereich.vorhanden && typeof bereich.wert === 'string') {
+            try {
+              const p = JSON.parse(bereich.wert);
+              if (
+                p &&
+                p.typ === 'htbah-zufallstabellen-pro-kampagne' &&
+                p.proKampagne &&
+                typeof p.proKampagne === 'object'
+              ) {
+                Object.keys(p.proKampagne).forEach((kid) => {
+                  window.HTBAH.speichereZufallstabellenZustand(p.proKampagne[kid], kid);
+                });
+              }
+            } catch {
+              fehlerBereiche.push(bereich.label || bereich.key);
+            }
+          } else {
+            window.HTBAH.speicher.loescheKeysMitPraefix(
+              window.HTBAH.speicherKeys.zufallstabellenProKampagnePraefix,
+            );
+            window.HTBAH.speicher.loescheKey('htbah_zufallstabellen');
+          }
+          return;
+        }
+        if (bereich.key === 'htbah_weltenbau') {
+          if (bereich.vorhanden && typeof bereich.wert === 'string') {
+            try {
+              const p = JSON.parse(bereich.wert);
+              if (
+                p &&
+                p.typ === 'htbah-weltenbau-pro-kampagne' &&
+                p.proKampagne &&
+                typeof p.proKampagne === 'object'
+              ) {
+                Object.keys(p.proKampagne).forEach((kid) => {
+                  window.HTBAH.speichereWeltenbauZustand(p.proKampagne[kid], kid);
+                });
+              }
+            } catch {
+              fehlerBereiche.push(bereich.label || bereich.key);
+            }
+          } else {
+            window.HTBAH.speicher.loescheKeysMitPraefix(
+              window.HTBAH.speicherKeys.weltenbauProKampagnePraefix,
+            );
+            window.HTBAH.speicher.loescheKey('htbah_weltenbau');
           }
           return;
         }
@@ -1024,41 +1167,62 @@ window.HTBAH_SEITEN.Einstellungen = {
       <h5 class="text-start mb-2">Speicherstatus</h5>
       <div class="card p-3 mb-3 text-start">
         <p class="small text-body-secondary mb-2">
-          Geschätztes Kontingent für diese Website (localStorage, IndexedDB, Service-Worker-Caches u. a.).
-          Die Werte sind ungefähr; unter HTTPS ist die Anzeige meist am zuverlässigsten.
+          <strong>localStorage</strong> wird beim Ermitteln direkt anhand aller Schlüssel summiert (Keys und Werte als UTF-16, ohne Browser-interne Zusatzstrukturen).
+          <strong>Browser gesamt</strong> ist eine grobe Schätzung über das Kontingent dieser Website (u. a. localStorage, IndexedDB, Service-Worker-Caches); sie kann von der localStorage-Summe abweichen.
         </p>
         <div v-if="!browserSpeicherInitialErmittelt" class="small text-body-secondary mb-2">
           Werte werden erst auf Anfrage geladen.
         </div>
         <div v-else-if="browserSpeicherLaden" class="small text-body-secondary">Wird geladen …</div>
-        <div v-else-if="browserSpeicherFehler" class="alert alert-warning py-2 mb-0 small">
-          {{ browserSpeicherFehler }}
-        </div>
-        <template v-else-if="browserSpeicher">
-          <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2 mb-2">
-            <span class="small"><strong>{{ browserSpeicherNutzungText }}</strong> belegt</span>
-            <span class="small text-body-secondary" v-if="browserSpeicherQuotaEndlich">
-              von {{ browserSpeicherQuotaText }}
-            </span>
-            <span class="small text-body-secondary" v-else>ohne gemeldetes Obergrenzen-Limit</span>
-          </div>
+        <template v-else>
           <div
-            v-if="browserSpeicherQuotaEndlich"
-            class="progress"
-            style="height: 1.1rem"
-            role="progressbar"
-            :aria-valuenow="browserSpeicherProzent"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            :aria-label="'Speicher: ' + browserSpeicherProzent + ' Prozent'">
+            v-if="localStorageStatistik && localStorageStatistik.ok"
+            class="small mb-2 pb-2 border-bottom border-secondary border-opacity-25">
+            <span class="d-block mb-1">
+              <strong>App (localStorage):</strong>
+              <strong>{{ localStorageHtbahText }}</strong>
+              <span class="text-body-secondary">
+                ({{ localStorageStatistik.htbahSchluesselAnzahl }} Schlüssel: Präfix htbah_ sowie gespeicherte Hinweis-Zustände)
+              </span>
+            </span>
+            <span class="d-block text-body-secondary">
+              Gesamtes localStorage dieser Website: {{ localStorageGesamtText }}
+              ({{ localStorageStatistik.originLocalStorageSchluesselAnzahl }} Schlüssel; z. B. eingebettete PDF-Ansicht zählt mit)
+            </span>
+          </div>
+          <div v-else-if="localStorageStatistik && !localStorageStatistik.ok" class="alert alert-warning py-2 mb-2 small">
+            Die Summe des localStorage konnte nicht ermittelt werden.
+          </div>
+          <div v-if="browserSpeicherFehler" class="alert alert-warning py-2 mb-2 small">
+            {{ browserSpeicherFehler }}
+          </div>
+          <p v-if="browserSpeicher" class="small text-body-secondary mb-1">Geschätzter Browser-Speicher (Origin):</p>
+          <template v-if="browserSpeicher">
+            <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2 mb-2">
+              <span class="small"><strong>{{ browserSpeicherNutzungText }}</strong> belegt</span>
+              <span class="small text-body-secondary" v-if="browserSpeicherQuotaEndlich">
+                von {{ browserSpeicherQuotaText }}
+              </span>
+              <span class="small text-body-secondary" v-else>ohne gemeldetes Obergrenzen-Limit</span>
+            </div>
             <div
-              class="progress-bar"
-              :class="browserSpeicherProgressBarKlasse"
-              :style="{ width: browserSpeicherProzent + '%' }"></div>
-          </div>
-          <div v-if="browserSpeicherQuotaEndlich" class="small text-body-secondary mt-1 text-end">
-            {{ browserSpeicherProzent }} %
-          </div>
+              v-if="browserSpeicherQuotaEndlich"
+              class="progress"
+              style="height: 1.1rem"
+              role="progressbar"
+              :aria-valuenow="browserSpeicherProzent"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="'Speicher: ' + browserSpeicherProzent + ' Prozent'">
+              <div
+                class="progress-bar"
+                :class="browserSpeicherProgressBarKlasse"
+                :style="{ width: browserSpeicherProzent + '%' }"></div>
+            </div>
+            <div v-if="browserSpeicherQuotaEndlich" class="small text-body-secondary mt-1 text-end">
+              {{ browserSpeicherProzent }} %
+            </div>
+          </template>
         </template>
         <icon-text-button
           type="button"

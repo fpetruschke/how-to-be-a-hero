@@ -11,6 +11,7 @@ window.HTBAH_SEITEN.Charakter = {
     NotizenModal: window.HTBAH_KOMPONENTEN.NotizenModal,
     FaehigkeitFormular: window.HTBAH_KOMPONENTEN.FaehigkeitFormular,
     InitiativeModal: window.HTBAH_KOMPONENTEN.InitiativeModal,
+    WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
     ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
@@ -192,6 +193,13 @@ window.HTBAH_SEITEN.Charakter = {
     zeigeAktuellePositionButton() {
       const pfad = this.$route && typeof this.$route.path === 'string' ? this.$route.path : '';
       return !!(this.spielleiterMitglied && this.aktiveKampagneId && pfad.startsWith('/kampagne/'));
+    },
+    /** Begabung Handeln (0–40) für Initiative-Obergrenze wie im Weltenbau */
+    spielleiterInitiativeBegabungHandelnGekappt() {
+      return Math.min(40, Math.max(0, Math.round(this.summen.handeln / 10)));
+    },
+    spielleiterInitiativeMax() {
+      return Math.max(1, 10 + this.spielleiterInitiativeBegabungHandelnGekappt);
     },
   },
   created() {
@@ -656,6 +664,53 @@ window.HTBAH_SEITEN.Charakter = {
         return 0;
       }
       return n;
+    },
+    normalisiereBegabungswertFuerInitiative(roh) {
+      const n = Math.round(Number(roh));
+      if (Number.isNaN(n) || n < 0) {
+        return 0;
+      }
+      return Math.min(40, n);
+    },
+    normalisiereInitiativeWert(roh, begabungswertHandeln) {
+      const txt = typeof roh === 'string' ? roh.trim() : String(roh == null ? '' : roh).trim();
+      if (!txt) {
+        return '';
+      }
+      const parsed = Math.round(Number(txt));
+      if (Number.isNaN(parsed)) {
+        return '';
+      }
+      const max = Math.max(1, 10 + this.normalisiereBegabungswertFuerInitiative(begabungswertHandeln));
+      return String(Math.max(1, Math.min(max, parsed)));
+    },
+    spielleiterInitiativeWuerfeln() {
+      if (!this.spielleiterMitglied || !this.charakter) {
+        return;
+      }
+      const handelnSumme = this.summen.handeln;
+      const handelnBegabungswert = Math.max(0, Math.round(handelnSumme / 10));
+      this.$refs.spielleiterInitiativeWuerfelbecher?.wuerfeln('1W10').then((werte) => {
+        const wurf = Array.isArray(werte) && werte.length ? Number(werte[0]) || 1 : 1;
+        const gesamt = wurf + handelnBegabungswert;
+        this.charakter.initiative = this.normalisiereInitiativeWert(gesamt, handelnBegabungswert);
+      });
+    },
+    async spielleiterInitiativeZuruecksetzen() {
+      if (!this.spielleiterMitglied || !this.charakter) {
+        return;
+      }
+      const bestaetigt = await window.HTBAH.ui.confirm({
+        titel: 'Initiative zurücksetzen?',
+        beschreibung: 'Ist der Kampf wirklich schon vorbei?',
+        bestaetigenText: 'Zurücksetzen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: false,
+      });
+      if (!bestaetigt) {
+        return;
+      }
+      this.charakter.initiative = '';
     },
     lebenspunkteEingabeFokus() {
       this._lpEingabeAktiv = true;
@@ -2048,6 +2103,39 @@ window.HTBAH_SEITEN.Charakter = {
               </div>
             </div>
           </div>
+          <div v-if="spielleiterMitglied" class="col-12">
+            <label class="form-label small text-secondary mb-1">Initiative</label>
+            <div class="input-group">
+              <input
+                class="form-control"
+                type="number"
+                min="1"
+                :max="spielleiterInitiativeMax"
+                v-model="charakter.initiative"
+                placeholder="z. B. 12"
+                inputmode="numeric"
+                autocomplete="off" />
+              <button
+                type="button"
+                class="btn btn-outline-primary"
+                title="1W10 + Begabung Handeln"
+                @click="spielleiterInitiativeWuerfeln">
+                🎲
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-danger htbah-input-icon-btn"
+                title="Initiative leeren"
+                aria-label="Initiative leeren"
+                :disabled="!String(charakter.initiative || '').trim()"
+                @click="spielleiterInitiativeZuruecksetzen">
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            </div>
+            <div class="form-text">
+              Gültig: 1 bis {{ spielleiterInitiativeMax }} (1W10 + Begabung Handeln).
+            </div>
+          </div>
           <div class="col-12 col-md-6">
             <icon-text-button
               class="btn btn-outline-primary btn-lg w-100"
@@ -2286,6 +2374,9 @@ window.HTBAH_SEITEN.Charakter = {
         @change="charakterbildDateiAusgewaehlt" />
       <vor-nachteile-modal ref="vorNachteileModal" :charakter="charakter" />
       <initiative-modal ref="initiativeModal" :charakter="charakter" />
+      <div v-if="spielleiterMitglied" class="d-none" aria-hidden="true">
+        <wuerfelbecher-wurf ref="spielleiterInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
+      </div>
       <schaden-modal ref="schadenModal" :charakter="charakter" />
       <parade-modal ref="paradeModal" />
       <probe-wurf-modal ref="probeWurfModal" />

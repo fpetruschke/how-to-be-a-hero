@@ -31,6 +31,7 @@ window.HTBAH_KOMPONENTEN.BildCropperModal = {
       drehungGrad: 0,
       spiegelX: 1,
       spiegelY: 1,
+      modalZIndexTimeoutId: null,
     };
   },
   methods: {
@@ -81,8 +82,15 @@ window.HTBAH_KOMPONENTEN.BildCropperModal = {
         this.bootstrapModal.show();
       }
       this.$nextTick(() => {
+        if (this.modalZIndexTimeoutId) {
+          window.clearTimeout(this.modalZIndexTimeoutId);
+          this.modalZIndexTimeoutId = null;
+        }
         this.setzeModalEbeneNachOben();
-        window.setTimeout(() => this.setzeModalEbeneNachOben(), 80);
+        this.modalZIndexTimeoutId = window.setTimeout(() => {
+          this.modalZIndexTimeoutId = null;
+          this.setzeModalEbeneNachOben();
+        }, 80);
       });
     },
     schliessen() {
@@ -252,6 +260,10 @@ window.HTBAH_KOMPONENTEN.BildCropperModal = {
     }
   },
   beforeUnmount() {
+    if (this.modalZIndexTimeoutId) {
+      window.clearTimeout(this.modalZIndexTimeoutId);
+      this.modalZIndexTimeoutId = null;
+    }
     const el = this.$refs.modalElement;
     if (el) {
       if (HTBAH_BILD_BOOTSTRAP_MODAL) {

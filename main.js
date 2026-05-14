@@ -16,6 +16,7 @@ const SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER = 'htbah_wuerfel_beutel_fenster';
 const SPEICHER_KEY_ZEICHEN_BRETT = 'htbah_zeichen_brett';
 const SPEICHER_KEY_MENTION_NAV_TARGET = 'htbah_mention_nav_target';
 const SPEICHER_KEY_ORIENTATION_MODE = 'htbah_orientation_mode';
+const SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN = 'htbah_interaktive_welt_stats_anzeigen';
 
 function erstelleLocalStorageBackend() {
   return {
@@ -128,6 +129,68 @@ function erstelleSpeicherGateway() {
       }
       keys.forEach((key) => this.loescheKey(key));
     },
+    loescheKeysMitPraefix(praefix) {
+      if (typeof praefix !== 'string' || !praefix) {
+        return;
+      }
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(praefix)) {
+            this.loescheKey(key);
+          }
+        }
+      } catch {
+        /* ignorieren */
+      }
+    },
+    /**
+     * Summiert localStorage nach UTF-16-Länge von Key und Wert (übliche Näherung für die Nutzung pro Eintrag).
+     * @returns {{ ok: boolean, htbahBytes: number, gesamtBytes: number, htbahSchluesselAnzahl: number, originLocalStorageSchluesselAnzahl: number }}
+     */
+    messeLocalStorageByteStatistik() {
+      const zusaetzlicheAppKeys = new Set(['verstanden_am', 'entwicklungshinweis_verstanden_am']);
+      let htbahBytes = 0;
+      let gesamtBytes = 0;
+      let htbahSchluesselAnzahl = 0;
+      try {
+        const n = localStorage.length;
+        for (let i = 0; i < n; i += 1) {
+          const key = localStorage.key(i);
+          if (!key) {
+            continue;
+          }
+          let wert = '';
+          try {
+            const raw = localStorage.getItem(key);
+            wert = raw == null ? '' : raw;
+          } catch {
+            wert = '';
+          }
+          const eintragBytes = key.length * 2 + wert.length * 2;
+          gesamtBytes += eintragBytes;
+          if (key.startsWith('htbah_') || zusaetzlicheAppKeys.has(key)) {
+            htbahBytes += eintragBytes;
+            htbahSchluesselAnzahl += 1;
+          }
+        }
+        return {
+          ok: true,
+          htbahBytes,
+          gesamtBytes,
+          htbahSchluesselAnzahl,
+          originLocalStorageSchluesselAnzahl: n,
+        };
+      } catch {
+        return {
+          ok: false,
+          htbahBytes: 0,
+          gesamtBytes: 0,
+          htbahSchluesselAnzahl: 0,
+          originLocalStorageSchluesselAnzahl: 0,
+        };
+      }
+    },
     listBackends() {
       return [...backends.keys()];
     },
@@ -217,8 +280,21 @@ function ladeSpielleiterZustand() {
   };
 }
 
+function htbahDispatchKampagneDatenGeaendert(detail) {
+  try {
+    window.dispatchEvent(new CustomEvent('htbah:kampagne-daten-geaendert', { detail }));
+  } catch {
+    /* ignorieren */
+  }
+}
+
 function speichereSpielleiterZustand(zustand) {
   htbahSpeicher.schreibeJson(SPEICHER_KEY_SPIELLEITER, zustand);
+  const kid =
+    zustand && typeof zustand.aktiveKampagneId === 'string' && zustand.aktiveKampagneId.trim()
+      ? zustand.aktiveKampagneId.trim()
+      : null;
+  htbahDispatchKampagneDatenGeaendert({ art: 'spielleiter', kampagneId: kid });
 }
 
 function kampagnenSlugAusName(name) {
@@ -522,19 +598,61 @@ function normalisiereZufallstabellenBestieZeile(z) {
   };
 }
 
-function ladeZufallstabellenZustand() {
-  const roh = htbahSpeicher.leseJson(SPEICHER_KEY_ZUFALLSTABELLEN, null);
+function zufallstabellenSpeicherKeyFuerKampagne(kampagneId) {
+  if (typeof kampagneId !== 'string' || !kampagneId.trim()) {
+    return '';
+  }
+  return `${SPEICHER_KEY_ZUFALLSTABELLEN}__${kampagneId.trim()}`;
+}
+
+function weltenbauSpeicherKeyFuerKampagne(kampagneId) {
+  if (typeof kampagneId !== 'string' || !kampagneId.trim()) {
+    return '';
+  }
+  return `${SPEICHER_KEY_WELTENBAU}__${kampagneId.trim()}`;
+}
+
+function ermittleKampagneIdFuerKampagnenSpeicher(kampagneId) {
+  if (typeof kampagneId === 'string' && kampagneId.trim()) {
+    return kampagneId.trim();
+  }
+  const z = ladeSpielleiterZustand();
+  return typeof z.aktiveKampagneId === 'string' && z.aktiveKampagneId.trim()
+    ? z.aktiveKampagneId.trim()
+    : '';
+}
+
+function leerenZufallstabellenZustand() {
+  return {
+    version: 1,
+    npcs: [],
+    orte: [],
+    gegenstaende: [],
+    fraktionen: [],
+    pantheon: [],
+    raetsel: [],
+    bestien: [],
+  };
+}
+
+function loescheZufallstabellenUndWeltenbauFuerKampagne(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return;
+  }
+  htbahSpeicher.loescheKey(zufallstabellenSpeicherKeyFuerKampagne(kid));
+  htbahSpeicher.loescheKey(weltenbauSpeicherKeyFuerKampagne(kid));
+}
+
+function ladeZufallstabellenZustand(kampagneId) {
+  const kid = ermittleKampagneIdFuerKampagnenSpeicher(kampagneId);
+  if (!kid) {
+    return leerenZufallstabellenZustand();
+  }
+  const speicherKey = zufallstabellenSpeicherKeyFuerKampagne(kid);
+  const roh = htbahSpeicher.leseJson(speicherKey, null);
   if (!roh || typeof roh !== 'object') {
-    return {
-      version: 1,
-      npcs: [],
-      orte: [],
-      gegenstaende: [],
-      fraktionen: [],
-      pantheon: [],
-      raetsel: [],
-      bestien: [],
-    };
+    return leerenZufallstabellenZustand();
   }
   return {
     version: 1,
@@ -562,12 +680,18 @@ function ladeZufallstabellenZustand() {
   };
 }
 
-function speichereZufallstabellenZustand(zustand) {
-  htbahSpeicher.schreibeJson(SPEICHER_KEY_ZUFALLSTABELLEN, zustand);
+function speichereZufallstabellenZustand(zustand, kampagneId) {
+  const kid = ermittleKampagneIdFuerKampagnenSpeicher(kampagneId);
+  if (!kid) {
+    return;
+  }
+  const speicherKey = zufallstabellenSpeicherKeyFuerKampagne(kid);
+  htbahSpeicher.schreibeJson(speicherKey, zustand);
+  htbahDispatchKampagneDatenGeaendert({ art: 'zufallstabellen', kampagneId: kid });
 }
 
-function erstellePantheonExportPaket() {
-  const z = ladeZufallstabellenZustand();
+function erstellePantheonExportPaket(kampagneId) {
+  const z = ladeZufallstabellenZustand(kampagneId);
   return {
     htbahExportVersion: 1,
     typ: 'zufallstabellen-pantheon',
@@ -953,8 +1077,26 @@ function normalisiereWeltenbauMapFreiePfeile(roh) {
   return map;
 }
 
-function ladeWeltenbauZustand() {
-  const roh = htbahSpeicher.leseJson(SPEICHER_KEY_WELTENBAU, null);
+function ladeWeltenbauZustand(kampagneId) {
+  const kid = ermittleKampagneIdFuerKampagnenSpeicher(kampagneId);
+  if (!kid) {
+    return {
+      version: 4,
+      eintraege: [],
+      generatorUrls: {},
+      generatorAufrufe: {},
+      mapLayouts: {},
+      mapBildLayouts: {},
+      mapFreieBilder: {},
+      mapFreieNotizen: {},
+      mapFreiePfeile: {},
+      mapHintergruende: {},
+      mapEinstellungen: {},
+      mapElementLocks: {},
+    };
+  }
+  const speicherKey = weltenbauSpeicherKeyFuerKampagne(kid);
+  const roh = htbahSpeicher.leseJson(speicherKey, null);
   if (!roh || typeof roh !== 'object') {
     return {
       version: 4,
@@ -1000,8 +1142,230 @@ function ladeWeltenbauZustand() {
   };
 }
 
-function speichereWeltenbauZustand(zustand) {
-  htbahSpeicher.schreibeJson(SPEICHER_KEY_WELTENBAU, zustand);
+function speichereWeltenbauZustand(zustand, kampagneId) {
+  const kid = ermittleKampagneIdFuerKampagnenSpeicher(kampagneId);
+  if (!kid) {
+    return;
+  }
+  const speicherKey = weltenbauSpeicherKeyFuerKampagne(kid);
+  htbahSpeicher.schreibeJson(speicherKey, zustand);
+}
+
+const ZST_DUPLIZIER_TYP_ZU_LISTE = Object.freeze({
+  npc: 'npcs',
+  ort: 'orte',
+  fraktion: 'fraktionen',
+  pantheon: 'pantheon',
+  raetsel: 'raetsel',
+  bestie: 'bestien',
+  gegenstand: 'gegenstaende',
+});
+
+const ZST_DUPLIZIER_TYP_REIHENFOLGE = Object.freeze([
+  'ort',
+  'fraktion',
+  'npc',
+  'bestie',
+  'gegenstand',
+  'raetsel',
+  'pantheon',
+]);
+
+function normalisiereKampagnenNameVergleich(name) {
+  return String(name || '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('de');
+}
+
+function erstelleSpielleiterKampagne(opts) {
+  const roh = opts && typeof opts === 'object' ? opts : {};
+  const sl = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen.slice() : [];
+  const basis =
+    typeof roh.name === 'string' && roh.name.trim()
+      ? roh.name.trim()
+      : `Kampagne ${kampagnen.length + 1}`;
+  const vergleich = normalisiereKampagnenNameVergleich(basis);
+  if (kampagnen.some((k) => k && normalisiereKampagnenNameVergleich(k.name) === vergleich)) {
+    return { ok: false, fehler: 'name_exists' };
+  }
+  const id = neueEntropieId();
+  kampagnen.push(normalisiereSpielleiterKampagne({ id, name: basis, mitglieder: [] }));
+  speichereSpielleiterZustand({ ...sl, kampagnen });
+  return { ok: true, id };
+}
+
+function zstDuplizierLeeresIdMaps() {
+  return {
+    ort: {},
+    fraktion: {},
+    npc: {},
+    bestie: {},
+    gegenstand: {},
+    raetsel: {},
+    pantheon: {},
+  };
+}
+
+function zstDuplizierWendeKopieSuffix(zeile, typ) {
+  if (!zeile || typeof zeile !== 'object') {
+    return;
+  }
+  const suffix = ' (Kopie)';
+  if (typ === 'raetsel') {
+    const t = String(zeile.titel != null ? zeile.titel : '').trim();
+    zeile.titel = t ? `${t}${suffix}` : `Rätsel${suffix}`;
+    return;
+  }
+  const n = String(zeile.name != null ? zeile.name : '').trim();
+  zeile.name = n ? `${n}${suffix}` : suffix.trim();
+}
+
+function zstDuplizierMapLayoutKey(layoutKey, idMaps) {
+  const k = String(layoutKey || '').trim();
+  if (!k || !idMaps) {
+    return null;
+  }
+  const einfach = (prefix) => {
+    const p = `${prefix}:`;
+    if (!k.startsWith(p)) {
+      return null;
+    }
+    const alt = k.slice(p.length);
+    const neu = idMaps[prefix] && idMaps[prefix][alt];
+    return neu ? `${prefix}:${neu}` : null;
+  };
+  let neuKey = einfach('ort');
+  if (neuKey) {
+    return neuKey;
+  }
+  neuKey = einfach('npc');
+  if (neuKey) {
+    return neuKey;
+  }
+  neuKey = einfach('bestie');
+  if (neuKey) {
+    return neuKey;
+  }
+  neuKey = einfach('gegenstand');
+  if (neuKey) {
+    return neuKey;
+  }
+  neuKey = einfach('raetsel');
+  if (neuKey) {
+    return neuKey;
+  }
+  neuKey = einfach('pantheon');
+  if (neuKey) {
+    return neuKey;
+  }
+  let m = /^fraktion:([^:]+):ohne-ort$/.exec(k);
+  if (m && idMaps.fraktion[m[1]]) {
+    return `fraktion:${idMaps.fraktion[m[1]]}:ohne-ort`;
+  }
+  m = /^fraktion:([^:]+):ort:(.+)$/.exec(k);
+  if (m && idMaps.fraktion[m[1]]) {
+    const newF = idMaps.fraktion[m[1]];
+    const newO = idMaps.ort[m[2]];
+    if (newO) {
+      return `fraktion:${newF}:ort:${newO}`;
+    }
+    return `fraktion:${newF}:ohne-ort`;
+  }
+  return null;
+}
+
+function zstDuplizierMergeWeltenbauKarteile(wbQuelle, wbZiel, feld, idMaps) {
+  const quelleRoot = wbQuelle && wbQuelle[feld] && typeof wbQuelle[feld] === 'object' ? wbQuelle[feld] : {};
+  const zielRoot = wbZiel && wbZiel[feld] && typeof wbZiel[feld] === 'object' ? { ...wbZiel[feld] } : {};
+  Object.keys(quelleRoot).forEach((gruppeKey) => {
+    const layerQ = quelleRoot[gruppeKey] && typeof quelleRoot[gruppeKey] === 'object' ? quelleRoot[gruppeKey] : {};
+    const layerZ = zielRoot[gruppeKey] && typeof zielRoot[gruppeKey] === 'object' ? { ...zielRoot[gruppeKey] } : {};
+    Object.entries(layerQ).forEach(([layoutKey, val]) => {
+      const nk = zstDuplizierMapLayoutKey(layoutKey, idMaps);
+      if (!nk) {
+        return;
+      }
+      layerZ[nk] = val && typeof val === 'object' ? JSON.parse(JSON.stringify(val)) : val;
+    });
+    zielRoot[gruppeKey] = layerZ;
+  });
+  return zielRoot;
+}
+
+function dupliziereZufallstabellenEntitaeten(opts) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const quelle = ermittleKampagneIdFuerKampagnenSpeicher(o.quelleKampagneId);
+  const ziel = ermittleKampagneIdFuerKampagnenSpeicher(o.zielKampagneId);
+  if (!quelle || !ziel) {
+    return { ok: false, fehler: 'Keine gültige Kampagne.', angelegt: 0, ergebnisse: [] };
+  }
+  const eintraegeRoh = Array.isArray(o.eintraege) ? o.eintraege : [];
+  const schon = new Set();
+  const eintraege = [];
+  eintraegeRoh.forEach((e) => {
+    const typ = String(e && e.typ ? e.typ : '').trim();
+    const id = String(e && e.id ? e.id : '').trim();
+    if (!typ || !id || !ZST_DUPLIZIER_TYP_ZU_LISTE[typ]) {
+      return;
+    }
+    const sk = `${typ}:${id}`;
+    if (schon.has(sk)) {
+      return;
+    }
+    schon.add(sk);
+    eintraege.push({ typ, id });
+  });
+  if (!eintraege.length) {
+    return { ok: false, fehler: 'Keine Einträge ausgewählt.', angelegt: 0, ergebnisse: [] };
+  }
+  const reihenIndex = (typ) => {
+    const i = ZST_DUPLIZIER_TYP_REIHENFOLGE.indexOf(typ);
+    return i >= 0 ? i : 99;
+  };
+  eintraege.sort((a, b) => reihenIndex(a.typ) - reihenIndex(b.typ) || a.typ.localeCompare(b.typ));
+
+  const quelleZ = JSON.parse(JSON.stringify(ladeZufallstabellenZustand(quelle)));
+  const zielZ = JSON.parse(JSON.stringify(ladeZufallstabellenZustand(ziel)));
+  const gleicheKampagne = quelle === ziel;
+  const idMaps = zstDuplizierLeeresIdMaps();
+  const ergebnisse = [];
+  eintraege.forEach(({ typ, id }) => {
+    const listeKey = ZST_DUPLIZIER_TYP_ZU_LISTE[typ];
+    const quelleListe = Array.isArray(quelleZ[listeKey]) ? quelleZ[listeKey] : [];
+    const zeileRoh = quelleListe.find((z) => z && z.id === id);
+    if (!zeileRoh) {
+      return;
+    }
+    const zeile = JSON.parse(JSON.stringify(zeileRoh));
+    const altId = id;
+    const neuId = neueEntropieId();
+    zeile.id = neuId;
+    if (gleicheKampagne) {
+      zstDuplizierWendeKopieSuffix(zeile, typ);
+    }
+    idMaps[typ][altId] = neuId;
+    if (!Array.isArray(zielZ[listeKey])) {
+      zielZ[listeKey] = [];
+    }
+    zielZ[listeKey].push(zeile);
+    ergebnisse.push({ typ, altId, neuId });
+  });
+  if (!ergebnisse.length) {
+    return { ok: false, fehler: 'Keine der Entitäten wurde gefunden.', angelegt: 0, ergebnisse: [] };
+  }
+  speichereZufallstabellenZustand(zielZ, ziel);
+
+  const wbQuelle = ladeWeltenbauZustand(quelle);
+  const wbZiel = JSON.parse(JSON.stringify(ladeWeltenbauZustand(ziel)));
+  wbZiel.mapLayouts = zstDuplizierMergeWeltenbauKarteile(wbQuelle, wbZiel, 'mapLayouts', idMaps);
+  wbZiel.mapBildLayouts = zstDuplizierMergeWeltenbauKarteile(wbQuelle, wbZiel, 'mapBildLayouts', idMaps);
+  wbZiel.mapElementLocks = zstDuplizierMergeWeltenbauKarteile(wbQuelle, wbZiel, 'mapElementLocks', idMaps);
+  speichereWeltenbauZustand(wbZiel, ziel);
+
+  return { ok: true, angelegt: ergebnisse.length, ergebnisse };
 }
 
 
@@ -1594,6 +1958,22 @@ function setzeTheme(theme) {
   return gueltigesTheme;
 }
 
+function ladeInteraktiveWeltStatsAnzeigen() {
+  const raw = String(htbahSpeicher.leseText(SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN, '') || '').trim();
+  return raw === '1' || raw === 'true';
+}
+
+function speichereInteraktiveWeltStatsAnzeigen(aktiv) {
+  const an = !!aktiv;
+  htbahSpeicher.schreibeText(SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN, an ? '1' : '0');
+  try {
+    window.dispatchEvent(new CustomEvent('htbah:interaktive-welt-stats-anzeigen-geaendert'));
+  } catch {
+    /* ignorieren */
+  }
+  return an;
+}
+
 const ORIENT_GUELTIGE_UNTER_MODI = new Set([
   'landscape-primary',
   'landscape-secondary',
@@ -1925,11 +2305,16 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   spielleiter: SPEICHER_KEY_SPIELLEITER,
   zufallstabellen: SPEICHER_KEY_ZUFALLSTABELLEN,
   weltenbau: SPEICHER_KEY_WELTENBAU,
+  /** Präfix aller pro-Kampagne-Keys (Zufallstabellen), inkl. „__“. */
+  zufallstabellenProKampagnePraefix: `${SPEICHER_KEY_ZUFALLSTABELLEN}__`,
+  /** Präfix aller pro-Kampagne-Keys (Weltenbau / interaktive Welt), inkl. „__“. */
+  weltenbauProKampagnePraefix: `${SPEICHER_KEY_WELTENBAU}__`,
   wuerfelAudio: SPEICHER_KEY_WUERFEL_AUDIO,
   diceColors: SPEICHER_KEY_DICE_COLORS,
   wuerfelBeutelFenster: SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER,
   zeichenBrett: SPEICHER_KEY_ZEICHEN_BRETT,
   mentionNavigationTarget: SPEICHER_KEY_MENTION_NAV_TARGET,
+  interaktiveWeltStatsAnzeigen: SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN,
 });
 
 window.HTBAH = {
@@ -1981,6 +2366,9 @@ window.HTBAH = {
   loescheKampagnenAbenteuerbuch,
   ladeWeltenbauZustand,
   speichereWeltenbauZustand,
+  erstelleSpielleiterKampagne,
+  dupliziereZufallstabellenEntitaeten,
+  loescheZufallstabellenUndWeltenbauFuerKampagne,
   ladeKampagnenAtmosphaereZustand,
   speichereKampagnenAtmosphaereZustand,
   ladeKampagnenAtmosphaereBadgePosition,
@@ -1995,6 +2383,8 @@ window.HTBAH = {
   ladeOrientierungModus,
   speichereOrientierungModus,
   bestimmeOrientierungsGruppe,
+  ladeInteraktiveWeltStatsAnzeigen,
+  speichereInteraktiveWeltStatsAnzeigen,
   speicher: htbahSpeicher,
   speicherKeys: HTBAH_SPEICHER_KEYS,
 };

@@ -161,6 +161,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         return;
       }
       const gid = g.id;
+      window.HTBAH.loescheZufallstabellenUndWeltenbauFuerKampagne(gid);
       this.zustand.kampagnen = this.zustand.kampagnen.filter((x) => x.id !== gid);
       delete this.zustand.mitgliedWahlProKampagne[gid];
       if (this.zustand.aktiveKampagneId === gid) {
@@ -350,8 +351,8 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         } catch {
           zufPaket = null;
         }
-        if (zufPaket && typeof zufPaket === 'object') {
-          const aktuell = window.HTBAH.ladeZufallstabellenZustand();
+        if (zufPaket && typeof zufPaket === 'object' && ergebnis.kampagneId) {
+          const aktuell = window.HTBAH.ladeZufallstabellenZustand(ergebnis.kampagneId);
           const kategorien = [
             'npcs',
             'orte',
@@ -384,7 +385,27 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
               ergebnis.zufallNeu += 1;
             });
           });
-          window.HTBAH.speichereZufallstabellenZustand(aktuell);
+          window.HTBAH.speichereZufallstabellenZustand(aktuell, ergebnis.kampagneId);
+        }
+      }
+
+      if (ergebnis.kampagneStatus === 'neu' && ergebnis.kampagneId) {
+        const welBereich = paket.daten.find((d) => d && d.key === 'htbah_weltenbau');
+        if (welBereich && welBereich.vorhanden && typeof welBereich.wert === 'string') {
+          try {
+            const welPaket = JSON.parse(welBereich.wert);
+            if (
+              welPaket &&
+              typeof welPaket === 'object' &&
+              Number(welPaket.version) === 4 &&
+              welPaket.mapLayouts &&
+              typeof welPaket.mapLayouts === 'object'
+            ) {
+              window.HTBAH.speichereWeltenbauZustand(welPaket, ergebnis.kampagneId);
+            }
+          } catch {
+            /* ignorieren */
+          }
         }
       }
 

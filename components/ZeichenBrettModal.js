@@ -12,14 +12,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   const EXPORT_PADDING = 24;
   const MAX_HISTORY = 30;
   const PASTE_VERSATZ = 16;
-  const ZEICHEN_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck'];
-  const ALLE_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck', 'auswahl'];
+  /** CSS-Referenz: 1in = 96px, 1in = 2,54cm — entspricht der Browser-Einheit „cm“ im Layout. */
+  const CSS_PX_PRO_CM = 96 / 2.54;
+  const KARO_KANTE_CM = 0.5;
+  const ZEICHEN_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck', 'radiergummi'];
+  const ALLE_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck', 'radiergummi', 'auswahl'];
 
   const WERKZEUG_META = {
     strich: { label: 'Freihand-Strich', kurz: 'Strich', icon: 'gesture' },
     rechteck: { label: 'Rechteck', kurz: 'Rechteck', icon: 'crop_square' },
     kreis: { label: 'Kreis / Ellipse', kurz: 'Kreis', icon: 'radio_button_unchecked' },
     dreieck: { label: 'Dreieck', kurz: 'Dreieck', icon: 'change_history' },
+    radiergummi: { label: 'Radiergummi', kurz: 'Radierer', icon: 'ink_eraser' },
     auswahl: { label: 'Auswahl-Werkzeug', kurz: 'Auswahl', icon: 'highlight_alt' },
   };
 
@@ -287,6 +291,106 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     return false;
   }
 
+  const RADIER_EPS = 1e-4;
+
+  function distanzPunktZuPunkt(ax, ay, bx, by) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  /** Teilsegmente der Strecke AB, die außerhalb der Kreisscheibe (cx,cy,R) liegen (R > 0). */
+  function segmenteAusserhalbKreis(x1, y1, x2, y2, cx, cy, R) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const fx = x1 - cx;
+    const fy = y1 - cy;
+    const a = dx * dx + dy * dy;
+    if (a < RADIER_EPS) {
+      if (distanzPunktZuPunkt(x1, y1, cx, cy) >= R - RADIER_EPS) {
+        return [[x1, y1, x2, y2]];
+      }
+      return [];
+    }
+    const b = 2 * (fx * dx + fy * dy);
+    const c = fx * fx + fy * fy - R * R;
+    const grenzen = [0, 1];
+    const disc = b * b - 4 * a * c;
+    if (disc >= 0) {
+      const w = Math.sqrt(disc);
+      const t1 = (-b - w) / (2 * a);
+      const t2 = (-b + w) / (2 * a);
+      if (t1 > RADIER_EPS && t1 < 1 - RADIER_EPS) grenzen.push(t1);
+      if (t2 > RADIER_EPS && t2 < 1 - RADIER_EPS) grenzen.push(t2);
+    }
+    grenzen.sort((u, v) => u - v);
+    const einzig = [];
+    for (const t of grenzen) {
+      if (!einzig.length || Math.abs(t - einzig[einzig.length - 1]) > RADIER_EPS) einzig.push(t);
+    }
+    const aus = [];
+    for (let i = 0; i + 1 < einzig.length; i += 1) {
+      const ta = einzig[i];
+      const tb = einzig[i + 1];
+      if (tb - ta < RADIER_EPS) continue;
+      const tm = (ta + tb) / 2;
+      const mx = x1 + tm * dx;
+      const my = y1 + tm * dy;
+      if (distanzPunktZuPunkt(mx, my, cx, cy) >= R - RADIER_EPS) {
+        const sx = x1 + ta * dx;
+        const sy = y1 + ta * dy;
+        const ex = x1 + tb * dx;
+        const ey = y1 + tb * dy;
+        aus.push([sx, sy, ex, ey]);
+      }
+    }
+    return aus;
+  }
+
+  /** Zerlegt einen Strich in 0..n Teilstücke, die nach Entfernen der Scheibe (cx,cy,R) übrig bleiben. */
+  function strichNachRadierscheibe(el, cx, cy, R, neueIdFn) {
+    if (!el || el.t !== 's' || el.p.length < 2) return [];
+    const rEffekt = Math.max(RADIER_EPS, R);
+    const ketten = [];
+    let aktuell = null;
+    const epsVerbind = Math.max(0.35, rEffekt * 0.02);
+
+    function verbinden(sx, sy, ex, ey) {
+      if (!aktuell) {
+        aktuell = [sx, sy, ex, ey];
+        return;
+      }
+      const lx = aktuell[aktuell.length - 2];
+      const ly = aktuell[aktuell.length - 1];
+      if (distanzPunktZuPunkt(lx, ly, sx, sy) <= epsVerbind) {
+        aktuell.push(ex, ey);
+      } else {
+        if (aktuell.length >= 4) ketten.push(aktuell);
+        aktuell = [sx, sy, ex, ey];
+      }
+    }
+
+    for (let i = 0; i + 3 < el.p.length; i += 2) {
+      const x1 = el.p[i];
+      const y1 = el.p[i + 1];
+      const x2 = el.p[i + 2];
+      const y2 = el.p[i + 3];
+      const teile = segmenteAusserhalbKreis(x1, y1, x2, y2, cx, cy, rEffekt);
+      for (const t of teile) {
+        verbinden(t[0], t[1], t[2], t[3]);
+      }
+    }
+    if (aktuell && aktuell.length >= 4) ketten.push(aktuell);
+
+    return ketten.map((p) => ({
+      i: neueIdFn(),
+      t: 's',
+      c: el.c,
+      d: el.d,
+      p,
+    }));
+  }
+
   function boxenSchneidenSich(a, b) {
     if (!a || !b) return false;
     return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
@@ -334,6 +438,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           '#8b5cf6',
           '#ec4899',
         ]),
+        /** Karoraster in Weltkoordinaten: bei 100 % Zoom entspricht eine Kante 0,5 cm auf dem Bildschirm; läuft mit Pan und Zoom mit. */
+        karopapierGitter: false,
         WERKZEUG_META,
         ZEICHEN_WERKZEUGE,
       };
@@ -371,6 +477,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       istAuswahlModus() {
         return this.werkzeug === 'auswahl';
       },
+      istRadierModus() {
+        return this.werkzeug === 'radiergummi';
+      },
       kannUndo() {
         return this.undoStack.length > 0;
       },
@@ -388,6 +497,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       zoomProzent() {
         return Math.round(this.ansicht.scale * 100);
+      },
+      karopapierGitterIcon() {
+        return this.karopapierGitter ? 'grid_on' : 'grid_off';
+      },
+      karopapierGitterLabel() {
+        return this.karopapierGitter ? 'Karopapier ausblenden' : 'Karopapier einblenden';
       },
       auswahlSet() {
         return new Set(this.auswahl);
@@ -426,6 +541,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.auswahl = [];
           this.zeichneAlles();
         }
+      },
+      karopapierGitter() {
+        if (this.zustandGeladen) this.persistDebounce();
+        this.zeichneAlles();
       },
       istVollbild() {
         if (this.zustandGeladen) this.persistDebounce();
@@ -541,6 +660,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             if (ALLE_WERKZEUGE.includes(z.einstellungen.werkzeug)) {
               this.werkzeug = z.einstellungen.werkzeug;
             }
+            if (typeof z.einstellungen.karopapierGitter === 'boolean') {
+              this.karopapierGitter = z.einstellungen.karopapierGitter;
+            }
           }
           if (z.ansicht && typeof z.ansicht === 'object') {
             const sc = Number(z.ansicht.scale);
@@ -598,6 +720,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             farbe: this.farbe,
             dicke: this.dicke,
             werkzeug: this.werkzeug,
+            karopapierGitter: !!this.karopapierGitter,
           },
           ansicht: { ...this.ansicht },
           elemente: rundeElementeFuerSpeicher(this.elemente),
@@ -818,6 +941,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return;
         }
 
+        if (this.werkzeug === 'radiergummi') {
+          this.verlaufSchnappschuss();
+          this._dragModus = 'radier';
+          this.radiereAmPunkt(welt.x, welt.y);
+          this.zeichneAlles();
+          return;
+        }
+
         this.verlaufSchnappschuss();
         const neu = this.erzeugeElementFuerWerkzeug(welt);
         if (!neu) return;
@@ -848,6 +979,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         const welt = this.canvasZuWelt(pos.x, pos.y);
         this._dragLetzteWelt = welt;
+        if (this._dragModus === 'radier') {
+          this.radiereStrecke(this._dragStartWelt, welt);
+          this._dragStartWelt = welt;
+          this.zeichneAlles();
+          return;
+        }
         if (this._dragModus === 'zeichnen') {
           this.aktualisiereZeichnung(welt);
           return;
@@ -882,6 +1019,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (this._dragModus === 'zeichnen') {
           this.finalisiereZeichnung();
           this._dragElement = null;
+          this._dragModus = null;
+          this.persistDebounce();
+          return;
+        }
+        if (this._dragModus === 'radier') {
           this._dragModus = null;
           this.persistDebounce();
           return;
@@ -921,6 +1063,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             if (idx >= 0) this.elemente.splice(idx, 1);
             this.undoStack.pop();
           }
+        } else if (this._dragModus === 'radier') {
+          if (this.undoStack.length) {
+            this.elemente = this.undoStack.pop();
+            this.zeichneAlles();
+          }
         } else if (this._dragModus === 'verschieben') {
           if (this._moveOriginal && this.undoStack.length) {
             this.elemente = this.undoStack.pop();
@@ -946,6 +1093,33 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return { ...basis, t: 'tri', x: welt.x, y: welt.y, w: 0, h: 0 };
         }
         return null;
+      },
+      radiereAmPunkt(wx, wy) {
+        const halbRadier = this.dicke / 2;
+        const neu = [];
+        for (const el of this.elemente) {
+          if (el.t === 's') {
+            const rEffekt = halbRadier + el.d / 2;
+            const teile = strichNachRadierscheibe(el, wx, wy, rEffekt, neueId);
+            for (const t of teile) {
+              if (t.p && t.p.length >= 2) neu.push(t);
+            }
+          } else if (!hitTest(el, wx, wy, halbRadier)) {
+            neu.push(el);
+          }
+        }
+        this.elemente = neu;
+      },
+      radiereStrecke(von, nach) {
+        const dx = nach.x - von.x;
+        const dy = nach.y - von.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const schritt = Math.max(0.5, this.dicke * 0.4);
+        const n = Math.max(1, Math.ceil(dist / schritt));
+        for (let i = 0; i <= n; i += 1) {
+          const t = i / n;
+          this.radiereAmPunkt(von.x + t * dx, von.y + t * dy);
+        }
       },
       aktualisiereZeichnung(welt) {
         const el = this._dragElement;
@@ -1167,6 +1341,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.ansicht.offsetX * dpr,
           this.ansicht.offsetY * dpr,
         );
+        if (this.karopapierGitter) {
+          this.zeichneKaropapierRasterWelt(ctx);
+        }
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         for (const el of this.elemente) {
@@ -1174,6 +1351,52 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         this.zeichneAuswahlOverlay(ctx);
         this.zeichneLasso(ctx);
+      },
+      zeichneKaropapierRasterWelt(ctx) {
+        const s = this.ansicht.scale || 1;
+        const ox = this.ansicht.offsetX;
+        const oy = this.ansicht.offsetY;
+        const bw = this.canvasBreite;
+        const bh = this.canvasHoehe;
+        if (!Number.isFinite(s) || s <= 0 || bw <= 0 || bh <= 0) return;
+        const schritt = KARO_KANTE_CM * CSS_PX_PRO_CM;
+        if (!Number.isFinite(schritt) || schritt <= 0) return;
+
+        let minX = -ox / s;
+        let minY = -oy / s;
+        let maxX = (bw - ox) / s;
+        let maxY = (bh - oy) / s;
+        minX -= schritt;
+        minY -= schritt;
+        maxX += schritt;
+        maxY += schritt;
+
+        const iMin = Math.floor(minX / schritt) - 1;
+        const iMax = Math.ceil(maxX / schritt) + 1;
+        const jMin = Math.floor(minY / schritt) - 1;
+        const jMax = Math.ceil(maxY / schritt) + 1;
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
+        ctx.lineWidth = 1 / s;
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'miter';
+        ctx.beginPath();
+        for (let i = iMin; i <= iMax; i += 1) {
+          const x = i * schritt;
+          ctx.moveTo(x, minY);
+          ctx.lineTo(x, maxY);
+        }
+        for (let j = jMin; j <= jMax; j += 1) {
+          const y = j * schritt;
+          ctx.moveTo(minX, y);
+          ctx.lineTo(maxX, y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      },
+      karopapierGitterUmschalten() {
+        this.karopapierGitter = !this.karopapierGitter;
       },
       zeichneElement(ctx, el) {
         ctx.beginPath();
@@ -1502,6 +1725,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               <button type="button" class="btn btn-sm btn-outline-secondary" @click="ansichtZuruecksetzen" title="Ansicht zurücksetzen / einpassen" aria-label="Ansicht zurücksetzen">
                 <span class="material-symbols-outlined">center_focus_strong</span>
               </button>
+              <button
+                type="button"
+                class="btn btn-sm"
+                :class="karopapierGitter ? 'btn-secondary' : 'btn-outline-secondary'"
+                :title="karopapierGitterLabel"
+                :aria-label="karopapierGitterLabel"
+                :aria-pressed="karopapierGitter ? 'true' : 'false'"
+                @click="karopapierGitterUmschalten">
+                <span class="material-symbols-outlined">{{ karopapierGitterIcon }}</span>
+              </button>
             </div>
 
             <div class="htbah-zeichen-werkzeuggruppe d-flex align-items-center gap-1">
@@ -1558,11 +1791,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             <canvas
               ref="canvas"
               class="htbah-zeichen-brett-canvas"
-              :class="{ 'htbah-zeichen-brett-canvas--auswahl': istAuswahlModus }"
+              :class="{
+                'htbah-zeichen-brett-canvas--auswahl': istAuswahlModus,
+              }"
               :style="{ touchAction: 'none' }"></canvas>
             <div class="htbah-zeichen-brett-tipp small text-muted">
               <template v-if="istAuswahlModus">
                 Klicken oder Rahmen ziehen zum Auswählen · Shift = Auswahl erweitern · Ziehen verschiebt · Strg+C/X/V · Entf löscht
+              </template>
+              <template v-else-if="istRadierModus">
+                Radiergummi: über Linien ziehen · Größe = Pinseldicke · Strg+Z rückgängig
               </template>
               <template v-else>
                 Strg + Mausrad zum Zoomen · Mit zwei Fingern zoomen &amp; verschieben · Mittlere Maustaste oder Alt+Ziehen zum Verschieben
