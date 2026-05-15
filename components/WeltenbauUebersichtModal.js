@@ -185,11 +185,13 @@ var HTBAH_REFACTOR_UTILS =
         zufallRaetselEpoche: 'mittelalter',
         zeileQuillInstanz: null,
         zeileMentionController: null,
+        zeileQuillSelectionHandler: null,
         zeileQuillHostElement: null,
         zeileQuillSession: 0,
         zeileQuillHostRefFn: null,
         overlayZeileQuillInstanz: null,
         overlayZeileMentionController: null,
+        overlayZeileQuillSelectionHandler: null,
         overlayZeileQuillHostElement: null,
         overlayZeileQuillSession: 0,
         overlayZeileQuillHostRefFn: null,
@@ -2671,16 +2673,11 @@ var HTBAH_REFACTOR_UTILS =
         }
       },
       schliesseCharakterModal() {
-        if (this.charakterMentionController && typeof this.charakterMentionController.destroy === 'function') {
-          this.charakterMentionController.destroy();
-        }
+        this.charakterQuillAufraeumen();
         this.uebernehmeCharakterInventarQuillInModel();
         this.beendeCharakterInventarEditoren();
-        this.charakterMentionController = null;
         this.beendeCharakterZiehen();
         this.beendeCharakterResize();
-        this.charakterQuillInstanz = null;
-        this.charakterQuillHostElement = null;
         this.charakterModal.offen = false;
         this.charakterModal.mitgliedId = '';
         this.charakterModal.charakter = null;
@@ -2827,22 +2824,27 @@ var HTBAH_REFACTOR_UTILS =
         }
         this.$nextTick(() => this.charakterQuillAufHostEinrichten(el));
       },
-      charakterQuillAufHostEinrichten(el, retry) {
+      charakterQuillAufHostEinrichten(el, retry, sessionAtStart) {
         const r = typeof retry === 'number' ? retry : 0;
+        const session =
+          typeof sessionAtStart === 'number' ? sessionAtStart : this.charakterQuillSession;
+        if (session !== this.charakterQuillSession) {
+          return;
+        }
         if (!el || !this.charakterModal.charakter) {
           return;
         }
         if (!window.Quill) {
           if (r < 40) {
-            window.setTimeout(() => this.charakterQuillAufHostEinrichten(el, r + 1), 25);
+            window.setTimeout(() => this.charakterQuillAufHostEinrichten(el, r + 1, session), 25);
           }
           return;
         }
         if (this.charakterQuillInstanz && this.charakterQuillHostElement === el && el.contains(this.charakterQuillInstanz.root)) {
           return;
         }
+        this.charakterQuillAufraeumen();
         el.innerHTML = '';
-        this.charakterQuillInstanz = null;
         this.charakterQuillHostElement = el;
         this.charakterQuillInstanz = new window.Quill(el, {
           theme: 'snow',
@@ -4338,14 +4340,19 @@ var HTBAH_REFACTOR_UTILS =
           this.overlayZeileQuillAufHostEinrichten(el);
         });
       },
-      overlayZeileQuillAufHostEinrichten(el, retry) {
+      overlayZeileQuillAufHostEinrichten(el, retry, sessionAtStart) {
         const r = typeof retry === 'number' ? retry : 0;
+        const session =
+          typeof sessionAtStart === 'number' ? sessionAtStart : this.overlayZeileQuillSession;
+        if (session !== this.overlayZeileQuillSession) {
+          return;
+        }
         if (!el || !this.anlageOverlay || !this.anlageOverlay.offen || !this.anlageOverlay.zeile) {
           return;
         }
         if (!window.Quill) {
           if (r < 40) {
-            window.setTimeout(() => this.overlayZeileQuillAufHostEinrichten(el, r + 1), 25);
+            window.setTimeout(() => this.overlayZeileQuillAufHostEinrichten(el, r + 1, session), 25);
           }
           return;
         }
@@ -4356,8 +4363,8 @@ var HTBAH_REFACTOR_UTILS =
         ) {
           return;
         }
+        this.anlageOverlayZeileQuillAufraeumen();
         el.innerHTML = '';
-        this.overlayZeileQuillInstanz = null;
         this.overlayZeileQuillHostElement = el;
         this.overlayZeileQuillInstanz = new window.Quill(el, {
           theme: 'snow',
@@ -4384,11 +4391,12 @@ var HTBAH_REFACTOR_UTILS =
           });
         }
         this.overlayZeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitungOverlay();
-        this.overlayZeileQuillInstanz.on('selection-change', (range, oldRange) => {
+        this.overlayZeileQuillSelectionHandler = (range, oldRange) => {
           if (this.anlageOverlay.offen && this.anlageOverlay.index >= 0 && oldRange && !range) {
             this.anlageOverlayBeiBlurSpeichern();
           }
-        });
+        };
+        this.overlayZeileQuillInstanz.on('selection-change', this.overlayZeileQuillSelectionHandler);
       },
       zeileQuillHostRef(el) {
         if (!el) {
@@ -4401,22 +4409,26 @@ var HTBAH_REFACTOR_UTILS =
         }
         this.$nextTick(() => this.zeileQuillAufHostEinrichten(el));
       },
-      zeileQuillAufHostEinrichten(el, retry) {
+      zeileQuillAufHostEinrichten(el, retry, sessionAtStart) {
         const r = typeof retry === 'number' ? retry : 0;
+        const session = typeof sessionAtStart === 'number' ? sessionAtStart : this.zeileQuillSession;
+        if (session !== this.zeileQuillSession) {
+          return;
+        }
         if (!el || !this.anlage.zeile) {
           return;
         }
         if (!window.Quill) {
           if (r < 40) {
-            window.setTimeout(() => this.zeileQuillAufHostEinrichten(el, r + 1), 25);
+            window.setTimeout(() => this.zeileQuillAufHostEinrichten(el, r + 1, session), 25);
           }
           return;
         }
         if (this.zeileQuillInstanz && this.zeileQuillHostElement === el && el.contains(this.zeileQuillInstanz.root)) {
           return;
         }
+        this.anlageZeileQuillAufraeumen();
         el.innerHTML = '';
-        this.zeileQuillInstanz = null;
         this.zeileQuillHostElement = el;
         this.zeileQuillInstanz = new window.Quill(el, {
           theme: 'snow',
@@ -4443,11 +4455,12 @@ var HTBAH_REFACTOR_UTILS =
           });
         }
         this.zeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitung();
-        this.zeileQuillInstanz.on('selection-change', (range, oldRange) => {
+        this.zeileQuillSelectionHandler = (range, oldRange) => {
           if (this.anlage.offen && this.anlage.index >= 0 && oldRange && !range) {
             this.anlageBearbeitungBeiBlurSpeichern();
           }
-        });
+        };
+        this.zeileQuillInstanz.on('selection-change', this.zeileQuillSelectionHandler);
       },
       quillHtmlInBearbeitungSchreiben() {
         if (!this.anlage.zeile || !this.zeileQuillInstanz) {
@@ -4714,12 +4727,7 @@ var HTBAH_REFACTOR_UTILS =
         this.anlageBearbeitungBeiBlurSpeichern();
       },
       schliesseAnlageModal() {
-        if (this.zeileMentionController && typeof this.zeileMentionController.destroy === 'function') {
-          this.zeileMentionController.destroy();
-        }
-        this.zeileMentionController = null;
-        this.zeileQuillInstanz = null;
-        this.zeileQuillHostElement = null;
+        this.anlageZeileQuillAufraeumen();
         this.medienUploadLaeuft = false;
         this.medienImportWarteschlange = [];
         this.speicherStatusHinweis = '';
@@ -4730,13 +4738,11 @@ var HTBAH_REFACTOR_UTILS =
       },
       schliesseAnlageOverlayModal() {
         this.withAnlageKontext('overlay', () => this.schliesseAnlageModal());
+        this.anlageOverlayZeileQuillAufraeumen();
         this.anlageOverlay.offen = false;
         this.anlageOverlay.typ = '';
         this.anlageOverlay.zeile = null;
         this.anlageOverlay.index = -1;
-        this.overlayZeileQuillInstanz = null;
-        this.overlayZeileMentionController = null;
-        this.overlayZeileQuillHostElement = null;
       },
       speichereAnlageOverlay() {
         this.withAnlageKontext('overlay', () => this.speichereAnlageIntern({ schliessenNachSpeichern: true }));
@@ -5026,6 +5032,60 @@ var HTBAH_REFACTOR_UTILS =
         });
         this.notizQuillInstanzen = {};
         this.notizQuillEditorRefs = {};
+      },
+      einzelQuillAufraeumen({
+        quill = null,
+        hostElement = null,
+        mentionController = null,
+        selectionHandler = null,
+        toolbarContainer = null,
+      } = {}) {
+        const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+        if (lifecycle && typeof lifecycle.zerstoereQuillInstanz === 'function') {
+          lifecycle.zerstoereQuillInstanz({
+            quill,
+            hostElement,
+            mentionController,
+            handler: selectionHandler ? [{ event: 'selection-change', fn: selectionHandler }] : [],
+            toolbarContainer,
+          });
+        } else if (mentionController && typeof mentionController.destroy === 'function') {
+          mentionController.destroy();
+        }
+      },
+      charakterQuillAufraeumen() {
+        this.einzelQuillAufraeumen({
+          quill: this.charakterQuillInstanz,
+          hostElement: this.charakterQuillHostElement,
+          mentionController: this.charakterMentionController,
+        });
+        this.charakterMentionController = null;
+        this.charakterQuillInstanz = null;
+        this.charakterQuillHostElement = null;
+      },
+      anlageZeileQuillAufraeumen() {
+        this.einzelQuillAufraeumen({
+          quill: this.zeileQuillInstanz,
+          hostElement: this.zeileQuillHostElement,
+          mentionController: this.zeileMentionController,
+          selectionHandler: this.zeileQuillSelectionHandler,
+        });
+        this.zeileMentionController = null;
+        this.zeileQuillInstanz = null;
+        this.zeileQuillHostElement = null;
+        this.zeileQuillSelectionHandler = null;
+      },
+      anlageOverlayZeileQuillAufraeumen() {
+        this.einzelQuillAufraeumen({
+          quill: this.overlayZeileQuillInstanz,
+          hostElement: this.overlayZeileQuillHostElement,
+          mentionController: this.overlayZeileMentionController,
+          selectionHandler: this.overlayZeileQuillSelectionHandler,
+        });
+        this.overlayZeileMentionController = null;
+        this.overlayZeileQuillInstanz = null;
+        this.overlayZeileQuillHostElement = null;
+        this.overlayZeileQuillSelectionHandler = null;
       },
       entferneFreiesElementLayoutUndLock(elementId) {
         if (!elementId) {
@@ -5394,18 +5454,13 @@ var HTBAH_REFACTOR_UTILS =
     beforeUnmount() {
       this.beendeZiehen();
       this.beendeResize();
-      if (this.zeileMentionController && typeof this.zeileMentionController.destroy === 'function') {
-        this.zeileMentionController.destroy();
-      }
-      if (this.overlayZeileMentionController && typeof this.overlayZeileMentionController.destroy === 'function') {
-        this.overlayZeileMentionController.destroy();
-      }
-      if (this.charakterMentionController && typeof this.charakterMentionController.destroy === 'function') {
-        this.charakterMentionController.destroy();
-      }
-      this.zeileMentionController = null;
-      this.overlayZeileMentionController = null;
-      this.charakterMentionController = null;
+      this.zeileQuillSession += 1;
+      this.overlayZeileQuillSession += 1;
+      this.charakterQuillSession += 1;
+      this.charakterQuillAufraeumen();
+      this.anlageZeileQuillAufraeumen();
+      this.anlageOverlayZeileQuillAufraeumen();
+      this.beendeCharakterInventarEditoren();
       if (this.sucheBlurTimer) {
         globalThis.clearTimeout(this.sucheBlurTimer);
         this.sucheBlurTimer = 0;

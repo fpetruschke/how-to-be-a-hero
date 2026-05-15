@@ -3,8 +3,9 @@
  * Scannt `assets/beispiel-kampagnen/` nach `*.json`-Dateien (außer `index.json`
  * selbst) und schreibt aus ihren Metadaten ein frisches `index.json`.
  *
- * Jede Kampagnen-Datei muss das Importformat `lokaler-speicher` verwenden und
- * sollte zusätzlich ein optionales Top-Level-Objekt `beispiel` enthalten:
+ * Jede Kampagnen-Datei muss das Importformat `lokaler-speicher` verwenden (wie der
+ * Daten-Export unter Einstellungen — Legacy-Sammel-Export oder neue `htbah_export_ls:*`-Teile).
+ * Zusätzlich empfohlen: Top-Level-Objekt `beispiel` für Titel und Beschreibung in der Auswahl:
  *
  *   {
  *     "htbahExportVersion": 1,
@@ -48,6 +49,50 @@ function leseJsonDatei(dateiPfad) {
   }
 }
 
+function parseLsKampagneIdAusKey(key) {
+  const pr = 'htbah_export_ls:';
+  if (typeof key !== 'string' || !key.startsWith(pr)) {
+    return '';
+  }
+  const tail = key.slice(pr.length);
+  const idx = tail.indexOf(':');
+  if (idx < 0) {
+    return tail;
+  }
+  const typ = tail.slice(0, idx + 1);
+  const rest = tail.slice(idx + 1);
+  if (
+    typ === 'kampagne_komplett:' ||
+    typ === 'kampagne_komplett_ohne_gruppe:' ||
+    typ === 'spielleiter_teil:' ||
+    typ === 'spielleiter_ohne_gruppe:' ||
+    typ === 'sl_abenteuerbuch:' ||
+    typ === 'sl_atmosphaere:' ||
+    typ === 'ztf_kampagne:' ||
+    typ === 'ztf_pantheon:' ||
+    typ === 'wb_kampagne:'
+  ) {
+    return rest;
+  }
+  if (typ === 'ztf_kategorie:' || typ === 'wb_bereich:' || typ === 'sl_mitglied:') {
+    const li = rest.lastIndexOf(':');
+    return li > 0 ? rest.slice(0, li) : rest;
+  }
+  return '';
+}
+
+function paketHatErkennbareKampagne(paket) {
+  const daten = Array.isArray(paket.daten) ? paket.daten : [];
+  if (
+    daten.some(
+      (d) => d && d.key === 'htbah_spielleiter_kampagnen' && d.vorhanden && typeof d.wert === 'string',
+    )
+  ) {
+    return true;
+  }
+  return daten.some((d) => d && typeof d.key === 'string' && parseLsKampagneIdAusKey(d.key));
+}
+
 function eintragAusKampagne(dateiname, paket) {
   if (!paket || typeof paket !== 'object') {
     return { ok: false, fehler: 'kein Objekt' };
@@ -57,6 +102,13 @@ function eintragAusKampagne(dateiname, paket) {
       ok: false,
       fehler:
         'Erwartet `typ: "lokaler-speicher"` und Array `daten` (Format wie der App-Export).',
+    };
+  }
+  if (!paketHatErkennbareKampagne(paket)) {
+    return {
+      ok: false,
+      fehler:
+        'Keine Spielleiter-Kampagne erkennbar (Legacy `htbah_spielleiter_kampagnen` oder `htbah_export_ls:*` mit Kampagnen-ID).',
     };
   }
   const m = paket.beispiel && typeof paket.beispiel === 'object' ? paket.beispiel : {};

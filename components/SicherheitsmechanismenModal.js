@@ -12,6 +12,8 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
       modalInstanz: null,
       tabuQuill: null,
       schleierQuill: null,
+      tabuTextChangeHandler: null,
+      schleierTextChangeHandler: null,
       tabuMentionController: null,
       schleierMentionController: null,
       lokaleDaten: {
@@ -49,16 +51,7 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
     }
   },
   beforeUnmount() {
-    if (this.tabuMentionController && typeof this.tabuMentionController.destroy === 'function') {
-      this.tabuMentionController.destroy();
-    }
-    if (this.schleierMentionController && typeof this.schleierMentionController.destroy === 'function') {
-      this.schleierMentionController.destroy();
-    }
-    this.tabuMentionController = null;
-    this.schleierMentionController = null;
-    this.tabuQuill = null;
-    this.schleierQuill = null;
+    this.quillAufraeumen();
     this.modalInstanz = null;
   },
   methods: {
@@ -83,8 +76,43 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
       this.$emit('update:offen', false);
     },
     onModalHidden() {
+      this.quillAufraeumen();
       this.modalInstanz = null;
       this.$emit('update:offen', false);
+    },
+    quillAufraeumen() {
+      const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+      if (lifecycle && typeof lifecycle.zerstoereQuillInstanz === 'function') {
+        lifecycle.zerstoereQuillInstanz({
+          quill: this.tabuQuill,
+          hostElement: this.$refs.tabuEditorElement || null,
+          mentionController: this.tabuMentionController,
+          handler: this.tabuTextChangeHandler
+            ? [{ event: 'text-change', fn: this.tabuTextChangeHandler }]
+            : [],
+        });
+        lifecycle.zerstoereQuillInstanz({
+          quill: this.schleierQuill,
+          hostElement: this.$refs.schleierEditorElement || null,
+          mentionController: this.schleierMentionController,
+          handler: this.schleierTextChangeHandler
+            ? [{ event: 'text-change', fn: this.schleierTextChangeHandler }]
+            : [],
+        });
+      } else {
+        if (this.tabuMentionController && typeof this.tabuMentionController.destroy === 'function') {
+          this.tabuMentionController.destroy();
+        }
+        if (this.schleierMentionController && typeof this.schleierMentionController.destroy === 'function') {
+          this.schleierMentionController.destroy();
+        }
+      }
+      this.tabuMentionController = null;
+      this.schleierMentionController = null;
+      this.tabuQuill = null;
+      this.schleierQuill = null;
+      this.tabuTextChangeHandler = null;
+      this.schleierTextChangeHandler = null;
     },
     editorenInitialisieren() {
       if (this.nurLesen || !window.Quill) {
@@ -104,10 +132,13 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
             ],
           },
         });
-        this.tabuQuill.on('text-change', () => {
-          this.lokaleDaten.tabuHtml = this.tabuQuill.root.innerHTML;
-          this.emittiereAenderung();
-        });
+        if (!this.tabuTextChangeHandler) {
+          this.tabuTextChangeHandler = () => {
+            this.lokaleDaten.tabuHtml = this.tabuQuill.root.innerHTML;
+            this.emittiereAenderung();
+          };
+        }
+        this.tabuQuill.on('text-change', this.tabuTextChangeHandler);
         const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
         if (mentionApi && typeof mentionApi.installMentions === 'function') {
           this.tabuMentionController = mentionApi.installMentions(this.tabuQuill, {
@@ -130,10 +161,13 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
             ],
           },
         });
-        this.schleierQuill.on('text-change', () => {
-          this.lokaleDaten.schleierHtml = this.schleierQuill.root.innerHTML;
-          this.emittiereAenderung();
-        });
+        if (!this.schleierTextChangeHandler) {
+          this.schleierTextChangeHandler = () => {
+            this.lokaleDaten.schleierHtml = this.schleierQuill.root.innerHTML;
+            this.emittiereAenderung();
+          };
+        }
+        this.schleierQuill.on('text-change', this.schleierTextChangeHandler);
         const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
         if (mentionApi && typeof mentionApi.installMentions === 'function') {
           this.schleierMentionController = mentionApi.installMentions(this.schleierQuill, {

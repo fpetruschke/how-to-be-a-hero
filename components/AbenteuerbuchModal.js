@@ -7,6 +7,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
       quill: null,
       mentionController: null,
+      quillTextChangeHandler: null,
       speichernTimer: null,
       fokusVorModal: null,
       aktiveKampagneIdLokal: '',
@@ -50,11 +51,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       this.beendeResize();
       this.istVollbild = false;
       this.speichernFlushen();
-      if (this.mentionController && typeof this.mentionController.destroy === 'function') {
-        this.mentionController.destroy();
-      }
-      this.mentionController = null;
-      this.quill = null;
+      this.quillAufraeumen();
       this.stelleFokusWiederHer();
     },
   },
@@ -64,10 +61,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
   },
   beforeUnmount() {
     this.beiSeiteVerlassen();
-    if (this.mentionController && typeof this.mentionController.destroy === 'function') {
-      this.mentionController.destroy();
-    }
-    this.mentionController = null;
+    this.quillAufraeumen();
     this.beendeZiehen();
     this.beendeResize();
     if (this.speichernTimer) {
@@ -110,6 +104,24 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       }
       this.speichernFlushen();
     },
+    quillAufraeumen() {
+      const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+      if (lifecycle && typeof lifecycle.zerstoereQuillInstanz === 'function') {
+        lifecycle.zerstoereQuillInstanz({
+          quill: this.quill,
+          hostElement: this.$refs.editorHost || null,
+          mentionController: this.mentionController,
+          handler: this.quillTextChangeHandler
+            ? [{ event: 'text-change', fn: this.quillTextChangeHandler }]
+            : [],
+        });
+      } else if (this.mentionController && typeof this.mentionController.destroy === 'function') {
+        this.mentionController.destroy();
+      }
+      this.mentionController = null;
+      this.quill = null;
+      this.quillTextChangeHandler = null;
+    },
     aktualisiereAktiveKampagne() {
       const zustand = window.HTBAH.ladeSpielleiterZustand();
       const id = typeof zustand.aktiveKampagneId === 'string' ? zustand.aktiveKampagneId : '';
@@ -144,9 +156,12 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
             ],
           },
         });
-        this.quill.on('text-change', () => {
-          this.speichernDebounced();
-        });
+        if (!this.quillTextChangeHandler) {
+          this.quillTextChangeHandler = () => {
+            this.speichernDebounced();
+          };
+        }
+        this.quill.on('text-change', this.quillTextChangeHandler);
         const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
         if (mentionApi && typeof mentionApi.installMentions === 'function') {
           this.mentionController = mentionApi.installMentions(this.quill, {

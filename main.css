@@ -426,6 +426,14 @@ input::placeholder {
   line-height: 1;
 }
 
+.btn.btn-labeled > .btn-label .htbah-btn-labeled-avatar {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.35rem;
+  object-fit: cover;
+  display: block;
+}
+
 .btn.btn-labeled.w-100 {
   width: 100%;
   justify-content: flex-start;

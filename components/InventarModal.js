@@ -171,16 +171,24 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
       return this.charakter.inventar.find((e) => e.id === id);
     },
     inventarQuillZerstoeren(id) {
+      const quill = this.inventarQuillNachId[id];
       const mentionController = this.inventarMentionControllerNachId[id];
-      if (mentionController && typeof mentionController.destroy === 'function') {
-        mentionController.destroy();
-      }
-      delete this.inventarMentionControllerNachId[id];
       const cleanup = this.inventarQuillToolbarCleanup[id];
       if (typeof cleanup === 'function') {
         cleanup();
         delete this.inventarQuillToolbarCleanup[id];
       }
+      const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+      if (lifecycle && typeof lifecycle.zerstoereQuillInstanz === 'function') {
+        lifecycle.zerstoereQuillInstanz({
+          quill,
+          hostElement: quill && quill.root ? quill.root.parentNode : null,
+          mentionController,
+        });
+      } else if (mentionController && typeof mentionController.destroy === 'function') {
+        mentionController.destroy();
+      }
+      delete this.inventarMentionControllerNachId[id];
       delete this.inventarQuillNachId[id];
       this.$nextTick(() => {
         if (this.inventarEditId) {

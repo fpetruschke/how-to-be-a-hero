@@ -64,13 +64,18 @@ window.HTBAH_KOMPONENTEN.NotizenModal = {
     },
   },
   beforeUnmount() {
-    if (this.mentionController && typeof this.mentionController.destroy === 'function') {
+    const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+    if (lifecycle && typeof lifecycle.zerstoereQuillInstanz === 'function') {
+      lifecycle.zerstoereQuillInstanz({
+        quill: this.notizenQuill,
+        hostElement: this.$refs.notizenEditorElement || null,
+        mentionController: this.mentionController,
+      });
+    } else if (this.mentionController && typeof this.mentionController.destroy === 'function') {
       this.mentionController.destroy();
     }
     this.mentionController = null;
-    if (this.notizenQuill) {
-      this.notizenQuill = null;
-    }
+    this.notizenQuill = null;
   },
   template: `
     <div

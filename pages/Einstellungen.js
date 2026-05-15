@@ -3,6 +3,8 @@ var HTBAH_REFACTOR_UTILS =
   (window.HTBAH_SHARED && window.HTBAH_SHARED.RefactorUtils) || null;
 var HTBAH_BOOTSTRAP_MODAL =
   (window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper) || null;
+var HTBAH_EXPORT_IMPORT_BAUM =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.ExportImportBaum) || null;
 
 const SPEICHER_BEREICHE = {
   charakter: {
@@ -134,7 +136,6 @@ const WUERFELBECHER_KEYS = [
   'htbah_wuerfel_audio',
   'htbah_wuerfel_sound',
 ];
-const WUERFELBECHER_BUNDLE_KEY = 'htbah_wuerfelbecher_bundle';
 
 const IMPORT_IGNORIERE_KEYS = new Set(['htbah_app_rolle', 'htbah_active_character_id']);
 
@@ -187,67 +188,76 @@ function htbahNormalisiereLokalerSpeicherImportDaten(rohDaten) {
   ];
 }
 
-const DATEN_EXPORT_BEREICHE_GLOBAL = [
-  {
-    id: 'sicherheitsmechanismen',
-    key: 'htbah_sicherheitsmechanismen_bundle',
-    label: 'Sicherheitsmechanismen (Grenzen, Schleier)',
-  },
-  {
-    id: 'presets',
-    key: 'htbah_presets',
-    label: 'Fähigkeiten-Presets',
-  },
-  {
-    id: 'charakterbildLegacy',
-    key: 'htbah_character_image',
-    label: 'Charakterbild (Legacy)',
-  },
-  {
-    id: 'theme',
-    key: 'htbah_theme',
-    label: 'Theme-Einstellung',
-  },
-  {
-    id: 'wuerfelbecher',
-    key: WUERFELBECHER_BUNDLE_KEY,
-    label: 'Würfelbecher',
-  },
-];
-
-/** Alte Sammel-Export-IDs (Import-Label-Fallback, weiterhin in importStarten unterstützt). */
-const DATEN_EXPORT_LEGACY_META = [
-  {
-    id: 'kampagnen',
-    key: 'htbah_spielleiter_kampagnen',
-    label: 'Kampagnen: alle Spielleiter-Kampagnen (Sammel-Export, wie früher)',
-  },
-  {
-    id: 'zufallstabellen',
-    key: 'htbah_zufallstabellen',
-    label: 'Zufallstabellen: alle Kampagnen (Sammel-Export, wie früher)',
-  },
-  {
-    id: 'weltenbau',
-    key: 'htbah_weltenbau',
-    label: 'Weltenbau: alle Kampagnen (Sammel-Export, wie früher)',
-  },
-];
-
-function neueBereichsAuswahl(alleBereiche) {
-  const auswahl = {};
-  alleBereiche.forEach((b) => {
-    auswahl[b.id] = true;
-  });
-  return auswahl;
+function parseLsExportKeyMeta(key) {
+  return HTBAH_EXPORT_IMPORT_BAUM
+    ? HTBAH_EXPORT_IMPORT_BAUM.parseLsExportKeyMeta(key)
+    : null;
 }
 
-function keineBereichsAuswahl(alleBereiche) {
-  const auswahl = {};
-  alleBereiche.forEach((b) => {
-    auswahl[b.id] = false;
+function neueBereichsAuswahl(wurzel) {
+  return HTBAH_EXPORT_IMPORT_BAUM
+    ? HTBAH_EXPORT_IMPORT_BAUM.neueAuswahlFuerBaum(wurzel, true)
+    : {};
+}
+
+function keineBereichsAuswahl(wurzel) {
+  return HTBAH_EXPORT_IMPORT_BAUM
+    ? HTBAH_EXPORT_IMPORT_BAUM.neueAuswahlFuerBaum(wurzel, false)
+    : {};
+}
+
+function kampagneNameAusLsPaket(pak) {
+  if (!pak || typeof pak !== 'object') {
+    return '';
+  }
+  const k =
+    (pak.kampagne && typeof pak.kampagne.name === 'string' && pak.kampagne.name) ||
+    (pak.spielleiterTeil &&
+      pak.spielleiterTeil.kampagne &&
+      typeof pak.spielleiterTeil.kampagne.name === 'string' &&
+      pak.spielleiterTeil.kampagne.name) ||
+    '';
+  return typeof k === 'string' ? k.trim() : '';
+}
+
+function kampagneNamenAusImportEintraegen(eintraege) {
+  const namen = new Map();
+  eintraege.forEach((e) => {
+    if (!e || typeof e !== 'object') {
+      return;
+    }
+    if (e.key === 'htbah_spielleiter_kampagnen' && e.vorhanden && typeof e.wert === 'string') {
+      try {
+        const p = JSON.parse(e.wert);
+        (Array.isArray(p.kampagnen) ? p.kampagnen : []).forEach((k) => {
+          if (k && k.id) {
+            const n = typeof k.name === 'string' ? k.name.trim() : '';
+            namen.set(String(k.id), n || String(k.id));
+          }
+        });
+      } catch {
+        /* ignorieren */
+      }
+    }
+    if (e.key.startsWith('htbah_export_ls:') && e.vorhanden && typeof e.wert === 'string') {
+      try {
+        const p = JSON.parse(e.wert);
+        const kid = typeof p.kampagneId === 'string' ? p.kampagneId.trim() : '';
+        if (!kid) {
+          return;
+        }
+        const n = kampagneNameAusLsPaket(p);
+        if (n) {
+          namen.set(kid, n);
+        } else if (!namen.has(kid)) {
+          namen.set(kid, kid);
+        }
+      } catch {
+        /* ignorieren */
+      }
+    }
   });
-  return auswahl;
+  return namen;
 }
 
 window.HTBAH_SEITEN.Einstellungen = {
@@ -262,10 +272,10 @@ window.HTBAH_SEITEN.Einstellungen = {
       browserSpeicherInitialErmittelt: false,
       /** @type {null | { ok: boolean, htbahBytes: number, gesamtBytes: number, htbahSchluesselAnzahl: number, originLocalStorageSchluesselAnzahl: number }} */
       localStorageStatistik: null,
-      datenExportBereiche: DATEN_EXPORT_BEREICHE_GLOBAL,
       exportAuswahl: {},
       importAuswahl: {},
-      importBereicheAusDatei: [],
+      importBaumWurzel: [],
+      importDateiEintraege: [],
       importDateiname: '',
       exportModalInstanz: null,
       importModalInstanz: null,
@@ -281,8 +291,6 @@ window.HTBAH_SEITEN.Einstellungen = {
       kampagneLoeschPayload: null,
       /** Pro Kampagnen-ID: detaillierte Lösch-Buttons sichtbar (Standard: aus = eingeklappt). */
       kampagnenLoeschDetailsSichtbar: {},
-      /** Kontext für kampagnenbezogenen JSON-Import (Dateiauswahl). */
-      kampagneImportKontext: null,
       /** Bereich „Alle Kampagnen / global“: detaillierte Lösch-Buttons (Standard: eingeklappt). */
       alleKampagnenLoeschDetailsAusgeklappt: false,
     };
@@ -376,149 +384,60 @@ window.HTBAH_SEITEN.Einstellungen = {
     wuerfelAudioLautProzent() {
       return Math.round(Math.min(1, Math.max(0, Number(this.wuerfelAudioLautstaerke) || 0)) * 100);
     },
+    exportBaumOpts() {
+      return {
+        appRolle: this.appRolle,
+        charakterEintraege: this.charakterEintraege,
+        spielleiterKampagnen: this.spielleiterKampagnen,
+        charakterNameFn: (e) => this.charakterName(e),
+        kampagneNameFn: (k) => this.kampagneAnzeigeName(k),
+        mitgliedNameFn: (m) => this.mitgliedName(m),
+      };
+    },
+    exportBaumWurzel() {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return [];
+      }
+      return HTBAH_EXPORT_IMPORT_BAUM.baueExportBaumWurzel(this.exportBaumOpts);
+    },
+    exportBaumFlacheListe() {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return [];
+      }
+      return HTBAH_EXPORT_IMPORT_BAUM.baumZuFlacherListe(this.exportBaumWurzel);
+    },
+    importBaumFlacheListe() {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return [];
+      }
+      return HTBAH_EXPORT_IMPORT_BAUM.baumZuFlacherListe(this.importBaumWurzel);
+    },
     hatExportAuswahl() {
-      return this.exportBereicheMitCharakteren.some((b) => this.exportAuswahl[b.id]);
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return false;
+      }
+      return HTBAH_EXPORT_IMPORT_BAUM.ausgewaehlteBlaetter(this.exportBaumWurzel, this.exportAuswahl).length > 0;
     },
     hatImportAuswahl() {
-      return this.importBereicheAusDatei.some((b) => this.importAuswahl[b.id]);
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return false;
+      }
+      return HTBAH_EXPORT_IMPORT_BAUM.ausgewaehlteBlaetter(this.importBaumWurzel, this.importAuswahl).length > 0;
     },
     exportAlleBereicheAusgewaehlt() {
-      const bereiche = this.exportBereicheMitCharakteren;
-      if (!bereiche.length) {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
         return false;
       }
-      return bereiche.every((b) => this.exportAuswahl[b.id]);
+      return HTBAH_EXPORT_IMPORT_BAUM.alleBlaetterAusgewaehlt(this.exportBaumWurzel, this.exportAuswahl);
     },
     importAlleBereicheAusgewaehlt() {
-      const bereiche = this.importBereicheAusDatei;
-      if (!bereiche.length) {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
         return false;
       }
-      return bereiche.every((b) => this.importAuswahl[b.id]);
+      return HTBAH_EXPORT_IMPORT_BAUM.alleBlaetterAusgewaehlt(this.importBaumWurzel, this.importAuswahl);
     },
     charakterEintraege() {
       return window.HTBAH.listeCharaktere();
-    },
-    exportBereicheMitCharakteren() {
-      const zeilen = [];
-      this.charakterEintraege.forEach((eintrag) => {
-        zeilen.push({
-          id: `charakter:${eintrag.id}`,
-          key: `htbah_character_entry:${eintrag.id}`,
-          label: `Charakter: ${this.charakterName(eintrag)}`,
-        });
-      });
-      DATEN_EXPORT_BEREICHE_GLOBAL.forEach((b) => {
-        zeilen.push({ ...b });
-      });
-      if (this.appRolle === 'spielleitung') {
-        this.spielleiterKampagnen.forEach((k) => {
-          const name = this.kampagneAnzeigeName(k);
-          const kid = k.id;
-          zeilen.push({
-            id: `exls:${kid}:komplett`,
-            key: `htbah_export_ls:kampagne_komplett:${kid}`,
-            label: `Kampagne „${name}“: komplett (Spielleiter + Zufallstabellen + Weltenbau)`,
-            exportEinruecken: false,
-            lsTyp: 'kampagne_komplett',
-            kampagneId: kid,
-          });
-          zeilen.push({
-            id: `exls:${kid}:komplett_og`,
-            key: `htbah_export_ls:kampagne_komplett_ohne_gruppe:${kid}`,
-            label: `Kampagne „${name}“: komplett ohne importierte Charaktere (Welt & Tabellen + Abenteuerbuch/Wetter)`,
-            exportEinruecken: false,
-            lsTyp: 'kampagne_komplett_ohne_gruppe',
-            kampagneId: kid,
-          });
-          zeilen.push({
-            id: `exls:${kid}:sl`,
-            key: `htbah_export_ls:spielleiter_teil:${kid}`,
-            label: `  … nur Spielleiter-Daten (Gruppe, Abenteuerbuch, Wetter)`,
-            exportEinruecken: true,
-            lsTyp: 'spielleiter_teil',
-            kampagneId: kid,
-          });
-          zeilen.push({
-            id: `exls:${kid}:slog`,
-            key: `htbah_export_ls:spielleiter_ohne_gruppe:${kid}`,
-            label: `  … nur Abenteuerbuch & Wetter (importierte Spielergruppe wird geleert)`,
-            exportEinruecken: true,
-            lsTyp: 'spielleiter_ohne_gruppe',
-            kampagneId: kid,
-          });
-          zeilen.push({
-            id: `exls:${kid}:ztf`,
-            key: `htbah_export_ls:ztf_kampagne:${kid}`,
-            label: `  … nur Zufallstabellen (alle Kategorien)`,
-            exportEinruecken: true,
-            lsTyp: 'ztf_kampagne',
-            kampagneId: kid,
-          });
-          zeilen.push({
-            id: `exls:${kid}:pantheon`,
-            key: `htbah_export_ls:ztf_pantheon:${kid}`,
-            label: `  … nur Pantheon (Zufallstabellen)`,
-            exportEinruecken: true,
-            lsTyp: 'ztf_pantheon',
-            kampagneId: kid,
-          });
-          ZTF_KAMPAGNE_KATEGORIEN.forEach((kat) => {
-            zeilen.push({
-              id: `exls:${kid}:ztf:${kat.schluessel}`,
-              key: `htbah_export_ls:ztf_kategorie:${kid}:${kat.schluessel}`,
-              label: `  … Zufallstabellen: ${kat.label}`,
-              exportEinruecken: true,
-              lsTyp: 'ztf_kategorie',
-              kampagneId: kid,
-              kategorie: kat.schluessel,
-            });
-          });
-          zeilen.push({
-            id: `exls:${kid}:wb`,
-            key: `htbah_export_ls:wb_kampagne:${kid}`,
-            label: `  … nur Weltenbau (gesamt)`,
-            exportEinruecken: true,
-            lsTyp: 'wb_kampagne',
-            kampagneId: kid,
-          });
-          zeilen.push({
-            id: `exls:${kid}:wb:galerie`,
-            key: `htbah_export_ls:wb_bereich:${kid}:galerie`,
-            label: `  … Weltenbau: Galerie`,
-            exportEinruecken: true,
-            lsTyp: 'wb_bereich',
-            kampagneId: kid,
-            weltenbauBereich: 'galerie',
-          });
-          zeilen.push({
-            id: `exls:${kid}:wb:iw`,
-            key: `htbah_export_ls:wb_bereich:${kid}:interaktive_welt`,
-            label: `  … Weltenbau: interaktive Welt / Karten`,
-            exportEinruecken: true,
-            lsTyp: 'wb_bereich',
-            kampagneId: kid,
-            weltenbauBereich: 'interaktive_welt',
-          });
-          zeilen.push({
-            id: `exls:${kid}:wb:gen`,
-            key: `htbah_export_ls:wb_bereich:${kid}:generatoren`,
-            label: `  … Weltenbau: Generatoren`,
-            exportEinruecken: true,
-            lsTyp: 'wb_bereich',
-            kampagneId: kid,
-            weltenbauBereich: 'generatoren',
-          });
-        });
-        DATEN_EXPORT_LEGACY_META.forEach((b) => {
-          zeilen.push({
-            ...b,
-            exportEinruecken: false,
-            exportLegacySammel: true,
-          });
-        });
-      }
-      return zeilen;
     },
     spielleiterKampagnen() {
       void this.kampagnenCacheTick;
@@ -536,6 +455,76 @@ window.HTBAH_SEITEN.Einstellungen = {
           ? eintrag.charakter.name.trim()
           : '';
       return name || 'Unbenannter Charakter';
+    },
+    charakterBild(eintrag) {
+      const bild =
+        eintrag && typeof eintrag.charakterBild === 'string' ? eintrag.charakterBild.trim() : '';
+      return bild || '';
+    },
+    mitgliedName(mitglied) {
+      const name =
+        mitglied &&
+        mitglied.charakter &&
+        typeof mitglied.charakter.name === 'string'
+          ? mitglied.charakter.name.trim()
+          : '';
+      return name || 'Unbenannter Charakter';
+    },
+    exportBaumOptsFuerImport(dateiEintraege) {
+      const kampagneNamen = kampagneNamenAusImportEintraegen(dateiEintraege || []);
+      return {
+        ...this.exportBaumOpts,
+        dateiEintraege: dateiEintraege || [],
+        kampagneNamen,
+      };
+    },
+    exportGruppeIstAn(gruppenId) {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return false;
+      }
+      return HTBAH_EXPORT_IMPORT_BAUM.gruppenToggleWert(
+        this.exportBaumWurzel,
+        this.exportAuswahl,
+        gruppenId,
+      );
+    },
+    importGruppeIstAn(gruppenId) {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return false;
+      }
+      return HTBAH_EXPORT_IMPORT_BAUM.gruppenToggleWert(
+        this.importBaumWurzel,
+        this.importAuswahl,
+        gruppenId,
+      );
+    },
+    exportGruppeToggle(gruppenId, event) {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return;
+      }
+      const aktiv = Boolean(event && event.target && event.target.checked);
+      this.exportAuswahl = HTBAH_EXPORT_IMPORT_BAUM.setzeGruppeUndNachfahren(
+        this.exportBaumWurzel,
+        this.exportAuswahl,
+        gruppenId,
+        aktiv,
+      );
+    },
+    importGruppeToggle(gruppenId, event) {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return;
+      }
+      const aktiv = Boolean(event && event.target && event.target.checked);
+      this.importAuswahl = HTBAH_EXPORT_IMPORT_BAUM.setzeGruppeUndNachfahren(
+        this.importBaumWurzel,
+        this.importAuswahl,
+        gruppenId,
+        aktiv,
+      );
+    },
+    baumEinrueckKlasse(tiefe) {
+      const t = Math.max(0, Math.min(4, Number(tiefe) || 0));
+      return t ? `ms-${t * 3}` : '';
     },
     kampagneAnzeigeName(k) {
       const n = k && typeof k.name === 'string' ? k.name.trim() : '';
@@ -741,12 +730,6 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
       this.statusAnzeigen(`„${name}“ wurde gelöscht.`);
     },
-    charakterBearbeiten(eintrag) {
-      if (!eintrag || !eintrag.id) {
-        return;
-      }
-      this.$router.push(`/charakter/${eintrag.id}`);
-    },
     themeUmschalten() {
       const neuesTheme = this.istHellesTheme ? 'light' : 'dark';
       window.HTBAH.setzeTheme(neuesTheme);
@@ -917,73 +900,22 @@ window.HTBAH_SEITEN.Einstellungen = {
       });
     },
     exportModalOeffnen() {
-      this.exportAuswahl = neueBereichsAuswahl(this.exportBereicheMitCharakteren);
+      this.exportAuswahl = keineBereichsAuswahl(this.exportBaumWurzel);
       this.modalAnzeigen('exportModalElement', 'exportModalInstanz');
     },
-    exportCharaktereAlleToggle() {
-      const liste = this.charakterEintraege;
-      if (!liste.length) {
-        return;
-      }
-      const alleAn = liste.every((e) => this.exportAuswahl[`charakter:${e.id}`]);
-      const next = !alleAn;
-      const nextAuswahl = { ...this.exportAuswahl };
-      liste.forEach((e) => {
-        nextAuswahl[`charakter:${e.id}`] = next;
-      });
-      this.exportAuswahl = nextAuswahl;
-    },
-    beiExportKampagneKomplettToggle(bereich, event) {
-      if (
-        (bereich.lsTyp !== 'kampagne_komplett' && bereich.lsTyp !== 'kampagne_komplett_ohne_gruppe') ||
-        !bereich.kampagneId
-      ) {
-        return;
-      }
-      const kid = bereich.kampagneId;
-      const prefix = `exls:${kid}:`;
-      const next = { ...this.exportAuswahl };
-      const einschalten = Boolean(event.target.checked);
-      this.exportBereicheMitCharakteren.forEach((b) => {
-        if (typeof b.id === 'string' && b.id.startsWith(prefix)) {
-          next[b.id] = einschalten;
-        }
-      });
-      this.exportAuswahl = next;
-    },
     exportPaketAusAuswahl(auswahl) {
-      const kidMitKomplettExport = new Set();
-      const kidMitKomplettOhneGruppeExport = new Set();
-      this.exportBereicheMitCharakteren.forEach((b) => {
-        if (b.lsTyp === 'kampagne_komplett' && b.kampagneId && auswahl[b.id]) {
-          kidMitKomplettExport.add(b.kampagneId);
-        }
-        if (b.lsTyp === 'kampagne_komplett_ohne_gruppe' && b.kampagneId && auswahl[b.id]) {
-          kidMitKomplettOhneGruppeExport.add(b.kampagneId);
-        }
-      });
-      const ausgewaehlteBereiche = this.exportBereicheMitCharakteren.filter((b) => {
-        if (!auswahl[b.id]) {
-          return false;
-        }
-        if (b.lsTyp === 'kampagne_komplett_ohne_gruppe' && kidMitKomplettExport.has(b.kampagneId)) {
-          return false;
-        }
-        if (
-          b.kampagneId &&
-          (kidMitKomplettExport.has(b.kampagneId) || kidMitKomplettOhneGruppeExport.has(b.kampagneId)) &&
-          b.lsTyp &&
-          b.lsTyp !== 'kampagne_komplett' &&
-          b.lsTyp !== 'kampagne_komplett_ohne_gruppe'
-        ) {
-          return false;
-        }
-        return true;
-      });
-      if (!ausgewaehlteBereiche.length) {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
         return null;
       }
-      const daten = ausgewaehlteBereiche.map((bereich) => {
+      const ausgewaehlteBlaetter = HTBAH_EXPORT_IMPORT_BAUM.ausgewaehlteBlaetter(
+        this.exportBaumWurzel,
+        auswahl,
+      );
+      if (!ausgewaehlteBlaetter.length) {
+        return null;
+      }
+      const daten = ausgewaehlteBlaetter.map((blatt) => {
+        const bereich = blatt.slot;
         if (bereich.lsTyp) {
           const kid = bereich.kampagneId;
           let pak = null;
@@ -995,6 +927,12 @@ window.HTBAH_SEITEN.Einstellungen = {
             pak = window.HTBAH.erstelleSpielleiterKampagneTeilExportPaket(kid);
           } else if (bereich.lsTyp === 'spielleiter_ohne_gruppe') {
             pak = window.HTBAH.erstelleSpielleiterKampagneTeilOhneMitgliederExportPaket(kid);
+          } else if (bereich.lsTyp === 'sl_mitglied') {
+            pak = window.HTBAH.erstelleSpielleiterMitgliedExportPaket(kid, bereich.mitgliedId);
+          } else if (bereich.lsTyp === 'sl_abenteuerbuch') {
+            pak = window.HTBAH.erstelleSpielleiterAbenteuerbuchExportPaket(kid);
+          } else if (bereich.lsTyp === 'sl_atmosphaere') {
+            pak = window.HTBAH.erstelleSpielleiterAtmosphaereExportPaket(kid);
           } else if (bereich.lsTyp === 'ztf_kampagne') {
             pak = window.HTBAH.erstelleZufallstabellenKampagneExportPaket(kid);
           } else if (bereich.lsTyp === 'ztf_pantheon') {
@@ -1008,9 +946,9 @@ window.HTBAH_SEITEN.Einstellungen = {
           }
           const wert = pak ? JSON.stringify(pak) : null;
           return {
-            id: bereich.id,
+            id: blatt.id,
             key: bereich.key,
-            label: bereich.label,
+            label: blatt.label || bereich.label,
             vorhanden: Boolean(wert),
             wert,
           };
@@ -1031,7 +969,7 @@ window.HTBAH_SEITEN.Einstellungen = {
             };
           });
           return {
-            id: bereich.id,
+            id: blatt.id,
             key: bereich.key,
             label: bereich.label,
             vorhanden: true,
@@ -1047,7 +985,7 @@ window.HTBAH_SEITEN.Einstellungen = {
           const eintrag = window.HTBAH.ladeCharakterEintrag(charakterId);
           const vorhanden = Boolean(eintrag);
           return {
-            id: bereich.id,
+            id: blatt.id,
             key: bereich.key,
             label: bereich.label,
             vorhanden,
@@ -1063,7 +1001,7 @@ window.HTBAH_SEITEN.Einstellungen = {
             }
           });
           return {
-            id: bereich.id,
+            id: blatt.id,
             key: bereich.key,
             label: bereich.label,
             vorhanden: Object.keys(eintraege).length > 0,
@@ -1091,7 +1029,7 @@ window.HTBAH_SEITEN.Einstellungen = {
                 })
               : null;
           return {
-            id: bereich.id,
+            id: blatt.id,
             key: bereich.key,
             label: bereich.label,
             vorhanden: Boolean(wert),
@@ -1116,7 +1054,7 @@ window.HTBAH_SEITEN.Einstellungen = {
                 })
               : null;
           return {
-            id: bereich.id,
+            id: blatt.id,
             key: bereich.key,
             label: bereich.label,
             vorhanden: Boolean(wert),
@@ -1126,7 +1064,7 @@ window.HTBAH_SEITEN.Einstellungen = {
         const wert = window.HTBAH.speicher.leseText(bereich.key, null);
         const vorhanden = typeof wert === 'string';
         return {
-          id: bereich.id,
+          id: blatt.id,
           key: bereich.key,
           label: bereich.label,
           vorhanden,
@@ -1163,7 +1101,8 @@ window.HTBAH_SEITEN.Einstellungen = {
     },
     importDateiWaehlen() {
       this.importDateiname = '';
-      this.importBereicheAusDatei = [];
+      this.importBaumWurzel = [];
+      this.importDateiEintraege = [];
       this.importAuswahl = {};
       const input = this.$refs.importDateiInput;
       if (!input) {
@@ -1198,6 +1137,10 @@ window.HTBAH_SEITEN.Einstellungen = {
       this.importPaketVorbereiten(roh, datei.name || 'Import-Datei');
     },
     importPaketVorbereiten(roh, dateiname = 'Import-Datei') {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        this.statusAnzeigen('Import ist derzeit nicht verfügbar.', 'danger');
+        return false;
+      }
       if (!roh || typeof roh !== 'object' || roh.typ !== 'lokaler-speicher' || !Array.isArray(roh.daten)) {
         this.statusAnzeigen(
           'Unbekanntes Importformat. Bitte wähle eine Datei aus dem Daten-Export der Einstellungen.',
@@ -1205,62 +1148,80 @@ window.HTBAH_SEITEN.Einstellungen = {
         );
         return false;
       }
-      const bekannteBereiche = new Map([
-        ...this.exportBereicheMitCharakteren.map((b) => [b.id, b]),
-        ...DATEN_EXPORT_LEGACY_META.map((b) => [b.id, b]),
-      ]);
       const normalisierteDaten = htbahNormalisiereLokalerSpeicherImportDaten(roh.daten);
-      const importBereiche = normalisierteDaten
-        .filter((eintrag) => eintrag && typeof eintrag === 'object' && typeof eintrag.key === 'string')
-        .map((eintrag, index) => {
-          const id =
-            typeof eintrag.id === 'string' && eintrag.id
-              ? eintrag.id
-              : `import_${index}_${eintrag.key}`;
-          const bekannterBereich = bekannteBereiche.get(id);
-          return {
-            id,
-            key: eintrag.key,
-            label:
-              typeof eintrag.label === 'string' && eintrag.label.trim()
-                ? eintrag.label.trim()
-                : bekannterBereich?.label || eintrag.key,
-            vorhanden: Boolean(eintrag.vorhanden),
-            wert: typeof eintrag.wert === 'string' ? eintrag.wert : null,
-          };
-        });
-      if (!importBereiche.length) {
+      const flatEintraege = normalisierteDaten.filter(
+        (eintrag) => eintrag && typeof eintrag === 'object' && typeof eintrag.key === 'string',
+      );
+      if (!flatEintraege.length) {
+        this.statusAnzeigen('Die JSON-Datei enthält keine importierbaren Speicherbereiche.', 'danger');
+        return false;
+      }
+      const opts = this.exportBaumOptsFuerImport(flatEintraege);
+      const wurzel = HTBAH_EXPORT_IMPORT_BAUM.baueImportBaumWurzel(opts);
+      const importBaum = HTBAH_EXPORT_IMPORT_BAUM.importBaumMitDateiWerten(wurzel, flatEintraege);
+      const importierbare = HTBAH_EXPORT_IMPORT_BAUM.sammleBlattKnoten({
+        typ: 'gruppe',
+        kinder: importBaum,
+      });
+      if (!importierbare.length) {
         this.statusAnzeigen('Die JSON-Datei enthält keine importierbaren Speicherbereiche.', 'danger');
         return false;
       }
       this.importDateiname = dateiname;
-      this.importBereicheAusDatei = importBereiche;
-      this.importAuswahl = neueBereichsAuswahl(importBereiche);
+      this.importDateiEintraege = flatEintraege;
+      this.importBaumWurzel = importBaum;
+      this.importAuswahl = neueBereichsAuswahl(importBaum);
       this.modalAnzeigen('importModalElement', 'importModalInstanz');
       return true;
     },
+    importBlattAlsBereich(blatt) {
+      return {
+        ...(blatt.slot || {}),
+        id: blatt.id,
+        label: blatt.label,
+        key: blatt.slot && blatt.slot.key ? blatt.slot.key : '',
+        vorhanden: Boolean(blatt.vorhanden),
+        wert: typeof blatt.wert === 'string' ? blatt.wert : null,
+      };
+    },
+    importBlattVorhanden(blattId) {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return true;
+      }
+      const blatt = HTBAH_EXPORT_IMPORT_BAUM.sammleBlattKnoten({
+        typ: 'gruppe',
+        kinder: this.importBaumWurzel,
+      }).find((b) => b.id === blattId);
+      return blatt ? Boolean(blatt.vorhanden) : true;
+    },
     bereicheAuswahlAlleToggle(ziel) {
       if (ziel === 'export') {
-        const bereiche = this.exportBereicheMitCharakteren;
+        const wurzel = this.exportBaumWurzel;
         this.exportAuswahl = this.exportAlleBereicheAusgewaehlt
-          ? keineBereichsAuswahl(bereiche)
-          : neueBereichsAuswahl(bereiche);
+          ? keineBereichsAuswahl(wurzel)
+          : neueBereichsAuswahl(wurzel);
         return;
       }
       if (ziel === 'import') {
-        const bereiche = this.importBereicheAusDatei;
+        const wurzel = this.importBaumWurzel;
         this.importAuswahl = this.importAlleBereicheAusgewaehlt
-          ? keineBereichsAuswahl(bereiche)
-          : neueBereichsAuswahl(bereiche);
-        return;
+          ? keineBereichsAuswahl(wurzel)
+          : neueBereichsAuswahl(wurzel);
       }
     },
     importStarten() {
-      const ausgewaehlteBereiche = this.importBereicheAusDatei.filter((b) => this.importAuswahl[b.id]);
-      if (!ausgewaehlteBereiche.length) {
+      if (!HTBAH_EXPORT_IMPORT_BAUM) {
+        return;
+      }
+      const ausgewaehlteBlaetter = HTBAH_EXPORT_IMPORT_BAUM.ausgewaehlteBlaetter(
+        this.importBaumWurzel,
+        this.importAuswahl,
+      );
+      if (!ausgewaehlteBlaetter.length) {
         this.statusAnzeigen('Bitte wähle mindestens einen Speicherbereich für den Import aus.', 'danger');
         return;
       }
+      const ausgewaehlteBereiche = ausgewaehlteBlaetter.map((b) => this.importBlattAlsBereich(b));
       const aktiveCharakterIdVorImport = window.HTBAH.ladeAktivenCharakterId();
       const fehlerBereiche = [];
       const keyHandler = {
@@ -1317,6 +1278,17 @@ window.HTBAH_SEITEN.Einstellungen = {
           } else if (tail.startsWith('spielleiter_teil:')) {
             const kid = tail.slice('spielleiter_teil:'.length);
             r = window.HTBAH.importiereSpielleiterKampagneTeilPaket(kid, p);
+          } else if (tail.startsWith('sl_mitglied:')) {
+            const rest = tail.slice('sl_mitglied:'.length);
+            const li = rest.lastIndexOf(':');
+            const kid = li > 0 ? rest.slice(0, li) : rest;
+            r = kid ? window.HTBAH.importiereSpielleiterMitgliedPaket(kid, p) : { ok: false, fehler: 'Keine Kampagne.' };
+          } else if (tail.startsWith('sl_abenteuerbuch:')) {
+            const kid = tail.slice('sl_abenteuerbuch:'.length);
+            r = window.HTBAH.importiereSpielleiterAbenteuerbuchPaket(kid, p);
+          } else if (tail.startsWith('sl_atmosphaere:')) {
+            const kid = tail.slice('sl_atmosphaere:'.length);
+            r = window.HTBAH.importiereSpielleiterAtmosphaerePaket(kid, p);
           } else if (tail.startsWith('ztf_kampagne:')) {
             const kid = tail.slice('ztf_kampagne:'.length);
             r = window.HTBAH.importiereZufallstabellenKampagnePaket(kid, p);
@@ -1409,7 +1381,10 @@ window.HTBAH_SEITEN.Einstellungen = {
             b.key.startsWith('htbah_export_ls:') ||
             b.key === 'htbah_spielleiter_kampagnen' ||
             b.key === 'htbah_zufallstabellen' ||
-            b.key === 'htbah_weltenbau',
+            b.key === 'htbah_weltenbau' ||
+            b.lsTyp === 'sl_mitglied' ||
+            b.lsTyp === 'sl_abenteuerbuch' ||
+            b.lsTyp === 'sl_atmosphaere',
         )
       ) {
         this.kampagnenCacheTick += 1;
@@ -1492,260 +1467,6 @@ window.HTBAH_SEITEN.Einstellungen = {
         }
       });
       window.dispatchEvent(new CustomEvent('htbah:wuerfel-einstellungen-geaendert'));
-    },
-    kampagneExportDateiname(stamm, k, extraSuffix = '') {
-      const slug = window.HTBAH.kampagnenSlugAusName(this.kampagneAnzeigeName(k));
-      const datum = new Date();
-      const yyyy = String(datum.getFullYear());
-      const mm = String(datum.getMonth() + 1).padStart(2, '0');
-      const dd = String(datum.getDate()).padStart(2, '0');
-      const suf = extraSuffix ? `-${extraSuffix}` : '';
-      return `htbah-${stamm}-${slug}${suf}-${yyyy}-${mm}-${dd}.json`;
-    },
-    exportSpielleiterKampagneTeil(k) {
-      if (!k || !k.id) {
-        return;
-      }
-      const paket = window.HTBAH.erstelleSpielleiterKampagneTeilExportPaket(k.id);
-      if (!paket) {
-        this.statusAnzeigen('Export nicht möglich: Kampagne nicht gefunden.', 'danger');
-        return;
-      }
-      window.HTBAH.dateiHerunterladenJson(paket, this.kampagneExportDateiname('spielleiter-kampagne', k));
-      this.statusAnzeigen('Spielleiter-Daten wurden als JSON heruntergeladen.');
-    },
-    exportSpielleiterKampagneTeilOhneMitglieder(k) {
-      if (!k || !k.id) {
-        return;
-      }
-      const paket = window.HTBAH.erstelleSpielleiterKampagneTeilOhneMitgliederExportPaket(k.id);
-      if (!paket) {
-        this.statusAnzeigen('Export nicht möglich: Kampagne nicht gefunden.', 'danger');
-        return;
-      }
-      window.HTBAH.dateiHerunterladenJson(
-        paket,
-        this.kampagneExportDateiname('spielleiter-ohne-gruppe', k),
-      );
-      this.statusAnzeigen('Spielleiter-Daten ohne importierte Charaktere wurden exportiert.');
-    },
-    exportKampagneKomplettOhneGruppe(k) {
-      if (!k || !k.id) {
-        return;
-      }
-      const paket = window.HTBAH.erstelleKampagneKomplettOhneGruppeBackupBundle(k.id);
-      if (!paket) {
-        this.statusAnzeigen('Export nicht möglich.', 'danger');
-        return;
-      }
-      window.HTBAH.dateiHerunterladenJson(
-        paket,
-        this.kampagneExportDateiname('kampagne-komplett-ohne-gruppe', k),
-      );
-      this.statusAnzeigen('Komplett-Export ohne importierte Charaktere wurde heruntergeladen.');
-    },
-    exportZufallstabellenKampagne(k) {
-      if (!k || !k.id) {
-        return;
-      }
-      const paket = window.HTBAH.erstelleZufallstabellenKampagneExportPaket(k.id);
-      if (!paket) {
-        this.statusAnzeigen('Export nicht möglich.', 'danger');
-        return;
-      }
-      window.HTBAH.dateiHerunterladenJson(paket, this.kampagneExportDateiname('zufallstabellen', k));
-      this.statusAnzeigen('Zufallstabellen dieser Kampagne wurden exportiert.');
-    },
-    exportZufallstabellenKategorie(k, kat) {
-      if (!k || !k.id || !kat || !kat.schluessel) {
-        return;
-      }
-      const paket = window.HTBAH.erstelleZufallstabellenKategorieExportPaket(k.id, kat.schluessel);
-      if (!paket) {
-        this.statusAnzeigen('Export nicht möglich.', 'danger');
-        return;
-      }
-      window.HTBAH.dateiHerunterladenJson(
-        paket,
-        this.kampagneExportDateiname('zufallstabellen', k, kat.schluessel),
-      );
-      this.statusAnzeigen(`Kategorie „${kat.label}“ wurde exportiert.`);
-    },
-    exportWeltenbauKampagne(k) {
-      if (!k || !k.id) {
-        return;
-      }
-      const paket = window.HTBAH.erstelleWeltenbauKampagneExportPaket(k.id);
-      if (!paket) {
-        this.statusAnzeigen('Export nicht möglich.', 'danger');
-        return;
-      }
-      window.HTBAH.dateiHerunterladenJson(paket, this.kampagneExportDateiname('weltenbau', k));
-      this.statusAnzeigen('Weltenbau dieser Kampagne wurde exportiert.');
-    },
-    exportWeltenbauBereich(k, bereich, labelKurz) {
-      if (!k || !k.id) {
-        return;
-      }
-      const paket = window.HTBAH.erstelleWeltenbauBereichExportPaket(k.id, bereich);
-      if (!paket) {
-        this.statusAnzeigen('Export nicht möglich.', 'danger');
-        return;
-      }
-      window.HTBAH.dateiHerunterladenJson(
-        paket,
-        this.kampagneExportDateiname('weltenbau', k, bereich),
-      );
-      this.statusAnzeigen(`Weltenbau: ${labelKurz} exportiert.`);
-    },
-    oeffneKampagneImport(ctx) {
-      if (!ctx || !ctx.kampagneId) {
-        return;
-      }
-      this.kampagneImportKontext = ctx;
-      const input = this.$refs.kampagneEinzelImportInput;
-      if (!input) {
-        this.kampagneImportKontext = null;
-        this.statusAnzeigen('Dateiauswahl ist derzeit nicht verfügbar.', 'danger');
-        return;
-      }
-      input.value = '';
-      input.click();
-    },
-    async kampagneImportDateiAusgewaehlt(event) {
-      const ctx = this.kampagneImportKontext;
-      this.kampagneImportKontext = null;
-      const input = event?.target;
-      const datei = input?.files?.[0];
-      if (input) {
-        input.value = '';
-      }
-      if (!datei || !ctx) {
-        return;
-      }
-      let text = '';
-      try {
-        text = await datei.text();
-      } catch {
-        this.statusAnzeigen('Die ausgewählte Datei konnte nicht gelesen werden.', 'danger');
-        return;
-      }
-      let roh;
-      try {
-        roh = JSON.parse(text);
-      } catch {
-        this.statusAnzeigen('Die ausgewählte Datei ist kein gültiges JSON.', 'danger');
-        return;
-      }
-      const v = window.HTBAH.validiereKampagneDatenImportDatei(ctx.art, roh, {
-        kategorie: ctx.kategorie,
-        wbBereich: ctx.wbBereich,
-      });
-      if (!v.ok) {
-        this.statusAnzeigen(v.fehler || 'Ungültige Datei.', 'danger');
-        return;
-      }
-      const name = this.kampagneAnzeigeName({ name: ctx.kampagneName });
-      let bestaetigt = false;
-      let r = { ok: false, fehler: 'Unbekannte Import-Aktion.' };
-      if (ctx.art === 'spielleiter') {
-        bestaetigt = await window.HTBAH.ui.confirm({
-          titel: 'Spielleiter-Daten importieren?',
-          beschreibung: `Die gespeicherte Gruppe, importierten Charaktere, das Abenteuerbuch sowie Wetter- und Badge-Daten der Kampagne „${name}“ werden durch die Datei ersetzt (gleiche Kampagne, neue Inhalte).`,
-          bestaetigenText: 'Importieren',
-          bestaetigenButtonClass: 'btn-danger',
-          warnhinweisAnzeigen: true,
-        });
-        if (bestaetigt) {
-          r = window.HTBAH.importiereSpielleiterKampagneTeilPaket(ctx.kampagneId, roh);
-        }
-      } else if (ctx.art === 'spielleiter_ohne_gruppe') {
-        bestaetigt = await window.HTBAH.ui.confirm({
-          titel: 'Abenteuerbuch & Wetter importieren?',
-          beschreibung: `Abenteuerbuch sowie Wetter- und Badge-Daten der Kampagne „${name}“ werden aus der Datei übernommen. Die importierte Spielergruppe (Charaktere in der Spielleiter-Ansicht) wird dabei geleert.`,
-          bestaetigenText: 'Importieren',
-          bestaetigenButtonClass: 'btn-danger',
-          warnhinweisAnzeigen: true,
-        });
-        if (bestaetigt) {
-          r = window.HTBAH.importiereSpielleiterKampagneTeilPaket(ctx.kampagneId, roh);
-        }
-      } else if (ctx.art === 'komplett_ohne_gruppe') {
-        bestaetigt = await window.HTBAH.ui.confirm({
-          titel: 'Welt & Tabellen ohne Spielergruppe importieren?',
-          beschreibung: `Kampagne „${name}“: Zufallstabellen, Weltenbau sowie Abenteuerbuch und Wetter werden aus der Datei übernommen. Die importierte Spielergruppe wird dabei geleert.`,
-          bestaetigenText: 'Importieren',
-          bestaetigenButtonClass: 'btn-danger',
-          warnhinweisAnzeigen: true,
-        });
-        if (bestaetigt) {
-          r = window.HTBAH.importiereKampagneKomplettBackupBundle(ctx.kampagneId, roh);
-        }
-      } else if (ctx.art === 'ztf') {
-        bestaetigt = await window.HTBAH.ui.confirm({
-          titel: 'Zufallstabellen importieren?',
-          beschreibung: `Alle Zufallstabellen der Kampagne „${name}“ werden durch die Datei ersetzt.`,
-          bestaetigenText: 'Importieren',
-          bestaetigenButtonClass: 'btn-danger',
-          warnhinweisAnzeigen: true,
-        });
-        if (bestaetigt) {
-          r = window.HTBAH.importiereZufallstabellenKampagnePaket(ctx.kampagneId, roh);
-        }
-      } else if (ctx.art === 'ztf_kat') {
-        const katLabel =
-          ZTF_KAMPAGNE_KATEGORIEN.find((x) => x.schluessel === ctx.kategorie)?.label || 'Kategorie';
-        bestaetigt = await window.HTBAH.ui.confirm({
-          titel: `${katLabel} importieren?`,
-          beschreibung: `In „${name}“ werden alle Einträge der Kategorie „${katLabel}“ durch die Datei ersetzt.`,
-          bestaetigenText: 'Importieren',
-          bestaetigenButtonClass: 'btn-danger',
-          warnhinweisAnzeigen: true,
-        });
-        if (bestaetigt) {
-          r = window.HTBAH.importiereZufallstabellenKategoriePaket(ctx.kampagneId, roh);
-        }
-      } else if (ctx.art === 'wb') {
-        bestaetigt = await window.HTBAH.ui.confirm({
-          titel: 'Weltenbau importieren?',
-          beschreibung: `Der gesamte Weltenbau (Galerie, interaktive Welt, Generatoren) der Kampagne „${name}“ wird durch die Datei ersetzt.`,
-          bestaetigenText: 'Importieren',
-          bestaetigenButtonClass: 'btn-danger',
-          warnhinweisAnzeigen: true,
-        });
-        if (bestaetigt) {
-          r = window.HTBAH.importiereWeltenbauKampagnePaket(ctx.kampagneId, roh);
-        }
-      } else if (ctx.art === 'wb_bereich') {
-        const bereichLabel =
-          ctx.wbBereich === 'galerie'
-            ? 'Galerie-Bilder'
-            : ctx.wbBereich === 'generatoren'
-              ? 'Generator-Links'
-              : 'interaktive Welt / Karten';
-        bestaetigt = await window.HTBAH.ui.confirm({
-          titel: `${bereichLabel} importieren?`,
-          beschreibung: `In „${name}“ werden nur „${bereichLabel}“ durch die Datei ersetzt; übriger Weltenbau bleibt erhalten.`,
-          bestaetigenText: 'Importieren',
-          bestaetigenButtonClass: 'btn-danger',
-          warnhinweisAnzeigen: true,
-        });
-        if (bestaetigt) {
-          r = window.HTBAH.importiereWeltenbauBereichPaket(ctx.kampagneId, roh);
-        }
-      }
-      if (!bestaetigt) {
-        return;
-      }
-      if (!r.ok) {
-        this.statusAnzeigen(r.fehler || 'Import fehlgeschlagen.', 'danger');
-        return;
-      }
-      this.kampagnenCacheTick += 1;
-      this.statusAnzeigen('Import abgeschlossen.');
-      if (this.browserSpeicherInitialErmittelt) {
-        this.speicherSchaetzungLaden();
-      }
     },
   },
   mounted() {
@@ -1974,8 +1695,6 @@ window.HTBAH_SEITEN.Einstellungen = {
         <p class="small text-body-secondary mb-2">
           Exportiere und importiere Deine lokalen Daten als JSON-Datei, um Backups zu erstellen
           oder Daten über Deine eigene Cloud zwischen Geräten zu synchronisieren.
-          Unter „Daten löschen“ kannst Du bei Spielleitung pro Kampagne dieselben Bereiche wie beim Löschen
-          auch gezielt als JSON sichern oder aus einer Datei wiederherstellen (Ziel ist immer die gewählte Kampagne).
         </p>
         <div class="d-flex flex-wrap gap-2">
           <icon-text-button
@@ -1999,12 +1718,6 @@ window.HTBAH_SEITEN.Einstellungen = {
           type="file"
           accept=".json,application/json"
           @change="importDateiAusgewaehlt" />
-        <input
-          ref="kampagneEinzelImportInput"
-          class="d-none"
-          type="file"
-          accept=".json,application/json"
-          @change="kampagneImportDateiAusgewaehlt" />
       </div>
 
       <h5 class="text-start mb-2">Daten löschen</h5>
@@ -2015,23 +1728,24 @@ window.HTBAH_SEITEN.Einstellungen = {
             Keine gespeicherten Charaktere vorhanden.
           </p>
           <div v-else class="d-flex flex-column gap-2">
-            <div
+            <button
               v-for="eintrag in charakterEintraege"
               :key="'del-char-' + eintrag.id"
-              class="d-flex flex-wrap gap-2">
-              <button
-                type="button"
-                class="btn btn-outline-secondary btn-sm text-start flex-grow-1"
-                @click="charakterBearbeiten(eintrag)">
-                {{ charakterName(eintrag) }} bearbeiten
-              </button>
-              <button
-                type="button"
-                class="btn btn-outline-danger btn-sm text-start flex-grow-1"
-                @click="loescheEinzelCharakter(eintrag)">
-                {{ charakterName(eintrag) }} löschen
-              </button>
-            </div>
+              type="button"
+              class="btn btn-outline-danger btn-sm btn-labeled w-100 text-start"
+              :aria-label="charakterName(eintrag) + ' löschen'"
+              @click="loescheEinzelCharakter(eintrag)">
+              <span class="btn-label">
+                <img
+                  v-if="charakterBild(eintrag)"
+                  :src="charakterBild(eintrag)"
+                  alt=""
+                  class="htbah-btn-labeled-avatar"
+                  aria-hidden="true" />
+                <span v-else class="btn-labeled-emoji" aria-hidden="true">🧙</span>
+              </span>
+              <span class="btn-labeled-text">{{ charakterName(eintrag) }} löschen</span>
+            </button>
           </div>
         </div>
         <hr class="border-secondary border-opacity-25 my-3" />
@@ -2084,52 +1798,6 @@ window.HTBAH_SEITEN.Einstellungen = {
                 :key="'del-kamp-' + k.id"
                 class="rounded border border-secondary border-opacity-25 p-2 ps-3 text-start">
                 <div class="fw-semibold mb-2">{{ kampagneAnzeigeName(k) }}</div>
-                <div class="d-flex flex-wrap gap-2 mb-2">
-                  <icon-text-button
-                    class="btn btn-outline-primary btn-sm flex-grow-1 text-start"
-                    type="button"
-                    icon="download"
-                    @click="exportSpielleiterKampagneTeil(k)">
-                    Spielleiter-Daten exportieren
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-secondary btn-sm flex-grow-1 text-start"
-                    type="button"
-                    icon="upload_file"
-                    @click="oeffneKampagneImport({ art: 'spielleiter', kampagneId: k.id, kampagneName: k.name })">
-                    Spielleiter-Daten importieren
-                  </icon-text-button>
-                </div>
-                <div class="d-flex flex-wrap gap-2 mb-2">
-                  <icon-text-button
-                    class="btn btn-outline-primary btn-sm flex-grow-1 text-start"
-                    type="button"
-                    icon="download"
-                    @click="exportSpielleiterKampagneTeilOhneMitglieder(k)">
-                    Ohne Spielergruppe exportieren
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-secondary btn-sm flex-grow-1 text-start"
-                    type="button"
-                    icon="upload_file"
-                    @click="oeffneKampagneImport({ art: 'spielleiter_ohne_gruppe', kampagneId: k.id, kampagneName: k.name })">
-                    Ohne Spielergruppe importieren
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-primary btn-sm flex-grow-1 text-start"
-                    type="button"
-                    icon="download"
-                    @click="exportKampagneKomplettOhneGruppe(k)">
-                    Komplett ohne Spielergruppe exportieren
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-secondary btn-sm flex-grow-1 text-start"
-                    type="button"
-                    icon="upload_file"
-                    @click="oeffneKampagneImport({ art: 'komplett_ohne_gruppe', kampagneId: k.id, kampagneName: k.name })">
-                    Komplett ohne Spielergruppe importieren
-                  </icon-text-button>
-                </div>
                 <div class="d-flex flex-column gap-2 ps-2 border-start border-secondary border-opacity-50 ms-1">
                   <icon-text-button
                     class="btn btn-outline-danger btn-sm w-100 text-start"
@@ -2148,7 +1816,7 @@ window.HTBAH_SEITEN.Einstellungen = {
                     <span class="material-symbols-outlined fs-5" aria-hidden="true">
                       {{ kampagneLoeschDetailsIstOffen(k) ? 'expand_less' : 'expand_more' }}
                     </span>
-                    <span class="small">Löschen &amp; Sicherung (Details)</span>
+                    <span class="small">Details</span>
                   </button>
                   <div
                     v-show="kampagneLoeschDetailsIstOffen(k)"
@@ -2156,22 +1824,6 @@ window.HTBAH_SEITEN.Einstellungen = {
                     class="pt-1">
                     <div class="d-flex flex-column gap-2">
                     <div class="small text-body-secondary pt-1">Zufallstabellen</div>
-                    <div class="d-flex flex-wrap gap-2">
-                      <icon-text-button
-                        class="btn btn-outline-primary btn-sm flex-grow-1 text-start"
-                        type="button"
-                        icon="download"
-                        @click="exportZufallstabellenKampagne(k)">
-                        Alle Tabellen exportieren
-                      </icon-text-button>
-                      <icon-text-button
-                        class="btn btn-outline-secondary btn-sm flex-grow-1 text-start"
-                        type="button"
-                        icon="upload_file"
-                        @click="oeffneKampagneImport({ art: 'ztf', kampagneId: k.id, kampagneName: k.name })">
-                        Alle importieren
-                      </icon-text-button>
-                    </div>
                     <icon-text-button
                       class="btn btn-outline-danger btn-sm w-100 text-start"
                       type="button"
@@ -2180,49 +1832,16 @@ window.HTBAH_SEITEN.Einstellungen = {
                       Alle Tabellen-Einträge löschen (alle Kategorien, inkl. Medien)
                     </icon-text-button>
                     <div class="d-flex flex-column gap-1 ps-2 border-start border-secondary border-opacity-25 ms-1">
-                      <div
+                      <button
                         v-for="kat in ztfKampagneKategorien"
                         :key="'ztf-del-' + k.id + '-' + kat.schluessel"
-                        class="d-flex flex-wrap gap-2 align-items-stretch">
-                        <icon-text-button
-                          class="btn btn-outline-primary btn-sm"
-                          type="button"
-                          icon="download"
-                          :title="'Export: ' + kat.label"
-                          :aria-label="'Export: ' + kat.label"
-                          @click="exportZufallstabellenKategorie(k, kat)" />
-                        <icon-text-button
-                          class="btn btn-outline-secondary btn-sm"
-                          type="button"
-                          icon="upload_file"
-                          :title="'Import: ' + kat.label"
-                          :aria-label="'Import: ' + kat.label"
-                          @click="oeffneKampagneImport({ art: 'ztf_kat', kampagneId: k.id, kampagneName: k.name, kategorie: kat.schluessel })" />
-                        <button
-                          type="button"
-                          class="btn btn-outline-danger btn-sm text-start flex-grow-1"
-                          @click="oeffneKampagneLoeschDialog('ztf_kategorie', k, { katSchluessel: kat.schluessel })">
-                          Nur {{ kat.label }} löschen
-                        </button>
-                      </div>
+                        type="button"
+                        class="btn btn-outline-danger btn-sm text-start w-100"
+                        @click="oeffneKampagneLoeschDialog('ztf_kategorie', k, { katSchluessel: kat.schluessel })">
+                        Nur {{ kat.label }} löschen
+                      </button>
                     </div>
                     <div class="small text-body-secondary pt-1">Weltenbau</div>
-                    <div class="d-flex flex-wrap gap-2">
-                      <icon-text-button
-                        class="btn btn-outline-primary btn-sm flex-grow-1 text-start"
-                        type="button"
-                        icon="download"
-                        @click="exportWeltenbauKampagne(k)">
-                        Gesamten Weltenbau exportieren
-                      </icon-text-button>
-                      <icon-text-button
-                        class="btn btn-outline-secondary btn-sm flex-grow-1 text-start"
-                        type="button"
-                        icon="upload_file"
-                        @click="oeffneKampagneImport({ art: 'wb', kampagneId: k.id, kampagneName: k.name })">
-                        Gesamt importieren
-                      </icon-text-button>
-                    </div>
                     <icon-text-button
                       class="btn btn-outline-danger btn-sm w-100 text-start"
                       type="button"
@@ -2231,72 +1850,24 @@ window.HTBAH_SEITEN.Einstellungen = {
                       Gesamten Weltenbau dieser Kampagne löschen
                     </icon-text-button>
                     <div class="d-flex flex-column gap-1 ps-2 border-start border-secondary border-opacity-25 ms-1">
-                      <div class="d-flex flex-wrap gap-2 align-items-stretch">
-                        <icon-text-button
-                          class="btn btn-outline-primary btn-sm"
-                          type="button"
-                          icon="download"
-                          title="Galerie exportieren"
-                          aria-label="Galerie exportieren"
-                          @click="exportWeltenbauBereich(k, 'galerie', 'Galerie')" />
-                        <icon-text-button
-                          class="btn btn-outline-secondary btn-sm"
-                          type="button"
-                          icon="upload_file"
-                          title="Galerie importieren"
-                          aria-label="Galerie importieren"
-                          @click="oeffneKampagneImport({ art: 'wb_bereich', kampagneId: k.id, kampagneName: k.name, wbBereich: 'galerie' })" />
-                        <button
-                          type="button"
-                          class="btn btn-outline-danger btn-sm text-start flex-grow-1"
-                          @click="oeffneKampagneLoeschDialog('wb_galerie', k)">
-                          Nur Galerie-Bilder löschen
-                        </button>
-                      </div>
-                      <div class="d-flex flex-wrap gap-2 align-items-stretch">
-                        <icon-text-button
-                          class="btn btn-outline-primary btn-sm"
-                          type="button"
-                          icon="download"
-                          title="Interaktive Welt exportieren"
-                          aria-label="Interaktive Welt exportieren"
-                          @click="exportWeltenbauBereich(k, 'interaktive_welt', 'Interaktive Welt')" />
-                        <icon-text-button
-                          class="btn btn-outline-secondary btn-sm"
-                          type="button"
-                          icon="upload_file"
-                          title="Interaktive Welt importieren"
-                          aria-label="Interaktive Welt importieren"
-                          @click="oeffneKampagneImport({ art: 'wb_bereich', kampagneId: k.id, kampagneName: k.name, wbBereich: 'interaktive_welt' })" />
-                        <button
-                          type="button"
-                          class="btn btn-outline-danger btn-sm text-start flex-grow-1"
-                          @click="oeffneKampagneLoeschDialog('wb_interaktive_welt', k)">
-                          Nur interaktive Welt / Karten löschen
-                        </button>
-                      </div>
-                      <div class="d-flex flex-wrap gap-2 align-items-stretch">
-                        <icon-text-button
-                          class="btn btn-outline-primary btn-sm"
-                          type="button"
-                          icon="download"
-                          title="Generatoren exportieren"
-                          aria-label="Generatoren exportieren"
-                          @click="exportWeltenbauBereich(k, 'generatoren', 'Generatoren')" />
-                        <icon-text-button
-                          class="btn btn-outline-secondary btn-sm"
-                          type="button"
-                          icon="upload_file"
-                          title="Generatoren importieren"
-                          aria-label="Generatoren importieren"
-                          @click="oeffneKampagneImport({ art: 'wb_bereich', kampagneId: k.id, kampagneName: k.name, wbBereich: 'generatoren' })" />
-                        <button
-                          type="button"
-                          class="btn btn-outline-danger btn-sm text-start flex-grow-1"
-                          @click="oeffneKampagneLoeschDialog('wb_generatoren', k)">
-                          Nur Generator-Links löschen
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger btn-sm text-start w-100"
+                        @click="oeffneKampagneLoeschDialog('wb_galerie', k)">
+                        Nur Galerie-Bilder löschen
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger btn-sm text-start w-100"
+                        @click="oeffneKampagneLoeschDialog('wb_interaktive_welt', k)">
+                        Nur interaktive Welt / Karten löschen
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger btn-sm text-start w-100"
+                        @click="oeffneKampagneLoeschDialog('wb_generatoren', k)">
+                        Nur Generator-Links löschen
+                      </button>
                     </div>
                     </div>
                   </div>
@@ -2309,7 +1880,7 @@ window.HTBAH_SEITEN.Einstellungen = {
             <div class="fw-semibold mb-2">Alle Kampagnen / global</div>
             <div class="d-flex flex-column gap-2 ps-2 border-start border-secondary border-opacity-50 ms-1">
               <icon-text-button
-                class="btn btn-outline-danger btn-sm w-100 text-start"
+                class="btn btn-danger btn-sm w-100 text-start"
                 type="button"
                 :symbol="speicherBereiche.alles.buttonSymbol"
                 @click="oeffneLoeschDialog('alles')">
@@ -2409,42 +1980,53 @@ window.HTBAH_SEITEN.Einstellungen = {
             </div>
             <div class="modal-body text-start">
               <p class="small text-body-secondary mb-2">
-                Wähle die Speicherbereiche für den Export aus. Bei Spielleitung kannst Du pro Kampagne
-                zwischen Komplett-Export und einzelnen Inhalten wählen; unten stehen weiterhin die
-                Sammel-Exporte aller Kampagnen (wie früher).
+                In die JSON-Datei kommen nur die Bereiche, die Du aktivierst. Gruppen schalten alle
+                Unterpunkte gemeinsam an oder aus; einzelne Unterpunkte kannst Du danach abwählen.
               </p>
-              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 mb-2">
                 <button
-                  v-if="charakterEintraege.length"
                   type="button"
                   class="btn btn-sm btn-link px-0"
-                  @click="exportCharaktereAlleToggle">
-                  Alle Charaktere an/ab
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-link px-0 ms-auto"
                   @click="bereicheAuswahlAlleToggle('export')">
                   {{ exportAlleBereicheAusgewaehlt ? 'Alle abwählen' : 'Alle auswählen' }}
                 </button>
               </div>
-              <div
-                v-for="bereich in exportBereicheMitCharakteren"
-                :key="'export-' + bereich.id"
-                class="form-check form-switch mb-2"
-                :class="{ 'ms-3': bereich.exportEinruecken }">
-                <input
-                  :id="'export-switch-' + bereich.id"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                  v-model="exportAuswahl[bereich.id]"
-                  @change="beiExportKampagneKomplettToggle(bereich, $event)" />
-                <label class="form-check-label" :for="'export-switch-' + bereich.id">
-                  <span v-if="bereich.exportLegacySammel" class="badge text-bg-secondary me-1">Sammel</span>
-                  {{ bereich.label }}
-                </label>
-              </div>
+              <template v-for="zeile in exportBaumFlacheListe" :key="'export-' + zeile.id">
+                <div
+                  v-if="zeile.typ === 'gruppe'"
+                  class="form-check form-switch mb-2"
+                  :style="{ marginLeft: (zeile.tiefe * 1.25) + 'rem' }">
+                  <input
+                    :id="'export-switch-' + zeile.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    :checked="exportGruppeIstAn(zeile.id)"
+                    @change="exportGruppeToggle(zeile.id, $event)" />
+                  <label class="form-check-label fw-semibold" :for="'export-switch-' + zeile.id">
+                    {{ zeile.label }}
+                  </label>
+                </div>
+                <div
+                  v-else
+                  class="form-check form-switch mb-2"
+                  :style="{ marginLeft: (zeile.tiefe * 1.25) + 'rem' }">
+                  <input
+                    :id="'export-switch-' + zeile.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    v-model="exportAuswahl[zeile.id]" />
+                  <label class="form-check-label" :for="'export-switch-' + zeile.id">
+                    <span
+                      v-if="zeile.slot && zeile.slot.importLegacy"
+                      class="badge text-bg-secondary me-1">
+                      Legacy
+                    </span>
+                    {{ zeile.label }}
+                  </label>
+                </div>
+              </template>
             </div>
             <div class="modal-footer">
               <button
@@ -2487,35 +2069,58 @@ window.HTBAH_SEITEN.Einstellungen = {
                 Datei: <strong>{{ importDateiname || 'Unbekannt' }}</strong>
               </p>
               <p class="small text-body-secondary mb-2">
-                Wähle die Speicherbereiche aus, die importiert werden sollen.
+                Es werden nur die Bereiche aus der Datei angezeigt und übernommen, die Du aktivierst.
+                Gruppen schalten alle Unterpunkte gemeinsam an oder aus.
               </p>
-              <div class="d-flex justify-content-end mb-2">
+              <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 mb-2">
                 <button
                   type="button"
-                  class="btn btn-sm btn-link"
+                  class="btn btn-sm btn-link px-0"
                   @click="bereicheAuswahlAlleToggle('import')">
                   {{ importAlleBereicheAusgewaehlt ? 'Alle abwählen' : 'Alle auswählen' }}
                 </button>
               </div>
-              <div
-                v-for="bereich in importBereicheAusDatei"
-                :key="'import-' + bereich.id"
-                class="form-check form-switch mb-2">
-                <input
-                  :id="'import-switch-' + bereich.id"
-                  class="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                  v-model="importAuswahl[bereich.id]" />
-                <label class="form-check-label d-flex align-items-center gap-2" :for="'import-switch-' + bereich.id">
-                  <span>{{ bereich.label }}</span>
-                  <span
-                    v-if="!bereich.vorhanden"
-                    class="badge text-bg-secondary">
-                    Wird gelöscht
-                  </span>
-                </label>
-              </div>
+              <template v-for="zeile in importBaumFlacheListe" :key="'import-' + zeile.id">
+                <div
+                  v-if="zeile.typ === 'gruppe'"
+                  class="form-check form-switch mb-2"
+                  :style="{ marginLeft: (zeile.tiefe * 1.25) + 'rem' }">
+                  <input
+                    :id="'import-switch-' + zeile.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    :checked="importGruppeIstAn(zeile.id)"
+                    @change="importGruppeToggle(zeile.id, $event)" />
+                  <label class="form-check-label fw-semibold" :for="'import-switch-' + zeile.id">
+                    {{ zeile.label }}
+                  </label>
+                </div>
+                <div
+                  v-else
+                  class="form-check form-switch mb-2"
+                  :style="{ marginLeft: (zeile.tiefe * 1.25) + 'rem' }">
+                  <input
+                    :id="'import-switch-' + zeile.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    v-model="importAuswahl[zeile.id]" />
+                  <label
+                    class="form-check-label d-flex align-items-center flex-wrap gap-2"
+                    :for="'import-switch-' + zeile.id">
+                    <span
+                      v-if="zeile.slot && zeile.slot.importLegacy"
+                      class="badge text-bg-secondary">
+                      Legacy
+                    </span>
+                    <span>{{ zeile.label }}</span>
+                    <span v-if="!importBlattVorhanden(zeile.id)" class="badge text-bg-secondary">
+                      Wird gelöscht
+                    </span>
+                  </label>
+                </div>
+              </template>
             </div>
             <div class="modal-footer">
               <button

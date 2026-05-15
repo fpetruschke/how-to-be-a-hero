@@ -39,17 +39,25 @@ window.HTBAH_KOMPONENTEN.VorNachteileModal = {
     quillTeilZerstoeren(id, feld) {
       const mentionKey = this.quillCleanupKey(id, `${feld}-mention`);
       const mentionController = this.mentionControllerNachPaarId[mentionKey];
-      if (mentionController && typeof mentionController.destroy === 'function') {
-        mentionController.destroy();
-      }
-      delete this.mentionControllerNachPaarId[mentionKey];
       const key = this.quillCleanupKey(id, feld);
       const cleanup = this.quillToolbarCleanup[key];
+      const bucket = this.quillNachPaarId[id];
+      const quill = bucket ? bucket[feld] : null;
       if (typeof cleanup === 'function') {
         cleanup();
         delete this.quillToolbarCleanup[key];
       }
-      const bucket = this.quillNachPaarId[id];
+      const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+      if (lifecycle && typeof lifecycle.zerstoereQuillInstanz === 'function') {
+        lifecycle.zerstoereQuillInstanz({
+          quill,
+          hostElement: quill && quill.root ? quill.root.parentNode : null,
+          mentionController,
+        });
+      } else if (mentionController && typeof mentionController.destroy === 'function') {
+        mentionController.destroy();
+      }
+      delete this.mentionControllerNachPaarId[mentionKey];
       if (bucket) {
         bucket[feld] = null;
       }

@@ -1253,6 +1253,9 @@ const EXPORT_TYP_WELTENBAU_KAMPAGNE = 'htbah-weltenbau-kampagne';
 const EXPORT_TYP_WELTENBAU_BEREICH = 'htbah-weltenbau-bereich';
 const EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_BUNDLE = 'htbah-export-ls-kampagne-komplett-bundle';
 const EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_OHNE_GRUPPE = 'htbah-export-ls-kampagne-komplett-ohne-gruppe';
+const EXPORT_TYP_SL_MITGLIED = 'htbah-spielleiter-mitglied';
+const EXPORT_TYP_SL_ABENTEUERBUCH = 'htbah-spielleiter-abenteuerbuch-teil';
+const EXPORT_TYP_SL_ATMOSPHAERE = 'htbah-spielleiter-atmosphaere-teil';
 
 function normalisiereZufallstabellenZeilenListeExportImport(schluessel, arr) {
   if (!ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET.has(schluessel) || !Array.isArray(arr)) {
@@ -1345,6 +1348,168 @@ function importiereSpielleiterKampagneTeilPaket(zielKampagneId, roh) {
     return { ok: false, fehler: 'Kampagnendaten ungültig.' };
   }
   kampagnen[idx] = merged;
+  if (!sl.mitgliedWahlProKampagne || typeof sl.mitgliedWahlProKampagne !== 'object') {
+    sl.mitgliedWahlProKampagne = {};
+  }
+  if (Object.prototype.hasOwnProperty.call(roh, 'mitgliedWahlMitgliedId')) {
+    if (typeof roh.mitgliedWahlMitgliedId === 'string' && roh.mitgliedWahlMitgliedId) {
+      sl.mitgliedWahlProKampagne[ziel] = roh.mitgliedWahlMitgliedId;
+    } else {
+      delete sl.mitgliedWahlProKampagne[ziel];
+    }
+  }
+  sl.kampagnen = kampagnen;
+  speichereSpielleiterZustand(sl);
+  return { ok: true };
+}
+
+function erstelleSpielleiterMitgliedExportPaket(kampagneId, mitgliedId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  const mid = typeof mitgliedId === 'string' && mitgliedId.trim() ? mitgliedId.trim() : '';
+  if (!kid || !mid) {
+    return null;
+  }
+  const sl = ladeSpielleiterZustand();
+  const g = (Array.isArray(sl.kampagnen) ? sl.kampagnen : []).find((x) => x && x.id === kid);
+  const m = g && Array.isArray(g.mitglieder) ? g.mitglieder.find((x) => x && x.id === mid) : null;
+  if (!m) {
+    return null;
+  }
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_SL_MITGLIED,
+    kampagneId: kid,
+    mitgliedId: mid,
+    exportiertAm: new Date().toISOString(),
+    mitglied: JSON.parse(JSON.stringify(m)),
+  };
+}
+
+function importiereSpielleiterMitgliedPaket(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (
+    !roh ||
+    typeof roh !== 'object' ||
+    roh.htbahExportVersion !== 1 ||
+    roh.typ !== EXPORT_TYP_SL_MITGLIED ||
+    !roh.mitglied
+  ) {
+    return { ok: false, fehler: 'Ungültige Datei (Gruppen-Charakter erwartet).' };
+  }
+  const idx = spielleiterKampagneIndexNachId(ziel);
+  if (idx < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  const merged = normalisiereSpielleiterMitglied(roh.mitglied);
+  if (!merged) {
+    return { ok: false, fehler: 'Charakterdaten ungültig.' };
+  }
+  const sl = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen.slice() : [];
+  const kampagne = kampagnen[idx];
+  const mitglieder = Array.isArray(kampagne.mitglieder) ? kampagne.mitglieder.slice() : [];
+  const mIdx = mitglieder.findIndex((x) => x && x.id === merged.id);
+  if (mIdx >= 0) {
+    mitglieder[mIdx] = merged;
+  } else {
+    mitglieder.push(merged);
+  }
+  kampagnen[idx] = { ...kampagne, mitglieder };
+  sl.kampagnen = kampagnen;
+  speichereSpielleiterZustand(sl);
+  return { ok: true };
+}
+
+function erstelleSpielleiterAbenteuerbuchExportPaket(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || spielleiterKampagneIndexNachId(kid) < 0) {
+    return null;
+  }
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_SL_ABENTEUERBUCH,
+    kampagneId: kid,
+    exportiertAm: new Date().toISOString(),
+    abenteuerbuchHtml: ladeKampagnenAbenteuerbuchHtml(kid),
+  };
+}
+
+function importiereSpielleiterAbenteuerbuchPaket(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (
+    !roh ||
+    typeof roh !== 'object' ||
+    roh.htbahExportVersion !== 1 ||
+    roh.typ !== EXPORT_TYP_SL_ABENTEUERBUCH
+  ) {
+    return { ok: false, fehler: 'Ungültige Datei (Abenteuerbuch erwartet).' };
+  }
+  if (spielleiterKampagneIndexNachId(ziel) < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  speichereKampagnenAbenteuerbuchHtml(
+    ziel,
+    typeof roh.abenteuerbuchHtml === 'string' ? roh.abenteuerbuchHtml : '',
+  );
+  return { ok: true };
+}
+
+function erstelleSpielleiterAtmosphaereExportPaket(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || spielleiterKampagneIndexNachId(kid) < 0) {
+    return null;
+  }
+  const sl = ladeSpielleiterZustand();
+  const g = (Array.isArray(sl.kampagnen) ? sl.kampagnen : []).find((x) => x && x.id === kid);
+  if (!g) {
+    return null;
+  }
+  const mwp =
+    sl.mitgliedWahlProKampagne && typeof sl.mitgliedWahlProKampagne === 'object'
+      ? sl.mitgliedWahlProKampagne
+      : {};
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_SL_ATMOSPHAERE,
+    kampagneId: kid,
+    exportiertAm: new Date().toISOString(),
+    atmosphaere: JSON.parse(JSON.stringify(g.atmosphaere || {})),
+    atmosphaereBadgePos: JSON.parse(JSON.stringify(g.atmosphaereBadgePos || {})),
+    mitgliedWahlMitgliedId: typeof mwp[kid] === 'string' ? mwp[kid] : '',
+  };
+}
+
+function importiereSpielleiterAtmosphaerePaket(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (
+    !roh ||
+    typeof roh !== 'object' ||
+    roh.htbahExportVersion !== 1 ||
+    roh.typ !== EXPORT_TYP_SL_ATMOSPHAERE
+  ) {
+    return { ok: false, fehler: 'Ungültige Datei (Wetter/Tageszeit erwartet).' };
+  }
+  const idx = spielleiterKampagneIndexNachId(ziel);
+  if (idx < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  const sl = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen.slice() : [];
+  const kampagne = kampagnen[idx];
+  kampagnen[idx] = {
+    ...kampagne,
+    atmosphaere: normalisiereAtmosphaereZustand(roh.atmosphaere),
+    atmosphaereBadgePos: normalisiereAtmosphaereBadgePosition(roh.atmosphaereBadgePos),
+  };
   if (!sl.mitgliedWahlProKampagne || typeof sl.mitgliedWahlProKampagne !== 'object') {
     sl.mitgliedWahlProKampagne = {};
   }
@@ -1662,6 +1827,450 @@ function erstelleKampagneKomplettOhneGruppeBackupBundle(kampagneId) {
     zufallstabellenKampagne: ztf,
     weltenbauKampagne: wb,
   };
+}
+
+function parseLsExportKeyMetaBeispiel(key) {
+  const Baum = window.HTBAH_SHARED && window.HTBAH_SHARED.ExportImportBaum;
+  if (Baum && typeof Baum.parseLsExportKeyMeta === 'function') {
+    return Baum.parseLsExportKeyMeta(key);
+  }
+  return null;
+}
+
+function beispielKampagneNameAusPaket(paket, kampagneId) {
+  const titel =
+    paket && paket.beispiel && typeof paket.beispiel.titel === 'string'
+      ? paket.beispiel.titel.trim()
+      : '';
+  if (titel) {
+    return titel;
+  }
+  const daten = Array.isArray(paket && paket.daten) ? paket.daten : [];
+  for (let i = 0; i < daten.length; i += 1) {
+    const e = daten[i];
+    if (!e || e.key !== 'htbah_spielleiter_kampagnen' || !e.vorhanden || typeof e.wert !== 'string') {
+      continue;
+    }
+    try {
+      const p = JSON.parse(e.wert);
+      const liste = Array.isArray(p.kampagnen) ? p.kampagnen : [];
+      const treffer = liste.find((k) => k && k.id === kampagneId);
+      if (treffer && typeof treffer.name === 'string' && treffer.name.trim()) {
+        return treffer.name.trim();
+      }
+    } catch {
+      /* ignorieren */
+    }
+  }
+  for (let i = 0; i < daten.length; i += 1) {
+    const e = daten[i];
+    if (!e || !e.vorhanden || typeof e.wert !== 'string') {
+      continue;
+    }
+    const meta = parseLsExportKeyMetaBeispiel(e.key);
+    if (!meta || meta.kampagneId !== kampagneId) {
+      continue;
+    }
+    try {
+      const p = JSON.parse(e.wert);
+      const name =
+        (p.kampagne && typeof p.kampagne.name === 'string' && p.kampagne.name) ||
+        (p.spielleiterTeil &&
+          p.spielleiterTeil.kampagne &&
+          typeof p.spielleiterTeil.kampagne.name === 'string' &&
+          p.spielleiterTeil.kampagne.name) ||
+        '';
+      if (typeof name === 'string' && name.trim()) {
+        return name.trim();
+      }
+    } catch {
+      /* ignorieren */
+    }
+  }
+  return typeof kampagneId === 'string' && kampagneId ? kampagneId : 'Unbenannte Kampagne';
+}
+
+function sicherstelleSpielleiterKampagneFuerBeispielImport(kampagneId, opts) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return { ok: false, fehler: 'Keine Kampagnen-ID.' };
+  }
+  if (spielleiterKampagneIndexNachId(kid) >= 0) {
+    return { ok: true, status: 'vorhanden', kampagneId: kid };
+  }
+  const o = opts && typeof opts === 'object' ? opts : {};
+  let kampagneRoh = o.kampagneRoh;
+  if (!kampagneRoh && o.spielleiterTeil && o.spielleiterTeil.kampagne) {
+    kampagneRoh = o.spielleiterTeil.kampagne;
+  }
+  const merged = kampagneRoh
+    ? normalisiereSpielleiterKampagne({ ...kampagneRoh, id: kid })
+    : normalisiereSpielleiterKampagne({
+        id: kid,
+        name:
+          typeof o.name === 'string' && o.name.trim() ? o.name.trim() : 'Unbenannte Kampagne',
+        mitglieder: [],
+      });
+  if (!merged) {
+    return { ok: false, fehler: 'Kampagnendaten ungültig.' };
+  }
+  const sl = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen.slice() : [];
+  kampagnen.push(merged);
+  sl.kampagnen = kampagnen;
+  speichereSpielleiterZustand(sl);
+  return { ok: true, status: 'neu', kampagneId: kid };
+}
+
+function beispielZufallstabellenKategorieAdditiv(kampagneId, roh, ergebnis) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || !roh || typeof roh !== 'object' || roh.typ !== EXPORT_TYP_ZUFALLSTABELLEN_KATEGORIE) {
+    return;
+  }
+  const kat = typeof roh.kategorie === 'string' ? roh.kategorie : '';
+  if (!ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET.has(kat)) {
+    return;
+  }
+  const eingang = normalisiereZufallstabellenZeilenListeExportImport(
+    kat,
+    Array.isArray(roh.zeilen) ? roh.zeilen : [],
+  );
+  const aktuell = ladeZufallstabellenZustand(kid);
+  if (!Array.isArray(aktuell[kat])) {
+    aktuell[kat] = [];
+  }
+  const vorhandenIds = new Set(
+    aktuell[kat]
+      .map((e) => (e && typeof e.id === 'string' ? e.id : ''))
+      .filter(Boolean),
+  );
+  eingang.forEach((eintrag) => {
+    if (!eintrag || typeof eintrag.id !== 'string' || !eintrag.id) {
+      return;
+    }
+    if (vorhandenIds.has(eintrag.id)) {
+      ergebnis.zufallVorhanden += 1;
+      return;
+    }
+    aktuell[kat].push(eintrag);
+    vorhandenIds.add(eintrag.id);
+    ergebnis.zufallNeu += 1;
+  });
+  speichereZufallstabellenZustand(aktuell, kid);
+}
+
+function beispielZufallstabellenZustandAdditiv(kampagneId, zufZustand, ergebnis) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || !zufZustand || typeof zufZustand !== 'object') {
+    return;
+  }
+  const aktuell = ladeZufallstabellenZustand(kid);
+  ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET.forEach((kat) => {
+    const eingang = Array.isArray(zufZustand[kat]) ? zufZustand[kat] : [];
+    if (!Array.isArray(aktuell[kat])) {
+      aktuell[kat] = [];
+    }
+    const vorhandenIds = new Set(
+      aktuell[kat]
+        .map((e) => (e && typeof e.id === 'string' ? e.id : ''))
+        .filter(Boolean),
+    );
+    eingang.forEach((eintrag) => {
+      if (!eintrag || typeof eintrag.id !== 'string' || !eintrag.id) {
+        return;
+      }
+      if (vorhandenIds.has(eintrag.id)) {
+        ergebnis.zufallVorhanden += 1;
+        return;
+      }
+      aktuell[kat].push(eintrag);
+      vorhandenIds.add(eintrag.id);
+      ergebnis.zufallNeu += 1;
+    });
+  });
+  if (Array.isArray(zufZustand.pantheon) && zufZustand.pantheon.length) {
+    const vorPantheon = Array.isArray(aktuell.pantheon) ? aktuell.pantheon : [];
+    const pantheonIds = new Set(
+      vorPantheon.map((e) => (e && typeof e.id === 'string' ? e.id : '')).filter(Boolean),
+    );
+    zufZustand.pantheon.forEach((eintrag) => {
+      if (!eintrag || typeof eintrag.id !== 'string' || !eintrag.id) {
+        return;
+      }
+      if (pantheonIds.has(eintrag.id)) {
+        ergebnis.zufallVorhanden += 1;
+        return;
+      }
+      vorPantheon.push(eintrag);
+      pantheonIds.add(eintrag.id);
+      ergebnis.zufallNeu += 1;
+    });
+    aktuell.pantheon = vorPantheon;
+  }
+  speichereZufallstabellenZustand(aktuell, kid);
+}
+
+function kampagneIdsAusLokalerSpeicherPaket(paket) {
+  const ids = new Set();
+  const daten = Array.isArray(paket && paket.daten) ? paket.daten : [];
+  daten.forEach((e) => {
+    if (!e || typeof e.key !== 'string') {
+      return;
+    }
+    if (e.key === 'htbah_spielleiter_kampagnen' && e.vorhanden && typeof e.wert === 'string') {
+      try {
+        const p = JSON.parse(e.wert);
+        (Array.isArray(p.kampagnen) ? p.kampagnen : []).forEach((k) => {
+          if (k && typeof k.id === 'string' && k.id) {
+            ids.add(k.id);
+          }
+        });
+      } catch {
+        /* ignorieren */
+      }
+    }
+    const meta = parseLsExportKeyMetaBeispiel(e.key);
+    if (meta && meta.kampagneId) {
+      ids.add(meta.kampagneId);
+    }
+  });
+  return ids;
+}
+
+/**
+ * Wendet ein `lokaler-speicher`-Paket additiv an (Beispiel-Kampagnen).
+ * Unterstützt Legacy-Sammel-Exporte und neue `htbah_export_ls:*`-Teilexporte.
+ */
+function wendeBeispielLokalerSpeicherPaketAdditivAn(paket) {
+  const ergebnis = {
+    kampagneId: '',
+    kampagneStatus: '',
+    zufallNeu: 0,
+    zufallVorhanden: 0,
+  };
+  if (!paket || paket.typ !== 'lokaler-speicher' || !Array.isArray(paket.daten)) {
+    return ergebnis;
+  }
+
+  const daten = paket.daten;
+  const neuAngelegteKampagnen = new Set();
+
+  const kampBereich = daten.find((d) => d && d.key === 'htbah_spielleiter_kampagnen');
+  if (kampBereich && kampBereich.vorhanden && typeof kampBereich.wert === 'string') {
+    let kampPaket = null;
+    try {
+      kampPaket = JSON.parse(kampBereich.wert);
+    } catch {
+      kampPaket = null;
+    }
+    const liste = kampPaket && Array.isArray(kampPaket.kampagnen) ? kampPaket.kampagnen : [];
+    liste.forEach((beispielKampagne) => {
+      if (!beispielKampagne || typeof beispielKampagne.id !== 'string' || !beispielKampagne.id) {
+        return;
+      }
+      const kid = beispielKampagne.id;
+      const vorherIdx = spielleiterKampagneIndexNachId(kid);
+      const sicher = sicherstelleSpielleiterKampagneFuerBeispielImport(kid, {
+        kampagneRoh: beispielKampagne,
+      });
+      if (!sicher.ok) {
+        return;
+      }
+      if (sicher.status === 'neu') {
+        neuAngelegteKampagnen.add(kid);
+      }
+      if (!ergebnis.kampagneId) {
+        ergebnis.kampagneId = kid;
+        ergebnis.kampagneStatus = vorherIdx >= 0 || sicher.status === 'vorhanden' ? 'vorhanden' : 'neu';
+      }
+    });
+    if (ergebnis.kampagneId) {
+      const sl = ladeSpielleiterZustand();
+      sl.aktiveKampagneId = ergebnis.kampagneId;
+      speichereSpielleiterZustand(sl);
+    }
+  }
+
+  const lsKampagneIds = [...kampagneIdsAusLokalerSpeicherPaket(paket)];
+
+  lsKampagneIds.forEach((kid) => {
+    if (spielleiterKampagneIndexNachId(kid) >= 0) {
+      if (!ergebnis.kampagneId) {
+        ergebnis.kampagneId = kid;
+        ergebnis.kampagneStatus = 'vorhanden';
+      }
+      return;
+    }
+    const name = beispielKampagneNameAusPaket(paket, kid);
+    const sicher = sicherstelleSpielleiterKampagneFuerBeispielImport(kid, { name });
+    if (sicher.ok && sicher.status === 'neu') {
+      neuAngelegteKampagnen.add(kid);
+      if (!ergebnis.kampagneId) {
+        ergebnis.kampagneId = kid;
+        ergebnis.kampagneStatus = 'neu';
+      }
+    }
+  });
+
+  daten.forEach((bereich) => {
+    if (!bereich || typeof bereich.key !== 'string' || !bereich.vorhanden || typeof bereich.wert !== 'string') {
+      return;
+    }
+    const meta = parseLsExportKeyMetaBeispiel(bereich.key);
+    if (!meta || !meta.kampagneId) {
+      return;
+    }
+    const kid = meta.kampagneId;
+    let p = null;
+    try {
+      p = JSON.parse(bereich.wert);
+    } catch {
+      return;
+    }
+    if (!p || typeof p !== 'object') {
+      return;
+    }
+
+    if (meta.lsTyp === 'kampagne_komplett' || meta.lsTyp === 'kampagne_komplett_ohne_gruppe') {
+      const vorher = spielleiterKampagneIndexNachId(kid);
+      sicherstelleSpielleiterKampagneFuerBeispielImport(kid, {
+        name: beispielKampagneNameAusPaket(paket, kid),
+        spielleiterTeil: p.spielleiterTeil,
+      });
+      importiereKampagneKomplettBackupBundle(kid, p);
+      if (vorher < 0) {
+        neuAngelegteKampagnen.add(kid);
+      }
+      if (!ergebnis.kampagneId) {
+        ergebnis.kampagneId = kid;
+        ergebnis.kampagneStatus = vorher >= 0 ? 'vorhanden' : 'neu';
+      }
+      return;
+    }
+
+    if (spielleiterKampagneIndexNachId(kid) < 0) {
+      const sicher = sicherstelleSpielleiterKampagneFuerBeispielImport(kid, {
+        name: beispielKampagneNameAusPaket(paket, kid),
+        spielleiterTeil: meta.lsTyp === 'spielleiter_teil' || meta.lsTyp === 'spielleiter_ohne_gruppe' ? p : null,
+        kampagneRoh: p.kampagne,
+      });
+      if (sicher.ok && sicher.status === 'neu') {
+        neuAngelegteKampagnen.add(kid);
+      }
+    }
+
+    if (meta.lsTyp === 'spielleiter_teil' || meta.lsTyp === 'spielleiter_ohne_gruppe') {
+      importiereSpielleiterKampagneTeilPaket(kid, p);
+    } else if (meta.lsTyp === 'sl_abenteuerbuch') {
+      importiereSpielleiterAbenteuerbuchPaket(kid, p);
+    } else if (meta.lsTyp === 'sl_atmosphaere') {
+      importiereSpielleiterAtmosphaerePaket(kid, p);
+    } else if (meta.lsTyp === 'sl_mitglied') {
+      importiereSpielleiterMitgliedPaket(kid, p);
+    } else if (meta.lsTyp === 'ztf_kategorie') {
+      beispielZufallstabellenKategorieAdditiv(kid, p, ergebnis);
+    } else if (meta.lsTyp === 'ztf_kampagne') {
+      if (p.daten && typeof p.daten === 'object') {
+        beispielZufallstabellenZustandAdditiv(kid, p.daten, ergebnis);
+      }
+    } else if (meta.lsTyp === 'ztf_pantheon') {
+      const r = pantheonImportAusPaket(p);
+      if (r.ok) {
+        const z = ladeZufallstabellenZustand(kid);
+        const alt = Array.isArray(z.pantheon) ? z.pantheon : [];
+        const ids = new Set(alt.map((e) => (e && e.id ? e.id : '')).filter(Boolean));
+        (Array.isArray(r.pantheon) ? r.pantheon : []).forEach((eintrag) => {
+          if (!eintrag || !eintrag.id) {
+            return;
+          }
+          if (ids.has(eintrag.id)) {
+            ergebnis.zufallVorhanden += 1;
+            return;
+          }
+          alt.push(eintrag);
+          ids.add(eintrag.id);
+          ergebnis.zufallNeu += 1;
+        });
+        z.pantheon = alt;
+        speichereZufallstabellenZustand(z, kid);
+      }
+    } else if (meta.lsTyp === 'wb_kampagne') {
+      if (neuAngelegteKampagnen.has(kid) && p.daten) {
+        importiereWeltenbauKampagnePaket(kid, p);
+      }
+    } else if (meta.lsTyp === 'wb_bereich') {
+      if (neuAngelegteKampagnen.has(kid)) {
+        importiereWeltenbauBereichPaket(kid, p);
+      }
+    }
+
+    if (!ergebnis.kampagneId) {
+      ergebnis.kampagneId = kid;
+      ergebnis.kampagneStatus = neuAngelegteKampagnen.has(kid) ? 'neu' : 'vorhanden';
+    }
+  });
+
+  if (ergebnis.kampagneId) {
+    const zufBereich = daten.find((d) => d && d.key === 'htbah_zufallstabellen');
+    if (zufBereich && zufBereich.vorhanden && typeof zufBereich.wert === 'string') {
+      try {
+        const zufPaket = JSON.parse(zufBereich.wert);
+        if (zufPaket && typeof zufPaket === 'object') {
+          if (
+            zufPaket.typ === 'htbah-zufallstabellen-pro-kampagne' &&
+            zufPaket.proKampagne &&
+            typeof zufPaket.proKampagne === 'object'
+          ) {
+            Object.keys(zufPaket.proKampagne).forEach((kid) => {
+              sicherstelleSpielleiterKampagneFuerBeispielImport(kid, {
+                name: beispielKampagneNameAusPaket(paket, kid),
+              });
+              beispielZufallstabellenZustandAdditiv(kid, zufPaket.proKampagne[kid], ergebnis);
+              if (!ergebnis.kampagneId) {
+                ergebnis.kampagneId = kid;
+              }
+            });
+          } else {
+            beispielZufallstabellenZustandAdditiv(ergebnis.kampagneId, zufPaket, ergebnis);
+          }
+        }
+      } catch {
+        /* ignorieren */
+      }
+    }
+
+    if (neuAngelegteKampagnen.has(ergebnis.kampagneId)) {
+      const welBereich = daten.find((d) => d && d.key === 'htbah_weltenbau');
+      if (welBereich && welBereich.vorhanden && typeof welBereich.wert === 'string') {
+        try {
+          const welPaket = JSON.parse(welBereich.wert);
+          if (welPaket && typeof welPaket === 'object') {
+            if (
+              welPaket.typ === 'htbah-weltenbau-pro-kampagne' &&
+              welPaket.proKampagne &&
+              typeof welPaket.proKampagne === 'object' &&
+              welPaket.proKampagne[ergebnis.kampagneId]
+            ) {
+              const wbDaten = welPaket.proKampagne[ergebnis.kampagneId];
+              if (Number(wbDaten.version) === 4) {
+                speichereWeltenbauZustand(wbDaten, ergebnis.kampagneId);
+              }
+            } else if (Number(welPaket.version) === 4) {
+              speichereWeltenbauZustand(welPaket, ergebnis.kampagneId);
+            }
+          }
+        } catch {
+          /* ignorieren */
+        }
+      }
+    }
+
+    const sl = ladeSpielleiterZustand();
+    sl.aktiveKampagneId = ergebnis.kampagneId;
+    speichereSpielleiterZustand(sl);
+  }
+
+  return ergebnis;
 }
 
 function importiereKampagneKomplettBackupBundle(zielKampagneId, roh) {
@@ -2460,6 +3069,38 @@ function setzeWuerfelAnzeigeProfil(teil) {
   return neu;
 }
 
+/** Wiederverwendbare Audio-Elemente statt pro Wurf neue Instanzen (vermeidet GC-Druck). */
+const WUERFEL_AUDIO_POOL = [];
+const WUERFEL_AUDIO_POOL_MAX = 8;
+
+function holeWuerfelAudioElement(url) {
+  for (let i = 0; i < WUERFEL_AUDIO_POOL.length; i += 1) {
+    const kandidat = WUERFEL_AUDIO_POOL[i];
+    if (kandidat.paused || kandidat.ended) {
+      if (kandidat.src !== url) {
+        kandidat.src = url;
+      }
+      return kandidat;
+    }
+  }
+  if (WUERFEL_AUDIO_POOL.length < WUERFEL_AUDIO_POOL_MAX) {
+    const neu = new Audio(url);
+    WUERFEL_AUDIO_POOL.push(neu);
+    return neu;
+  }
+  const aeltestes = WUERFEL_AUDIO_POOL[0];
+  try {
+    aeltestes.pause();
+    aeltestes.currentTime = 0;
+  } catch {
+    /* ignorieren */
+  }
+  if (aeltestes.src !== url) {
+    aeltestes.src = url;
+  }
+  return aeltestes;
+}
+
 /**
  * Spielt den Würfel-Klang einmal pro Würfel. Erster Klang bei delay 0 ms (Klickfeedback);
  * weitere leicht zufällig gestaffelt (wirkt natürlicher als fester Abstand).
@@ -2484,7 +3125,7 @@ function spieleWuerfelSounds(anzahl) {
     const delay = t;
     window.setTimeout(() => {
       try {
-        const a = new Audio(url);
+        const a = holeWuerfelAudioElement(url);
         a.volume = vol;
         const p = a.play();
         if (p && typeof p.catch === 'function') {
@@ -2934,6 +3575,12 @@ window.HTBAH = {
   erstelleSpielleiterKampagneTeilExportPaket,
   erstelleSpielleiterKampagneTeilOhneMitgliederExportPaket,
   importiereSpielleiterKampagneTeilPaket,
+  erstelleSpielleiterMitgliedExportPaket,
+  importiereSpielleiterMitgliedPaket,
+  erstelleSpielleiterAbenteuerbuchExportPaket,
+  importiereSpielleiterAbenteuerbuchPaket,
+  erstelleSpielleiterAtmosphaereExportPaket,
+  importiereSpielleiterAtmosphaerePaket,
   erstelleZufallstabellenKampagneExportPaket,
   importiereZufallstabellenKampagnePaket,
   erstelleZufallstabellenKategorieExportPaket,
@@ -2946,6 +3593,7 @@ window.HTBAH = {
   erstelleKampagneKomplettBackupBundle,
   erstelleKampagneKomplettOhneGruppeBackupBundle,
   importiereKampagneKomplettBackupBundle,
+  wendeBeispielLokalerSpeicherPaketAdditivAn,
   importierePantheonPaketInKampagne,
   ladeKampagnenAtmosphaereZustand,
   speichereKampagnenAtmosphaereZustand,
