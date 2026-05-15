@@ -53,6 +53,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       letzterWurfAnzahl: 1,
       wuerfelnLaeuft: false,
       wuerfelSound3dVerzoegerungTimeoutId: null,
+      begegnungOpenRequestTimeoutId: null,
       wuerfelBeutelOffen: false,
       wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       wuerfelBeutelAusloeserElement: null,
@@ -454,6 +455,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.diceInitPromiseEiner = null;
     this.diceModulLadenPromise = null;
     this.abbrecheAnstehenden3dWuerfelSound();
+    if (this.begegnungOpenRequestTimeoutId != null) {
+      window.clearTimeout(this.begegnungOpenRequestTimeoutId);
+      this.begegnungOpenRequestTimeoutId = null;
+    }
     window.removeEventListener('resize', this.wuerfelBeutelBeiViewportResize);
     window.removeEventListener('keydown', this.onWuerfelBeutelKeydown);
     window.removeEventListener(
@@ -1696,7 +1701,13 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const istSchonDort = this.$route && this.$route.path === zielPfad;
       if (!istSchonDort) {
         this.$router.push(zielPfad).finally(() => {
-          window.setTimeout(() => this.sendeBegegnungOpenRequest(payload), 120);
+          if (this.begegnungOpenRequestTimeoutId != null) {
+            window.clearTimeout(this.begegnungOpenRequestTimeoutId);
+          }
+          this.begegnungOpenRequestTimeoutId = window.setTimeout(() => {
+            this.begegnungOpenRequestTimeoutId = null;
+            this.sendeBegegnungOpenRequest(payload);
+          }, 120);
         });
       }
       this.wuerfelBeutelSchliessen();

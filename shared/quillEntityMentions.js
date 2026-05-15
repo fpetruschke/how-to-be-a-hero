@@ -277,6 +277,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       cancelable: true,
     });
     window.dispatchEvent(requestEvent);
+    window.dispatchEvent(new CustomEvent('htbah:mention-nav-target-updated'));
     // Wichtig: Kein Redirect/Fallback-Navigation. URL bleibt unverändert.
   }
 
@@ -328,6 +329,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       selectedIndex: 0,
       items: [],
     };
+    let entityLinkClickTimeoutId = null;
 
     function hide() {
       state.active = false;
@@ -513,7 +515,11 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       event.stopPropagation();
       if (onEntityClick) {
         const nav = parsed;
-        window.setTimeout(() => {
+        if (entityLinkClickTimeoutId != null) {
+          window.clearTimeout(entityLinkClickTimeoutId);
+        }
+        entityLinkClickTimeoutId = window.setTimeout(() => {
+          entityLinkClickTimeoutId = null;
           onEntityClick(nav);
         }, 0);
       }
@@ -525,7 +531,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       }
     }
 
-    container.addEventListener('mousedown', (event) => {
+    function onContainerMousedown(event) {
       event.preventDefault();
       const btn = event.target.closest('[data-mention-index]');
       if (!btn) {
@@ -536,7 +542,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         return;
       }
       applySelection(state.items[index]);
-    });
+    }
+
+    container.addEventListener('mousedown', onContainerMousedown);
     quill.root.addEventListener('keydown', onKeyDown);
     /* mousedown: nur Default verhindern (sonst navigiert der Browser zu https://htbah.local/… und blockiert). */
     quill.root.addEventListener('mousedown', onRootEntityLinkMouseDown);
@@ -549,10 +557,19 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return {
       destroy() {
         hide();
+        if (entityLinkClickTimeoutId != null) {
+          window.clearTimeout(entityLinkClickTimeoutId);
+          entityLinkClickTimeoutId = null;
+        }
+        if (quill && typeof quill.off === 'function') {
+          quill.off('text-change', onTextChange);
+          quill.off('selection-change', onSelectionChange);
+        }
         quill.root.removeEventListener('keydown', onKeyDown);
         quill.root.removeEventListener('mousedown', onRootEntityLinkMouseDown);
         quill.root.removeEventListener('click', onRootLinkInteraction);
         document.removeEventListener('pointerdown', onOutsidePointer);
+        container.removeEventListener('mousedown', onContainerMousedown);
         container.remove();
       },
     };

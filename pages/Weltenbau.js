@@ -180,6 +180,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       weltenbauMapModalOffen: false,
       ausgewaehlteKampagneId: startKampagneId,
       importWarteschlange: [],
+      importNaechstesTimeoutId: null,
       zeigeImportHinweis: false,
       generatorModal: {
         offen: false,
@@ -679,12 +680,23 @@ window.HTBAH_SEITEN.Weltenbau = {
         this.schliesseGeneratorModal();
       }
     },
+    abbrecheImportWarteschlange() {
+      this.importWarteschlange = [];
+      if (this.importNaechstesTimeoutId != null) {
+        window.clearTimeout(this.importNaechstesTimeoutId);
+        this.importNaechstesTimeoutId = null;
+      }
+    },
     importNaechsteAusWarteschlange() {
       if (!this.importWarteschlange.length) {
         return;
       }
       const file = this.importWarteschlange.shift();
-      window.setTimeout(() => {
+      if (this.importNaechstesTimeoutId != null) {
+        window.clearTimeout(this.importNaechstesTimeoutId);
+      }
+      this.importNaechstesTimeoutId = window.setTimeout(() => {
+        this.importNaechstesTimeoutId = null;
         const m = this.$refs.weltenbauImportModal;
         if (m && typeof m.oeffnenMitDatei === 'function') {
           m.oeffnenMitDatei(file);
@@ -712,7 +724,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         this.persist();
       } catch (err) {
         this.zustand = vorher;
-        this.importWarteschlange = [];
+        this.abbrecheImportWarteschlange();
         if (err && err.name === 'QuotaExceededError') {
           this.zeigeStatus(
             'Browser-Speicher voll. Ältere Weltenbau-Bilder löschen oder in den Einstellungen Platz schaffen.',
@@ -727,7 +739,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       this.importNaechsteAusWarteschlange();
     },
     onWeltenbauBildImportAbgebrochen() {
-      this.importWarteschlange = [];
+      this.abbrecheImportWarteschlange();
     },
     onWeltenbauDateiImportFehler() {
       window.setTimeout(() => this.importNaechsteAusWarteschlange(), 450);
@@ -849,13 +861,16 @@ window.HTBAH_SEITEN.Weltenbau = {
   mounted() {
     window.addEventListener('resize', this.onFensterGroesseGeaendert);
     window.addEventListener('keydown', this.onGlobaleTaste);
+    window.addEventListener('htbah:mention-nav-target-updated', this.pruefeMentionNavigationTarget);
     this.pruefeMentionNavigationTarget();
   },
   beforeUnmount() {
+    this.abbrecheImportWarteschlange();
     this.beendeGeneratorZiehen();
     this.beendeGeneratorResize();
     window.removeEventListener('resize', this.onFensterGroesseGeaendert);
     window.removeEventListener('keydown', this.onGlobaleTaste);
+    window.removeEventListener('htbah:mention-nav-target-updated', this.pruefeMentionNavigationTarget);
   },
   template: `
     <div class="container content py-3">

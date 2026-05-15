@@ -3883,6 +3883,16 @@ const app = Vue.createApp({
       eingabeModal: this.$refs.globalEingabeModal || null,
       toastHost: this.$refs.globalToastHost || null,
     });
+    const dispatch = window.HTBAH_SHARED && window.HTBAH_SHARED.EntityOpenDispatch;
+    if (dispatch && typeof dispatch.install === 'function') {
+      this._entityOpenDispatchCleanup = dispatch.install(this.$router);
+    }
+  },
+  beforeUnmount() {
+    if (typeof this._entityOpenDispatchCleanup === 'function') {
+      this._entityOpenDispatchCleanup();
+      this._entityOpenDispatchCleanup = null;
+    }
   },
   template: `
     <lebenspunkte-status-banner />

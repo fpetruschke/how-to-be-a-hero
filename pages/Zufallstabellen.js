@@ -124,6 +124,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       /** Filtert alle Tabellen gleichzeitig (zusätzlich zu den Feldern pro Kategorie) */
       sucheGlobal: '',
       medienImportWarteschlange: [],
+      bildImportTimeoutId: null,
       galerieModalInstanz: null,
       galerieModalZeile: null,
       /** { typ, zeile } — Zeile als Deep-Kopie, nur Anzeige */
@@ -1399,12 +1400,23 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.bearbeitung.zeile.primaryMediumId = id;
       this.zeileBearbeitungBeiBlurSpeichern();
     },
+    abbrecheMedienImportWarteschlange() {
+      this.medienImportWarteschlange = [];
+      if (this.bildImportTimeoutId != null) {
+        window.clearTimeout(this.bildImportTimeoutId);
+        this.bildImportTimeoutId = null;
+      }
+    },
     bildImportNaechstesAusWarteschlange() {
       if (!this.medienImportWarteschlange.length) {
         return;
       }
       const file = this.medienImportWarteschlange.shift();
-      window.setTimeout(() => {
+      if (this.bildImportTimeoutId != null) {
+        window.clearTimeout(this.bildImportTimeoutId);
+      }
+      this.bildImportTimeoutId = window.setTimeout(() => {
+        this.bildImportTimeoutId = null;
         const modal = this.$refs.zufallstabellenBildImportModal;
         if (modal && typeof modal.oeffnenMitDatei === 'function') {
           modal.oeffnenMitDatei(file);
@@ -1429,7 +1441,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.bildImportNaechstesAusWarteschlange();
     },
     onZufallstabellenBildImportAbgebrochen() {
-      this.medienImportWarteschlange = [];
+      this.abbrecheMedienImportWarteschlange();
     },
     onZufallstabellenBildImportFehler() {
       this.bildImportNaechstesAusWarteschlange();
@@ -2146,7 +2158,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.zeileQuillInstanz = null;
       this.zeileQuillHostElement = null;
       this.zeileQuillSelectionHandler = null;
-      this.medienImportWarteschlange = [];
+      this.abbrecheMedienImportWarteschlange();
       this.bearbeitung = null;
       this.bearbeitungIndex = -1;
       this.$nextTick(() => this.zeileQuillOrphanToolbarsInModalBodyEntfernen());
@@ -2699,6 +2711,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     window.addEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
   },
   beforeUnmount() {
+    this.abbrecheMedienImportWarteschlange();
     this.entferneDetailAnsichtModalHiddenKette();
     window.removeEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
     this.zeileQuillSession += 1;

@@ -203,8 +203,12 @@ var HTBAH_REFACTOR_UTILS =
         charakterInventarQuillInstanzen: {},
         charakterInventarMentionController: {},
         charakterInventarQuillRefFnCache: {},
+        charakterInventarQuillSession: 0,
         notizQuillInstanzen: {},
         notizQuillEditorRefs: {},
+        notizQuillSession: 0,
+        bildImportTimeoutId: null,
+        zuletztGezogeneNodeTimeoutId: null,
         hintergrundUploadLaeuft: false,
         bildImportKontext: 'hintergrund',
         mapHintergrundTick: 0,
@@ -3089,14 +3093,22 @@ var HTBAH_REFACTOR_UTILS =
         }
         this.$nextTick(() => this.charakterInventarQuillAufHostEinrichten(id, el));
       },
-      charakterInventarQuillAufHostEinrichten(id, el, retry) {
+      charakterInventarQuillAufHostEinrichten(id, el, retry, sessionAtStart) {
         const r = typeof retry === 'number' ? retry : 0;
+        const session =
+          typeof sessionAtStart === 'number' ? sessionAtStart : this.charakterInventarQuillSession;
+        if (session !== this.charakterInventarQuillSession) {
+          return;
+        }
         if (!id || !el || !this.charakterModal.charakter) {
           return;
         }
         if (!window.Quill) {
           if (r < 40) {
-            window.setTimeout(() => this.charakterInventarQuillAufHostEinrichten(id, el, r + 1), 25);
+            window.setTimeout(
+              () => this.charakterInventarQuillAufHostEinrichten(id, el, r + 1, session),
+              25,
+            );
           }
           return;
         }
@@ -3134,8 +3146,16 @@ var HTBAH_REFACTOR_UTILS =
         if (!id) {
           return;
         }
+        const quill = this.charakterInventarQuillInstanzen[id];
         const mentionController = this.charakterInventarMentionController[id];
-        if (mentionController && typeof mentionController.destroy === 'function') {
+        const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+        if (lifecycle && typeof lifecycle.zerstoereQuillInstanz === 'function') {
+          lifecycle.zerstoereQuillInstanz({
+            quill,
+            hostElement: quill && quill.root ? quill.root.parentNode : null,
+            mentionController,
+          });
+        } else if (mentionController && typeof mentionController.destroy === 'function') {
           mentionController.destroy();
         }
         delete this.charakterInventarMentionController[id];
@@ -3173,6 +3193,7 @@ var HTBAH_REFACTOR_UTILS =
         });
       },
       beendeCharakterInventarEditoren() {
+        this.charakterInventarQuillSession += 1;
         Object.keys(this.charakterInventarQuillInstanzen || {}).forEach((id) => {
           this.charakterInventarQuillZerstoeren(id);
         });
@@ -3837,8 +3858,13 @@ var HTBAH_REFACTOR_UTILS =
             this.schreibeNodePosition(node.id, node.position, this.graph.gruppeKey);
             this.zuletztGezogeneNodeId = this.nodeDrag.bewegt ? node.id : '';
             if (this.zuletztGezogeneNodeId) {
-              window.setTimeout(() => {
-                if (this.zuletztGezogeneNodeId === node.id) {
+              if (this.zuletztGezogeneNodeTimeoutId != null) {
+                window.clearTimeout(this.zuletztGezogeneNodeTimeoutId);
+              }
+              const nodeId = node.id;
+              this.zuletztGezogeneNodeTimeoutId = window.setTimeout(() => {
+                this.zuletztGezogeneNodeTimeoutId = null;
+                if (this.zuletztGezogeneNodeId === nodeId) {
                   this.zuletztGezogeneNodeId = '';
                 }
               }, 220);
@@ -4480,7 +4506,11 @@ var HTBAH_REFACTOR_UTILS =
           return;
         }
         const file = this.medienImportWarteschlange.shift();
-        window.setTimeout(() => {
+        if (this.bildImportTimeoutId != null) {
+          window.clearTimeout(this.bildImportTimeoutId);
+        }
+        this.bildImportTimeoutId = window.setTimeout(() => {
+          this.bildImportTimeoutId = null;
           const modal = this.$refs.weltenbauHintergrundImportModal;
           if (modal && typeof modal.oeffnenMitDatei === 'function') {
             this.bildImportKontext = 'anlage';
@@ -4514,7 +4544,7 @@ var HTBAH_REFACTOR_UTILS =
         this.bildImportNaechstesAusWarteschlange();
       },
       onZeilenBildImportAbgebrochen() {
-        this.medienImportWarteschlange = [];
+        this.abbrecheMedienImportWarteschlange();
         this.medienUploadLaeuft = false;
         this.bildImportKontext = 'hintergrund';
       },
@@ -4729,7 +4759,7 @@ var HTBAH_REFACTOR_UTILS =
       schliesseAnlageModal() {
         this.anlageZeileQuillAufraeumen();
         this.medienUploadLaeuft = false;
-        this.medienImportWarteschlange = [];
+        this.abbrecheMedienImportWarteschlange();
         this.speicherStatusHinweis = '';
         this.anlage.offen = false;
         this.anlage.typ = '';
@@ -4800,8 +4830,12 @@ var HTBAH_REFACTOR_UTILS =
         this.notizQuillEditorRefs[elementId] = el;
         this.$nextTick(() => this.richteNotizEditorEin(elementId));
       },
-      richteNotizEditorEin(elementId, retry) {
+      richteNotizEditorEin(elementId, retry, sessionAtStart) {
         const r = typeof retry === 'number' ? retry : 0;
+        const session = typeof sessionAtStart === 'number' ? sessionAtStart : this.notizQuillSession;
+        if (session !== this.notizQuillSession) {
+          return;
+        }
         const host = this.notizQuillEditorRefs[elementId];
         const bild = (this.ortBildElemente || []).find((eintrag) => eintrag && eintrag.bildId === elementId);
         if (!host || !bild || bild.ankerTyp !== 'notiz') {
@@ -4809,7 +4843,7 @@ var HTBAH_REFACTOR_UTILS =
         }
         if (!window.Quill) {
           if (r < 40) {
-            window.setTimeout(() => this.richteNotizEditorEin(elementId, r + 1), 25);
+            window.setTimeout(() => this.richteNotizEditorEin(elementId, r + 1, session), 25);
           }
           return;
         }
@@ -5016,7 +5050,17 @@ var HTBAH_REFACTOR_UTILS =
         this.speichereFreieNotizen(liste);
         this.mapFreieElementeTick += 1;
       },
+      abbrecheMedienImportWarteschlange() {
+        this.medienImportWarteschlange = [];
+        this.medienUploadLaeuft = false;
+        this.bildImportKontext = 'hintergrund';
+        if (this.bildImportTimeoutId != null) {
+          window.clearTimeout(this.bildImportTimeoutId);
+          this.bildImportTimeoutId = null;
+        }
+      },
       beendeAlleNotizEditoren() {
+        this.notizQuillSession += 1;
         Object.keys(this.notizQuillInstanzen || {}).forEach((id) => {
           const eintrag = this.notizQuillInstanzen[id];
           if (eintrag && eintrag.quill) {
@@ -5452,6 +5496,11 @@ var HTBAH_REFACTOR_UTILS =
       window.addEventListener('htbah:kampagne-daten-geaendert', this.onKampagneDatenExternGeaendert);
     },
     beforeUnmount() {
+      this.abbrecheMedienImportWarteschlange();
+      if (this.zuletztGezogeneNodeTimeoutId != null) {
+        window.clearTimeout(this.zuletztGezogeneNodeTimeoutId);
+        this.zuletztGezogeneNodeTimeoutId = null;
+      }
       this.beendeZiehen();
       this.beendeResize();
       this.zeileQuillSession += 1;
