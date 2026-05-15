@@ -339,78 +339,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         </div>
       </div>
 
-      <div v-if="beispielManifest.length" class="card p-3 mb-3 text-start htbah-beispiel-kampagnen-card">
-        <h5 class="mb-2 d-flex align-items-center gap-2">
-          <span aria-hidden="true">📖</span>
-          <span>Beispiel-Kampagne laden</span>
-        </h5>
-        <p class="small text-body-secondary mb-2">
-          Wähle eine Kampagne aus und füge sie <strong>additiv</strong> zu deinen Daten hinzu.
-          Vorhandene Kampagnen und Zufallstabellen-Einträge bleiben unverändert; gleiche IDs werden übersprungen.
-        </p>
-        <div class="row g-2 align-items-stretch mb-2">
-          <div class="col-12 col-sm">
-            <div class="form-floating">
-              <select
-                id="sl-uebersicht-beispiel-auswahl"
-                class="form-select"
-                v-model="ausgewaehltesBeispielDatei"
-                :disabled="beispielLaedtGerade">
-                <option value="">— Beispiel-Kampagne wählen —</option>
-                <option
-                  v-for="b in beispielManifest"
-                  :key="'sl-bsp-opt-' + b.datei"
-                  :value="b.datei">
-                  {{ b.titel }}
-                </option>
-              </select>
-              <label for="sl-uebersicht-beispiel-auswahl">Beispiel-Kampagne</label>
-            </div>
-          </div>
-          <div class="col-12 col-sm-auto d-grid">
-            <icon-text-button
-              class="btn-primary w-100"
-              icon="auto_stories"
-              :disabled="!ausgewaehltesBeispielDatei || beispielLaedtGerade"
-              :aria-label="aktuellesBeispiel ? 'Beispiel-Kampagne „' + aktuellesBeispiel.titel + '“ laden' : 'Beispiel-Kampagne laden'"
-              @click="beispielKampagneLaden">
-              {{ beispielLaedtGerade ? 'Lade …' : 'Laden' }}
-            </icon-text-button>
-          </div>
-        </div>
-        <div v-if="aktuellesBeispiel" class="border rounded p-2 small text-body-secondary">
-          <p v-if="aktuellesBeispiel.untertitel" class="mb-1">{{ aktuellesBeispiel.untertitel }}</p>
-          <p v-if="aktuellesBeispiel.beschreibung" class="mb-2">{{ aktuellesBeispiel.beschreibung }}</p>
-          <p v-if="aktuellesBeispiel.quelleUrl || aktuellesBeispiel.quelleLabel" class="mb-1">
-            <strong>Quelle:</strong>
-            <a
-              v-if="aktuellesBeispiel.quelleUrl"
-              :href="aktuellesBeispiel.quelleUrl"
-              target="_blank"
-              rel="noopener noreferrer">{{ aktuellesBeispiel.quelleLabel || aktuellesBeispiel.quelleUrl }}</a>
-            <span v-else>{{ aktuellesBeispiel.quelleLabel }}</span>
-          </p>
-          <p v-if="aktuellesBeispiel.autoren || aktuellesBeispiel.kontext" class="mb-1">
-            <template v-if="aktuellesBeispiel.autoren">
-              <strong>Verfasst von:</strong> {{ aktuellesBeispiel.autoren }}
-            </template>
-            <template v-if="aktuellesBeispiel.kontext">
-              <span v-if="aktuellesBeispiel.autoren"> · </span>{{ aktuellesBeispiel.kontext }}
-            </template>
-          </p>
-          <p v-if="aktuellesBeispiel.lizenz" class="mb-0">
-            <strong>Lizenz:</strong> {{ aktuellesBeispiel.lizenz }}
-          </p>
-        </div>
-      </div>
-      <div
-        v-else-if="beispielManifestFehler"
-        class="alert alert-warning small mb-3 text-start"
-        role="status">
-        Beispiel-Kampagnen konnten nicht geladen werden: {{ beispielManifestFehler }}
-      </div>
-
-      <div class="card p-3 mb-0 text-start">
+      <div class="card p-3 mb-3 text-start">
         <h5 class="mb-2">Kampagnen</h5>
 
         <div v-if="!zustand.kampagnen.length" class="alert alert-secondary mb-0">
@@ -532,6 +461,88 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         </div>
       </div>
 
+      <div v-if="beispielManifest.length" class="card p-3 mb-0 text-start htbah-beispiel-kampagnen-card">
+        <h5 class="mb-2 d-flex align-items-center gap-2">
+          <span aria-hidden="true">📖</span>
+          <span>Beispiel-Kampagne laden</span>
+        </h5>
+        <div
+            class="alert alert-danger border-danger mb-3"
+            role="alert">
+          <strong>Nur für Spielleitung — nicht zum Testen als Spielende!</strong>
+          <p class="mb-0 mt-2 small">
+            Wenn du als Spielende:r unterwegs bist: hier nicht weiter testen. Bereits die Auswahl einer
+            Demo-Kampagne kann Spoiler offenbaren und das Spielerlebnis zerstören. Diese Funktion ist
+            ausschließlich gedacht, wenn du die Beispiel-Kampagne(n) in der Rolle der Spielleitung spielen
+            möchtest.
+          </p>
+        </div>
+        <p class="small text-body-secondary mb-2">
+          Wähle eine Kampagne aus und füge sie <strong>additiv</strong> zu deinen Daten hinzu.
+          Vorhandene Kampagnen und Zufallstabellen-Einträge bleiben unverändert; gleiche IDs werden übersprungen.
+        </p>
+        <div class="row g-2 align-items-stretch mb-2">
+          <div class="col-12 col-sm">
+            <div class="form-floating">
+              <select
+                  id="sl-uebersicht-beispiel-auswahl"
+                  class="form-select"
+                  v-model="ausgewaehltesBeispielDatei"
+                  :disabled="beispielLaedtGerade">
+                <option value="">— Beispiel-Kampagne wählen —</option>
+                <option
+                    v-for="b in beispielManifest"
+                    :key="'sl-bsp-opt-' + b.datei"
+                    :value="b.datei">
+                  {{ b.titel }}
+                </option>
+              </select>
+              <label for="sl-uebersicht-beispiel-auswahl">Beispiel-Kampagne</label>
+            </div>
+          </div>
+          <div class="col-12 col-sm-auto d-grid">
+            <icon-text-button
+                class="btn-primary w-100"
+                icon="auto_stories"
+                :disabled="!ausgewaehltesBeispielDatei || beispielLaedtGerade"
+                :aria-label="aktuellesBeispiel ? 'Beispiel-Kampagne „' + aktuellesBeispiel.titel + '“ laden' : 'Beispiel-Kampagne laden'"
+                @click="beispielKampagneLaden">
+              {{ beispielLaedtGerade ? 'Lade …' : 'Laden' }}
+            </icon-text-button>
+          </div>
+        </div>
+        <div v-if="aktuellesBeispiel" class="border rounded p-2 small text-body-secondary">
+          <p v-if="aktuellesBeispiel.untertitel" class="mb-1">{{ aktuellesBeispiel.untertitel }}</p>
+          <p v-if="aktuellesBeispiel.beschreibung" class="mb-2">{{ aktuellesBeispiel.beschreibung }}</p>
+          <p v-if="aktuellesBeispiel.quelleUrl || aktuellesBeispiel.quelleLabel" class="mb-1">
+            <strong>Quelle:</strong>
+            <a
+                v-if="aktuellesBeispiel.quelleUrl"
+                :href="aktuellesBeispiel.quelleUrl"
+                target="_blank"
+                rel="noopener noreferrer">{{ aktuellesBeispiel.quelleLabel || aktuellesBeispiel.quelleUrl }}</a>
+            <span v-else>{{ aktuellesBeispiel.quelleLabel }}</span>
+          </p>
+          <p v-if="aktuellesBeispiel.autoren || aktuellesBeispiel.kontext" class="mb-1">
+            <template v-if="aktuellesBeispiel.autoren">
+              <strong>Verfasst von:</strong> {{ aktuellesBeispiel.autoren }}
+            </template>
+            <template v-if="aktuellesBeispiel.kontext">
+              <span v-if="aktuellesBeispiel.autoren"> · </span>{{ aktuellesBeispiel.kontext }}
+            </template>
+          </p>
+          <p v-if="aktuellesBeispiel.lizenz" class="mb-0">
+            <strong>Lizenz:</strong> {{ aktuellesBeispiel.lizenz }}
+          </p>
+        </div>
+      </div>
+      <div
+          v-else-if="beispielManifestFehler"
+          class="alert alert-warning small mb-3 text-start"
+          role="status">
+        Beispiel-Kampagnen konnten nicht geladen werden: {{ beispielManifestFehler }}
+      </div>
+      
       <div class="abstandshalter" aria-hidden="true"></div>
 
     </div>

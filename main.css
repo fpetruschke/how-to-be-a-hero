@@ -37,6 +37,7 @@
   --htbah-z-modal-crop: 5000;
   --htbah-z-modal-ui-backdrop: 13000;
   --htbah-z-modal-ui: 13010;
+  --htbah-z-dropdown: 1090;
 }
 
 [data-theme='light'] {
@@ -3457,6 +3458,25 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   align-items: flex-start;
 }
 
+/* Dropdowns in Tabellen/Karten: nicht von overflow-Clippern abschneiden */
+.table-responsive:has(.dropdown.show),
+.card-body:has(.dropdown.show) {
+  overflow: visible !important;
+}
+
+.card:has(.dropdown.show),
+.zufallstabellen-mobile-card:has(.dropdown.show),
+.inventar-mobile-card:has(.dropdown.show),
+.htbah-weltenbau-karte:has(.dropdown.show) {
+  position: relative;
+  z-index: 30;
+  overflow: visible;
+}
+
+.dropdown-menu.show {
+  z-index: var(--htbah-z-dropdown);
+}
+
 .zufallstabellen-mobile-card {
   border-radius: 0.75rem;
   border-color: var(--border-color);
@@ -3482,10 +3502,6 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 .zufallstabellen-mobile-card--klickbar .card-body {
   cursor: pointer;
   overflow: visible;
-}
-
-.zufallstabellen-mobile-card .dropdown-menu {
-  z-index: 1080;
 }
 
 .zufallstabellen-tabellenzeile-klickbar {
