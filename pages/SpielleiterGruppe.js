@@ -3,6 +3,7 @@ window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
 window.HTBAH_SEITEN.SpielleiterGruppe = {
   props: {
     eingebettet: { type: Boolean, default: false },
+    kampagneId: { type: String, default: '' },
   },
   components: {
     Charakter: window.HTBAH_SEITEN.Charakter,
@@ -18,14 +19,31 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
     };
   },
   computed: {
-    kampagneId() {
+    kampagneIdEffektiv() {
+      if (typeof this.kampagneId === 'string' && this.kampagneId.trim()) {
+        return this.kampagneId.trim();
+      }
       const routeId = this.$route.params.kampagneId || '';
       if (routeId) {
         return routeId;
       }
-      const ausZustand = this.zustand && typeof this.zustand.aktiveKampagneId === 'string'
-        ? this.zustand.aktiveKampagneId
-        : '';
+      const slugRaw = this.$route.params.kampagneSlug;
+      const slug = typeof slugRaw === 'string' ? decodeURIComponent(slugRaw) : '';
+      if (slug && window.HTBAH && typeof window.HTBAH.kampagnenSlugAusName === 'function') {
+        const kampagnen = Array.isArray(this.zustand && this.zustand.kampagnen)
+          ? this.zustand.kampagnen
+          : [];
+        const gefunden = kampagnen.find(
+          (k) => k && window.HTBAH.kampagnenSlugAusName(k.name) === slug,
+        );
+        if (gefunden && typeof gefunden.id === 'string' && gefunden.id) {
+          return gefunden.id;
+        }
+      }
+      const ausZustand =
+        this.zustand && typeof this.zustand.aktiveKampagneId === 'string'
+          ? this.zustand.aktiveKampagneId
+          : '';
       if (ausZustand) {
         return ausZustand;
       }
@@ -33,6 +51,9 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         ? this.zustand.kampagnen[0]
         : null;
       return ersteKampagne && typeof ersteKampagne.id === 'string' ? ersteKampagne.id : '';
+    },
+    kampagneId() {
+      return this.kampagneIdEffektiv;
     },
     aktiveKampagne() {
       return this.zustand.kampagnen.find((g) => g.id === this.kampagneId) || null;
@@ -68,9 +89,12 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
     },
   },
   watch: {
-    kampagneId: {
+    kampagneIdEffektiv: {
       immediate: true,
-      handler() {
+      handler(neu, alt) {
+        if (neu && neu !== alt) {
+          this.zustand = window.HTBAH.ladeSpielleiterZustand();
+        }
         this.syncAusRoute();
       },
     },
@@ -100,12 +124,8 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
   },
   methods: {
     syncAusRoute() {
-      const routeKampagneId = this.$route.params.kampagneId || '';
       const z = window.HTBAH.ladeSpielleiterZustand();
-      const fallbackKampagneId =
-        (typeof z.aktiveKampagneId === 'string' && z.aktiveKampagneId) ||
-        ((z.kampagnen && z.kampagnen[0] && z.kampagnen[0].id) || '');
-      const gid = routeKampagneId || fallbackKampagneId;
+      const gid = this.kampagneIdEffektiv;
       if (!gid || !z.kampagnen.some((g) => g.id === gid)) {
         this.$router.replace('/spielleiter');
         return;
@@ -122,7 +142,39 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       this.aktivesMitgliedId = aktivesMitgliedId;
     },
     persist() {
+      const kid = this.kampagneIdEffektiv;
+      if (kid) {
+        this.zustand.aktiveKampagneId = kid;
+      }
       window.HTBAH.speichereSpielleiterZustand(this.zustand);
+    },
+    nachMitgliedImportAktualisieren(mitgliedId = '') {
+      const g = this.aktiveKampagne;
+      if (!g) {
+        return;
+      }
+      const mid =
+        typeof mitgliedId === 'string' && mitgliedId && g.mitglieder.some((m) => m && m.id === mitgliedId)
+          ? mitgliedId
+          : g.mitglieder.length
+            ? g.mitglieder[g.mitglieder.length - 1].id
+            : null;
+      this.aktivesMitgliedId = mid;
+      if (mid) {
+        this.zustand.mitgliedWahlProKampagne[g.id] = mid;
+      }
+      this.persist();
+      this.zustand = window.HTBAH.ladeSpielleiterZustand();
+      if (mid) {
+        const ag = this.aktiveKampagne;
+        this.aktivesMitgliedId =
+          ag && ag.mitglieder.some((m) => m && m.id === mid)
+            ? mid
+            : ag && ag.mitglieder.length
+              ? ag.mitglieder[ag.mitglieder.length - 1].id
+              : null;
+      }
+      this.lokaleCharaktereNeuLaden();
     },
     zeigeStatus(text) {
       window.HTBAH.ui.notify({ text, typ: 'success' });
@@ -168,13 +220,13 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         });
         return;
       }
-      this.fuegeMitgliedHinzu(
+      const mitgliedId = this.fuegeMitgliedHinzu(
         window.HTBAH_CHARAKTER_MODEL.charakterMitDefaults(eintrag.charakter),
         typeof eintrag.charakterBild === 'string' ? eintrag.charakterBild : '',
         eintrag.id,
       );
       this.lokaleCharaktereNeuLaden();
-      this.persist();
+      this.nachMitgliedImportAktualisieren(mitgliedId);
       this.zeigeStatus('Lokaler Charakter hinzugefügt.');
     },
     charakterName(m) {
@@ -335,20 +387,87 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       }
       this.zeigeStatus(`„${name}“ wurde verschoben.`);
     },
-    fuegeMitgliedHinzu(charakter, charakterBild, charakterStorageId = '') {
+    fuegeMitgliedHinzu(charakter, charakterBild, charakterStorageId = '', mitgliedId = '') {
       const g = this.aktiveKampagne;
       if (!g) {
-        return;
+        return null;
       }
+      const storageId = typeof charakterStorageId === 'string' ? charakterStorageId.trim() : '';
+      const gewuenschteId = typeof mitgliedId === 'string' ? mitgliedId.trim() : '';
+      const vorhandenIdx =
+        gewuenschteId && Array.isArray(g.mitglieder)
+          ? g.mitglieder.findIndex((m) => m && m.id === gewuenschteId)
+          : -1;
       const mitglied = {
-        id: window.HTBAH.neueEntropieId(),
+        id: gewuenschteId || window.HTBAH.neueEntropieId(),
         charakter,
         charakterBild: typeof charakterBild === 'string' ? charakterBild : '',
-        charakterStorageId: typeof charakterStorageId === 'string' ? charakterStorageId : '',
+        charakterStorageId: storageId,
       };
-      g.mitglieder.push(mitglied);
+      if (vorhandenIdx >= 0) {
+        g.mitglieder[vorhandenIdx] = {
+          ...g.mitglieder[vorhandenIdx],
+          ...mitglied,
+        };
+      } else {
+        g.mitglieder.push(mitglied);
+      }
       this.aktivesMitgliedId = mitglied.id;
       this.zustand.mitgliedWahlProKampagne[g.id] = mitglied.id;
+      return mitglied.id;
+    },
+    charakterAusImportInLokalenSpeicher(kandidat) {
+      if (
+        !kandidat ||
+        !window.HTBAH ||
+        typeof window.HTBAH.importiereOderAktualisiereCharakterEintrag !== 'function'
+      ) {
+        return '';
+      }
+      const aktiveIdVorher =
+        typeof window.HTBAH.ladeAktivenCharakterId === 'function'
+          ? window.HTBAH.ladeAktivenCharakterId()
+          : null;
+      const eintrag = window.HTBAH.importiereOderAktualisiereCharakterEintrag({
+        id: typeof kandidat.id === 'string' && kandidat.id ? kandidat.id : null,
+        charakter: kandidat.charakter,
+        charakterBild: kandidat.charakterBild,
+      });
+      if (typeof window.HTBAH.setzeAktivenCharakterId === 'function') {
+        window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher || null);
+      }
+      return eintrag && typeof eintrag.id === 'string' ? eintrag.id : '';
+    },
+    importiereMitgliedPaketAusJson(json) {
+      const kid = this.kampagneIdEffektiv;
+      if (!kid) {
+        return { ok: false, fehler: 'Keine aktive Kampagne.' };
+      }
+      if (
+        !window.HTBAH ||
+        typeof window.HTBAH.importiereSpielleiterMitgliedPaket !== 'function'
+      ) {
+        return { ok: false, fehler: 'Import nicht verfügbar.' };
+      }
+      return window.HTBAH.importiereSpielleiterMitgliedPaket(kid, json);
+    },
+    importiereKandidatAlsMitglied(kandidat) {
+      if (!kandidat || !kandidat.charakter) {
+        return '';
+      }
+      const storageId = this.charakterAusImportInLokalenSpeicher(kandidat);
+      const mitgliedId =
+        kandidat.quelle === 'spielleiter-kampagne' && typeof kandidat.id === 'string'
+          ? kandidat.id
+          : '';
+      return (
+        this.fuegeMitgliedHinzu(
+          kandidat.charakter,
+          kandidat.charakterBild,
+          storageId,
+          mitgliedId,
+        ) || ''
+      );
     },
     async importJsonDateien(event) {
       const input = event.target;
@@ -356,7 +475,17 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       if (!files || !files.length) {
         return;
       }
+      if (!this.kampagneIdEffektiv) {
+        await window.HTBAH.ui.alert({
+          titel: 'Keine Kampagne',
+          beschreibung: 'Bitte zuerst eine Kampagne auswählen.',
+        });
+        input.value = '';
+        return;
+      }
       let importiert = 0;
+      let zuletztImportiertesMitgliedId = '';
+      try {
       for (let i = 0; i < files.length; i++) {
         const datei = files[i];
         let text;
@@ -381,6 +510,31 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         }
         if (
           json &&
+          json.htbahExportVersion === 1 &&
+          json.typ === 'htbah-spielleiter-mitglied' &&
+          json.mitglied
+        ) {
+          const ergebnis = this.importiereMitgliedPaketAusJson(json);
+          if (!ergebnis || !ergebnis.ok) {
+            await window.HTBAH.ui.alert({
+              titel: 'Import nicht möglich',
+              beschreibung:
+                (ergebnis && ergebnis.fehler) ||
+                `„${datei.name}“: Gruppen-Charakter konnte nicht importiert werden.`,
+            });
+            continue;
+          }
+          const mid =
+            json.mitglied && typeof json.mitglied.id === 'string' ? json.mitglied.id : '';
+          if (mid) {
+            zuletztImportiertesMitgliedId = mid;
+          }
+          this.zustand = window.HTBAH.ladeSpielleiterZustand();
+          importiert += 1;
+          continue;
+        }
+        if (
+          json &&
           json.typ === 'spielleiter_kampagne' &&
           Array.isArray(json.mitglieder)
         ) {
@@ -389,11 +543,20 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
             if (!raw || typeof raw !== 'object') {
               continue;
             }
-            const c = window.HTBAH_CHARAKTER_MODEL.charakterMitDefaults(raw.charakter);
-            const bild = typeof raw.charakterBild === 'string' ? raw.charakterBild : '';
-            this.fuegeMitgliedHinzu(c, bild);
+            const ergebnis = this.importiereMitgliedPaketAusJson({
+              htbahExportVersion: 1,
+              typ: 'htbah-spielleiter-mitglied',
+              mitglied: raw,
+            });
+            if (!ergebnis || !ergebnis.ok) {
+              continue;
+            }
+            if (typeof raw.id === 'string' && raw.id) {
+              zuletztImportiertesMitgliedId = raw.id;
+            }
             importiert += 1;
           }
+          this.zustand = window.HTBAH.ladeSpielleiterZustand();
           continue;
         }
         const stuecke = Array.isArray(json) ? json : [json];
@@ -408,17 +571,34 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
             continue;
           }
           kandidaten.forEach((kandidat) => {
-            this.fuegeMitgliedHinzu(kandidat.charakter, kandidat.charakterBild);
-            importiert += 1;
+            const mid = this.importiereKandidatAlsMitglied(kandidat);
+            if (mid) {
+              zuletztImportiertesMitgliedId = mid;
+              importiert += 1;
+            }
           });
         }
       }
+      } catch (err) {
+        await window.HTBAH.ui.alert({
+          titel: 'Import fehlgeschlagen',
+          beschreibung:
+            err && err.message
+              ? err.message
+              : 'Beim Import ist ein unerwarteter Fehler aufgetreten.',
+        });
+      }
       input.value = '';
-      this.persist();
       if (importiert) {
+        this.nachMitgliedImportAktualisieren(zuletztImportiertesMitgliedId);
         this.zeigeStatus(
           importiert === 1 ? 'Ein Charakter importiert.' : `${importiert} Charaktere importiert.`,
         );
+      } else if (!this.aktiveKampagne) {
+        await window.HTBAH.ui.alert({
+          titel: 'Import nicht möglich',
+          beschreibung: 'Keine aktive Kampagne zum Hinzufügen des Charakters.',
+        });
       }
     },
   },

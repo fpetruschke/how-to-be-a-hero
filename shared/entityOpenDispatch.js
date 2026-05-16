@@ -74,14 +74,20 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     }
 
     if (typ === 'charakter') {
-      if (tab === 'welt') {
+      const kampagneId =
+        typeof detail.kampagneId === 'string' && detail.kampagneId.trim()
+          ? detail.kampagneId.trim()
+          : null;
+      const ziel = kampagnenPfad('welt', kampagneId);
+      if (tab === 'welt' && route && route.path === ziel) {
         signalMentionNavTargetUpdated();
         return;
       }
-      const ziel = kampagnenPfad('welt');
       const nav = router.push(ziel);
       if (nav && typeof nav.then === 'function') {
         nav.then(() => signalMentionNavTargetUpdated()).catch(() => {});
+      } else {
+        signalMentionNavTargetUpdated();
       }
     }
   }

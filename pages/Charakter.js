@@ -1316,21 +1316,25 @@ window.HTBAH_SEITEN.Charakter = {
         });
         return;
       }
+      const kampagneId =
+        typeof this.aktiveKampagneId === 'string' ? this.aktiveKampagneId.trim() : '';
       oeffneEntitaet({
         entityType: 'charakter',
         entityId: this.spielleiterMitglied.id,
         openMode: 'focus',
+        kampagneId,
       });
-      const ziel = window.HTBAH.kampagnenPfad('welt', this.aktiveKampagneId);
-      if (this.$route && this.$route.path === ziel) {
-        return;
+      const ziel = window.HTBAH.kampagnenPfad('welt', kampagneId);
+      const bereitsAufWelt = this.$route && this.$route.path === ziel;
+      if (!bereitsAufWelt && this.$router && typeof this.$router.push === 'function') {
+        try {
+          await this.$router.push(ziel);
+        } catch {
+          /* Navigation abgebrochen */
+        }
       }
-      const nav = this.$router && typeof this.$router.push === 'function'
-        ? this.$router.push(ziel)
-        : null;
-      if (nav && typeof nav.catch === 'function') {
-        nav.catch(() => {});
-      }
+      await this.$nextTick();
+      window.dispatchEvent(new CustomEvent('htbah:mention-nav-target-updated'));
     },
   },
   template: `

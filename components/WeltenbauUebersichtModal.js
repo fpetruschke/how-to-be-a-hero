@@ -835,6 +835,9 @@ var HTBAH_REFACTOR_UTILS =
         return !!(this.anlage && this.anlage.offen) || !!vorher;
       },
       verarbeiteMentionNavigationTarget() {
+        if (!this.offen) {
+          return;
+        }
         const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
         if (!mentionApi || typeof mentionApi.consumeNavigationTarget !== 'function') {
           return;
@@ -3107,6 +3110,15 @@ var HTBAH_REFACTOR_UTILS =
           String((a && a.name) || '').localeCompare(String((b && b.name) || ''), 'de'),
         );
       },
+      charakterModalFaehigkeitBasiswert(faehigkeit) {
+        const v = Number(faehigkeit && faehigkeit.value);
+        return Number.isFinite(v) ? v : 0;
+      },
+      charakterModalSichtbareFaehigkeiten(kategorie) {
+        return this.charakterModalSortierteFaehigkeiten(kategorie).filter(
+          (faehigkeit) => this.charakterModalFaehigkeitBasiswert(faehigkeit) > 0,
+        );
+      },
       charakterModalEffektivwert(kategorie, faehigkeit) {
         const stats = this.charakterModalFaehigkeitenStats;
         if (!stats) {
@@ -3284,9 +3296,17 @@ var HTBAH_REFACTOR_UTILS =
           [this.gruppeId]: mitgliedId,
         };
         window.HTBAH.speichereSpielleiterZustand(zustand);
+        this.schliesseCharakterModal();
         this.schliessen();
         if (this.$router && typeof this.$router.push === 'function') {
-          this.$router.push(`/spielleiter/kampagne/${this.gruppeId}`);
+          const ziel =
+            window.HTBAH && typeof window.HTBAH.kampagnenPfad === 'function'
+              ? window.HTBAH.kampagnenPfad('gruppe', this.gruppeId)
+              : '/spielleiter';
+          const nav = this.$router.push(ziel);
+          if (nav && typeof nav.catch === 'function') {
+            nav.catch(() => {});
+          }
         }
       },
       schliesseCharakterModal() {
@@ -7048,53 +7068,57 @@ var HTBAH_REFACTOR_UTILS =
                 <div v-else class="small text-body-secondary">Keine Fraktionen vorhanden.</div>
               </div>
             </div>
-            <div v-if="charakterModalFaehigkeitenStats" class="htbah-iw-charakter-stats mt-2">
-              <p class="form-label small text-secondary mb-1">Fähigkeiten &amp; Begabungen</p>
+            <div
+              v-if="charakterModalFaehigkeitenStats"
+              class="htbah-iw-charakter-stats mt-2"
+              role="region"
+              aria-label="Begabungen und Fähigkeiten (nur Anzeige)">
+              <p class="form-label small text-secondary mb-1">
+                Fähigkeiten &amp; Begabungen
+                <span class="text-body-secondary fw-normal">(nur Anzeige)</span>
+              </p>
               <div class="row g-2">
                 <div
                   v-for="kategorie in ['handeln', 'wissen', 'soziales']"
                   :key="'iw-stats-' + kategorie"
-                  class="col-12 col-lg-4">
-                  <div class="border rounded p-2 h-100">
-                    <p class="small fw-semibold text-uppercase mb-1">{{ charakterModalKategorieLabel(kategorie) }}</p>
-                    <div class="d-flex flex-wrap gap-1 mb-2">
-                      <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-summe">
-                        Summe {{ charakterModalFaehigkeitenStats.summen[kategorie] }}
-                      </span>
-                      <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-begabung">
-                        Begabung {{ charakterModalFaehigkeitenStats.begabungen[kategorie] }}
-                      </span>
-                      <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-geistesblitz">
-                        GB {{ charakterModalFaehigkeitenStats.gbVerbleibend[kategorie] }} /
-                        {{ charakterModalFaehigkeitenStats.gbMax[kategorie] }}
-                      </span>
-                    </div>
-                    <div class="table-responsive rounded border border-secondary border-opacity-25">
-                      <table class="table table-sm mb-0 faehigkeiten-tabelle">
-                        <thead>
-                          <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col" class="text-end">Wert</th>
-                            <th scope="col" class="text-end">Effektiv</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr v-if="!charakterModalSortierteFaehigkeiten(kategorie).length">
-                            <td colspan="3" class="text-muted small py-1">Keine Fähigkeiten</td>
-                          </tr>
-                          <tr
-                            v-for="faehigkeit in charakterModalSortierteFaehigkeiten(kategorie)"
-                            :key="kategorie + '-' + (faehigkeit.name || '')">
-                            <td class="align-middle">{{ faehigkeit.name }}</td>
-                            <td class="align-middle text-end text-muted">
-                              {{ faehigkeit.value == null ? '—' : faehigkeit.value }}
-                            </td>
-                            <td class="align-middle text-end">
-                              {{ charakterModalEffektivwert(kategorie, faehigkeit) }}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                  class="col-12 col-md-4">
+                  <div class="card h-100 htbah-iw-charakter-begabung-karte">
+                    <div class="card-body py-2 px-2">
+                      <h6 class="card-title small text-uppercase fw-bold mb-1">
+                        {{ charakterModalKategorieLabel(kategorie) }}
+                      </h6>
+                      <div class="d-flex flex-wrap gap-1 mb-2">
+                        <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-begabung">
+                          Begabung {{ charakterModalFaehigkeitenStats.begabungen[kategorie] }}
+                        </span>
+                        <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-summe">
+                          Summe {{ charakterModalFaehigkeitenStats.summen[kategorie] }}
+                        </span>
+                        <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-geistesblitz">
+                          GB {{ charakterModalFaehigkeitenStats.gbVerbleibend[kategorie] }} /
+                          {{ charakterModalFaehigkeitenStats.gbMax[kategorie] }}
+                        </span>
+                      </div>
+                      <ul
+                        v-if="charakterModalSichtbareFaehigkeiten(kategorie).length"
+                        class="list-unstyled mb-0 htbah-iw-faehigkeiten-kompakt">
+                        <li
+                          v-for="faehigkeit in charakterModalSichtbareFaehigkeiten(kategorie)"
+                          :key="kategorie + '-' + (faehigkeit.name || '')"
+                          class="htbah-iw-faehigkeit-zeile">
+                          <span class="htbah-iw-faehigkeit-name" :title="faehigkeit.name">{{ faehigkeit.name }}</span>
+                          <span
+                            class="htbah-iw-faehigkeit-werte"
+                            :title="'Basis ' + charakterModalFaehigkeitBasiswert(faehigkeit) + ', effektiv ' + charakterModalEffektivwert(kategorie, faehigkeit)">
+                            <span class="text-muted">{{ charakterModalFaehigkeitBasiswert(faehigkeit) }}</span>
+                            <span class="text-body-secondary mx-1" aria-hidden="true">→</span>
+                            <span>{{ charakterModalEffektivwert(kategorie, faehigkeit) }}</span>
+                          </span>
+                        </li>
+                      </ul>
+                      <p v-else class="small text-body-secondary mb-0">
+                        Keine Fähigkeiten mit Punkten.
+                      </p>
                     </div>
                   </div>
                 </div>

@@ -221,6 +221,10 @@ function normalisiereSpielleiterMitglied(m) {
     id: typeof m.id === 'string' && m.id ? m.id : neueEntropieId(),
     charakter: window.HTBAH_CHARAKTER_MODEL.charakterMitDefaults(m.charakter),
     charakterBild: typeof m.charakterBild === 'string' ? m.charakterBild : '',
+    charakterStorageId:
+      typeof m.charakterStorageId === 'string' && m.charakterStorageId.trim()
+        ? m.charakterStorageId.trim()
+        : '',
   };
 }
 

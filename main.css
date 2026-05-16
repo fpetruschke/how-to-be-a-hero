@@ -1369,12 +1369,47 @@ input::placeholder {
   overflow: auto;
 }
 
-.htbah-weltenbau-charakter-modal-body .htbah-iw-charakter-stats .faehigkeiten-tabelle {
-  font-size: 0.78rem;
+.htbah-weltenbau-charakter-modal-body .htbah-iw-charakter-begabung-karte {
+  border-color: var(--border-color);
+  background: var(--card-bg);
 }
 
-.htbah-weltenbau-charakter-modal-body .htbah-iw-charakter-stats .faehigkeiten-tabelle thead th {
+.htbah-weltenbau-charakter-modal-body .htbah-iw-charakter-begabung-karte .card-title {
+  letter-spacing: 0.04em;
   font-size: 0.72rem;
+  color: var(--heading-color);
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-kompakt {
+  font-size: 0.78rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeit-zeile {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeit-zeile:last-child {
+  border-bottom: none;
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeit-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeit-werte {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .htbah-weltenbau-charakter-modal-body .htbah-charakter-inventar-karte {

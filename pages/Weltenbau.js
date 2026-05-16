@@ -290,9 +290,19 @@ window.HTBAH_SEITEN.Weltenbau = {
       if (!pending) {
         return;
       }
-      if (this.aktiveWeltenbauTab === 'welt' && !this.weltenbauMapModalOffen) {
-        this.weltenbauMapModalOffen = true;
+      if (this.aktiveWeltenbauTab !== 'welt') {
+        return;
       }
+      if (!this.weltenbauMapModalOffen) {
+        this.weltenbauMapModalOffen = true;
+        return;
+      }
+      this.$nextTick(() => {
+        const modal = this.$refs.weltenbauMapModal;
+        if (modal && typeof modal.verarbeiteMentionNavigationTarget === 'function') {
+          modal.verarbeiteMentionNavigationTarget();
+        }
+      });
     },
     syncKampagneAusRoute() {
       const slugRaw = this.$route?.params?.kampagneSlug;
@@ -874,6 +884,7 @@ window.HTBAH_SEITEN.Weltenbau = {
   template: `
     <div class="container content py-3">
       <weltenbau-uebersicht-modal
+        ref="weltenbauMapModal"
         :offen="weltenbauMapModalOffen"
         :gruppe-id="ausgewaehlteKampagneId"
         @schliessen="onWeltenbauMapModalSchliessen" />
@@ -1106,7 +1117,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         <div class="alert alert-info py-2 px-3 small mb-2" role="note">
           Hier bearbeitest du die aktuell gewählte Kampagne und ihre Charaktere.
         </div>
-        <spielleiter-gruppe eingebettet />
+        <spielleiter-gruppe eingebettet :kampagne-id="ausgewaehlteKampagneId" />
       </template>
 
       <div class="abstandshalter" aria-hidden="true"></div>

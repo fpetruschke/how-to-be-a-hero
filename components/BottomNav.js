@@ -2361,6 +2361,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           <div class="px-3 pt-2 pb-0">
             <div class="alert alert-info mb-2 py-2" role="note">
               Das eingebettete Tool ist ein experimentelles Soundboard und nur zu Demonstrationszwecken eingebunden.
+              Bitte nutze dedizierte Tools - z.B. <a href="https://www.soundtale.de/" target="_blank" rel="noopener noreferrer">SoundTale</a>.
             </div>
           </div>
           <div class="htbah-musik-iframe-wrap">
