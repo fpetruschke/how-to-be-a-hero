@@ -233,10 +233,9 @@ body.htbah-mit-lp-banner #app {
 }
 
 /*
- * Erzwungene Ausrichtung (Fallback per CSS-Transform):
- * Wird aktiviert, wenn die screen.orientation.lock()-API nicht greift (z. B. im normalen Browser-Tab
- * auf einem Smartphone). Der <body> wird dann passend rotiert, sodass die gewählte Ausrichtung visuell
- * erzwungen wird, auch wenn das Gerät selbst gedreht ist.
+ * Erzwungene Ausrichtung (CSS-Transform gegen Gerätedrehung):
+ * Kompensiert die Differenz zwischen verankertem Ankerwinkel (bei Nutzerwahl gespeichert) und
+ * aktuellem Gerätewinkel – unabhängig davon, ob screen.orientation.lock() verfügbar ist.
  */
 html.htbah-orient-erzwungen {
   overflow: hidden;
@@ -929,6 +928,10 @@ input::placeholder {
   padding: 8px;
 }
 
+.htbah-map-notiz-editor-host .ql-editor [style*='font-size'] {
+  line-height: 1.35;
+}
+
 .htbah-map-pfeil-wrap {
   position: relative;
   width: 100%;
@@ -1115,7 +1118,7 @@ input::placeholder {
 }
 
 .htbah-map-element-lock-button.is-locked {
-  background: rgb(96 96 96 / 90%);
+  background: rgb(157 1 1 / 90%);
 }
 
 .htbah-map-element-lock-button.is-unlocked {
@@ -1364,6 +1367,36 @@ input::placeholder {
 .htbah-weltenbau-charakter-modal-body {
   max-height: 72vh;
   overflow: auto;
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-iw-charakter-stats .faehigkeiten-tabelle {
+  font-size: 0.78rem;
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-iw-charakter-stats .faehigkeiten-tabelle thead th {
+  font-size: 0.72rem;
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-charakter-inventar-karte {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-charakter-inventar-karte .col-12 {
+  min-width: 0;
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-charakter-inventar-karte .quill-editor-host.inventar-beschreibung-quill {
+  min-height: 0 !important;
+  max-width: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.htbah-weltenbau-charakter-modal-body .htbah-charakter-inventar-karte .inventar-beschreibung-quill .ql-toolbar.ql-snow,
+.htbah-weltenbau-charakter-modal-body .htbah-charakter-inventar-karte .inventar-beschreibung-quill .ql-container.ql-snow {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .htbah-charakter-journal-host.quill-editor-host {
@@ -1682,10 +1715,134 @@ input::placeholder {
 }
 
 .htbah-wuerfel-beutel-window.regelwerk-modal-window {
-  width: min(94vw, 520px);
+  width: min(94vw, 640px);
   height: min(86vh, 700px);
   max-height: min(90dvh, 720px);
   overflow: hidden;
+}
+
+.htbah-zeitmessung-badge {
+  position: fixed;
+  z-index: 1038;
+  left: 0.65rem;
+  bottom: calc(
+    var(--htbah-bottom-nav-reserve, 3.5rem) + 0.35rem + env(safe-area-inset-bottom, 0px)
+  );
+  display: flex;
+  max-width: min(14rem, calc(100vw - 1.25rem));
+  align-items: stretch;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.18),
+    0 0 0 1px color-mix(in srgb, var(--primary-color) 35%, transparent);
+  background: color-mix(in srgb, var(--bs-body-bg) 92%, var(--primary-color) 8%);
+  touch-action: manipulation;
+}
+
+.htbah-zeitmessung-badge--custom-pos {
+  left: auto;
+  bottom: auto;
+}
+
+.htbah-zeitmessung-badge__drag {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  padding: 0 0.15rem;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  font-size: 0.75rem;
+  line-height: 1;
+  letter-spacing: -0.12em;
+  color: var(--secondary-color);
+  background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+}
+
+.htbah-zeitmessung-badge__drag:active {
+  cursor: grabbing;
+}
+
+.htbah-zeitmessung-badge__tap {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0.45rem 0.55rem 0.45rem 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.htbah-zeitmessung-badge__tap:hover {
+  filter: brightness(1.04);
+}
+
+.htbah-zeitmessung-badge__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--secondary-color);
+}
+
+.htbah-zeitmessung-badge__modus {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.htbah-zeitmessung-badge__pause {
+  font-weight: 600;
+  color: var(--bs-warning);
+}
+
+.htbah-zeitmessung-badge__zeit {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+}
+
+@media (min-width: 992px) {
+  .htbah-zeitmessung-badge {
+    max-width: min(16rem, calc(100vw - 1.25rem));
+    border-radius: 1.125rem;
+  }
+
+  .htbah-zeitmessung-badge__drag {
+    width: 2.625rem;
+    padding: 0 0.225rem;
+    font-size: 1.125rem;
+  }
+
+  .htbah-zeitmessung-badge__tap {
+    padding: 0.675rem 0.825rem 0.675rem 0.525rem;
+    gap: 0.25rem;
+  }
+
+  .htbah-zeitmessung-badge__meta {
+    font-size: 1.05rem;
+  }
+
+  .htbah-zeitmessung-badge__zeit {
+    font-size: 2rem;
+  }
+}
+
+.htbah-zeitmessung-eingabe .form-control {
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .htbah-musik-modal-window.regelwerk-modal-window {
@@ -2421,6 +2578,77 @@ input::placeholder {
 .htbah-mention-item.is-active,
 .htbah-mention-item:hover {
   background: rgba(76, 125, 255, 0.16);
+}
+
+.ql-snow .ql-toolbar button.ql-emoticons {
+  width: auto;
+  min-width: 1.75rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.ql-snow .ql-toolbar button.ql-emoticons svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.htbah-quill-emoticon-picker {
+  position: fixed;
+  z-index: 12050;
+  max-width: min(92vw, 320px);
+  border: 1px solid var(--border-color);
+  border-radius: 0.65rem;
+  background: var(--card-bg);
+  box-shadow: 0 0.85rem 2rem rgba(0, 0, 0, 0.28);
+  padding: 0.45rem;
+  color: var(--card-color);
+}
+
+.htbah-quill-emoticon-picker__header {
+  margin-bottom: 0.4rem;
+}
+
+.htbah-quill-emoticon-picker__search {
+  background: var(--input-bg);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.htbah-quill-emoticon-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.15rem;
+  max-height: min(42vh, 240px);
+  overflow: auto;
+}
+
+.htbah-quill-emoticon-picker__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.15rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.htbah-quill-emoticon-picker__item--html {
+  font-size: 1rem;
+}
+
+.htbah-quill-emoticon-picker__item:hover,
+.htbah-quill-emoticon-picker__item:focus-visible {
+  background: rgba(76, 125, 255, 0.18);
+  outline: none;
+}
+
+.htbah-quill-emoticon-picker__empty {
+  padding: 0.35rem 0.25rem 0.15rem;
+  text-align: center;
 }
 
 .htbah-zufall-rich-preview {

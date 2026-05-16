@@ -358,7 +358,14 @@ var HTBAH_REFACTOR_UTILS =
             }
             const ortNodeId = `ort:${ort.id}`;
             const bildId = `ortbild:${ort.id}`;
-            const layout = gruppeLayouts[ortNodeId] && typeof gruppeLayouts[ortNodeId] === 'object' ? gruppeLayouts[ortNodeId] : {};
+            const layout =
+              (gruppeLayouts[ortNodeId] && typeof gruppeLayouts[ortNodeId] === 'object'
+                ? gruppeLayouts[ortNodeId]
+                : null) ||
+              (gruppeLayouts[`ortbild:${ort.id}`] && typeof gruppeLayouts[`ortbild:${ort.id}`] === 'object'
+                ? gruppeLayouts[`ortbild:${ort.id}`]
+                : null) ||
+              {};
             return {
               ankerTyp: 'ort',
               layoutKey: ortNodeId,
@@ -477,12 +484,20 @@ var HTBAH_REFACTOR_UTILS =
       },
       kantenLinien() {
         const byId = new Map(this.graph.nodes.map((n) => [n.id, n]));
-        const center = (node) => ({
-          x: (node.position && Number(node.position.x)) || 0,
-          y: (node.position && Number(node.position.y)) || 0,
-          w: this.nodeBreite(node),
-          h: this.nodeHoehe(node),
-        });
+        const center = (node) => {
+          const x = (node.position && Number(node.position.x)) || 0;
+          const y = (node.position && Number(node.position.y)) || 0;
+          const w = this.nodeBreite(node);
+          const h = this.nodeHoehe(node);
+          const entityType = node && node.data ? node.data.entityType : '';
+          const istKreisEntitaet =
+            entityType === 'charakter' || entityType === 'npc' || entityType === 'bestie';
+          if (istKreisEntitaet) {
+            const d = Math.max(30, Math.round(Math.min(w, h) * 0.78));
+            return { x, y, w: d, h: d };
+          }
+          return { x, y, w, h };
+        };
         const schnittpunktAmBildrand = (sx, sy, rectX, rectY, rectW, rectH) => {
           const cx = rectX + rectW / 2;
           const cy = rectY + rectH / 2;
@@ -571,6 +586,34 @@ var HTBAH_REFACTOR_UTILS =
           return { tot: false, bewusstlos: false };
         }
         return statusFuerLebenspunkte(this.charakterModal.charakter);
+      },
+      charakterModalFaehigkeitenStats() {
+        const charakter = this.charakterModal.charakter;
+        const M = window.HTBAH_CHARAKTER_MODEL;
+        if (!charakter || !M || typeof M.summenAusCharakter !== 'function') {
+          return null;
+        }
+        const summen = M.summenAusCharakter(charakter);
+        const begabungen =
+          typeof M.begabungenAusSummen === 'function'
+            ? M.begabungenAusSummen(summen)
+            : { handeln: 0, wissen: 0, soziales: 0 };
+        const gbVerbleibend = charakter.geistesblitzVerbleibend || {};
+        const gbMax = {
+          handeln: Math.round(begabungen.handeln / 10),
+          wissen: Math.round(begabungen.wissen / 10),
+          soziales: Math.round(begabungen.soziales / 10),
+        };
+        return {
+          summen,
+          begabungen,
+          gbMax,
+          gbVerbleibend: {
+            handeln: Number.isFinite(Number(gbVerbleibend.handeln)) ? Number(gbVerbleibend.handeln) : 0,
+            wissen: Number.isFinite(Number(gbVerbleibend.wissen)) ? Number(gbVerbleibend.wissen) : 0,
+            soziales: Number.isFinite(Number(gbVerbleibend.soziales)) ? Number(gbVerbleibend.soziales) : 0,
+          },
+        };
       },
       ausgeblendeteFilterAnzahl() {
         let anzahl = 0;
@@ -1199,13 +1242,61 @@ var HTBAH_REFACTOR_UTILS =
         };
         window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
       },
+      migriereBildLayoutsLokal(gruppeLayouts) {
+        const quelle = gruppeLayouts && typeof gruppeLayouts === 'object' ? gruppeLayouts : {};
+        const next = { ...quelle };
+        let geaendert = false;
+        const istStandardGroesse = (layout) => {
+          if (!layout || typeof layout !== 'object') {
+            return true;
+          }
+          const w = Math.round(Number(layout.width) || 0);
+          const h = Math.round(Number(layout.height) || 0);
+          return (
+            (w === 320 && h === 220) ||
+            (w === 260 && h === 180) ||
+            !Number.isFinite(Number(layout.width)) ||
+            !Number.isFinite(Number(layout.height))
+          );
+        };
+        Object.entries(quelle).forEach(([key, layout]) => {
+          if (!layout || typeof layout !== 'object') {
+            return;
+          }
+          if (key.startsWith('ortbild:')) {
+            const ortKey = `ort:${key.slice('ortbild:'.length)}`;
+            const bestehend = next[ortKey];
+            if (!bestehend || istStandardGroesse(bestehend)) {
+              next[ortKey] = { ...(bestehend || {}), ...layout };
+              geaendert = true;
+            }
+            if (key !== ortKey) {
+              delete next[key];
+              geaendert = true;
+            }
+          }
+          if (key.startsWith('freibild:freibild:')) {
+            const neuKey = key.replace(/^freibild:/, '');
+            if (!next[neuKey]) {
+              next[neuKey] = layout;
+              geaendert = true;
+            }
+            delete next[key];
+            geaendert = true;
+          }
+        });
+        return { layouts: next, geaendert };
+      },
       uebernehmeBildLayouts() {
         const gruppeKey = this.gruppeId || 'default';
         const alleLayouts = this.ladeBildLayouts();
-        const gruppeLayouts = alleLayouts[gruppeKey] && typeof alleLayouts[gruppeKey] === 'object'
-          ? alleLayouts[gruppeKey]
-          : {};
-        this.mapBildLayoutsLokal = JSON.parse(JSON.stringify(gruppeLayouts));
+        const roh =
+          alleLayouts[gruppeKey] && typeof alleLayouts[gruppeKey] === 'object' ? alleLayouts[gruppeKey] : {};
+        const migriert = this.migriereBildLayoutsLokal(roh);
+        this.mapBildLayoutsLokal = JSON.parse(JSON.stringify(migriert.layouts));
+        if (migriert.geaendert) {
+          this.persistiereLokaleOrtBildLayouts();
+        }
       },
       ladeMapEinstellungen() {
         const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
@@ -1579,10 +1670,87 @@ var HTBAH_REFACTOR_UTILS =
           return null;
         }
       },
+      gegenstaendeMitAufgeloestemBesitzer() {
+        const zuordnung = new Map();
+        const ausInventar = (typ, entityId, inventar) => {
+          const besitzerId = String(entityId || '').trim();
+          if (!besitzerId) {
+            return;
+          }
+          (Array.isArray(inventar) ? inventar : []).forEach((item) => {
+            const gegenstandId = String(item && item.gegenstandId ? item.gegenstandId : '').trim();
+            if (gegenstandId) {
+              zuordnung.set(gegenstandId, { typ, id: besitzerId });
+            }
+          });
+        };
+        (this.zustand.npcs || []).forEach((npc) => {
+          if (npc && npc.id) {
+            ausInventar('npc', npc.id, npc.inventar);
+          }
+        });
+        (this.zustand.bestien || []).forEach((bestie) => {
+          if (bestie && bestie.id) {
+            ausInventar('bestie', bestie.id, bestie.inventar);
+          }
+        });
+        (this.aktiveGruppe && this.aktiveGruppe.mitglieder ? this.aktiveGruppe.mitglieder : []).forEach(
+          (mitglied) => {
+            if (!mitglied || !mitglied.id) {
+              return;
+            }
+            const charakter = mitglied.charakter || {};
+            ausInventar('charakter', mitglied.id, charakter.inventar);
+          },
+        );
+        return (this.zustand.gegenstaende || []).map((g) => {
+          if (!g || !g.id) {
+            return g;
+          }
+          const inv = zuordnung.get(String(g.id));
+          if (!inv) {
+            return g;
+          }
+          const besitzerTyp = String(g.besitzerTyp || '').trim();
+          const besitzerId = String(g.besitzerId || '').trim();
+          if (besitzerTyp && besitzerId) {
+            return g;
+          }
+          return { ...g, besitzerTyp: inv.typ, besitzerId: inv.id };
+        });
+      },
+      ergaenzeBesitzerKanten(nodes, edges, gegenstaende) {
+        const nodeIds = new Set((nodes || []).map((n) => n && n.id).filter(Boolean));
+        const edgeIds = new Set((edges || []).map((e) => e && e.id).filter(Boolean));
+        (gegenstaende || []).forEach((g) => {
+          if (!g || !g.id) {
+            return;
+          }
+          const typ = String(g.besitzerTyp || '').trim();
+          const id = String(g.besitzerId || '').trim();
+          if (!typ || !id) {
+            return;
+          }
+          const besitzerKey = `${typ}:${id}`;
+          const gegenstandKey = `gegenstand:${g.id}`;
+          const edgeId = `e-${besitzerKey}-${gegenstandKey}`;
+          if (!nodeIds.has(besitzerKey) || !nodeIds.has(gegenstandKey) || edgeIds.has(edgeId)) {
+            return;
+          }
+          edges.push({
+            id: edgeId,
+            source: besitzerKey,
+            target: gegenstandKey,
+            type: 'straight',
+          });
+          edgeIds.add(edgeId);
+        });
+      },
       baueGraph() {
         const gruppeKey = this.gruppeId || 'default';
         const layoutAlle = this.ladeLayouts();
         const layout = layoutAlle[gruppeKey] || {};
+        const gegenstaende = this.gegenstaendeMitAufgeloestemBesitzer();
         const ortNodes = (this.zustand.orte || []).map((ort, idx) => {
           const key = `ort:${ort.id}`;
           return {
@@ -1594,6 +1762,9 @@ var HTBAH_REFACTOR_UTILS =
           };
         });
         const ortByName = new Map((this.zustand.orte || []).map((o) => [String(o.name || '').trim(), o]));
+        const gegenstandById = new Map(
+          gegenstaende.filter((g) => g && g.id).map((g) => [String(g.id), g]),
+        );
         const edges = [];
         const nodes = ortNodes.slice();
         const fraktionByName = new Map(
@@ -1665,12 +1836,48 @@ var HTBAH_REFACTOR_UTILS =
               fraktionByName,
               fraktionNodeByOrtSchluessel,
             );
+            const inGegenstandId =
+              prefix === 'gegenstand' ? String(row.inGegenstandId || '').trim() : '';
+            const raetselGegenstandId =
+              prefix === 'raetsel' ? String(row.gegenstandId || '').trim() : '';
+            const besitzerTyp =
+              prefix === 'gegenstand' ? String(row.besitzerTyp || '').trim() : '';
+            const besitzerId =
+              prefix === 'gegenstand' ? String(row.besitzerId || '').trim() : '';
+            let besitzerKey = '';
+            if (besitzerTyp === 'npc' && besitzerId) {
+              besitzerKey = `npc:${besitzerId}`;
+            } else if (besitzerTyp === 'bestie' && besitzerId) {
+              besitzerKey = `bestie:${besitzerId}`;
+            } else if (besitzerTyp === 'charakter' && besitzerId) {
+              besitzerKey = `charakter:${besitzerId}`;
+            }
+            const traegerGegenstandId = raetselGegenstandId || inGegenstandId;
+            const traegerGegenstand = traegerGegenstandId ? gegenstandById.get(traegerGegenstandId) : null;
+            const traegerGegenstandKey =
+              traegerGegenstandId && traegerGegenstand ? `gegenstand:${traegerGegenstandId}` : '';
+            const hatParentGegenstand = !!traegerGegenstandKey;
+            const hatBesitzer = !!besitzerKey;
+            const traegerOrtName = traegerGegenstand
+              ? String(traegerGegenstand.aufenthaltsort || '').trim()
+              : ortName;
+            const traegerOrt = traegerOrtName ? ortByName.get(traegerOrtName) : ort;
             const anchor =
-              fraktionNodeIds.length
-                ? layout[fraktionNodeIds[0]] || { x: 520, y: 280 }
-                : ort
-                  ? layout[`ort:${ort.id}`] || { x: 280, y: 200 }
-                  : { x: 1200, y: 140 + fallbackY };
+              traegerGegenstandKey && layout[traegerGegenstandKey]
+                ? layout[traegerGegenstandKey]
+                : besitzerKey && layout[besitzerKey]
+                  ? layout[besitzerKey]
+                  : fraktionNodeIds.length
+                    ? layout[fraktionNodeIds[0]] || { x: 520, y: 280 }
+                    : traegerOrt
+                      ? layout[`ort:${traegerOrt.id}`] || { x: 280, y: 200 }
+                      : ort
+                        ? layout[`ort:${ort.id}`] || { x: 280, y: 200 }
+                        : { x: 1200, y: 140 + fallbackY };
+            const nestOffsetX =
+              traegerGegenstandId || besitzerKey ? 24 + (idx % 2) * 108 : (idx % 3) * 210;
+            const nestOffsetY =
+              traegerGegenstandId || besitzerKey ? 58 + Math.floor(idx / 2) * 72 : Math.floor(idx / 3) * 120;
             const status = statusFaerben ? statusFuerLebenspunkte(row) : { tot: false, bewusstlos: false };
             if (prefix === 'npc' && status.tot && !this.sichtbarkeitsFilter.toteNpcsAnzeigen) {
               return;
@@ -1690,7 +1897,12 @@ var HTBAH_REFACTOR_UTILS =
             nodes.push({
               id: key,
               type: 'default',
-              position: layout[key] || { x: anchor.x + 240 + (idx % 3) * 210, y: anchor.y + Math.floor(idx / 3) * 120 },
+              position:
+                layout[key] ||
+                {
+                  x: anchor.x + (traegerGegenstandId || besitzerKey ? nestOffsetX : 240 + nestOffsetX),
+                  y: anchor.y + nestOffsetY,
+                },
               data: {
                 label: `${emoji} ${textWert(prefix === 'raetsel' ? row.titel : row.name)}`,
                 entityType: prefix,
@@ -1702,22 +1914,38 @@ var HTBAH_REFACTOR_UTILS =
               },
               style: { width: istKreisTyp ? 86 : 200, ...style },
             });
-            if (ort && !fraktionNodeIds.length) {
-              edges.push({ id: `e-${key}-ort:${ort.id}`, source: `ort:${ort.id}`, target: key, type: 'straight' });
-            }
-            fraktionNodeIds.forEach((fraktionNodeId, fraktionIndex) => {
+            if (hatParentGegenstand) {
               edges.push({
-                id: `e-${fraktionNodeId}-${key}-${fraktionIndex}`,
-                source: fraktionNodeId,
+                id: `e-${traegerGegenstandKey}-${key}`,
+                source: traegerGegenstandKey,
                 target: key,
                 type: 'straight',
               });
-            });
+            } else if (hatBesitzer) {
+              edges.push({
+                id: `e-${besitzerKey}-${key}`,
+                source: besitzerKey,
+                target: key,
+                type: 'straight',
+              });
+            } else {
+              if (ort && !fraktionNodeIds.length) {
+                edges.push({ id: `e-${key}-ort:${ort.id}`, source: `ort:${ort.id}`, target: key, type: 'straight' });
+              }
+              fraktionNodeIds.forEach((fraktionNodeId, fraktionIndex) => {
+                edges.push({
+                  id: `e-${fraktionNodeId}-${key}-${fraktionIndex}`,
+                  source: fraktionNodeId,
+                  target: key,
+                  type: 'straight',
+                });
+              });
+            }
           });
         };
         pushEnt('npc', '👤', this.zustand.npcs, 'aufenthaltsort', 60, true);
         pushEnt('bestie', '🦁', this.zustand.bestien, 'aufenthaltsort', 260, true);
-        pushEnt('gegenstand', '📦', this.zustand.gegenstaende, 'aufenthaltsort', 460, false);
+        pushEnt('gegenstand', '📦', gegenstaende, 'aufenthaltsort', 460, false);
         pushEnt('raetsel', '🧩', this.zustand.raetsel, 'aufenthaltsort', 660, false);
         nodes.forEach((node) => {
           if (!(node && node.data && node.data.entityType === 'raetsel')) {
@@ -1778,6 +2006,7 @@ var HTBAH_REFACTOR_UTILS =
             });
           });
         });
+        this.ergaenzeBesitzerKanten(nodes, edges, gegenstaende);
         return { nodes, edges, layoutAlle, gruppeKey };
       },
       schreibeNodePosition(nodeId, position, gruppeKey) {
@@ -2299,13 +2528,27 @@ var HTBAH_REFACTOR_UTILS =
           : Number.isFinite(Number(alt && alt.angleDeg))
             ? Number(alt && alt.angleDeg)
             : 0;
+        const widthRaw = Number(layout.width);
+        const heightRaw = Number(layout.height);
+        const width = Number.isFinite(widthRaw)
+          ? Math.max(minWidth, Math.round(widthRaw))
+          : Number.isFinite(Number(alt && alt.width))
+            ? Math.max(minWidth, Math.round(Number(alt.width)))
+            : 320;
+        const height = Number.isFinite(heightRaw)
+          ? Math.max(minHeight, Math.round(heightRaw))
+          : Number.isFinite(Number(alt && alt.height))
+            ? Math.max(minHeight, Math.round(Number(alt.height)))
+            : 220;
+        const xRaw = Number(layout.x);
+        const yRaw = Number(layout.y);
         this.mapBildLayoutsLokal = {
           ...(this.mapBildLayoutsLokal || {}),
           [ortId]: {
-            x: Math.round(Number(layout.x) || 0),
-            y: Math.round(Number(layout.y) || 0),
-            width: Math.max(minWidth, Math.round(Number(layout.width) || 320)),
-            height: Math.max(minHeight, Math.round(Number(layout.height) || 220)),
+            x: Number.isFinite(xRaw) ? Math.round(xRaw) : Math.round(Number(alt && alt.x) || 0),
+            y: Number.isFinite(yRaw) ? Math.round(yRaw) : Math.round(Number(alt && alt.y) || 0),
+            width,
+            height,
             angleDeg,
           },
         };
@@ -2317,10 +2560,15 @@ var HTBAH_REFACTOR_UTILS =
           this.verlauf.ortBildLayoutSpeicherTimer = 0;
         }
         const gruppeKey = this.gruppeId || 'default';
+        const layouts = JSON.parse(JSON.stringify(this.mapBildLayoutsLokal || {}));
+        if (typeof window.HTBAH.speichereWeltenbauMapBildLayoutsGruppe === 'function') {
+          window.HTBAH.speichereWeltenbauMapBildLayoutsGruppe(this.gruppeId, gruppeKey, layouts);
+          return;
+        }
         const alleLayouts = this.ladeBildLayouts();
         this.speichereBildLayouts({
           ...alleLayouts,
-          [gruppeKey]: JSON.parse(JSON.stringify(this.mapBildLayoutsLokal || {})),
+          [gruppeKey]: layouts,
         });
       },
       rechteckeUeberlappen(a, b, padding = 0) {
@@ -2354,6 +2602,12 @@ var HTBAH_REFACTOR_UTILS =
             return false;
           }
           const t = n.data.entityType;
+          if (sourceType === 'gegenstand') {
+            return t === 'charakter' || t === 'npc' || t === 'bestie' || t === 'gegenstand' || t === 'ort' || t === 'fraktion';
+          }
+          if (sourceType === 'raetsel') {
+            return t === 'gegenstand' || t === 'ort' || t === 'fraktion';
+          }
           if (sourceType === 'fraktion') {
             return t === 'ort';
           }
@@ -2504,7 +2758,366 @@ var HTBAH_REFACTOR_UTILS =
           }
           return false;
         }
+        if (targetType === 'gegenstand') {
+          const parentId = targetNode.data.entityId;
+          if (!parentId || parentId === sourceId) {
+            return false;
+          }
+          if (sourceType === 'gegenstand') {
+            return this.verknuepfeGegenstandMitGegenstand(sourceId, parentId);
+          }
+          if (sourceType === 'raetsel') {
+            return this.verknuepfeRaetselMitGegenstand(sourceId, parentId);
+          }
+          return false;
+        }
+        if (sourceType === 'gegenstand') {
+          const dropTargetType = targetNode.data.entityType;
+          if (!['charakter', 'npc', 'bestie'].includes(dropTargetType)) {
+            return false;
+          }
+          const gegenstand = sourceNode.data.payload || {};
+          return this.uebertrageGegenstandInInventar(
+            sourceId,
+            gegenstand,
+            dropTargetType,
+            targetNode.data.entityId,
+          );
+        }
         return false;
+      },
+      gegenstandNameFuerId(gegenstandId) {
+        const id = String(gegenstandId || '').trim();
+        if (!id) {
+          return '';
+        }
+        const gegenstand = (this.zustand.gegenstaende || []).find((g) => g && g.id === id);
+        return gegenstand ? String(gegenstand.name || '').trim() : '';
+      },
+      istGegenstandVorfahreVon(vorfahrId, nachfahrId) {
+        const start = String(vorfahrId || '').trim();
+        const ziel = String(nachfahrId || '').trim();
+        if (!start || !ziel || start === ziel) {
+          return start === ziel;
+        }
+        const byId = new Map(
+          (this.zustand.gegenstaende || [])
+            .filter((g) => g && g.id)
+            .map((g) => [String(g.id), g]),
+        );
+        const besucht = new Set();
+        let aktuell = ziel;
+        while (aktuell && !besucht.has(aktuell)) {
+          if (aktuell === start) {
+            return true;
+          }
+          besucht.add(aktuell);
+          const row = byId.get(aktuell);
+          aktuell = row ? String(row.inGegenstandId || '').trim() : '';
+        }
+        return false;
+      },
+      verknuepfeGegenstandMitGegenstand(kindId, parentId) {
+        const kind = String(kindId || '').trim();
+        const parent = String(parentId || '').trim();
+        if (!kind || !parent || kind === parent || this.istGegenstandVorfahreVon(kind, parent)) {
+          return false;
+        }
+        const parentRow = (this.zustand.gegenstaende || []).find((g) => g && g.id === parent);
+        if (!parentRow) {
+          return false;
+        }
+        const ortName = String(parentRow.aufenthaltsort || '').trim();
+        let wurdeGeaendert = false;
+        const kindRow = (this.zustand.gegenstaende || []).find((g) => g && g.id === kind);
+        if (kindRow) {
+          const bTyp = String(kindRow.besitzerTyp || '').trim();
+          const bId = String(kindRow.besitzerId || '').trim();
+          if (bTyp && bId) {
+            this.entferneGegenstandAusBesitzerInventar(bTyp, bId, kind);
+          }
+        }
+        this.zustand.gegenstaende = (this.zustand.gegenstaende || []).map((g) => {
+          if (!g || g.id !== kind) {
+            return g;
+          }
+          wurdeGeaendert = true;
+          return {
+            ...g,
+            inGegenstandId: parent,
+            aufenthaltsort: ortName,
+            besitzerTyp: '',
+            besitzerId: '',
+          };
+        });
+        if (wurdeGeaendert) {
+          this.speichereZustand();
+        }
+        return wurdeGeaendert;
+      },
+      verknuepfeRaetselMitGegenstand(raetselId, gegenstandId) {
+        const raetsel = String(raetselId || '').trim();
+        const gegenstand = String(gegenstandId || '').trim();
+        if (!raetsel || !gegenstand) {
+          return false;
+        }
+        const gegenstandRow = (this.zustand.gegenstaende || []).find((g) => g && g.id === gegenstand);
+        if (!gegenstandRow) {
+          return false;
+        }
+        const ortName = String(gegenstandRow.aufenthaltsort || '').trim();
+        let wurdeGeaendert = false;
+        this.zustand.raetsel = (this.zustand.raetsel || []).map((r) => {
+          if (!r || r.id !== raetsel) {
+            return r;
+          }
+          wurdeGeaendert = true;
+          return {
+            ...r,
+            gegenstandId: gegenstand,
+            aufenthaltsort: ortName,
+          };
+        });
+        if (wurdeGeaendert) {
+          this.speichereZustand();
+        }
+        return wurdeGeaendert;
+      },
+      erzeugeInventarEintragAusGegenstand(gegenstand) {
+        const M = window.HTBAH_CHARAKTER_MODEL;
+        if (M && typeof M.inventarEintragAusGegenstand === 'function') {
+          return M.inventarEintragAusGegenstand(gegenstand);
+        }
+        return {
+          id: M && typeof M.neueInventarId === 'function' ? M.neueInventarId() : `inv-${Date.now()}`,
+          name: '',
+          typ: 'gegenstand',
+          beschreibungHtml: '',
+        };
+      },
+      entferneGegenstandAusWelt(gegenstandId) {
+        if (!gegenstandId) {
+          return;
+        }
+        const id = String(gegenstandId);
+        if (window.HTBAH && typeof window.HTBAH.entferneGegenstandAusAllenInventaren === 'function') {
+          window.HTBAH.entferneGegenstandAusAllenInventaren(this.zustand, id);
+        }
+        this.zustand.gegenstaende = (this.zustand.gegenstaende || []).filter((g) => g && g.id !== id);
+        this.speichereZustand();
+      },
+      entferneGegenstandAusBesitzerInventar(besitzerTyp, besitzerId, gegenstandId) {
+        const typ = String(besitzerTyp || '').trim();
+        const id = String(besitzerId || '').trim();
+        const gid = String(gegenstandId || '').trim();
+        if (!typ || !id || !gid) {
+          return;
+        }
+        if (typ === 'npc' || typ === 'bestie') {
+          const listeName = typ === 'npc' ? 'npcs' : 'bestien';
+          this.zustand[listeName] = (this.zustand[listeName] || []).map((row) => {
+            if (!row || row.id !== id || !Array.isArray(row.inventar)) {
+              return row;
+            }
+            return {
+              ...row,
+              inventar: row.inventar.filter(
+                (item) => item && String(item.gegenstandId || '').trim() !== gid,
+              ),
+            };
+          });
+          return;
+        }
+        if (typ === 'charakter') {
+          this.updateCharakterZuordnung(id, (charakter) => {
+            const inventar = Array.isArray(charakter.inventar) ? charakter.inventar : [];
+            return {
+              ...charakter,
+              inventar: inventar.filter(
+                (item) => item && String(item.gegenstandId || '').trim() !== gid,
+              ),
+            };
+          });
+        }
+      },
+      befreieGegenstandBesitzer(gegenstandId) {
+        const gid = String(gegenstandId || '').trim();
+        if (!gid) {
+          return;
+        }
+        const row = (this.zustand.gegenstaende || []).find((g) => g && g.id === gid);
+        if (row) {
+          const bTyp = String(row.besitzerTyp || '').trim();
+          const bId = String(row.besitzerId || '').trim();
+          if (bTyp && bId) {
+            this.entferneGegenstandAusBesitzerInventar(bTyp, bId, gid);
+          }
+        }
+        this.zustand.gegenstaende = (this.zustand.gegenstaende || []).map((g) =>
+          g && g.id === gid ? { ...g, besitzerTyp: '', besitzerId: '' } : g,
+        );
+        this.speichereZustand();
+      },
+      inventarHatGegenstandId(inventar, gegenstandId) {
+        const gid = String(gegenstandId || '').trim();
+        if (!gid || !Array.isArray(inventar)) {
+          return false;
+        }
+        return inventar.some((item) => item && String(item.gegenstandId || '').trim() === gid);
+      },
+      besitzerAufenthaltsort(besitzerTyp, besitzerId) {
+        const typ = String(besitzerTyp || '').trim();
+        const id = String(besitzerId || '').trim();
+        if (!typ || !id) {
+          return '';
+        }
+        if (typ === 'npc') {
+          const npc = (this.zustand.npcs || []).find((n) => n && n.id === id);
+          return npc ? String(npc.aufenthaltsort || '').trim() : '';
+        }
+        if (typ === 'bestie') {
+          const bestie = (this.zustand.bestien || []).find((b) => b && b.id === id);
+          return bestie ? String(bestie.aufenthaltsort || '').trim() : '';
+        }
+        if (typ === 'charakter') {
+          const mitglied = (this.aktiveGruppe && this.aktiveGruppe.mitglieder
+            ? this.aktiveGruppe.mitglieder
+            : []
+          ).find((m) => m && m.id === id);
+          const char = mitglied && mitglied.charakter ? mitglied.charakter : null;
+          return char ? String(char.aufenthaltsort || '').trim() : '';
+        }
+        return '';
+      },
+      verknuepfeGegenstandMitBesitzer(gegenstandId, besitzerTyp, besitzerId) {
+        const gid = String(gegenstandId || '').trim();
+        const typ = String(besitzerTyp || '').trim();
+        const id = String(besitzerId || '').trim();
+        if (!gid || !typ || !id) {
+          return false;
+        }
+        const ortName = this.besitzerAufenthaltsort(typ, id);
+        const alt = (this.zustand.gegenstaende || []).find((g) => g && g.id === gid);
+        if (alt) {
+          const bTyp = String(alt.besitzerTyp || '').trim();
+          const bId = String(alt.besitzerId || '').trim();
+          if (bTyp && bId && (bTyp !== typ || bId !== id)) {
+            this.entferneGegenstandAusBesitzerInventar(bTyp, bId, gid);
+          }
+        }
+        let wurdeGeaendert = false;
+        this.zustand.gegenstaende = (this.zustand.gegenstaende || []).map((g) => {
+          if (!g || g.id !== gid) {
+            return g;
+          }
+          wurdeGeaendert = true;
+          return {
+            ...g,
+            besitzerTyp: typ,
+            besitzerId: id,
+            aufenthaltsort: ortName || g.aufenthaltsort || '',
+            inGegenstandId: '',
+          };
+        });
+        if (wurdeGeaendert) {
+          this.speichereZustand();
+        }
+        return wurdeGeaendert;
+      },
+      fuegeInventarEintragZuNpcOderBestieHinzu(listeName, entityId, eintrag) {
+        if (!entityId || !eintrag || (listeName !== 'npcs' && listeName !== 'bestien')) {
+          return false;
+        }
+        const gegenstandId = String(eintrag.gegenstandId || '').trim();
+        let gefunden = false;
+        this.zustand[listeName] = (this.zustand[listeName] || []).map((row) => {
+          if (!row || row.id !== entityId) {
+            return row;
+          }
+          gefunden = true;
+          const inventar = Array.isArray(row.inventar) ? row.inventar.slice() : [];
+          if (gegenstandId && this.inventarHatGegenstandId(inventar, gegenstandId)) {
+            return row;
+          }
+          inventar.push(eintrag);
+          return { ...row, inventar };
+        });
+        if (!gefunden) {
+          return false;
+        }
+        this.speichereZustand();
+        return true;
+      },
+      uebertrageGegenstandInInventar(gegenstandId, gegenstand, targetType, targetId) {
+        if (!gegenstandId || !targetId) {
+          return false;
+        }
+        const eintrag = this.erzeugeInventarEintragAusGegenstand(gegenstand);
+        eintrag.gegenstandId = String(gegenstandId);
+        let ok = false;
+        if (targetType === 'charakter') {
+          ok = this.updateCharakterZuordnung(targetId, (charakter) => {
+            const inventar = Array.isArray(charakter.inventar) ? charakter.inventar.slice() : [];
+            if (this.inventarHatGegenstandId(inventar, eintrag.gegenstandId)) {
+              return charakter;
+            }
+            inventar.push(eintrag);
+            return { ...charakter, inventar };
+          });
+          if (
+            ok &&
+            this.charakterModal.offen &&
+            this.charakterModal.mitgliedId === targetId &&
+            this.charakterModal.charakter
+          ) {
+            if (!Array.isArray(this.charakterModal.charakter.inventar)) {
+              this.charakterModal.charakter.inventar = [];
+            }
+            this.charakterModal.charakter.inventar.push({ ...eintrag });
+            this.$nextTick(() => this.charakterInventarEditorenSync());
+          }
+        } else if (targetType === 'npc') {
+          ok = this.fuegeInventarEintragZuNpcOderBestieHinzu('npcs', targetId, eintrag);
+        } else if (targetType === 'bestie') {
+          ok = this.fuegeInventarEintragZuNpcOderBestieHinzu('bestien', targetId, eintrag);
+        }
+        if (ok) {
+          ok = this.verknuepfeGegenstandMitBesitzer(gegenstandId, targetType, targetId);
+        }
+        return ok;
+      },
+      charakterModalKategorieLabel(kategorie) {
+        if (kategorie === 'handeln') {
+          return 'Handeln';
+        }
+        if (kategorie === 'wissen') {
+          return 'Wissen';
+        }
+        if (kategorie === 'soziales') {
+          return 'Soziales';
+        }
+        return kategorie;
+      },
+      charakterModalSortierteFaehigkeiten(kategorie) {
+        const charakter = this.charakterModal.charakter;
+        if (!charakter || !Array.isArray(charakter[kategorie])) {
+          return [];
+        }
+        return [...charakter[kategorie]].sort((a, b) =>
+          String((a && a.name) || '').localeCompare(String((b && b.name) || ''), 'de'),
+        );
+      },
+      charakterModalEffektivwert(kategorie, faehigkeit) {
+        const stats = this.charakterModalFaehigkeitenStats;
+        if (!stats) {
+          return 0;
+        }
+        const b = stats.begabungen[kategorie] || 0;
+        const v = Number(faehigkeit && faehigkeit.value);
+        if (Number.isNaN(v)) {
+          return 0;
+        }
+        return Math.min(100, v + b);
       },
       winkelGradZwischenPunkten(vonX, vonY, nachX, nachY) {
         const dx = Number(nachX) - Number(vonX);
@@ -2969,6 +3582,8 @@ var HTBAH_REFACTOR_UTILS =
           if (!d.kampagneId || d.kampagneId !== this.gruppeId) {
             return;
           }
+          this.uebernehmeBildLayouts();
+          this.mapFreieElementeTick += 1;
         } else if (d.art === 'spielleiter') {
           this.spielleiterTick += 1;
         } else {
@@ -3953,12 +4568,22 @@ var HTBAH_REFACTOR_UTILS =
                 ? 'raetsel'
                 : 'gegenstande';
         if (listeName === 'gegenstande') {
+          const alt = (this.zustand.gegenstaende || []).find((g) => g && g.id === entityId);
+          if (alt) {
+            const bTyp = String(alt.besitzerTyp || '').trim();
+            const bId = String(alt.besitzerId || '').trim();
+            if (bTyp && bId) {
+              this.entferneGegenstandAusBesitzerInventar(bTyp, bId, entityId);
+            }
+          }
           this.zustand.gegenstaende = (this.zustand.gegenstaende || []).map((g) =>
-            g.id === entityId ? { ...g, aufenthaltsort: ortName } : g,
+            g.id === entityId
+              ? { ...g, aufenthaltsort: ortName, inGegenstandId: '', besitzerTyp: '', besitzerId: '' }
+              : g,
           );
         } else if (listeName === 'raetsel') {
           this.zustand.raetsel = (this.zustand.raetsel || []).map((e) =>
-            e.id === entityId ? { ...e, aufenthaltsort: ortName } : e,
+            e.id === entityId ? { ...e, aufenthaltsort: ortName, gegenstandId: '' } : e,
           );
         } else {
           this.zustand[listeName] = (this.zustand[listeName] || []).map((e) =>
@@ -4040,7 +4665,19 @@ var HTBAH_REFACTOR_UTILS =
         if (!listeName || !Array.isArray(this.zustand[listeName]) || index >= this.zustand[listeName].length) {
           return false;
         }
+        const geloescht = this.zustand[listeName][index];
+        const geloeschtId = geloescht && geloescht.id ? String(geloescht.id) : '';
         this.zustand[listeName] = this.zustand[listeName].filter((_, i) => i !== index);
+        if (typ === 'gegenstand' && geloeschtId && window.HTBAH) {
+          window.HTBAH.entferneZufallstabellenParentReferenzenAufGegenstand(this.zustand, geloeschtId);
+          if (typeof window.HTBAH.entferneGegenstandAusAllenInventaren === 'function') {
+            window.HTBAH.entferneGegenstandAusAllenInventaren(this.zustand, geloeschtId);
+          }
+        } else if ((typ === 'npc' || typ === 'bestie') && geloeschtId && window.HTBAH) {
+          if (typeof window.HTBAH.entferneZufallstabellenBesitzerReferenzen === 'function') {
+            window.HTBAH.entferneZufallstabellenBesitzerReferenzen(this.zustand, typ, geloeschtId);
+          }
+        }
         this.speichereZustand();
         return true;
       },
@@ -4167,6 +4804,7 @@ var HTBAH_REFACTOR_UTILS =
             waffe: '',
             schadenswertNahkampf: '',
             schadenswertFernkampf: '',
+            waffenloserKampf: '',
             aufenthaltsort: ortDefault,
             handeln: 12,
             wissen: 14,
@@ -4176,6 +4814,7 @@ var HTBAH_REFACTOR_UTILS =
             glaube: '',
             lpBewusstlosAusgeblendet: false,
             lpMassenschadenBewusstlos: false,
+            inventar: [],
             notizenHtml: '',
             medien: [],
             primaryMediumId: '',
@@ -4206,6 +4845,7 @@ var HTBAH_REFACTOR_UTILS =
             aggressivitaetSkala: 5,
             lpBewusstlosAusgeblendet: false,
             lpMassenschadenBewusstlos: false,
+            inventar: [],
             medien: [],
             primaryMediumId: '',
           };
@@ -4229,6 +4869,7 @@ var HTBAH_REFACTOR_UTILS =
             art: '',
             titel: '',
             aufenthaltsort: ortDefault,
+            gegenstandId: '',
             aufgabeWas: '',
             aufgabenstellung: '',
             ergebnis: '',
@@ -4246,11 +4887,33 @@ var HTBAH_REFACTOR_UTILS =
           schadenswertNahkampf: '',
           schadenswertFernkampf: '',
           aufenthaltsort: ortDefault,
+          inGegenstandId: '',
+          besitzerTyp: '',
+          besitzerId: '',
           initiative: '',
           beschreibungHtml: '',
           medien: [],
           primaryMediumId: '',
         };
+      },
+      onInventarEintragEntfernen(payload) {
+        this.onInventarEintragEntfernenFuerAnlage(this.anlage, payload);
+      },
+      onInventarEintragEntfernenOverlay(payload) {
+        this.withAnlageKontext('overlay', () => this.onInventarEintragEntfernenFuerAnlage(this.anlage, payload));
+      },
+      onInventarEintragEntfernenFuerAnlage(anlage, payload) {
+        const gegenstandId =
+          payload && typeof payload === 'object' ? String(payload.gegenstandId || '').trim() : '';
+        if (!gegenstandId || !anlage || !anlage.zeile) {
+          return;
+        }
+        const inventar = Array.isArray(anlage.zeile.inventar) ? anlage.zeile.inventar : [];
+        anlage.zeile.inventar = inventar.filter(
+          (item) => item && String(item.gegenstandId || '').trim() !== gegenstandId,
+        );
+        this.befreieGegenstandBesitzer(gegenstandId);
+        this.$nextTick(() => this.refreshGraph());
       },
       starteAnlageFlow(typ) {
         if (!typ) {
@@ -4805,24 +5468,96 @@ var HTBAH_REFACTOR_UTILS =
       speichereAnlage() {
         this.speichereAnlageIntern({ schliessenNachSpeichern: true });
       },
+      notizQuillToolbarKonfiguration() {
+        return [
+          ['bold', 'italic', 'underline'],
+          [{ color: [] }, { background: [] }],
+          [{ list: 'ordered' }, { list: 'bullet' }],
+          ['clean'],
+        ];
+      },
+      notizQuillToolbarElement(host) {
+        if (!host) {
+          return null;
+        }
+        const prev = host.previousElementSibling;
+        if (
+          prev &&
+          prev.classList &&
+          prev.classList.contains('ql-toolbar') &&
+          prev.classList.contains('ql-snow')
+        ) {
+          return prev;
+        }
+        const parent = host.parentElement;
+        if (!parent || typeof parent.querySelector !== 'function') {
+          return null;
+        }
+        return parent.querySelector('.ql-toolbar.ql-snow');
+      },
+      bereinigeVerwaisteNotizToolbarsAmHost(host) {
+        if (!host || !host.parentElement) {
+          return;
+        }
+        const aktiveToolbar = this.notizQuillToolbarElement(host);
+        host.parentElement.querySelectorAll('.ql-toolbar.ql-snow').forEach((node) => {
+          if (node === aktiveToolbar) {
+            return;
+          }
+          if (!host.contains(node)) {
+            try {
+              node.remove();
+            } catch {
+              /* ignorieren */
+            }
+          }
+        });
+      },
+      zerstoereNotizQuillEintrag(eintrag) {
+        if (!eintrag) {
+          return;
+        }
+        if (Array.isArray(eintrag.cleanupFns)) {
+          eintrag.cleanupFns.forEach((fn) => {
+            if (typeof fn === 'function') {
+              fn();
+            }
+          });
+        }
+        const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+        const host = eintrag.host;
+        if (lifecycle && typeof lifecycle.zerstoereQuillInstanz === 'function' && eintrag.quill) {
+          lifecycle.zerstoereQuillInstanz({
+            quill: eintrag.quill,
+            hostElement: host,
+            mentionController: eintrag.mentionController,
+            handler: eintrag.textChangeHandler
+              ? [{ event: 'text-change', fn: eintrag.textChangeHandler }]
+              : [],
+            toolbarContainer: host && host.parentElement ? host.parentElement : host,
+          });
+        } else {
+          if (eintrag.quill && eintrag.textChangeHandler) {
+            eintrag.quill.off('text-change', eintrag.textChangeHandler);
+          }
+          if (lifecycle && typeof lifecycle.zerstoereMentionController === 'function') {
+            lifecycle.zerstoereMentionController(eintrag.mentionController);
+          }
+          if (host) {
+            host.innerHTML = '';
+            if (lifecycle && typeof lifecycle.entferneVerwaisteQuillToolbars === 'function') {
+              lifecycle.entferneVerwaisteQuillToolbars(host.parentElement || host);
+            }
+          }
+        }
+      },
       notizEditorRef(elementId, el) {
         if (!elementId) {
           return;
         }
         if (!el) {
           const eintrag = this.notizQuillInstanzen[elementId];
-          if (eintrag) {
-            if (eintrag.quill && eintrag.textChangeHandler) {
-              eintrag.quill.off('text-change', eintrag.textChangeHandler);
-            }
-            if (Array.isArray(eintrag.cleanupFns)) {
-              eintrag.cleanupFns.forEach((fn) => {
-                if (typeof fn === 'function') {
-                  fn();
-                }
-              });
-            }
-          }
+          this.zerstoereNotizQuillEintrag(eintrag);
           delete this.notizQuillInstanzen[elementId];
           delete this.notizQuillEditorRefs[elementId];
           return;
@@ -4847,71 +5582,61 @@ var HTBAH_REFACTOR_UTILS =
           }
           return;
         }
-        if (!window.__HTBAH_QUILL_SIZE_STYLE_REGISTRIERT__) {
-          try {
-            const SizeStyle = window.Quill.import('attributors/style/size');
-            if (SizeStyle) {
-              SizeStyle.whitelist = null;
-            }
-            window.Quill.register(SizeStyle, true);
-            window.__HTBAH_QUILL_SIZE_STYLE_REGISTRIERT__ = true;
-          } catch {
-            // Fallback: Standard-Quill-Format ohne freie px-Groesse.
-          }
+        const sizeApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEmoticons;
+        if (sizeApi && typeof sizeApi.registerPxSizeAttributor === 'function') {
+          sizeApi.registerPxSizeAttributor();
         }
         const istReadOnly = this.istElementGesperrt(elementId);
         const vorhanden = this.notizQuillInstanzen[elementId];
-        if (
-          vorhanden &&
-          vorhanden.quill &&
-          vorhanden.host === host &&
-          host.contains(vorhanden.quill.root) &&
-          !!vorhanden.istReadOnly === istReadOnly
-        ) {
-          const html = typeof bild.notizHtml === 'string' ? bild.notizHtml : '';
-          if (vorhanden.lastHtml !== html) {
-            vorhanden.quill.root.innerHTML = html;
-            vorhanden.lastHtml = html;
+        if (vorhanden && vorhanden.quill && vorhanden.host === host && host.contains(vorhanden.quill.root)) {
+          if (vorhanden.istReadOnly !== istReadOnly) {
+            const htmlAktuell = vorhanden.quill.root.innerHTML;
+            this.speichereNotizHtml(elementId, htmlAktuell);
+            vorhanden.lastHtml = htmlAktuell;
+            this.bereinigeVerwaisteNotizToolbarsAmHost(host);
+            if (!istReadOnly && !this.notizQuillToolbarElement(host)) {
+              this.zerstoereNotizQuillEintrag(vorhanden);
+              delete this.notizQuillInstanzen[elementId];
+            } else {
+              vorhanden.quill.enable(!istReadOnly);
+              vorhanden.istReadOnly = istReadOnly;
+              return;
+            }
+          } else {
+            const html = typeof bild.notizHtml === 'string' ? bild.notizHtml : '';
+            if (vorhanden.lastHtml !== html) {
+              vorhanden.quill.root.innerHTML = html;
+              vorhanden.lastHtml = html;
+            }
+            return;
           }
-          return;
         }
-        if (vorhanden && vorhanden.quill) {
-          vorhanden.quill.off('text-change', vorhanden.textChangeHandler);
-          if (Array.isArray(vorhanden.cleanupFns)) {
-            vorhanden.cleanupFns.forEach((fn) => {
-              if (typeof fn === 'function') {
-                fn();
-              }
-            });
-          }
+        if (vorhanden) {
+          this.zerstoereNotizQuillEintrag(vorhanden);
+        }
+        const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+        if (lifecycle && typeof lifecycle.entferneVerwaisteQuillToolbars === 'function') {
+          lifecycle.entferneVerwaisteQuillToolbars(host.parentElement || host);
         }
         host.innerHTML = '';
         const quill = new window.Quill(host, {
           theme: 'snow',
           placeholder: 'Notiz…',
           modules: {
-            toolbar: istReadOnly
-              ? false
-              : [
-                  ['bold', 'italic', 'underline'],
-                  [{ color: [] }, { background: [] }],
-                  [{ list: 'ordered' }, { list: 'bullet' }],
-                  ['clean'],
-                ],
+            toolbar: this.notizQuillToolbarKonfiguration(),
           },
           readOnly: istReadOnly,
         });
         const cleanupFns = [];
-        if (!istReadOnly) {
-          const parent = host.parentElement;
-          const toolbarEl =
-            (parent && parent.querySelector && parent.querySelector('.ql-toolbar.ql-snow')) ||
-            (host.previousElementSibling &&
-            host.previousElementSibling.classList &&
-            host.previousElementSibling.classList.contains('ql-toolbar')
-              ? host.previousElementSibling
-              : null);
-          if (toolbarEl) {
+        const parent = host.parentElement;
+        const toolbarEl =
+          (parent && parent.querySelector && parent.querySelector('.ql-toolbar.ql-snow')) ||
+          (host.previousElementSibling &&
+          host.previousElementSibling.classList &&
+          host.previousElementSibling.classList.contains('ql-toolbar')
+            ? host.previousElementSibling
+            : null);
+        if (toolbarEl) {
             const bereitsVorhanden = toolbarEl.querySelector('.htbah-quill-size-wrap');
             if (bereitsVorhanden && bereitsVorhanden.parentNode) {
               bereitsVorhanden.parentNode.removeChild(bereitsVorhanden);
@@ -4935,15 +5660,44 @@ var HTBAH_REFACTOR_UTILS =
             };
             groesseInput.addEventListener('pointerdown', stopEvent);
             groesseInput.addEventListener('click', stopEvent);
+            let letzteTextauswahl = null;
             const anwendenGroesse = () => {
               const px = Math.max(1, Math.round(Number(groesseInput.value) || 0));
               if (!Number.isFinite(px) || px <= 0) {
                 return;
               }
-              quill.format('size', `${px}px`);
+              const groesseWert = `${px}px`;
+              let range = quill.getSelection();
+              if (!range && letzteTextauswahl) {
+                quill.setSelection(letzteTextauswahl.index, letzteTextauswahl.length, 'silent');
+                range = letzteTextauswahl;
+              }
+              if (!range) {
+                const docLen = Math.max(0, quill.getLength() - 1);
+                if (docLen > 0) {
+                  quill.setSelection(0, docLen, 'user');
+                  range = { index: 0, length: docLen };
+                } else {
+                  quill.setSelection(0, 0, 'user');
+                  range = { index: 0, length: 0 };
+                }
+              }
+              if (range.length > 0) {
+                quill.formatText(range.index, range.length, 'size', groesseWert, 'user');
+              } else {
+                quill.format('size', groesseWert, 'user');
+              }
+              quill.focus();
             };
             groesseInput.addEventListener('change', anwendenGroesse);
             groesseInput.addEventListener('blur', anwendenGroesse);
+            const onGroesseKeydown = (ev) => {
+              if (ev && ev.key === 'Enter') {
+                ev.preventDefault();
+                anwendenGroesse();
+              }
+            };
+            groesseInput.addEventListener('keydown', onGroesseKeydown);
             const leseGroesseAusFormat = (format) => {
               const raw = String((format && format.size) || '').trim();
               const parsed = Number.parseFloat(raw.replace('px', ''));
@@ -4977,19 +5731,25 @@ var HTBAH_REFACTOR_UTILS =
               }
               groesseInput.value = '14';
             };
-            quill.on('selection-change', syncGroesse);
+            const onSelectionChange = (range) => {
+              if (range) {
+                letzteTextauswahl = range;
+              }
+              syncGroesse();
+            };
+            quill.on('selection-change', onSelectionChange);
             groesseWrap.appendChild(groesseInput);
             groesseWrap.appendChild(groesseLabel);
             toolbarEl.prepend(groesseWrap);
             syncGroesse();
             cleanupFns.push(() => {
-              quill.off('selection-change', syncGroesse);
+              quill.off('selection-change', onSelectionChange);
               groesseInput.removeEventListener('pointerdown', stopEvent);
               groesseInput.removeEventListener('click', stopEvent);
               groesseInput.removeEventListener('change', anwendenGroesse);
               groesseInput.removeEventListener('blur', anwendenGroesse);
+              groesseInput.removeEventListener('keydown', onGroesseKeydown);
             });
-          }
         }
         const html = typeof bild.notizHtml === 'string' ? bild.notizHtml : '';
         quill.root.innerHTML = html;
@@ -5006,13 +5766,14 @@ var HTBAH_REFACTOR_UTILS =
         };
         quill.on('text-change', textChangeHandler);
         const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        let mentionController = null;
         if (mentionApi && typeof mentionApi.installMentions === 'function') {
-          const mentionCtrl = mentionApi.installMentions(quill, {
+          mentionController = mentionApi.installMentions(quill, {
             getItems: (query) => this.mentionItemsFuerQuill(query),
             onEntityClick: (target) => this.oeffneEntitaetAusMention(target),
           });
-          if (mentionCtrl && typeof mentionCtrl.destroy === 'function') {
-            cleanupFns.push(() => mentionCtrl.destroy());
+          if (mentionController && typeof mentionController.destroy === 'function') {
+            cleanupFns.push(() => mentionController.destroy());
           }
         }
         quill.enable(!istReadOnly);
@@ -5021,6 +5782,7 @@ var HTBAH_REFACTOR_UTILS =
           host,
           textChangeHandler,
           cleanupFns,
+          mentionController,
           lastHtml: html,
           istReadOnly,
         };
@@ -5062,17 +5824,7 @@ var HTBAH_REFACTOR_UTILS =
       beendeAlleNotizEditoren() {
         this.notizQuillSession += 1;
         Object.keys(this.notizQuillInstanzen || {}).forEach((id) => {
-          const eintrag = this.notizQuillInstanzen[id];
-          if (eintrag && eintrag.quill) {
-            eintrag.quill.off('text-change', eintrag.textChangeHandler);
-            if (Array.isArray(eintrag.cleanupFns)) {
-              eintrag.cleanupFns.forEach((fn) => {
-                if (typeof fn === 'function') {
-                  fn();
-                }
-              });
-            }
-          }
+          this.zerstoereNotizQuillEintrag(this.notizQuillInstanzen[id]);
         });
         this.notizQuillInstanzen = {};
         this.notizQuillEditorRefs = {};
@@ -6054,6 +6806,14 @@ var HTBAH_REFACTOR_UTILS =
           <div class="card-body py-2 small">
             <div><span class="text-secondary">Typ:</span> {{ detail.entityType }}</div>
             <div v-if="detail.payload && detail.payload.aufenthaltsort"><span class="text-secondary">Aufenthaltsort:</span> {{ detail.payload.aufenthaltsort }}</div>
+            <div v-if="detail.entityType === 'gegenstand' && detail.payload && detail.payload.inGegenstandId">
+              <span class="text-secondary">In Gegenstand:</span>
+              {{ gegenstandNameFuerId(detail.payload.inGegenstandId) || detail.payload.inGegenstandId }}
+            </div>
+            <div v-if="detail.entityType === 'raetsel' && detail.payload && detail.payload.gegenstandId">
+              <span class="text-secondary">Gegenstand:</span>
+              {{ gegenstandNameFuerId(detail.payload.gegenstandId) || detail.payload.gegenstandId }}
+            </div>
             <div v-if="detail.payload && detail.payload.lebenspunkte"><span class="text-secondary">Lebenspunkte:</span> {{ detail.payload.lebenspunkte }}</div>
             <div v-if="detail.payload && initiativeBadgeText(detail.payload.initiative)"><span class="text-secondary">Initiative:</span> {{ initiativeBadgeText(detail.payload.initiative) }}</div>
             <div v-if="detail.payload && detail.payload.beschreibungHtml" v-html="detail.payload.beschreibungHtml"></div>
@@ -6089,8 +6849,9 @@ var HTBAH_REFACTOR_UTILS =
           @media-set-primary="setzeBearbeitungPrimaryMedium"
           @media-open="mediumImBildbetrachterOeffnen"
           @media-download="mediumHerunterladen"
-          @delete="loescheOverlayAnlageMitBestaetigung"
-          @duplicate="dupliziereAnlageAusOverlayModal"
+          @delete="loescheAnlageMitBestaetigung"
+          @duplicate="dupliziereAnlageAusModal"
+          @inventar-remove="onInventarEintragEntfernen"
           @update:zufallNpcEpoche="zufallNpcEpoche = $event"
           @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
           @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
@@ -6123,6 +6884,7 @@ var HTBAH_REFACTOR_UTILS =
           @media-download="mediumOverlayHerunterladen"
           @delete="loescheAnlageMitBestaetigung"
           @duplicate="dupliziereAnlageAusModal"
+          @inventar-remove="onInventarEintragEntfernenOverlay"
           @update:zufallNpcEpoche="zufallNpcEpoche = $event"
           @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
           @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
@@ -6286,13 +7048,68 @@ var HTBAH_REFACTOR_UTILS =
                 <div v-else class="small text-body-secondary">Keine Fraktionen vorhanden.</div>
               </div>
             </div>
+            <div v-if="charakterModalFaehigkeitenStats" class="htbah-iw-charakter-stats mt-2">
+              <p class="form-label small text-secondary mb-1">Fähigkeiten &amp; Begabungen</p>
+              <div class="row g-2">
+                <div
+                  v-for="kategorie in ['handeln', 'wissen', 'soziales']"
+                  :key="'iw-stats-' + kategorie"
+                  class="col-12 col-lg-4">
+                  <div class="border rounded p-2 h-100">
+                    <p class="small fw-semibold text-uppercase mb-1">{{ charakterModalKategorieLabel(kategorie) }}</p>
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                      <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-summe">
+                        Summe {{ charakterModalFaehigkeitenStats.summen[kategorie] }}
+                      </span>
+                      <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-begabung">
+                        Begabung {{ charakterModalFaehigkeitenStats.begabungen[kategorie] }}
+                      </span>
+                      <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-geistesblitz">
+                        GB {{ charakterModalFaehigkeitenStats.gbVerbleibend[kategorie] }} /
+                        {{ charakterModalFaehigkeitenStats.gbMax[kategorie] }}
+                      </span>
+                    </div>
+                    <div class="table-responsive rounded border border-secondary border-opacity-25">
+                      <table class="table table-sm mb-0 faehigkeiten-tabelle">
+                        <thead>
+                          <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col" class="text-end">Wert</th>
+                            <th scope="col" class="text-end">Effektiv</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-if="!charakterModalSortierteFaehigkeiten(kategorie).length">
+                            <td colspan="3" class="text-muted small py-1">Keine Fähigkeiten</td>
+                          </tr>
+                          <tr
+                            v-for="faehigkeit in charakterModalSortierteFaehigkeiten(kategorie)"
+                            :key="kategorie + '-' + (faehigkeit.name || '')">
+                            <td class="align-middle">{{ faehigkeit.name }}</td>
+                            <td class="align-middle text-end text-muted">
+                              {{ faehigkeit.value == null ? '—' : faehigkeit.value }}
+                            </td>
+                            <td class="align-middle text-end">
+                              {{ charakterModalEffektivwert(kategorie, faehigkeit) }}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <label class="form-label mt-3 mb-1">Inventar</label>
             <div class="d-flex justify-content-end mb-2">
               <button type="button" class="btn btn-sm btn-outline-secondary" @click="inventarEintragHinzufuegen">Eintrag hinzufügen</button>
             </div>
             <div v-if="!charakterModal.charakter.inventar.length" class="text-secondary small mb-2">Kein Inventar.</div>
             <div v-else class="d-flex flex-column gap-2 mb-2">
-              <div v-for="(item, idx) in charakterModal.charakter.inventar" :key="item.id || idx" class="border rounded p-2">
+              <div
+                v-for="(item, idx) in charakterModal.charakter.inventar"
+                :key="item.id || idx"
+                class="border rounded p-2 htbah-charakter-inventar-karte">
                 <div class="row g-2">
                   <div class="col-md-4"><input class="form-control form-control-sm" v-model="item.name" placeholder="Name" /></div>
                   <div class="col-md-4">

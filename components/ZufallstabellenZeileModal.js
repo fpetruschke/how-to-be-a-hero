@@ -46,6 +46,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     'npc-wizard',
     'bestien-wizard',
     'welt-open',
+    'inventar-remove',
   ],
   data() {
     return {
@@ -102,6 +103,16 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       const id = this.anlage && this.anlage.zeile && this.anlage.zeile.id;
       return !!(id && String(id).trim());
+    },
+    zeigtInventarBereich() {
+      const typ = this.anlage && this.anlage.typ;
+      return typ === 'npc' || typ === 'bestie';
+    },
+    inventarListe() {
+      if (!this.zeigtInventarBereich || !this.anlage || !this.anlage.zeile) {
+        return [];
+      }
+      return Array.isArray(this.anlage.zeile.inventar) ? this.anlage.zeile.inventar : [];
     },
   },
   watch: {
@@ -399,13 +410,13 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     },
     npcAbhaengigkeitsLabel(feld) {
       if (feld === 'alter') {
-        return 'mit Statur + LP';
+        return 'mit Statur + LP + waffenloser Kampf';
       }
       if (feld === 'beruf') {
         return 'mit Statur, Waffe, Schaden, LP, Begabungen';
       }
       if (feld === 'statur') {
-        return 'mit LP';
+        return 'mit LP + waffenloser Kampf';
       }
       if (feld === 'waffe') {
         return 'mit Schadenswerten';
@@ -426,6 +437,27 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         return;
       }
       this.$emit('welt-open');
+    },
+    inventarEintragLabel(item) {
+      const name = String(item && item.name ? item.name : '').trim();
+      const typ = String(item && item.typ ? item.typ : '').trim();
+      if (name && typ) {
+        return `${name} (${typ})`;
+      }
+      return name || typ || 'Gegenstand';
+    },
+    inventarEintragEntfernen(item) {
+      if (!this.anlage || !this.anlage.zeile || !Array.isArray(this.anlage.zeile.inventar)) {
+        return;
+      }
+      const gegenstandId = String(item && item.gegenstandId ? item.gegenstandId : '').trim();
+      const index = this.anlage.zeile.inventar.indexOf(item);
+      if (index >= 0) {
+        this.anlage.zeile.inventar.splice(index, 1);
+      }
+      if (gegenstandId) {
+        this.$emit('inventar-remove', { gegenstandId });
+      }
     },
   },
   template: `
@@ -574,6 +606,18 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
               </div>
               <div class="col-md-6"><label class="form-label small text-secondary mb-1">Schadenswert Nahkampf</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder="Schadenswert Nahkampf" autocomplete="off" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Nahkampfschaden neu würfeln" @click="npcFeldNeuWuerfeln('schadenswertNahkampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6"><label class="form-label small text-secondary mb-1">Schadenswert Fernkampf</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder="Schadenswert Fernkampf" autocomplete="off" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Fernkampfschaden neu würfeln" @click="npcFeldNeuWuerfeln('schadenswertFernkampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1">Waffenloser Kampf (Fäuste, Tritte)</label>
+                <div class="input-group">
+                  <input class="form-control" v-model="anlage.zeile.waffenloserKampf" placeholder="z. B. 1W10+2" autocomplete="off" />
+                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Waffenlosen Nahkampf neu würfeln (nach Statur)" @click="npcFeldNeuWuerfeln('waffenloserKampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
+                  <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Optionen</span></button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('waffenloserKampf', 'einzeln')">Nur waffenloser Kampf neu</button></li>
+                    <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('statur', 'mitAbhaengigen')">Statur + {{ npcAbhaengigkeitsLabel('statur') }}</button></li>
+                  </ul>
+                </div>
+              </div>
               <div class="col-md-6" v-if="istBearbeitung">
                 <label class="form-label small text-secondary mb-1">Initiative</label>
                 <div class="input-group">
@@ -1059,6 +1103,21 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             </div>
           </div>
         </div>
+
+        <section v-if="zeigtInventarBereich && zeigtDatenTab" class="htbah-entitaet-bereich mt-3">
+          <h6 class="htbah-entitaet-bereich-titel">🎒 Inventar</h6>
+          <p class="small text-secondary mb-2">Gegenstände per Drag &amp; Drop auf der interaktiven Welt zuordnen.</p>
+          <div v-if="!inventarListe.length" class="text-secondary small">Keine Gegenstände im Inventar.</div>
+          <ul v-else class="list-group list-group-flush mb-0">
+            <li
+              v-for="(item, idx) in inventarListe"
+              :key="item.id || ('inv-' + idx)"
+              class="list-group-item px-0 d-flex justify-content-between align-items-center gap-2">
+              <span>{{ inventarEintragLabel(item) }}</span>
+              <button type="button" class="btn btn-sm btn-outline-danger" @click="inventarEintragEntfernen(item)">Entfernen</button>
+            </li>
+          </ul>
+        </section>
 
         <div v-if="zeigtDatenTab">
         <label class="form-label mt-3 mb-1" v-if="anlage.typ === 'npc'">Notizen</label>

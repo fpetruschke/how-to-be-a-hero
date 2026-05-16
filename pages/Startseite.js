@@ -333,8 +333,9 @@ window.HTBAH_SEITEN.Startseite = {
                 <h6 class="mb-2">Die Spielleitung</h6>
                 <p class="mb-0 small text-body-secondary">
                   Die Spielleitung beschreibt Welt, NSCs und Situationen, moderiert Regeln und sorgt dafür,
-                  dass alle eingebunden sind. Sie führt die Runde, spielt aber nicht <em>gegen</em> die Gruppe,
-                  sondern gemeinsam <em>mit</em> ihr.
+                  dass alle eingebunden sind. Die Spielleitung übernimmt die Rolle der Sinne der Spielenden: 
+                  Was sie sehen, hören, riechen, schmecken und fühlen bestimmt die Spielleitung. 
+                  Sie führt die Runde, spielt aber nicht <em>gegen</em> die Gruppe, sondern gemeinsam <em>mit</em> ihr.
                 </p>
               </div>
               <div class="card p-3 mb-3">

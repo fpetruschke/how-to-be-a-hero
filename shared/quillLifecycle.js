@@ -17,6 +17,17 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     }
   }
 
+  function schliesseEmoticonPickerFuerQuill(quill) {
+    const api = SHARED.QuillEmoticons;
+    if (api && typeof api.zerstoereEmoticonPickerFuerQuill === 'function' && quill) {
+      try {
+        api.zerstoereEmoticonPickerFuerQuill(quill);
+      } catch {
+        /* ignorieren */
+      }
+    }
+  }
+
   function leereQuillHost(hostElement) {
     if (!hostElement) {
       return;
@@ -71,6 +82,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       });
     }
     zerstoereMentionController(o.mentionController);
+    schliesseEmoticonPickerFuerQuill(quill);
     const host =
       o.hostElement && o.hostElement.parentNode
         ? o.hostElement
@@ -88,6 +100,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 
   SHARED.QuillLifecycle = {
     zerstoereMentionController,
+    schliesseEmoticonPickerFuerQuill,
     leereQuillHost,
     entferneVerwaisteQuillToolbars,
     zerstoereQuillInstanz,

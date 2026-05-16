@@ -87,10 +87,10 @@ window.HTBAH_SEITEN.PresetEditor = {
       const v = this.neueFaehigkeit.value;
       if (v !== null && v !== undefined && v !== '') {
         const n = Number(v);
-        if (!Number.isFinite(n) || n < 1 || n > 100) {
+        if (!Number.isFinite(n) || n < 0 || n > 100) {
           await window.HTBAH.ui.alert({
             titel: 'Ungültiger Wert',
-            beschreibung: 'Wert muss zwischen 1 und 100 liegen oder leer bleiben.',
+            beschreibung: 'Wert muss zwischen 0 und 100 liegen oder leer bleiben.',
           });
           return;
         }
@@ -159,10 +159,10 @@ window.HTBAH_SEITEN.PresetEditor = {
       let wert = null;
       if (value !== null && value !== undefined && value !== '') {
         const n = Number(value);
-        if (!Number.isFinite(n) || n < 1 || n > 100) {
+        if (!Number.isFinite(n) || n < 0 || n > 100) {
           await window.HTBAH.ui.alert({
             titel: 'Ungültiger Wert',
-            beschreibung: 'Wert muss zwischen 1 und 100 liegen oder leer bleiben.',
+            beschreibung: 'Wert muss zwischen 0 und 100 liegen oder leer bleiben.',
           });
           return;
         }

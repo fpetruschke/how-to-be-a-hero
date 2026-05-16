@@ -13,6 +13,8 @@ const SPEICHER_KEY_WUERFEL_AUDIO = 'htbah_wuerfel_audio';
 const SPEICHER_KEY_WUERFEL_SOUND_LEGACY = 'htbah_wuerfel_sound';
 const SPEICHER_KEY_DICE_COLORS = 'htbah_dice_colors';
 const SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER = 'htbah_wuerfel_beutel_fenster';
+const SPEICHER_KEY_ZEITMESSUNG = 'htbah_zeitmessung_einstellungen';
+const SPEICHER_KEY_ZEITMESSUNG_BADGE_POS = 'htbah_zeitmessung_badge_pos';
 const SPEICHER_KEY_ZEICHEN_MODAL = 'htbah_zeichen_brett';
 const SPEICHER_KEY_MENTION_NAV_TARGET = 'htbah_mention_nav_target';
 const SPEICHER_KEY_ORIENTATION_MODE = 'htbah_orientation_mode';
@@ -381,6 +383,40 @@ function normalisiereZufallstabellenPrimaryMediumId(primaryMediumId, medien) {
   return bilder[0] && typeof bilder[0].id === 'string' ? bilder[0].id : '';
 }
 
+function normalisiereZufallstabellenInventarListe(arr) {
+  const M = window.HTBAH_CHARAKTER_MODEL;
+  if (!Array.isArray(arr)) {
+    return [];
+  }
+  if (!M || typeof M.inventarEintragNachTypBereinigen !== 'function') {
+    return [];
+  }
+  return arr
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+      return M.inventarEintragNachTypBereinigen({
+        id:
+          typeof item.id === 'string' && item.id
+            ? item.id
+            : typeof M.neueInventarId === 'function'
+              ? M.neueInventarId()
+              : `inv-${Date.now()}`,
+        name: typeof item.name === 'string' ? item.name : '',
+        typ: item.typ,
+        beschreibungHtml: typeof item.beschreibungHtml === 'string' ? item.beschreibungHtml : '',
+        rustwert: item.rustwert,
+        schadenswert: item.schadenswert,
+        kampfart: item.kampfart,
+        schadenswertNahkampf: item.schadenswertNahkampf,
+        schadenswertFernkampf: item.schadenswertFernkampf,
+        gegenstandId: item.gegenstandId,
+      });
+    })
+    .filter(Boolean);
+}
+
 function normalisiereZufallstabellenNpcZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
@@ -412,6 +448,7 @@ function normalisiereZufallstabellenNpcZeile(z) {
     lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
     schadenswertNahkampf,
     schadenswertFernkampf,
+    waffenloserKampf: typeof z.waffenloserKampf === 'string' ? z.waffenloserKampf : '',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
     handeln,
     wissen,
@@ -419,6 +456,7 @@ function normalisiereZufallstabellenNpcZeile(z) {
     fraktion: typeof z.fraktion === 'string' ? z.fraktion : '',
     glaube: typeof z.glaube === 'string' ? z.glaube : '',
     initiative: typeof z.initiative === 'string' ? z.initiative : '',
+    inventar: normalisiereZufallstabellenInventarListe(z.inventar),
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
     medien,
     primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
@@ -459,6 +497,9 @@ function normalisiereZufallstabellenGegenstandZeile(z) {
     schadenswertNahkampf,
     schadenswertFernkampf,
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
+    inGegenstandId: typeof z.inGegenstandId === 'string' ? z.inGegenstandId.trim() : '',
+    besitzerTyp: typeof z.besitzerTyp === 'string' ? z.besitzerTyp.trim() : '',
+    besitzerId: typeof z.besitzerId === 'string' ? z.besitzerId.trim() : '',
     initiative: typeof z.initiative === 'string' ? z.initiative : '',
     fraktionen: Array.isArray(z.fraktionen)
       ? z.fraktionen.map((f) => (typeof f === 'string' ? f.trim() : '')).filter(Boolean)
@@ -531,11 +572,236 @@ function normalisiereZufallstabellenRaetselZeile(z) {
     ergebnis: typeof z.ergebnis === 'string' ? z.ergebnis : '',
     schwierigkeit: typeof z.schwierigkeit === 'string' ? z.schwierigkeit : '',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
+    gegenstandId: typeof z.gegenstandId === 'string' ? z.gegenstandId.trim() : '',
     geloest: Boolean(z.geloest),
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
     medien,
     primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
   };
+}
+
+function bereinigeZufallstabellenParentReferenzen(zustand) {
+  if (!zustand || typeof zustand !== 'object') {
+    return zustand;
+  }
+  const gegenstaende = Array.isArray(zustand.gegenstaende)
+    ? zustand.gegenstaende.filter((g) => g && g.id)
+    : [];
+  const gegenstandIds = new Set(gegenstaende.map((g) => String(g.id)));
+  const npcIds = new Set((zustand.npcs || []).filter((n) => n && n.id).map((n) => String(n.id)));
+  const bestieIds = new Set((zustand.bestien || []).filter((b) => b && b.id).map((b) => String(b.id)));
+  const byId = new Map(gegenstaende.map((g) => [String(g.id), g]));
+  zustand.gegenstaende = gegenstaende.map((g) => {
+    const id = String(g.id);
+    let parentId = String(g.inGegenstandId || '').trim();
+    if (!parentId || parentId === id || !gegenstandIds.has(parentId)) {
+      parentId = '';
+    } else {
+      const besucht = new Set([id]);
+      let aktuell = parentId;
+      while (aktuell) {
+        if (besucht.has(aktuell)) {
+          parentId = '';
+          break;
+        }
+        besucht.add(aktuell);
+        const parent = byId.get(aktuell);
+        aktuell = parent ? String(parent.inGegenstandId || '').trim() : '';
+      }
+    }
+    let besitzerTyp = String(g.besitzerTyp || '').trim();
+    let besitzerId = String(g.besitzerId || '').trim();
+    if (besitzerTyp === 'npc' && (!besitzerId || !npcIds.has(besitzerId))) {
+      besitzerTyp = '';
+      besitzerId = '';
+    } else if (besitzerTyp === 'bestie' && (!besitzerId || !bestieIds.has(besitzerId))) {
+      besitzerTyp = '';
+      besitzerId = '';
+    } else if (besitzerTyp === 'charakter') {
+      if (!besitzerId) {
+        besitzerTyp = '';
+      }
+    } else if (besitzerTyp) {
+      besitzerTyp = '';
+      besitzerId = '';
+    }
+    return { ...g, inGegenstandId: parentId, besitzerTyp, besitzerId };
+  });
+  zustand.raetsel = (Array.isArray(zustand.raetsel) ? zustand.raetsel : [])
+    .filter((r) => r && r.id)
+    .map((r) => {
+      const gegenstandId = String(r.gegenstandId || '').trim();
+      if (gegenstandId && gegenstandIds.has(gegenstandId)) {
+        return { ...r, gegenstandId };
+      }
+      return { ...r, gegenstandId: '' };
+    });
+  return synchronisiereGegenstandBesitzerAusInventar(zustand);
+}
+
+function synchronisiereGegenstandBesitzerAusInventar(zustand) {
+  if (!zustand || typeof zustand !== 'object') {
+    return zustand;
+  }
+  const zuordnung = new Map();
+  const ausInventar = (typ, entityId, inventar) => {
+    const besitzerId = String(entityId || '').trim();
+    if (!besitzerId) {
+      return;
+    }
+    (Array.isArray(inventar) ? inventar : []).forEach((item) => {
+      const gegenstandId = String(item && item.gegenstandId ? item.gegenstandId : '').trim();
+      if (gegenstandId) {
+        zuordnung.set(gegenstandId, { typ, id: besitzerId });
+      }
+    });
+  };
+  (zustand.npcs || []).forEach((npc) => {
+    if (npc && npc.id) {
+      ausInventar('npc', npc.id, npc.inventar);
+    }
+  });
+  (zustand.bestien || []).forEach((bestie) => {
+    if (bestie && bestie.id) {
+      ausInventar('bestie', bestie.id, bestie.inventar);
+    }
+  });
+  if (!zuordnung.size) {
+    return zustand;
+  }
+  zustand.gegenstaende = (zustand.gegenstaende || []).map((g) => {
+    if (!g || !g.id) {
+      return g;
+    }
+    const inv = zuordnung.get(String(g.id));
+    if (!inv) {
+      return g;
+    }
+    const besitzerTyp = String(g.besitzerTyp || '').trim();
+    const besitzerId = String(g.besitzerId || '').trim();
+    if (besitzerTyp && besitzerId) {
+      return g;
+    }
+    return { ...g, besitzerTyp: inv.typ, besitzerId: inv.id };
+  });
+  return zustand;
+}
+
+function entferneZufallstabellenParentReferenzenAufGegenstand(zustand, geloeschteGegenstandId) {
+  const id = String(geloeschteGegenstandId || '').trim();
+  if (!id || !zustand || typeof zustand !== 'object') {
+    return zustand;
+  }
+  zustand.gegenstaende = (zustand.gegenstaende || []).map((g) =>
+    g && String(g.inGegenstandId || '').trim() === id ? { ...g, inGegenstandId: '' } : g,
+  );
+  zustand.raetsel = (zustand.raetsel || []).map((r) =>
+    r && String(r.gegenstandId || '').trim() === id ? { ...r, gegenstandId: '' } : r,
+  );
+  return zustand;
+}
+
+function entferneZufallstabellenBesitzerReferenzen(zustand, besitzerTyp, besitzerId) {
+  const typ = String(besitzerTyp || '').trim();
+  const id = String(besitzerId || '').trim();
+  if (!typ || !id || !zustand || typeof zustand !== 'object') {
+    return zustand;
+  }
+  zustand.gegenstaende = (zustand.gegenstaende || []).map((g) => {
+    if (!g || String(g.besitzerTyp || '').trim() !== typ || String(g.besitzerId || '').trim() !== id) {
+      return g;
+    }
+    return { ...g, besitzerTyp: '', besitzerId: '' };
+  });
+  return zustand;
+}
+
+function entferneGegenstandAusAllenInventaren(zustand, gegenstandId) {
+  const id = String(gegenstandId || '').trim();
+  if (!id || !zustand || typeof zustand !== 'object') {
+    return zustand;
+  }
+  const ohneGegenstand = (row) => {
+    if (!row || !Array.isArray(row.inventar)) {
+      return row;
+    }
+    return {
+      ...row,
+      inventar: row.inventar.filter((item) => item && String(item.gegenstandId || '').trim() !== id),
+    };
+  };
+  zustand.npcs = (zustand.npcs || []).map(ohneGegenstand);
+  zustand.bestien = (zustand.bestien || []).map(ohneGegenstand);
+  return zustand;
+}
+
+function zstDuplizierAktualisiereParentReferenzen(zielZ, idMaps) {
+  if (!zielZ || !idMaps) {
+    return;
+  }
+  (zielZ.gegenstaende || []).forEach((g) => {
+    if (!g) {
+      return;
+    }
+    const parent = String(g.inGegenstandId || '').trim();
+    if (!parent) {
+      return;
+    }
+    const neu = idMaps.gegenstand && idMaps.gegenstand[parent];
+    if (neu) {
+      g.inGegenstandId = neu;
+    }
+  });
+  (zielZ.raetsel || []).forEach((r) => {
+    if (!r) {
+      return;
+    }
+    const gegenstand = String(r.gegenstandId || '').trim();
+    if (!gegenstand) {
+      return;
+    }
+    const neu = idMaps.gegenstand && idMaps.gegenstand[gegenstand];
+    if (neu) {
+      r.gegenstandId = neu;
+    }
+  });
+  (zielZ.gegenstaende || []).forEach((g) => {
+    if (!g) {
+      return;
+    }
+    const typ = String(g.besitzerTyp || '').trim();
+    const id = String(g.besitzerId || '').trim();
+    if (!typ || !id) {
+      return;
+    }
+    const map = idMaps[typ];
+    const neu = map && map[id];
+    if (neu) {
+      g.besitzerId = neu;
+    }
+  });
+  const inventarGegenstandIdAktualisieren = (liste) => {
+    (liste || []).forEach((row) => {
+      if (!row || !Array.isArray(row.inventar)) {
+        return;
+      }
+      row.inventar.forEach((item) => {
+        if (!item) {
+          return;
+        }
+        const alt = String(item.gegenstandId || '').trim();
+        if (!alt) {
+          return;
+        }
+        const neu = idMaps.gegenstand && idMaps.gegenstand[alt];
+        if (neu) {
+          item.gegenstandId = neu;
+        }
+      });
+    });
+  };
+  inventarGegenstandIdAktualisieren(zielZ.npcs);
+  inventarGegenstandIdAktualisieren(zielZ.bestien);
 }
 
 function normalisiereZufallstabellenBestieZeile(z) {
@@ -594,6 +860,7 @@ function normalisiereZufallstabellenBestieZeile(z) {
     aggressivitaetSkala: agg,
     schadenswertNahkampf,
     schadenswertFernkampf,
+    inventar: normalisiereZufallstabellenInventarListe(z.inventar),
     medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
 }
@@ -748,7 +1015,7 @@ function ladeZufallstabellenZustand(kampagneId) {
   if (!roh || typeof roh !== 'object') {
     return leerenZufallstabellenZustand();
   }
-  return {
+  return bereinigeZufallstabellenParentReferenzen({
     version: 1,
     npcs: Array.isArray(roh.npcs)
       ? roh.npcs.map(normalisiereZufallstabellenNpcZeile).filter(Boolean)
@@ -771,7 +1038,35 @@ function ladeZufallstabellenZustand(kampagneId) {
     bestien: Array.isArray(roh.bestien)
       ? roh.bestien.map(normalisiereZufallstabellenBestieZeile).filter(Boolean)
       : [],
-  };
+  });
+}
+
+function zufallstabellenZustandFuerSpeicher(zustand) {
+  const z = zustand && typeof zustand === 'object' ? zustand : {};
+  return bereinigeZufallstabellenParentReferenzen({
+    version: 1,
+    npcs: Array.isArray(z.npcs)
+      ? z.npcs.map(normalisiereZufallstabellenNpcZeile).filter(Boolean)
+      : [],
+    orte: Array.isArray(z.orte)
+      ? z.orte.map(normalisiereZufallstabellenOrtZeile).filter(Boolean)
+      : [],
+    gegenstaende: Array.isArray(z.gegenstaende)
+      ? z.gegenstaende.map(normalisiereZufallstabellenGegenstandZeile).filter(Boolean)
+      : [],
+    fraktionen: Array.isArray(z.fraktionen)
+      ? z.fraktionen.map(normalisiereZufallstabellenFraktionZeile).filter(Boolean)
+      : [],
+    pantheon: Array.isArray(z.pantheon)
+      ? z.pantheon.map(normalisiereZufallstabellenPantheonZeile).filter(Boolean)
+      : [],
+    raetsel: Array.isArray(z.raetsel)
+      ? z.raetsel.map(normalisiereZufallstabellenRaetselZeile).filter(Boolean)
+      : [],
+    bestien: Array.isArray(z.bestien)
+      ? z.bestien.map(normalisiereZufallstabellenBestieZeile).filter(Boolean)
+      : [],
+  });
 }
 
 function speichereZufallstabellenZustand(zustand, kampagneId) {
@@ -780,7 +1075,7 @@ function speichereZufallstabellenZustand(zustand, kampagneId) {
     return;
   }
   const speicherKey = zufallstabellenSpeicherKeyFuerKampagne(kid);
-  htbahSpeicher.schreibeJson(speicherKey, zustand);
+  htbahSpeicher.schreibeJson(speicherKey, zufallstabellenZustandFuerSpeicher(zustand));
   htbahDispatchKampagneDatenGeaendert({ art: 'zufallstabellen', kampagneId: kid });
 }
 
@@ -954,6 +1249,31 @@ function speichereKampagnenAtmosphaereBadgePosition(kampagneId, pos) {
   });
 }
 
+function ladeZeitmessungBadgePosition() {
+  try {
+    const roh = htbahSpeicher.leseText(SPEICHER_KEY_ZEITMESSUNG_BADGE_POS, null);
+    if (roh && String(roh).trim().startsWith('{')) {
+      return normalisiereAtmosphaereBadgePosition(JSON.parse(roh));
+    }
+  } catch {
+    /* defektes JSON */
+  }
+  return null;
+}
+
+function speichereZeitmessungBadgePosition(pos) {
+  const normalisiert = normalisiereAtmosphaereBadgePosition(pos);
+  if (normalisiert) {
+    htbahSpeicher.schreibeText(SPEICHER_KEY_ZEITMESSUNG_BADGE_POS, JSON.stringify(normalisiert));
+  } else {
+    try {
+      htbahSpeicher.loescheKey(SPEICHER_KEY_ZEITMESSUNG_BADGE_POS);
+    } catch {
+      /* optional */
+    }
+  }
+}
+
 function ladeKampagnenAbenteuerbuchHtml(kampagneId) {
   const kampagne = findeKampagneById(ladeSpielleiterZustand(), kampagneId);
   return kampagne && typeof kampagne.abenteuerbuchHtml === 'string'
@@ -1067,33 +1387,98 @@ function normalisiereWeltenbauMapEinstellungen(roh) {
   return map;
 }
 
+function normalisiereWeltenbauEinzelBildLayout(layout) {
+  if (!layout || typeof layout !== 'object') {
+    return null;
+  }
+  const x = Math.round(Number(layout.x) || 0);
+  const y = Math.round(Number(layout.y) || 0);
+  const width = Math.max(1, Math.round(Number(layout.width) || 260));
+  const height = Math.max(1, Math.round(Number(layout.height) || 180));
+  const winkelRaw = Number(layout.angleDeg);
+  const angleDeg = Number.isFinite(winkelRaw)
+    ? Math.max(-3600, Math.min(3600, Math.round(winkelRaw * 100) / 100))
+    : 0;
+  return { x, y, width, height, angleDeg };
+}
+
+function istWeltenbauEinzelBildLayout(wert) {
+  if (!wert || typeof wert !== 'object' || Array.isArray(wert)) {
+    return false;
+  }
+  const kern = ['x', 'y', 'width', 'height', 'angleDeg'];
+  const hatKern = kern.some((k) => Object.prototype.hasOwnProperty.call(wert, k));
+  if (!hatKern) {
+    return false;
+  }
+  const fremd = Object.keys(wert).filter((k) => !kern.includes(k));
+  return fremd.length === 0;
+}
+
 function normalisiereWeltenbauMapBildLayouts(roh) {
   if (!roh || typeof roh !== 'object') {
     return {};
   }
   const map = {};
+  const flacheLayouts = {};
   Object.entries(roh).forEach(([gruppeId, gruppeLayouts]) => {
     if (typeof gruppeId !== 'string' || !gruppeId || !gruppeLayouts || typeof gruppeLayouts !== 'object') {
       return;
     }
+    if (istWeltenbauEinzelBildLayout(gruppeLayouts)) {
+      const normalisiert = normalisiereWeltenbauEinzelBildLayout(gruppeLayouts);
+      if (normalisiert) {
+        flacheLayouts[gruppeId] = normalisiert;
+      }
+      return;
+    }
     const gruppeMap = {};
     Object.entries(gruppeLayouts).forEach(([bildId, layout]) => {
-      if (typeof bildId !== 'string' || !bildId || !layout || typeof layout !== 'object') {
+      if (typeof bildId !== 'string' || !bildId) {
         return;
       }
-      const x = Math.round(Number(layout.x) || 0);
-      const y = Math.round(Number(layout.y) || 0);
-      const width = Math.max(1, Math.round(Number(layout.width) || 260));
-      const height = Math.max(1, Math.round(Number(layout.height) || 180));
-      const winkelRaw = Number(layout.angleDeg);
-      const angleDeg = Number.isFinite(winkelRaw)
-        ? Math.max(-3600, Math.min(3600, Math.round(winkelRaw * 100) / 100))
-        : 0;
-      gruppeMap[bildId] = { x, y, width, height, angleDeg };
+      const normalisiert = normalisiereWeltenbauEinzelBildLayout(layout);
+      if (normalisiert) {
+        gruppeMap[bildId] = normalisiert;
+      }
     });
-    map[gruppeId] = gruppeMap;
+    if (Object.keys(gruppeMap).length) {
+      map[gruppeId] = gruppeMap;
+    }
   });
+  if (Object.keys(flacheLayouts).length) {
+    const defaultKey = 'default';
+    map[defaultKey] = {
+      ...(map[defaultKey] || {}),
+      ...flacheLayouts,
+    };
+  }
   return map;
+}
+
+function speichereWeltenbauMapBildLayoutsGruppe(kampagneId, gruppeKey, gruppeLayouts) {
+  const kid = ermittleKampagneIdFuerKampagnenSpeicher(kampagneId);
+  const key = typeof gruppeKey === 'string' && gruppeKey ? gruppeKey : 'default';
+  if (!kid) {
+    return;
+  }
+  const wb = ladeWeltenbauZustand(kid);
+  const alle = normalisiereWeltenbauMapBildLayouts(wb.mapBildLayouts);
+  const normalisiert = {};
+  Object.entries(gruppeLayouts && typeof gruppeLayouts === 'object' ? gruppeLayouts : {}).forEach(([bildId, layout]) => {
+    if (typeof bildId !== 'string' || !bildId) {
+      return;
+    }
+    const eintrag = normalisiereWeltenbauEinzelBildLayout(layout);
+    if (eintrag) {
+      normalisiert[bildId] = eintrag;
+    }
+  });
+  wb.mapBildLayouts = {
+    ...alle,
+    [key]: normalisiert,
+  };
+  speichereWeltenbauZustand(wb, kid);
 }
 
 function normalisiereWeltenbauMapElementLocks(roh) {
@@ -2524,6 +2909,7 @@ function dupliziereZufallstabellenEntitaeten(opts) {
   if (!ergebnisse.length) {
     return { ok: false, fehler: 'Keine der Entitäten wurde gefunden.', angelegt: 0, ergebnisse: [] };
   }
+  zstDuplizierAktualisiereParentReferenzen(zielZ, idMaps);
   speichereZufallstabellenZustand(zielZ, ziel);
 
   const wbQuelle = ladeWeltenbauZustand(quelle);
@@ -3106,6 +3492,59 @@ function holeWuerfelAudioElement(url) {
  * weitere leicht zufällig gestaffelt (wirkt natürlicher als fester Abstand).
  * @param {number} anzahl
  */
+function ladeZeitmessungProfil() {
+  const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
+  const defaults = ZU ? ZU.normalisiereProfil(null) : { klickAktiv: true, klickLautstaerke: 0.65, stoppuhrMitKlick: false, countdownAbSekunde: 10 };
+  try {
+    const roh = htbahSpeicher.leseText(SPEICHER_KEY_ZEITMESSUNG, null);
+    if (roh && String(roh).trim().startsWith('{')) {
+      const o = JSON.parse(roh);
+      return ZU ? ZU.normalisiereProfil(o) : defaults;
+    }
+  } catch {
+    /* defektes JSON */
+  }
+  return defaults;
+}
+
+/**
+ * @param {{ klickAktiv?: boolean, klickLautstaerke?: number, stoppuhrMitKlick?: boolean, countdownAbSekunde?: number }} teil
+ */
+function setzeZeitmessungProfil(teil) {
+  const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
+  const aktuell = ladeZeitmessungProfil();
+  const zusammengefuegt = {
+    klickAktiv: teil.klickAktiv !== undefined ? Boolean(teil.klickAktiv) : aktuell.klickAktiv,
+    klickLautstaerke:
+      teil.klickLautstaerke !== undefined
+        ? Math.min(1, Math.max(0, Number(teil.klickLautstaerke) || aktuell.klickLautstaerke))
+        : aktuell.klickLautstaerke,
+    stoppuhrMitKlick:
+      teil.stoppuhrMitKlick !== undefined ? Boolean(teil.stoppuhrMitKlick) : aktuell.stoppuhrMitKlick,
+    countdownAbSekunde:
+      teil.countdownAbSekunde !== undefined
+        ? Math.min(35999, Math.max(0, Math.round(Number(teil.countdownAbSekunde) || 0)))
+        : aktuell.countdownAbSekunde,
+  };
+  const neu = ZU ? ZU.normalisiereProfil(zusammengefuegt) : zusammengefuegt;
+  htbahSpeicher.schreibeText(SPEICHER_KEY_ZEITMESSUNG, JSON.stringify(neu));
+  return neu;
+}
+
+function spieleZeitmessungKlick(lautstaerkeOverride) {
+  const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
+  if (ZU && typeof ZU.spieleKlick === 'function') {
+    ZU.spieleKlick(lautstaerkeOverride);
+  }
+}
+
+function spieleZeitmessungAbgelaufen(lautstaerkeOverride) {
+  const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
+  if (ZU && typeof ZU.spieleAbgelaufen === 'function') {
+    ZU.spieleAbgelaufen(lautstaerkeOverride);
+  }
+}
+
 function spieleWuerfelSounds(anzahl) {
   const n = Math.max(0, Math.min(50, Math.floor(Number(anzahl) || 0)));
   if (n === 0) {
@@ -3174,186 +3613,22 @@ function speichereInteraktiveWeltStatsAnzeigen(aktiv) {
   return an;
 }
 
-const ORIENT_GUELTIGE_UNTER_MODI = new Set([
-  'landscape-primary',
-  'landscape-secondary',
-  'portrait-primary',
-  'portrait-secondary',
-]);
-
-const ORIENT_WINKEL_MAP = {
-  'portrait-primary': 0,
-  'landscape-primary': 90,
-  'portrait-secondary': 180,
-  'landscape-secondary': 270,
-};
-
-function bestimmeOrientierungsGruppe(modus) {
-  if (typeof modus !== 'string') {
-    return 'frei';
-  }
-  if (modus.indexOf('landscape') === 0) {
-    return 'landscape';
-  }
-  if (modus.indexOf('portrait') === 0) {
-    return 'portrait';
-  }
-  return 'frei';
-}
-
-function normalisiereOrientierungModus(modus) {
-  if (ORIENT_GUELTIGE_UNTER_MODI.has(modus)) {
-    return modus;
-  }
-  // Legacy-Werte aus älteren Versionen sinnvoll auf eine konkrete Untervariante mappen.
-  if (modus === 'landscape') {
-    return 'landscape-primary';
-  }
-  if (modus === 'portrait') {
-    return 'portrait-primary';
-  }
-  return 'frei';
+const HTBAH_ORIENTIERUNG =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.Orientierung) || null;
+if (HTBAH_ORIENTIERUNG && typeof HTBAH_ORIENTIERUNG.setzeSpeicher === 'function') {
+  HTBAH_ORIENTIERUNG.setzeSpeicher(htbahSpeicher);
 }
 
 function ladeOrientierungModus() {
-  return normalisiereOrientierungModus(htbahSpeicher.leseText(SPEICHER_KEY_ORIENTATION_MODE, 'frei'));
-}
-
-function entsperreBildschirmAusrichtungWennMoeglich() {
-  if (typeof screen === 'undefined') {
-    return;
-  }
-  const orientationApi = screen.orientation;
-  if (!orientationApi || typeof orientationApi.unlock !== 'function') {
-    return;
-  }
-  try {
-    orientationApi.unlock();
-  } catch {
-    // Einige Browser erlauben unlock nur in bestimmten Kontexten.
-  }
-}
-
-async function sperreBildschirmAusrichtungWennMoeglich(ziel) {
-  if (typeof screen === 'undefined') {
-    return false;
-  }
-  const orientationApi = screen.orientation;
-  if (!orientationApi || typeof orientationApi.lock !== 'function') {
-    return false;
-  }
-  try {
-    await orientationApi.lock(ziel);
-    return true;
-  } catch {
-    // In einigen Browsern nur mit Nutzerinteraktion/Fullscreen erlaubt.
-    return false;
-  }
-}
-
-const HTBAH_ORIENT_KLASSE_AKTIV = 'htbah-orient-erzwungen';
-const HTBAH_ORIENT_KLASSE_DREHUNG_CW = 'htbah-orient-drehung-cw';
-const HTBAH_ORIENT_KLASSE_DREHUNG_CCW = 'htbah-orient-drehung-ccw';
-const HTBAH_ORIENT_KLASSE_DREHUNG_180 = 'htbah-orient-drehung-180';
-
-function ermittleAktuelleBildschirmAusrichtung() {
-  if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.type === 'string') {
-    return screen.orientation.type;
-  }
-  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-    return window.matchMedia('(orientation: landscape)').matches ? 'landscape-primary' : 'portrait-primary';
-  }
-  if (typeof window !== 'undefined') {
-    return window.innerWidth > window.innerHeight ? 'landscape-primary' : 'portrait-primary';
-  }
-  return 'portrait-primary';
-}
-
-function aktualisiereOrientierungCssFallback(modus) {
-  if (typeof document === 'undefined') {
-    return;
-  }
-  const html = document.documentElement;
-  if (!html) {
-    return;
-  }
-  html.classList.remove(
-    HTBAH_ORIENT_KLASSE_AKTIV,
-    HTBAH_ORIENT_KLASSE_DREHUNG_CW,
-    HTBAH_ORIENT_KLASSE_DREHUNG_CCW,
-    HTBAH_ORIENT_KLASSE_DREHUNG_180,
-  );
-  const normalisiert = normalisiereOrientierungModus(modus);
-  if (normalisiert === 'frei') {
-    return;
-  }
-  const aktuelle = ermittleAktuelleBildschirmAusrichtung();
-  if (aktuelle === normalisiert) {
-    return;
-  }
-  const aktuellerWinkel = ORIENT_WINKEL_MAP[aktuelle];
-  const zielWinkel = ORIENT_WINKEL_MAP[normalisiert];
-  if (typeof aktuellerWinkel !== 'number' || typeof zielWinkel !== 'number') {
-    return;
-  }
-  // Delta in Grad gegen den Uhrzeigersinn, das den Inhalt von der aktuellen Geräte-Lage
-  // zurück in die gewünschte Ausrichtung dreht.
-  const delta = (((zielWinkel - aktuellerWinkel) % 360) + 360) % 360;
-  let drehKlasse = null;
-  if (delta === 90) {
-    drehKlasse = HTBAH_ORIENT_KLASSE_DREHUNG_CCW;
-  } else if (delta === 180) {
-    drehKlasse = HTBAH_ORIENT_KLASSE_DREHUNG_180;
-  } else if (delta === 270) {
-    drehKlasse = HTBAH_ORIENT_KLASSE_DREHUNG_CW;
-  }
-  if (!drehKlasse) {
-    return;
-  }
-  html.classList.add(HTBAH_ORIENT_KLASSE_AKTIV, drehKlasse);
-}
-
-async function versucheOrientierungSperreSonstCssFallback(modus) {
-  const gesperrt = await sperreBildschirmAusrichtungWennMoeglich(modus);
-  if (gesperrt) {
-    // Native Sperre hat übernommen – CSS-Fallback wird nicht zusätzlich benötigt.
-    aktualisiereOrientierungCssFallback('frei');
-  } else {
-    aktualisiereOrientierungCssFallback(modus);
-  }
-}
-
-function wendeOrientierungModusAn(modus) {
-  const normalisiert = normalisiereOrientierungModus(modus);
-  if (normalisiert === 'frei') {
-    entsperreBildschirmAusrichtungWennMoeglich();
-    aktualisiereOrientierungCssFallback('frei');
-    return;
-  }
-  void versucheOrientierungSperreSonstCssFallback(normalisiert);
-}
-
-function aufloeseOrientierungZielUnterModus(generischerModus) {
-  // Bei generischer Auswahl ('landscape'/'portrait') die aktuelle Geräte-Lage übernehmen,
-  // damit ein bereits "kopfüber" gehaltenes Device nicht zwangsweise um 180° zurückgedreht wird.
-  const aktuelle = ermittleAktuelleBildschirmAusrichtung();
-  const aktuelleGruppe = bestimmeOrientierungsGruppe(aktuelle);
-  if (aktuelleGruppe === generischerModus && ORIENT_GUELTIGE_UNTER_MODI.has(aktuelle)) {
-    return aktuelle;
-  }
-  return generischerModus === 'landscape' ? 'landscape-primary' : 'portrait-primary';
+  return HTBAH_ORIENTIERUNG ? HTBAH_ORIENTIERUNG.ladeModus() : 'frei';
 }
 
 function speichereOrientierungModus(modus) {
-  let normalisiert;
-  if (modus === 'landscape' || modus === 'portrait') {
-    normalisiert = aufloeseOrientierungZielUnterModus(modus);
-  } else {
-    normalisiert = normalisiereOrientierungModus(modus);
-  }
-  htbahSpeicher.schreibeText(SPEICHER_KEY_ORIENTATION_MODE, normalisiert);
-  wendeOrientierungModusAn(normalisiert);
-  return normalisiert;
+  return HTBAH_ORIENTIERUNG ? HTBAH_ORIENTIERUNG.speichereModus(modus) : 'frei';
+}
+
+function bestimmeOrientierungsGruppe(modus) {
+  return HTBAH_ORIENTIERUNG ? HTBAH_ORIENTIERUNG.bestimmeGruppe(modus) : 'frei';
 }
 
 function ladeCharakterBild(charakterId = null) {
@@ -3512,6 +3787,8 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   wuerfelAudio: SPEICHER_KEY_WUERFEL_AUDIO,
   diceColors: SPEICHER_KEY_DICE_COLORS,
   wuerfelBeutelFenster: SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER,
+  zeitmessung: SPEICHER_KEY_ZEITMESSUNG,
+  zeitmessungBadgePos: SPEICHER_KEY_ZEITMESSUNG_BADGE_POS,
   zeichenModal: SPEICHER_KEY_ZEICHEN_MODAL,
   mentionNavigationTarget: SPEICHER_KEY_MENTION_NAV_TARGET,
   interaktiveWeltStatsAnzeigen: SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN,
@@ -3540,6 +3817,12 @@ window.HTBAH = {
   ladeWuerfelAnzeigeProfil,
   setzeWuerfelAnzeigeProfil,
   spieleWuerfelSounds,
+  ladeZeitmessungProfil,
+  setzeZeitmessungProfil,
+  spieleZeitmessungKlick,
+  spieleZeitmessungAbgelaufen,
+  ladeZeitmessungBadgePosition,
+  speichereZeitmessungBadgePosition,
   berechneProbeAuswertung,
   ermittleAssetUrl,
   ermittleRegelwerkQuelleUrl,
@@ -3566,8 +3849,12 @@ window.HTBAH = {
   loescheKampagnenAbenteuerbuch,
   ladeWeltenbauZustand,
   speichereWeltenbauZustand,
+  speichereWeltenbauMapBildLayoutsGruppe,
   erstelleSpielleiterKampagne,
   dupliziereZufallstabellenEntitaeten,
+  entferneZufallstabellenParentReferenzenAufGegenstand,
+  entferneZufallstabellenBesitzerReferenzen,
+  entferneGegenstandAusAllenInventaren,
   loescheZufallstabellenUndWeltenbauFuerKampagne,
   loescheZufallstabellenListeFuerKampagne,
   loescheWeltenbauBereichFuerKampagne,
@@ -3948,28 +4235,9 @@ app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.Lebenspunkt
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);
 app.component('bildbetrachter-host', window.HTBAH_KOMPONENTEN.BildbetrachterHost);
 app.mount('#app');
-wendeOrientierungModusAn(ladeOrientierungModus());
-window.addEventListener('orientationchange', () => {
-  wendeOrientierungModusAn(ladeOrientierungModus());
-});
-window.addEventListener('resize', () => {
-  // CSS-Fallback ggf. neu evaluieren, wenn sich Viewport-Dimensionen ändern (z. B. Drehung im Browser-Tab).
-  aktualisiereOrientierungCssFallback(ladeOrientierungModus());
-});
-if (
-  typeof screen !== 'undefined' &&
-  screen.orientation &&
-  typeof screen.orientation.addEventListener === 'function'
-) {
-  screen.orientation.addEventListener('change', () => {
-    wendeOrientierungModusAn(ladeOrientierungModus());
-  });
+if (HTBAH_ORIENTIERUNG && typeof HTBAH_ORIENTIERUNG.initialisiereListener === 'function') {
+  HTBAH_ORIENTIERUNG.initialisiereListener();
 }
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    wendeOrientierungModusAn(ladeOrientierungModus());
-  }
-});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

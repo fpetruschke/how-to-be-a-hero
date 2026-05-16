@@ -343,21 +343,20 @@ window.HTBAH_SEITEN.Weltenbau = {
     },
     persist() {
       const kid = this.ausgewaehlteKampagneId;
-      const aktuell = window.HTBAH.ladeWeltenbauZustand(kid);
+      // Direkt vor dem Schreiben laden, damit parallel gespeicherte Karten-Layouts (Interaktive Welt) erhalten bleiben.
+      const frisch = window.HTBAH.ladeWeltenbauZustand(kid);
       window.HTBAH.speichereWeltenbauZustand(
         {
-        ...aktuell,
-        ...this.zustand,
-        // Diese Felder werden direkt im Interaktive-Welt-Modal gepflegt.
-        // Hier nie mit möglicherweise stale Daten überschreiben.
-        mapLayouts: aktuell.mapLayouts || {},
-        mapBildLayouts: aktuell.mapBildLayouts || {},
-        mapFreieBilder: aktuell.mapFreieBilder || {},
-        mapFreieNotizen: aktuell.mapFreieNotizen || {},
-        mapFreiePfeile: aktuell.mapFreiePfeile || {},
-        mapHintergruende: aktuell.mapHintergruende || {},
-        mapEinstellungen: aktuell.mapEinstellungen || {},
-        mapElementLocks: aktuell.mapElementLocks || {},
+          ...frisch,
+          ...this.zustand,
+          mapLayouts: frisch.mapLayouts || {},
+          mapBildLayouts: frisch.mapBildLayouts || {},
+          mapFreieBilder: frisch.mapFreieBilder || {},
+          mapFreieNotizen: frisch.mapFreieNotizen || {},
+          mapFreiePfeile: frisch.mapFreiePfeile || {},
+          mapHintergruende: frisch.mapHintergruende || {},
+          mapEinstellungen: frisch.mapEinstellungen || {},
+          mapElementLocks: frisch.mapElementLocks || {},
         },
         kid,
       );

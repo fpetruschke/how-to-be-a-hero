@@ -45,6 +45,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       beispielManifestFehler: '',
       ausgewaehltesBeispielDatei: '',
       beispielLaeuftDatei: '',
+      beispielKampagnenInhaltOffen: false,
     };
   },
   computed: {
@@ -462,16 +463,30 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       </div>
 
       <div v-if="beispielManifest.length" class="card p-3 mb-0 text-start htbah-beispiel-kampagnen-card">
-        <h5 class="mb-2 d-flex align-items-center gap-2">
-          <span aria-hidden="true">📖</span>
-          <span>Beispiel-Kampagne laden</span>
-        </h5>
+        <button
+            type="button"
+            class="btn w-100 d-flex align-items-center justify-content-between gap-2 mb-2 p-0 border-0 bg-transparent text-start text-body cursor-pointer"
+            :aria-expanded="beispielKampagnenInhaltOffen ? 'true' : 'false'"
+            aria-controls="sl-uebersicht-beispiel-inhalt"
+            :aria-label="beispielKampagnenInhaltOffen ? 'Beispiel-Kampagne-Bereich einklappen' : 'Beispiel-Kampagne-Bereich ausklappen'"
+            @click="beispielKampagnenInhaltOffen = !beispielKampagnenInhaltOffen">
+          <h5 class="mb-0 d-flex align-items-center gap-2">
+            <span aria-hidden="true">📖</span>
+            <span>Beispiel-Kampagne laden</span>
+          </h5>
+          <span class="material-symbols-outlined flex-shrink-0" aria-hidden="true">
+            {{ beispielKampagnenInhaltOffen ? 'expand_less' : 'expand_more' }}
+          </span>
+        </button>
+        <div
+            v-show="beispielKampagnenInhaltOffen"
+            id="sl-uebersicht-beispiel-inhalt">
         <div
             class="alert alert-danger border-danger mb-3"
             role="alert">
           <strong>Nur für Spielleitung — nicht zum Testen als Spielende!</strong>
           <p class="mb-0 mt-2 small">
-            Wenn du als Spielende:r unterwegs bist: hier nicht weiter testen. Bereits die Auswahl einer
+            Wenn du als spielende Person unterwegs bist: hier nicht weiter testen. Bereits die Auswahl einer
             Demo-Kampagne kann Spoiler offenbaren und das Spielerlebnis zerstören. Diese Funktion ist
             ausschließlich gedacht, wenn du die Beispiel-Kampagne(n) in der Rolle der Spielleitung spielen
             möchtest.
@@ -534,6 +549,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
           <p v-if="aktuellesBeispiel.lizenz" class="mb-0">
             <strong>Lizenz:</strong> {{ aktuellesBeispiel.lizenz }}
           </p>
+        </div>
         </div>
       </div>
       <div

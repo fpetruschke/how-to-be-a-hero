@@ -993,10 +993,10 @@ window.HTBAH_SEITEN.Charakter = {
 
       const wert = Number(value);
 
-      if (wert <= 0) {
+      if (!Number.isFinite(wert) || wert < 0) {
         await window.HTBAH.ui.alert({
           titel: 'Ungültiger Wert',
-          beschreibung: 'Wert muss größer als 0 sein.',
+          beschreibung: 'Negative Werte sind nicht erlaubt.',
         });
         return;
       }
@@ -1056,10 +1056,10 @@ window.HTBAH_SEITEN.Charakter = {
 
       const wert = Number(this.neueFaehigkeit.value);
 
-      if (wert <= 0) {
+      if (!Number.isFinite(wert) || wert < 0) {
         await window.HTBAH.ui.alert({
           titel: 'Ungültiger Wert',
-          beschreibung: 'Wert muss größer als 0 sein.',
+          beschreibung: 'Negative Werte sind nicht erlaubt.',
         });
         return;
       }

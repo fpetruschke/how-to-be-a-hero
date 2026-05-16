@@ -268,6 +268,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           plain('Waffe', z.waffe),
           plain('Schadenswert Nahkampf', z.schadenswertNahkampf),
           plain('Schadenswert Fernkampf', z.schadenswertFernkampf),
+          plain('Waffenloser Kampf (Fäuste, Tritte)', z.waffenloserKampf),
           plain('Initiative', z.initiative),
           rich('Notizen', this.bereinigeNpcNotizenHtml(z.notizenHtml)),
         ];
@@ -406,6 +407,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           'waffe',
           'schadenswertNahkampf',
           'schadenswertFernkampf',
+          'waffenloserKampf',
           'initiative',
           'notizenHtml',
         ];
@@ -425,6 +427,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             'schadenswertNahkampf',
             'schadenswertFernkampf',
             'aufenthaltsort',
+            'inGegenstandId',
             'initiative',
             'beschreibungHtml',
           ],
@@ -465,7 +468,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       return (this.zustand.raetsel || []).filter((row) =>
         this.trifftSucheZu(
           row,
-          ['art', 'titel', 'aufenthaltsort', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'geloest', 'notizenHtml'],
+          ['art', 'titel', 'aufenthaltsort', 'gegenstandId', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'geloest', 'notizenHtml'],
           q,
         ),
       );
@@ -558,6 +561,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           'waffe',
           'schadenswertNahkampf',
           'schadenswertFernkampf',
+          'waffenloserKampf',
           'initiative',
           'notizenHtml',
         ];
@@ -618,7 +622,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return base;
       }
       return base.filter((row) =>
-        this.trifftSucheZu(row, ['art', 'titel', 'aufenthaltsort', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'geloest', 'notizenHtml'], gq),
+        this.trifftSucheZu(row, ['art', 'titel', 'aufenthaltsort', 'gegenstandId', 'aufgabenstellung', 'ergebnis', 'schwierigkeit', 'geloest', 'notizenHtml'], gq),
       );
     },
     anzeigeBestien() {
@@ -811,6 +815,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       if (typ === 'fraktion') {
         zeileKopie.orte = this.fraktionOrteListe(zeileKopie);
+      }
+      if ((typ === 'npc' || typ === 'bestie') && !Array.isArray(zeileKopie.inventar)) {
+        zeileKopie.inventar = [];
       }
       this.bearbeitungOverlay = { typ, zeile: zeileKopie };
       this.bearbeitungOverlayIndex = index;
@@ -1130,8 +1137,13 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     bereinigeNpcNotizenHtml(html) {
       const inhalt = typeof html === 'string' ? html : '';
       return inhalt
+        .replace(/<p><strong>Geheimnis:<\/strong>[\s\S]*?<\/p>/gi, '')
         .replace(/<p><strong>Lebenspunkte:<\/strong>[\s\S]*?<\/p>/gi, '')
         .replace(/<p><strong>Waffe:<\/strong>[\s\S]*?<\/p>/gi, '')
+        .replace(
+          /<p><strong>Waffenloser Nahkampf \(Fäuste, Tritte\):<\/strong>[\s\S]*?<\/p>/gi,
+          '',
+        )
         .trim();
     },
     bereinigeRaetselNotizenHtml(html) {
@@ -1650,12 +1662,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const schadenswertFernkampf = String(
         row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '',
       ).trim();
+      const waffenloserKampf = String(
+        row && row.waffenloserKampf ? row.waffenloserKampf : '',
+      ).trim();
       const teile = [];
       if (schadenswertNahkampf) {
         teile.push(`Nahkampf ${schadenswertNahkampf}`);
       }
       if (schadenswertFernkampf) {
         teile.push(`Fernkampf ${schadenswertFernkampf}`);
+      }
+      if (waffenloserKampf) {
+        teile.push(`Waffenlos ${waffenloserKampf}`);
       }
       if (!teile.length) {
         return '—';
@@ -1773,6 +1791,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         waffe: '',
         schadenswertNahkampf: '',
         schadenswertFernkampf: '',
+        waffenloserKampf: '',
         aufenthaltsort: '',
         handeln: 12,
         wissen: 14,
@@ -1780,6 +1799,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         initiative: '',
         fraktion: '',
         glaube: '',
+        inventar: [],
         notizenHtml: '',
         medien: [],
         primaryMediumId: '',
@@ -1806,6 +1826,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         schadenswertNahkampf: '',
         schadenswertFernkampf: '',
         aufenthaltsort: '',
+        inGegenstandId: '',
+        besitzerTyp: '',
+        besitzerId: '',
         handeln: 16,
         wissen: 8,
         soziales: 16,
@@ -1851,6 +1874,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         art: '',
         titel: '',
         aufenthaltsort: '',
+        gegenstandId: '',
         aufgabenstellung: '',
         ergebnis: '',
         schwierigkeit: '',
@@ -1880,6 +1904,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         geheimnis: '',
         beschreibungHtml: '',
         aggressivitaetSkala: 5,
+        inventar: [],
         medien: [],
         primaryMediumId: '',
       };
@@ -1911,6 +1936,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       if (typ === 'fraktion') {
         zeileKopie.orte = this.fraktionOrteListe(zeileKopie);
+      }
+      if ((typ === 'npc' || typ === 'bestie') && !Array.isArray(zeileKopie.inventar)) {
+        zeileKopie.inventar = [];
       }
       this.bearbeitung = {
         typ,
@@ -2495,6 +2523,43 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const treffer = kampagnen.find((k) => slugAusName(k && k.name) === slug);
       return treffer && treffer.id ? treffer.id : '';
     },
+    onInventarEintragEntfernen(payload) {
+      const gegenstandId =
+        payload && typeof payload === 'object' ? String(payload.gegenstandId || '').trim() : '';
+      if (!gegenstandId) {
+        return;
+      }
+      const syncInventar = (bearbeitung) => {
+        if (!bearbeitung || !bearbeitung.zeile || !Array.isArray(bearbeitung.zeile.inventar)) {
+          return;
+        }
+        bearbeitung.zeile.inventar = bearbeitung.zeile.inventar.filter(
+          (item) => item && String(item.gegenstandId || '').trim() !== gegenstandId,
+        );
+        const typ = bearbeitung.typ;
+        const entityId = String(bearbeitung.zeile.id || '').trim();
+        if ((typ === 'npc' || typ === 'bestie') && entityId) {
+          const listeName = typ === 'npc' ? 'npcs' : 'bestien';
+          this.zustand[listeName] = (this.zustand[listeName] || []).map((row) => {
+            if (!row || row.id !== entityId || !Array.isArray(row.inventar)) {
+              return row;
+            }
+            return {
+              ...row,
+              inventar: row.inventar.filter(
+                (item) => item && String(item.gegenstandId || '').trim() !== gegenstandId,
+              ),
+            };
+          });
+        }
+      };
+      syncInventar(this.bearbeitung);
+      syncInventar(this.bearbeitungOverlay);
+      this.zustand.gegenstaende = (this.zustand.gegenstaende || []).map((g) =>
+        g && g.id === gegenstandId ? { ...g, besitzerTyp: '', besitzerId: '' } : g,
+      );
+      this.persist();
+    },
     zeileSpeichern() {
       this.zeileSpeichernIntern({ schliessenNachSpeichern: true });
     },
@@ -2595,6 +2660,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const i = liste.findIndex((r) => r.id === id);
       if (i !== -1) {
         liste.splice(i, 1);
+        if (typ === 'gegenstand' && window.HTBAH) {
+          window.HTBAH.entferneZufallstabellenParentReferenzenAufGegenstand(this.zustand, id);
+          if (typeof window.HTBAH.entferneGegenstandAusAllenInventaren === 'function') {
+            window.HTBAH.entferneGegenstandAusAllenInventaren(this.zustand, id);
+          }
+        } else if ((typ === 'npc' || typ === 'bestie') && window.HTBAH) {
+          if (typeof window.HTBAH.entferneZufallstabellenBesitzerReferenzen === 'function') {
+            window.HTBAH.entferneZufallstabellenBesitzerReferenzen(this.zustand, typ, id);
+          }
+        }
         this.bereinigeWeltenbauLayoutdaten([{ typ, id }]);
         this.persist();
       }
@@ -4107,6 +4182,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @media-open="mediumImBildbetrachterOeffnen"
         @media-download="mediumHerunterladen"
         @duplicate="onHauptZeileModalDuplicate"
+        @inventar-remove="onInventarEintragEntfernen"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"
         @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
         @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
@@ -4142,6 +4218,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @media-open="mediumImBildbetrachterOeffnen"
         @media-download="overlayMediaDownload"
         @duplicate="onOverlayZeileModalDuplicate"
+        @inventar-remove="onInventarEintragEntfernen"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"
         @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
         @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"

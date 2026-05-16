@@ -13,6 +13,42 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       : `inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   };
 
+  M.inventarEintragAusGegenstand = function inventarEintragAusGegenstand(gegenstand) {
+    const g = gegenstand && typeof gegenstand === 'object' ? gegenstand : {};
+    const typ = g.istWaffe ? 'waffe' : 'gegenstand';
+    return M.inventarEintragNachTypBereinigen({
+      id: M.neueInventarId(),
+      name: typeof g.name === 'string' ? g.name.trim() : '',
+      typ,
+      beschreibungHtml: typeof g.beschreibungHtml === 'string' ? g.beschreibungHtml : '',
+      schadenswertNahkampf: g.schadenswertNahkampf,
+      schadenswertFernkampf: g.schadenswertFernkampf,
+      gegenstandId: typeof g.id === 'string' ? g.id.trim() : '',
+    });
+  };
+
+  M.summenAusCharakter = function summenAusCharakter(charakter) {
+    const sum = (kat) =>
+      (Array.isArray(charakter && charakter[kat]) ? charakter[kat] : []).reduce(
+        (s, e) => s + (Number(e && e.value) || 0),
+        0,
+      );
+    return {
+      handeln: sum('handeln'),
+      wissen: sum('wissen'),
+      soziales: sum('soziales'),
+    };
+  };
+
+  M.begabungenAusSummen = function begabungenAusSummen(summen) {
+    const b = (v) => Math.round(Number(v) / 10);
+    return {
+      handeln: b(summen.handeln),
+      wissen: b(summen.wissen),
+      soziales: b(summen.soziales),
+    };
+  };
+
   M.inventarEintragNachTypBereinigen = function inventarEintragNachTypBereinigen(e) {
     const t = ['rustung', 'waffe', 'gegenstand'].includes(e.typ) ? e.typ : 'gegenstand';
     e.typ = t;
@@ -44,6 +80,7 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       delete e.kampfart;
       delete e.rustwert;
     }
+    e.gegenstandId = typeof e.gegenstandId === 'string' ? e.gegenstandId.trim() : '';
     return e;
   };
 
@@ -61,6 +98,7 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
           kampfart: item.kampfart,
           schadenswertNahkampf: item.schadenswertNahkampf,
           schadenswertFernkampf: item.schadenswertFernkampf,
+          gegenstandId: item.gegenstandId,
         };
         return M.inventarEintragNachTypBereinigen(roh);
       });

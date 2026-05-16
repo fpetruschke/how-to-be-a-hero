@@ -17,7 +17,7 @@ function normalisierePresetFaehigkeiten(roh) {
         continue;
       }
       const value = Number(rohWert);
-      if (Number.isNaN(value) || value < 1 || value > 100) continue;
+      if (Number.isNaN(value) || value < 0 || value > 100) continue;
       arr.push({ name, value });
     }
     out[k] = arr;

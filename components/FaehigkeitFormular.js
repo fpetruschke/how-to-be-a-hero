@@ -32,7 +32,7 @@ window.HTBAH_KOMPONENTEN.FaehigkeitFormular = {
           return;
         }
         const n = Number(raw);
-        if (Number.isFinite(n) && n >= 1 && n <= 100) {
+        if (Number.isFinite(n) && n >= 0 && n <= 100) {
           this.aktualisiere({ value: n });
         }
         return;

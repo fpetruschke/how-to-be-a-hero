@@ -104,15 +104,18 @@ const SPEICHER_BEREICHE = {
       'htbah_weltenbau',
       'htbah_wuerfel_audio',
       'htbah_wuerfel_sound',
+      'htbah_zeitmessung_einstellungen',
+      'htbah_zeitmessung_badge_pos',
       'htbah_dice_colors',
       'htbah_wuerfel_beutel_fenster',
       'htbah_wuerfelbecher_bundle',
       'htbah_orientation_mode',
+      'htbah_orientation_anchor_angle',
       'htbah_interaktive_welt_stats_anzeigen',
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen und Weltenbau-Daten je Kampagne, deine Theme-Auswahl, die Würfel-Audio-Einstellungen, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen und Weltenbau-Daten je Kampagne, deine Theme-Auswahl, die Würfel- und Zeitmessungs-Einstellungen, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
@@ -135,6 +138,8 @@ const WUERFELBECHER_KEYS = [
   'htbah_wuerfel_beutel_fenster',
   'htbah_wuerfel_audio',
   'htbah_wuerfel_sound',
+  'htbah_zeitmessung_einstellungen',
+  'htbah_zeitmessung_badge_pos',
 ];
 
 const IMPORT_IGNORIERE_KEYS = new Set(['htbah_app_rolle', 'htbah_active_character_id']);
@@ -284,6 +289,10 @@ window.HTBAH_SEITEN.Einstellungen = {
       wuerfelFarbeZehner: '#3b7a36',
       wuerfelAudioStumm: false,
       wuerfelAudioLautstaerke: 0.88,
+      zeitmessungKlickAktiv: true,
+      zeitmessungKlickLautstaerke: 0.65,
+      zeitmessungStoppuhrMitKlick: false,
+      zeitmessungCountdownAbSekunde: 10,
       orientierungModus: 'frei',
       /** Erzwingt Neu-Laden der Kampagnenliste aus dem Speicher (nicht reaktiv). */
       kampagnenCacheTick: 0,
@@ -383,6 +392,9 @@ window.HTBAH_SEITEN.Einstellungen = {
     },
     wuerfelAudioLautProzent() {
       return Math.round(Math.min(1, Math.max(0, Number(this.wuerfelAudioLautstaerke) || 0)) * 100);
+    },
+    zeitmessungKlickLautProzent() {
+      return Math.round(Math.min(1, Math.max(0, Number(this.zeitmessungKlickLautstaerke) || 0)) * 100);
     },
     exportBaumOpts() {
       return {
@@ -743,11 +755,21 @@ window.HTBAH_SEITEN.Einstellungen = {
     wuerfelEinstellungenLaden() {
       const anzeige = window.HTBAH.ladeWuerfelAnzeigeProfil();
       const audio = window.HTBAH.ladeWuerfelAudioProfil();
+      const zeit =
+        window.HTBAH && typeof window.HTBAH.ladeZeitmessungProfil === 'function'
+          ? window.HTBAH.ladeZeitmessungProfil()
+          : null;
       this.wuerfel3dAktiv = anzeige.enabled;
       this.wuerfelFarbe = anzeige.themeOnes || anzeige.theme;
       this.wuerfelFarbeZehner = anzeige.themeTens || '#3b7a36';
       this.wuerfelAudioStumm = audio.stumm;
       this.wuerfelAudioLautstaerke = audio.lautstaerke;
+      if (zeit) {
+        this.zeitmessungKlickAktiv = zeit.klickAktiv;
+        this.zeitmessungKlickLautstaerke = zeit.klickLautstaerke;
+        this.zeitmessungStoppuhrMitKlick = zeit.stoppuhrMitKlick;
+        this.zeitmessungCountdownAbSekunde = zeit.countdownAbSekunde;
+      }
     },
     speichereWuerfelAnzeigeEinstellungen() {
       window.HTBAH.setzeWuerfelAnzeigeProfil({
@@ -773,6 +795,43 @@ window.HTBAH_SEITEN.Einstellungen = {
       const n = Math.max(0, Math.min(100, Math.round(Number(roh) || 0)));
       this.wuerfelAudioLautstaerke = n / 100;
       this.wuerfelAudioPersistiere();
+    },
+    zeitmessungEinstellungenPersistiere() {
+      if (!window.HTBAH || typeof window.HTBAH.setzeZeitmessungProfil !== 'function') {
+        return;
+      }
+      window.HTBAH.setzeZeitmessungProfil({
+        klickAktiv: this.zeitmessungKlickAktiv,
+        klickLautstaerke: this.zeitmessungKlickLautstaerke,
+        stoppuhrMitKlick: this.zeitmessungStoppuhrMitKlick,
+        countdownAbSekunde: this.zeitmessungCountdownAbSekunde,
+      });
+    },
+    zeitmessungKlickAktivToggle() {
+      this.zeitmessungKlickAktiv = !this.zeitmessungKlickAktiv;
+      this.zeitmessungEinstellungenPersistiere();
+    },
+    zeitmessungKlickSetzeLautstaerkeProzent(roh) {
+      const n = Math.max(0, Math.min(100, Math.round(Number(roh) || 0)));
+      this.zeitmessungKlickLautstaerke = n / 100;
+      this.zeitmessungEinstellungenPersistiere();
+    },
+    zeitmessungKlickVorschau() {
+      if (!this.zeitmessungKlickAktiv) {
+        return;
+      }
+      window.HTBAH?.spieleZeitmessungKlick?.(this.zeitmessungKlickLautstaerke);
+    },
+    zeitmessungAbgelaufenVorschau() {
+      if (!this.zeitmessungKlickAktiv) {
+        return;
+      }
+      window.HTBAH?.spieleZeitmessungAbgelaufen?.(this.zeitmessungKlickLautstaerke);
+    },
+    zeitmessungCountdownAbGeaendert() {
+      const n = Math.max(0, Math.min(35999, Math.round(Number(this.zeitmessungCountdownAbSekunde) || 0)));
+      this.zeitmessungCountdownAbSekunde = n;
+      this.zeitmessungEinstellungenPersistiere();
     },
     async speicherSchaetzungLaden() {
       this.browserSpeicherFehler = '';
@@ -1506,7 +1565,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       <h5 class="text-start mb-2">Ausrichtung</h5>
       <div class="card p-3 mb-3 text-start">
         <p class="small text-body-secondary mb-2">
-          Lege fest, ob die Ansicht frei drehbar bleibt oder auf Quer-/Hochformat fixiert wird.
+          Lege fest, ob die Ansicht frei drehbar bleibt oder in der aktuellen Lage (Quer- bzw. Hochformat) fixiert wird – auch bei Drehen oder Wenden des Geräts.
         </p>
         <div
           class="btn-group w-100"
@@ -1617,6 +1676,86 @@ window.HTBAH_SEITEN.Einstellungen = {
               {{ wuerfelAudioStumm ? 'volume_off' : 'volume_up' }}
             </span>
           </button>
+        </div>
+      </div>
+
+      <h5 class="text-start mb-2">Zeitmessung (Würfelbeutel)</h5>
+      <div class="card p-3 mb-3 text-start">
+        <p class="small text-body-secondary mb-3">
+          Klick-Töne für Timer und Stoppuhr im Würfelbeutel. Der Ton wird per Web Audio erzeugt — kein
+          zusätzliches Audio-Asset nötig.
+        </p>
+        <div class="form-check form-switch mb-3">
+          <input
+            id="settings-zeitmessung-klick"
+            class="form-check-input"
+            type="checkbox"
+            role="switch"
+            v-model="zeitmessungKlickAktiv"
+            @change="zeitmessungEinstellungenPersistiere" />
+          <label class="form-check-label" for="settings-zeitmessung-klick">
+            Countdown-Klick aktiv
+          </label>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+          <span class="small text-body-secondary text-nowrap">Klick-Lautstärke</span>
+          <input
+            type="range"
+            class="form-range flex-grow-1 m-0 htbah-wuerfel-audio-range"
+            min="0"
+            max="100"
+            step="1"
+            :disabled="!zeitmessungKlickAktiv"
+            :value="zeitmessungKlickLautProzent"
+            @input="zeitmessungKlickSetzeLautstaerkeProzent($event.target.value)"
+            aria-label="Zeitmessung Klick Lautstärke" />
+          <span class="small text-body-secondary tabular-nums text-nowrap" style="min-width: 2.5rem">
+            {{ zeitmessungKlickLautProzent }}%
+          </span>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            :disabled="!zeitmessungKlickAktiv"
+            @click="zeitmessungKlickVorschau">
+            Klick
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            :disabled="!zeitmessungKlickAktiv"
+            @click="zeitmessungAbgelaufenVorschau">
+            Ende
+          </button>
+        </div>
+        <div class="form-check form-switch mb-3">
+          <input
+            id="settings-zeitmessung-stoppuhr-klick"
+            class="form-check-input"
+            type="checkbox"
+            role="switch"
+            v-model="zeitmessungStoppuhrMitKlick"
+            @change="zeitmessungEinstellungenPersistiere" />
+          <label class="form-check-label" for="settings-zeitmessung-stoppuhr-klick">
+            Stoppuhr: jede volle Sekunde mit Klick
+          </label>
+        </div>
+        <div class="mb-0">
+          <label class="form-label small text-body-secondary mb-1" for="settings-zeitmessung-countdown-ab">
+            Timer: Klick ab verbleibenden Sekunden
+          </label>
+          <input
+            id="settings-zeitmessung-countdown-ab"
+            type="number"
+            class="form-control"
+            min="0"
+            max="35999"
+            v-model.number="zeitmessungCountdownAbSekunde"
+            :disabled="!zeitmessungKlickAktiv"
+            @change="zeitmessungCountdownAbGeaendert" />
+          <div class="form-text">
+            Bei 10 ertönt ab 00:00:10 bis 00:00:01 je ein Klick pro Sekunde. Bei 0 eine kurze Melodie
+            (Ende-Test).
+          </div>
         </div>
       </div>
 

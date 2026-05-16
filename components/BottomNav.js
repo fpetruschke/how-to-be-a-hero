@@ -1,5 +1,6 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 const HTBAH_BEGEGNUNG_UTILS = window.HTBAH_SHARED && window.HTBAH_SHARED.BegegnungUtils;
+const HTBAH_ZEITMESSUNG = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
 
 /** Aufgelöste URL für dynamisches import() (Bare Specifier wie "assets/…" sind im Browser ungültig). */
 function htbahAssetUrl(relMitPunktSlash) {
@@ -31,6 +32,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       atmosphaere: {},
       badgePos: null,
       _badgeDrag: null,
+      zeitmessungBadgePos: null,
+      _zeitmessungBadgeDrag: null,
+      _zeitmessungBadgeDragMoveHandler: null,
+      _zeitmessungBadgeDragUpHandler: null,
       begegnungZiehung: null,
       /** Erzwingt Neu-Auslesen der Zufallstabellen nach Speichern (gleiche Kampagne). */
       zufallstabellenSpeicherTick: 0,
@@ -54,6 +59,17 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       wuerfelnLaeuft: false,
       wuerfelSound3dVerzoegerungTimeoutId: null,
       begegnungOpenRequestTimeoutId: null,
+      zeitmessungModus: 'timer',
+      zeitmessungStatus: 'bereit',
+      zeitmessungAnzeigeMs: 0,
+      zeitmessungBasisMs: 0,
+      zeitmessungZielMs: 0,
+      zeitmessungEingabeH: 0,
+      zeitmessungEingabeM: 5,
+      zeitmessungEingabeS: 0,
+      zeitmessungStartPerformance: 0,
+      zeitmessungTickIntervalId: null,
+      zeitmessungLetzteKlickSekunde: -1,
       wuerfelBeutelOffen: false,
       wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       wuerfelBeutelAusloeserElement: null,
@@ -68,6 +84,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
   created() {
     this.synchronisiereKampagnenbasierteDaten();
     this.ladeWuerfelBeutelFenster();
+    this.zeitmessungTimerEingabeGeaendert();
+    if (window.HTBAH && typeof window.HTBAH.ladeZeitmessungBadgePosition === 'function') {
+      this.zeitmessungBadgePos = window.HTBAH.ladeZeitmessungBadgePosition();
+    }
   },
   computed: {
     ergebnisSumme() {
@@ -207,6 +227,51 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     wuerfelNavAktiv() {
       return this.wuerfelBeutelOffen;
+    },
+    zeitmessungAnzeigeText() {
+      const format =
+        HTBAH_ZEITMESSUNG && typeof HTBAH_ZEITMESSUNG.formatHhMmSs === 'function'
+          ? HTBAH_ZEITMESSUNG.formatHhMmSs
+          : (ms) => String(ms);
+      return format(this.zeitmessungAnzeigeMs);
+    },
+    zeitmessungLaeuft() {
+      return this.zeitmessungStatus === 'laeuft';
+    },
+    zeitmessungPausiert() {
+      return this.zeitmessungStatus === 'pausiert';
+    },
+    zeitmessungStartPauseLabel() {
+      if (this.zeitmessungLaeuft) {
+        return 'Pause';
+      }
+      if (this.zeitmessungPausiert) {
+        return 'Fortsetzen';
+      }
+      return 'Start';
+    },
+    zeitmessungEingabeSichtbar() {
+      return (
+        this.zeitmessungModus === 'timer' &&
+        !this.zeitmessungLaeuft &&
+        !this.zeitmessungPausiert
+      );
+    },
+    zeitmessungOverlaySichtbar() {
+      return this.zeitmessungLaeuft || this.zeitmessungPausiert;
+    },
+    zeitmessungBadgeCombinedStyle() {
+      const o = {};
+      if (this.zeitmessungBadgePos && this.zeitmessungBadgePos.mode === 'fixed') {
+        o.left = `${this.zeitmessungBadgePos.left}px`;
+        o.top = `${this.zeitmessungBadgePos.top}px`;
+        o.right = 'auto';
+        o.bottom = 'auto';
+      }
+      return o;
+    },
+    zeitmessungOverlayModusLabel() {
+      return this.zeitmessungModus === 'timer' ? 'Timer' : 'Stoppuhr';
     },
     musikNavAktiv() {
       return this.musikboardOffen;
@@ -355,6 +420,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       }
     },
     wuerfelModalTab(neu) {
+      if (neu === 'zeitmessung') {
+        this.zeitmessungTimerEingabeGeaendert();
+      }
       if (neu === 'wuerfel' && this.dice3dAktiv) {
         this.$nextTick(() => {
           if (this.wuerfelModus === 'w100') {
@@ -397,6 +465,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           }
         });
       } else {
+        this.zeitmessungStoppeTicker();
         window.removeEventListener('resize', this.wuerfelBeutelBeiViewportResize);
         window.removeEventListener('keydown', this.onWuerfelBeutelKeydown);
         this.wuerfelBeutelBeendeZiehen();
@@ -455,6 +524,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.diceInitPromiseEiner = null;
     this.diceModulLadenPromise = null;
     this.abbrecheAnstehenden3dWuerfelSound();
+    this.zeitmessungStoppeTicker();
     if (this.begegnungOpenRequestTimeoutId != null) {
       window.clearTimeout(this.begegnungOpenRequestTimeoutId);
       this.begegnungOpenRequestTimeoutId = null;
@@ -474,6 +544,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.musikboardBeendeZiehen();
     this.musikboardBeendeResize();
     this.badgeZiehenCleanup();
+    this.zeitmessungBadgeZiehenCleanup();
   },
   methods: {
     entsorgeDiceBoxInstanz(rawBox) {
@@ -1016,15 +1087,169 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         /* Optional: Speicher gesperrt */
       }
     },
+    zeitmessungMsAusEingabe() {
+      if (HTBAH_ZEITMESSUNG && typeof HTBAH_ZEITMESSUNG.msAusTeilen === 'function') {
+        return HTBAH_ZEITMESSUNG.msAusTeilen(
+          this.zeitmessungEingabeH,
+          this.zeitmessungEingabeM,
+          this.zeitmessungEingabeS,
+        );
+      }
+      const h = Math.max(0, Math.min(99, Math.round(Number(this.zeitmessungEingabeH) || 0)));
+      const m = Math.max(0, Math.min(59, Math.round(Number(this.zeitmessungEingabeM) || 0)));
+      const s = Math.max(0, Math.min(59, Math.round(Number(this.zeitmessungEingabeS) || 0)));
+      return (h * 3600 + m * 60 + s) * 1000;
+    },
+    zeitmessungStoppeTicker() {
+      if (this.zeitmessungTickIntervalId != null) {
+        window.clearInterval(this.zeitmessungTickIntervalId);
+        this.zeitmessungTickIntervalId = null;
+      }
+    },
+    zeitmessungSetzeModus(modus) {
+      if (modus !== 'timer' && modus !== 'stoppuhr') {
+        return;
+      }
+      this.zeitmessungStoppeTicker();
+      this.zeitmessungModus = modus;
+      this.zeitmessungStatus = 'bereit';
+      this.zeitmessungLetzteKlickSekunde = -1;
+      if (modus === 'stoppuhr') {
+        this.zeitmessungAnzeigeMs = 0;
+        this.zeitmessungBasisMs = 0;
+        this.zeitmessungZielMs = 0;
+      } else {
+        const ms = this.zeitmessungMsAusEingabe();
+        this.zeitmessungAnzeigeMs = ms;
+        this.zeitmessungBasisMs = 0;
+        this.zeitmessungZielMs = ms;
+      }
+    },
+    zeitmessungZuruecksetzen() {
+      this.zeitmessungStoppeTicker();
+      this.zeitmessungStatus = 'bereit';
+      this.zeitmessungLetzteKlickSekunde = -1;
+      if (this.zeitmessungModus === 'stoppuhr') {
+        this.zeitmessungAnzeigeMs = 0;
+        this.zeitmessungBasisMs = 0;
+        this.zeitmessungZielMs = 0;
+      } else {
+        const ms = this.zeitmessungMsAusEingabe();
+        this.zeitmessungAnzeigeMs = ms;
+        this.zeitmessungBasisMs = 0;
+        this.zeitmessungZielMs = ms;
+      }
+    },
+    zeitmessungAktualisiereAnzeige() {
+      const profil =
+        window.HTBAH && typeof window.HTBAH.ladeZeitmessungProfil === 'function'
+          ? window.HTBAH.ladeZeitmessungProfil()
+          : { stoppuhrMitKlick: false, countdownAbSekunde: 10, klickAktiv: true };
+      if (this.zeitmessungStatus !== 'laeuft') {
+        return;
+      }
+      const jetzt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const vergangen = Math.max(0, jetzt - this.zeitmessungStartPerformance);
+      if (this.zeitmessungModus === 'stoppuhr') {
+        const neuMs = this.zeitmessungBasisMs + vergangen;
+        this.zeitmessungAnzeigeMs = neuMs;
+        if (profil.stoppuhrMitKlick && profil.klickAktiv) {
+          const sek = Math.floor(neuMs / 1000);
+          if (sek > 0 && sek !== this.zeitmessungLetzteKlickSekunde) {
+            this.zeitmessungLetzteKlickSekunde = sek;
+            window.HTBAH?.spieleZeitmessungKlick?.();
+          }
+        }
+        return;
+      }
+      const rest = Math.max(0, this.zeitmessungZielMs - vergangen);
+      this.zeitmessungAnzeigeMs = rest;
+      /** floor = gleiche Sekundenzahl wie HH:mm:ss-Anzeige (ceil würde Ende/Klicks eine Sekunde zu früh auslösen). */
+      const restSek = Math.floor(rest / 1000);
+      if (restSek <= 0) {
+        this.zeitmessungStoppeTicker();
+        this.zeitmessungStatus = 'bereit';
+        this.zeitmessungAnzeigeMs = 0;
+        this.zeitmessungLetzteKlickSekunde = -1;
+        if (profil.klickAktiv) {
+          window.HTBAH?.spieleZeitmessungAbgelaufen?.();
+        }
+        return;
+      }
+      if (
+        profil.klickAktiv &&
+        restSek <= profil.countdownAbSekunde &&
+        restSek !== this.zeitmessungLetzteKlickSekunde
+      ) {
+        this.zeitmessungLetzteKlickSekunde = restSek;
+        window.HTBAH?.spieleZeitmessungKlick?.();
+      }
+    },
+    zeitmessungStartPause() {
+      const jetzt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (this.zeitmessungLaeuft) {
+        this.zeitmessungStoppeTicker();
+        this.zeitmessungStatus = 'pausiert';
+        const vergangen = Math.max(0, jetzt - this.zeitmessungStartPerformance);
+        if (this.zeitmessungModus === 'stoppuhr') {
+          this.zeitmessungBasisMs += vergangen;
+          this.zeitmessungAnzeigeMs = this.zeitmessungBasisMs;
+        } else {
+          const rest = Math.max(0, this.zeitmessungZielMs - vergangen);
+          this.zeitmessungAnzeigeMs = rest;
+          this.zeitmessungZielMs = rest;
+        }
+        return;
+      }
+      if (this.zeitmessungPausiert) {
+        this.zeitmessungStatus = 'laeuft';
+        this.zeitmessungStartPerformance = jetzt;
+        this.zeitmessungStarteTicker();
+        return;
+      }
+      if (this.zeitmessungModus === 'timer') {
+        const ms = this.zeitmessungMsAusEingabe();
+        if (ms <= 0) {
+          return;
+        }
+        this.zeitmessungZielMs = ms;
+        this.zeitmessungAnzeigeMs = ms;
+        this.zeitmessungBasisMs = 0;
+      } else {
+        this.zeitmessungZielMs = 0;
+        this.zeitmessungBasisMs = 0;
+        this.zeitmessungAnzeigeMs = 0;
+      }
+      this.zeitmessungStatus = 'laeuft';
+      this.zeitmessungLetzteKlickSekunde = -1;
+      this.zeitmessungStartPerformance = jetzt;
+      this.zeitmessungStarteTicker();
+    },
+    zeitmessungStarteTicker() {
+      this.zeitmessungStoppeTicker();
+      this.zeitmessungTickIntervalId = window.setInterval(() => {
+        this.zeitmessungAktualisiereAnzeige();
+      }, 200);
+    },
+    zeitmessungTimerEingabeGeaendert() {
+      if (this.zeitmessungModus !== 'timer' || this.zeitmessungLaeuft || this.zeitmessungPausiert) {
+        return;
+      }
+      const ms = this.zeitmessungMsAusEingabe();
+      this.zeitmessungAnzeigeMs = ms;
+      this.zeitmessungZielMs = ms;
+    },
     wuerfelModalOeffnen(tab) {
-      const zielTab =
-        tab === 'atmosphaere' || tab === 'begegnung' || tab === 'wuerfel' ? tab : 'wuerfel';
+      const erlaubteTabs = ['wuerfel', 'zeitmessung', 'atmosphaere', 'begegnung'];
+      const zielTab = erlaubteTabs.includes(tab) ? tab : 'wuerfel';
       const gmTab = zielTab === 'atmosphaere' || zielTab === 'begegnung';
       const atmosphaereVerbieten = zielTab === 'atmosphaere' && !this.hatAktiveKampagne;
       const begegnungVerbieten = zielTab === 'begegnung' && !this.begegnungReiterMoeglich;
       this.wuerfelModalTab =
         (!this.istSpielleitung && gmTab) || atmosphaereVerbieten || begegnungVerbieten
-          ? 'wuerfel'
+          ? zielTab === 'zeitmessung'
+            ? 'zeitmessung'
+            : 'wuerfel'
           : zielTab;
       this.wuerfelBeutelAusloeserElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.ladeDiceFarbwahl();
@@ -1380,6 +1605,85 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     atmosphaereBadgeOeffnen() {
       this.wuerfelModalOeffnen('atmosphaere');
     },
+    zeitmessungBadgeOeffnen() {
+      this.wuerfelModalOeffnen('zeitmessung');
+    },
+    zeitmessungBadgeZiehenCleanup() {
+      if (this._zeitmessungBadgeDragMoveHandler) {
+        document.removeEventListener('pointermove', this._zeitmessungBadgeDragMoveHandler);
+        this._zeitmessungBadgeDragMoveHandler = null;
+      }
+      if (this._zeitmessungBadgeDragUpHandler) {
+        document.removeEventListener('pointerup', this._zeitmessungBadgeDragUpHandler);
+        document.removeEventListener('pointercancel', this._zeitmessungBadgeDragUpHandler);
+        this._zeitmessungBadgeDragUpHandler = null;
+      }
+      this.zeitmessungBadgeZiehenEnd();
+    },
+    zeitmessungBadgeZiehenStart(e) {
+      if (e.button != null && e.button !== 0) {
+        return;
+      }
+      const el = this.$refs.zeitmessungBadgeEl;
+      if (!el) {
+        return;
+      }
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      this._zeitmessungBadgeDrag = {
+        captureEl: e.target,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        baseLeft: r.left,
+        baseTop: r.top,
+      };
+      this.zeitmessungBadgeZiehenCleanup();
+      this._zeitmessungBadgeDragMoveHandler = (ev) => this.zeitmessungBadgeZiehenMove(ev);
+      this._zeitmessungBadgeDragUpHandler = () => this.zeitmessungBadgeZiehenCleanup();
+      document.addEventListener('pointermove', this._zeitmessungBadgeDragMoveHandler, { passive: false });
+      document.addEventListener('pointerup', this._zeitmessungBadgeDragUpHandler);
+      document.addEventListener('pointercancel', this._zeitmessungBadgeDragUpHandler);
+      try {
+        e.target.setPointerCapture(e.pointerId);
+      } catch {
+        /* optional */
+      }
+    },
+    zeitmessungBadgeZiehenMove(e) {
+      const d = this._zeitmessungBadgeDrag;
+      if (!d) {
+        return;
+      }
+      e.preventDefault();
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      const el = this.$refs.zeitmessungBadgeEl;
+      const w = el ? el.offsetWidth : 120;
+      const h = el ? el.offsetHeight : 56;
+      let left = d.baseLeft + dx;
+      let top = d.baseTop + dy;
+      const pad = 6;
+      const maxL = Math.max(pad, window.innerWidth - w - pad);
+      const maxT = Math.max(pad, window.innerHeight - h - pad);
+      left = Math.min(maxL, Math.max(pad, left));
+      top = Math.min(maxT, Math.max(pad, top));
+      this.zeitmessungBadgePos = { mode: 'fixed', left, top };
+    },
+    zeitmessungBadgeZiehenEnd() {
+      const d = this._zeitmessungBadgeDrag;
+      if (d && d.captureEl && d.pointerId != null) {
+        try {
+          d.captureEl.releasePointerCapture(d.pointerId);
+        } catch {
+          /* optional */
+        }
+      }
+      this._zeitmessungBadgeDrag = null;
+      if (window.HTBAH && typeof window.HTBAH.speichereZeitmessungBadgePosition === 'function') {
+        window.HTBAH.speichereZeitmessungBadgePosition(this.zeitmessungBadgePos);
+      }
+    },
     sicherheitsmechanismenOeffnen() {
       this.sicherheitsmechanismenModalOffen = true;
     },
@@ -1638,12 +1942,16 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     begegnungNpcWaffenWerteText(row) {
       const nah = String(row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '').trim();
       const fern = String(row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '').trim();
+      const waffenlos = String(row && row.waffenloserKampf ? row.waffenloserKampf : '').trim();
       const teile = [];
       if (nah) {
         teile.push(`Nahkampf ${nah}`);
       }
       if (fern) {
         teile.push(`Fernkampf ${fern}`);
+      }
+      if (waffenlos) {
+        teile.push(`Waffenlos ${waffenlos}`);
       }
       return teile.length ? teile.join(' · ') : '—';
     },
@@ -1831,12 +2139,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </button>
             <button
               type="button"
-              title="Würfel"
+              title="Werkzeuge"
               class="htbah-nav-item"
               :class="{ 'htbah-nav-button-active': wuerfelNavAktiv }"
               @click="wuerfelModalOeffnen('wuerfel')">
               <span class="htbah-nav-item-emoji" aria-hidden="true">🎲</span>
-              <span class="htbah-nav-item-label">Würfel</span>
+              <span class="htbah-nav-item-label">Werkzeuge</span>
             </button>
             <button
               v-if="istSpielleitung"
@@ -1911,7 +2219,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           </button>
           <button
             type="button"
-            title="Würfel"
+            title="Werkzeuge"
             :class="{ 'htbah-nav-button-active': wuerfelNavAktiv }"
             @click="wuerfelModalOeffnen('wuerfel')">
             🎲
@@ -1983,6 +2291,36 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           <template v-else>
             <span class="htbah-atmosphaere-badge__line htbah-atmosphaere-badge__hint">🌤️ Wetter würfeln</span>
           </template>
+        </button>
+      </div>
+    </teleport>
+
+    <teleport to="body">
+      <div
+        v-if="zeigeNav && zeitmessungOverlaySichtbar"
+        ref="zeitmessungBadgeEl"
+        class="htbah-zeitmessung-badge"
+        :class="{ 'htbah-zeitmessung-badge--custom-pos': zeitmessungBadgePos && zeitmessungBadgePos.mode === 'fixed' }"
+        :style="zeitmessungBadgeCombinedStyle">
+        <div
+          class="htbah-zeitmessung-badge__drag"
+          title="Ziehen zum Verschieben"
+          aria-label="Zeitmessung verschieben"
+          @pointerdown="zeitmessungBadgeZiehenStart">
+          ⠿
+        </div>
+        <button
+          type="button"
+          class="htbah-zeitmessung-badge__tap"
+          title="Zeitmessung (Würfelbeutel)"
+          @click="zeitmessungBadgeOeffnen">
+          <span class="htbah-zeitmessung-badge__meta">
+            <span class="htbah-zeitmessung-badge__modus">{{ zeitmessungOverlayModusLabel }}</span>
+            <span v-if="zeitmessungPausiert" class="htbah-zeitmessung-badge__pause">Pause</span>
+          </span>
+          <span class="htbah-zeitmessung-badge__zeit" aria-live="polite" aria-atomic="true">
+            {{ zeitmessungAnzeigeText }}
+          </span>
         </button>
       </div>
     </teleport>
@@ -2071,7 +2409,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               @click="wuerfelBeutelSchliessen"></button>
           </div>
           <div class="flex-grow-1 min-h-0 overflow-auto px-3 py-2">
-              <ul v-if="istSpielleitung" class="nav nav-tabs mb-3" role="tablist">
+              <ul class="nav nav-tabs mb-3" role="tablist">
                 <li class="nav-item" role="presentation">
                   <button
                     type="button"
@@ -2081,7 +2419,16 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     Würfel
                   </button>
                 </li>
-                <li v-if="hatAktiveKampagne" class="nav-item" role="presentation">
+                <li class="nav-item" role="presentation">
+                  <button
+                    type="button"
+                    class="nav-link"
+                    :class="{ active: wuerfelModalTab === 'zeitmessung' }"
+                    @click="wuerfelModalTab = 'zeitmessung'">
+                    Zeitmessung
+                  </button>
+                </li>
+                <li v-if="istSpielleitung && hatAktiveKampagne" class="nav-item" role="presentation">
                   <button
                     type="button"
                     class="nav-link"
@@ -2090,7 +2437,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     Wetter &amp; Tageszeit
                   </button>
                 </li>
-                <li v-if="begegnungReiterMoeglich" class="nav-item" role="presentation">
+                <li v-if="istSpielleitung && begegnungReiterMoeglich" class="nav-item" role="presentation">
                   <button
                     type="button"
                     class="nav-link"
@@ -2151,6 +2498,96 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                   :notation="wuerfelModus === 'w100' ? '1W100' : (Math.max(1, Math.min(50, Number(anzahlW10) || 1)) + 'W10')"
                   chip-praefix="#"
                 />
+              </div>
+
+              <div v-show="wuerfelModalTab === 'zeitmessung'" class="htbah-zeitmessung-tab">
+                <div class="btn-group w-100 mb-3" role="group" aria-label="Zeitmessungsmodus">
+                  <button
+                    type="button"
+                    class="btn"
+                    :class="zeitmessungModus === 'timer' ? 'btn-primary' : 'btn-outline-primary'"
+                    :disabled="zeitmessungLaeuft || zeitmessungPausiert"
+                    @click="zeitmessungSetzeModus('timer')">
+                    Timer
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    :class="zeitmessungModus === 'stoppuhr' ? 'btn-primary' : 'btn-outline-primary'"
+                    :disabled="zeitmessungLaeuft || zeitmessungPausiert"
+                    @click="zeitmessungSetzeModus('stoppuhr')">
+                    Stoppuhr
+                  </button>
+                </div>
+
+                <div
+                  v-if="zeitmessungEingabeSichtbar"
+                  class="htbah-zeitmessung-eingabe row g-2 mb-3">
+                  <div class="col-4">
+                    <div class="form-floating">
+                      <input
+                        id="zeitmessung-eingabe-h"
+                        type="number"
+                        class="form-control"
+                        min="0"
+                        max="99"
+                        v-model.number="zeitmessungEingabeH"
+                        @input="zeitmessungTimerEingabeGeaendert"
+                        placeholder=" " />
+                      <label for="zeitmessung-eingabe-h">Std</label>
+                    </div>
+                  </div>
+                  <div class="col-4">
+                    <div class="form-floating">
+                      <input
+                        id="zeitmessung-eingabe-m"
+                        type="number"
+                        class="form-control"
+                        min="0"
+                        max="59"
+                        v-model.number="zeitmessungEingabeM"
+                        @input="zeitmessungTimerEingabeGeaendert"
+                        placeholder=" " />
+                      <label for="zeitmessung-eingabe-m">Min</label>
+                    </div>
+                  </div>
+                  <div class="col-4">
+                    <div class="form-floating">
+                      <input
+                        id="zeitmessung-eingabe-s"
+                        type="number"
+                        class="form-control"
+                        min="0"
+                        max="59"
+                        v-model.number="zeitmessungEingabeS"
+                        @input="zeitmessungTimerEingabeGeaendert"
+                        placeholder=" " />
+                      <label for="zeitmessung-eingabe-s">Sek</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                  <button
+                    type="button"
+                    class="btn btn-primary flex-grow-1"
+                    @click="zeitmessungStartPause">
+                    {{ zeitmessungStartPauseLabel }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    :disabled="zeitmessungLaeuft"
+                    @click="zeitmessungZuruecksetzen">
+                    Zurücksetzen
+                  </button>
+                </div>
+                <p class="small text-body-secondary mb-0">
+                  Während Timer oder Stoppuhr laufen, erscheint die Uhr als schwebendes Overlay (wie das
+                  Wetter-Badge). Klick-Töne stellst Du unter
+                  <router-link to="/einstellungen">Einstellungen</router-link>
+                  ein.
+                </p>
               </div>
 
               <div v-if="istSpielleitung" v-show="wuerfelModalTab === 'atmosphaere'" class="htbah-atmosphaere-modal">

@@ -306,6 +306,84 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return target;
   }
 
+  /** Liefert den Quill-Textbereich eines Entity-Links, der index enthält (oder davor liegt). */
+  function findEntityLinkRangeAt(quill, index) {
+    const docLen = quill && typeof quill.getLength === 'function' ? quill.getLength() : 0;
+    if (docLen <= 1) {
+      return null;
+    }
+    const maxIndex = docLen - 1;
+    const candidates = index <= 0 ? [0] : [index, index - 1];
+    for (let c = 0; c < candidates.length; c += 1) {
+      const i = candidates[c];
+      if (i < 0 || i >= maxIndex) {
+        continue;
+      }
+      const fmt = quill.getFormat(i, 1);
+      const link = fmt && fmt.link;
+      if (!hrefSiehtNachEntityLinkAus(link)) {
+        continue;
+      }
+      let start = i;
+      let end = i + 1;
+      while (start > 0) {
+        const prev = quill.getFormat(start - 1, 1);
+        if (prev && prev.link === link) {
+          start -= 1;
+        } else {
+          break;
+        }
+      }
+      while (end < maxIndex) {
+        const next = quill.getFormat(end, 1);
+        if (next && next.link === link) {
+          end += 1;
+        } else {
+          break;
+        }
+      }
+      return { index: start, length: end - start };
+    }
+    return null;
+  }
+
+  /** Erweitert eine geplante Löschung so, dass betroffene Entity-Links vollständig entfernt werden. */
+  function computeEntityLinkDeletion(quill, range, key) {
+    if (!range || (key !== 'Backspace' && key !== 'Delete')) {
+      return null;
+    }
+    let delStart;
+    let delEnd;
+    if (range.length > 0) {
+      delStart = range.index;
+      delEnd = range.index + range.length;
+    } else if (key === 'Backspace') {
+      if (range.index <= 0) {
+        return null;
+      }
+      delStart = range.index - 1;
+      delEnd = range.index;
+    } else {
+      delStart = range.index;
+      delEnd = range.index + 1;
+    }
+    let start = delStart;
+    let end = delEnd;
+    let expanded = false;
+    for (let i = delStart; i < delEnd; i += 1) {
+      const linkRange = findEntityLinkRangeAt(quill, i);
+      if (linkRange) {
+        expanded = true;
+        start = Math.min(start, linkRange.index);
+        end = Math.max(end, linkRange.index + linkRange.length);
+      }
+    }
+    if (!expanded) {
+      return null;
+    }
+    return { index: start, length: end - start };
+  }
+
   function installMentions(quill, options) {
     if (!quill || !quill.root) {
       return null;
@@ -387,7 +465,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       state.applying = true;
       quill.deleteText(insertAt, replaceLength, 'silent');
       quill.insertText(insertAt, text, { link }, 'silent');
-      quill.setSelection(insertAt + text.length, 0, 'silent');
+      quill.insertText(insertAt + text.length, ' ', {}, 'silent');
+      quill.setSelection(insertAt + text.length + 1, 0, 'silent');
       state.applying = false;
       hide();
     }
@@ -455,6 +534,17 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     }
 
     function onKeyDown(event) {
+      if (!state.active && (event.key === 'Backspace' || event.key === 'Delete')) {
+        const delRange = computeEntityLinkDeletion(quill, quill.getSelection(), event.key);
+        if (delRange) {
+          event.preventDefault();
+          state.applying = true;
+          quill.deleteText(delRange.index, delRange.length, 'user');
+          quill.setSelection(delRange.index, 0, 'silent');
+          state.applying = false;
+          return;
+        }
+      }
       if (!state.active) {
         return;
       }
