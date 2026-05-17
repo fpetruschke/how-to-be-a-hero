@@ -166,19 +166,17 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (!this.bearbeitung) {
         return '';
       }
-      const neu = this.bearbeitungIndex < 0 ? 'Neu: ' : '';
       const cfg = TABLE_TYPE_CONFIG[this.bearbeitung.typ] || TABLE_TYPE_CONFIG.gegenstand;
       const label = this.bearbeitung.typ === 'bestie' ? 'Bestarium' : cfg.label;
-      return `${neu}${cfg.emoji} ${label}`;
+      return `${cfg.emoji} ${label}`;
     },
     zeileModalTitelOverlay() {
       if (!this.bearbeitungOverlay) {
         return '';
       }
-      const neu = this.bearbeitungOverlayIndex < 0 ? 'Neu: ' : '';
       const cfg = TABLE_TYPE_CONFIG[this.bearbeitungOverlay.typ] || TABLE_TYPE_CONFIG.gegenstand;
       const label = this.bearbeitungOverlay.typ === 'bestie' ? 'Bestarium' : cfg.label;
-      return `${neu}${cfg.emoji} ${label}`;
+      return `${cfg.emoji} ${label}`;
     },
     zufallsgeneratorBereit() {
       return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
@@ -1786,8 +1784,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         geheimnis: '',
         stimme: '',
         lebenspunkte: '',
-        lpBewusstlosAusgeblendet: false,
-        lpMassenschadenBewusstlos: false,
+        kampfZustand: 'vital',
         waffe: '',
         schadenswertNahkampf: '',
         schadenswertFernkampf: '',
@@ -1897,8 +1894,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         lebenspunkte: '',
         aufenthaltsort: '',
         initiative: '',
-        lpBewusstlosAusgeblendet: false,
-        lpMassenschadenBewusstlos: false,
+        kampfZustand: 'vital',
         staerke: '',
         schwaeche: '',
         geheimnis: '',

@@ -60,6 +60,9 @@ var HTBAH_REFACTOR_UTILS =
       ZufallstabellenZeileModal: window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal,
       WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
       WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
+      ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
+      SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
+      ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     },
     props: {
       offen: { type: Boolean, default: false },
@@ -162,6 +165,17 @@ var HTBAH_REFACTOR_UTILS =
         medienImportWarteschlange: [],
         medienGalerieModalOffen: false,
         speicherStatusHinweis: '',
+        bearbeitungSnapshots: {
+          anlage: '',
+          overlay: '',
+          charakter: '',
+        },
+        bearbeitungUngespeichert: {
+          anlage: false,
+          overlay: false,
+          charakter: false,
+        },
+        _bearbeitungDirtyTimerId: null,
         charakterModal: {
           offen: false,
           mitgliedId: '',
@@ -253,45 +267,43 @@ var HTBAH_REFACTOR_UTILS =
         if (!this.anlage.typ) {
           return '';
         }
-        const neu = 'Neu: ';
         if (this.anlage.typ === 'npc') {
-          return `${neu}👤 NPC`;
+          return '👤 NPC';
         }
         if (this.anlage.typ === 'ort') {
-          return `${neu}🗺️ Ort`;
+          return '🗺️ Ort';
         }
         if (this.anlage.typ === 'fraktion') {
-          return `${neu}🏛️ Fraktion`;
+          return '🏛️ Fraktion';
         }
         if (this.anlage.typ === 'bestie') {
-          return `${neu}🦁 Bestarium`;
+          return '🦁 Bestarium';
         }
-      if (this.anlage.typ === 'raetsel') {
-        return `${neu}🧩 Rätsel`;
-      }
-        return `${neu}📦 Gegenstand`;
+        if (this.anlage.typ === 'raetsel') {
+          return '🧩 Rätsel';
+        }
+        return '📦 Gegenstand';
       },
       zeileModalTitelOverlay() {
         if (!this.anlageOverlay.typ) {
           return '';
         }
-        const neu = 'Neu: ';
         if (this.anlageOverlay.typ === 'npc') {
-          return `${neu}👤 NPC`;
+          return '👤 NPC';
         }
         if (this.anlageOverlay.typ === 'ort') {
-          return `${neu}🗺️ Ort`;
+          return '🗺️ Ort';
         }
         if (this.anlageOverlay.typ === 'fraktion') {
-          return `${neu}🏛️ Fraktion`;
+          return '🏛️ Fraktion';
         }
         if (this.anlageOverlay.typ === 'bestie') {
-          return `${neu}🦁 Bestarium`;
+          return '🦁 Bestarium';
         }
         if (this.anlageOverlay.typ === 'raetsel') {
-          return `${neu}🧩 Rätsel`;
+          return '🧩 Rätsel';
         }
-        return `${neu}📦 Gegenstand`;
+        return '📦 Gegenstand';
       },
       zufallsgeneratorBereit() {
         return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
@@ -587,6 +599,13 @@ var HTBAH_REFACTOR_UTILS =
         }
         return statusFuerLebenspunkte(this.charakterModal.charakter);
       },
+      charakterKampfZustandOptionen() {
+        return [
+          { id: 'vital', label: 'Vital', emoji: '💚' },
+          { id: 'bewusstlos', label: 'Bewusstlos', emoji: '😵' },
+          { id: 'tot', label: 'Tot', emoji: '💀' },
+        ];
+      },
       charakterModalFaehigkeitenStats() {
         const charakter = this.charakterModal.charakter;
         const M = window.HTBAH_CHARAKTER_MODEL;
@@ -756,6 +775,235 @@ var HTBAH_REFACTOR_UTILS =
         this.zeileQuillHostElement = snapshot.zeileQuillHostElement;
         this.zeileQuillSession = snapshot.zeileQuillSession;
         return result;
+      },
+      bearbeitungDirtyHilfe() {
+        return window.HTBAH_SHARED && window.HTBAH_SHARED.ModalBearbeitungDirty
+          ? window.HTBAH_SHARED.ModalBearbeitungDirty
+          : null;
+      },
+      listeFuerAnlageTyp(typ) {
+        if (typ === 'ort') {
+          return this.zustand.orte || [];
+        }
+        if (typ === 'npc') {
+          return this.zustand.npcs || [];
+        }
+        if (typ === 'fraktion') {
+          return this.zustand.fraktionen || [];
+        }
+        if (typ === 'bestie') {
+          return this.zustand.bestien || [];
+        }
+        if (typ === 'raetsel') {
+          return this.zustand.raetsel || [];
+        }
+        if (typ === 'gegenstand') {
+          return this.zustand.gegenstaende || [];
+        }
+        if (typ === 'pantheon') {
+          return this.zustand.pantheon || [];
+        }
+        return [];
+      },
+      leseAnlageBearbeitungZustand(kontext) {
+        const erfassen = () => {
+          this.quillHtmlInBearbeitungSchreiben();
+          return this.anlage.zeile ? JSON.parse(JSON.stringify(this.anlage.zeile)) : null;
+        };
+        if (kontext === 'overlay') {
+          return this.withAnlageKontext('overlay', erfassen);
+        }
+        return erfassen();
+      },
+      setzeAnlageBearbeitungSnapshot(kontext) {
+        const H = this.bearbeitungDirtyHilfe();
+        if (!H) {
+          return;
+        }
+        const zustand = this.leseAnlageBearbeitungZustand(kontext);
+        const json = H.snapshotJson(zustand);
+        if (kontext === 'overlay') {
+          this.bearbeitungSnapshots.overlay = json;
+          this.bearbeitungUngespeichert.overlay = false;
+        } else {
+          this.bearbeitungSnapshots.anlage = json;
+          this.bearbeitungUngespeichert.anlage = false;
+        }
+      },
+      pruefeAnlageBearbeitungDirty(kontext) {
+        const H = this.bearbeitungDirtyHilfe();
+        if (!H) {
+          return false;
+        }
+        const snapshot =
+          kontext === 'overlay' ? this.bearbeitungSnapshots.overlay : this.bearbeitungSnapshots.anlage;
+        const anlage = kontext === 'overlay' ? this.anlageOverlay : this.anlage;
+        if (!anlage.offen || !anlage.zeile) {
+          return false;
+        }
+        return H.istGeaendert(snapshot, this.leseAnlageBearbeitungZustand(kontext));
+      },
+      planBearbeitungDirtyPruefung(kontext) {
+        if (this._bearbeitungDirtyTimerId != null) {
+          window.clearTimeout(this._bearbeitungDirtyTimerId);
+        }
+        this._bearbeitungDirtyTimerId = window.setTimeout(() => {
+          this._bearbeitungDirtyTimerId = null;
+          if (kontext === 'charakter') {
+            this.bearbeitungUngespeichert.charakter = this.pruefeCharakterModalDirty();
+            return;
+          }
+          const ungespeichert = this.pruefeAnlageBearbeitungDirty(kontext);
+          if (kontext === 'overlay') {
+            this.bearbeitungUngespeichert.overlay = ungespeichert;
+          } else {
+            this.bearbeitungUngespeichert.anlage = ungespeichert;
+          }
+        }, 350);
+      },
+      planBearbeitungDirtyNachAenderung() {
+        if (this.anlage.offen) {
+          this.planBearbeitungDirtyPruefung('anlage');
+        }
+        if (this.anlageOverlay.offen) {
+          this.planBearbeitungDirtyPruefung('overlay');
+        }
+      },
+      leseCharakterModalZustand() {
+        if (!this.charakterModal.charakter) {
+          return null;
+        }
+        this.uebernehmeCharakterInventarQuillInModel();
+        if (this.charakterQuillInstanz) {
+          this.charakterModal.charakter.journalHtml = this.charakterQuillInstanz.root.innerHTML;
+        }
+        return JSON.parse(JSON.stringify(this.charakterModal.charakter));
+      },
+      setzeCharakterModalSnapshot() {
+        const H = this.bearbeitungDirtyHilfe();
+        if (!H) {
+          return;
+        }
+        this.bearbeitungSnapshots.charakter = H.snapshotJson(this.leseCharakterModalZustand());
+        this.bearbeitungUngespeichert.charakter = false;
+      },
+      pruefeCharakterModalDirty() {
+        const H = this.bearbeitungDirtyHilfe();
+        if (!H || !this.charakterModal.charakter) {
+          return false;
+        }
+        return H.istGeaendert(this.bearbeitungSnapshots.charakter, this.leseCharakterModalZustand());
+      },
+      async bearbeitungSchliessenAbfragen(kontext) {
+        const istDirty =
+          kontext === 'charakter'
+            ? this.pruefeCharakterModalDirty()
+            : this.pruefeAnlageBearbeitungDirty(kontext);
+        if (!istDirty) {
+          return true;
+        }
+        const H = this.bearbeitungDirtyHilfe();
+        const ergebnis = H
+          ? await H.bestaetigeUngespeichertSchliessen()
+          : window.confirm('Ungespeicherte Änderungen. Speichern?')
+            ? 'save'
+            : 'cancel';
+        if (ergebnis === 'cancel') {
+          return false;
+        }
+        if (ergebnis === 'discard') {
+          return true;
+        }
+        if (kontext === 'charakter') {
+          return this.speichereCharakterModal({ schliessenNachSpeichern: false });
+        }
+        if (kontext === 'overlay') {
+          return !!this.withAnlageKontext('overlay', () =>
+            this.speichereAnlageIntern({ schliessenNachSpeichern: false }),
+          );
+        }
+        return !!this.speichereAnlageIntern({ schliessenNachSpeichern: false });
+      },
+      hatUngespeicherteBearbeitungImModal() {
+        if (this.charakterModal.offen && this.pruefeCharakterModalDirty()) {
+          return true;
+        }
+        if (this.anlage.offen && this.pruefeAnlageBearbeitungDirty('anlage')) {
+          return true;
+        }
+        if (this.anlageOverlay.offen && this.pruefeAnlageBearbeitungDirty('overlay')) {
+          return true;
+        }
+        return false;
+      },
+      schliesseAlleBearbeitungsModalsOhnePruefung() {
+        if (this.anlageOverlay.offen) {
+          this.schliesseAnlageOverlayModalOhnePruefung();
+        }
+        if (this.anlage.offen) {
+          this.schliesseAnlageModalOhnePruefung();
+        }
+        if (this.charakterModal.offen) {
+          this.schliesseCharakterModalOhnePruefung();
+        }
+      },
+      async speichereAlleUngespeicherteBearbeitungen() {
+        if (this.anlage.offen && this.pruefeAnlageBearbeitungDirty('anlage')) {
+          if (!this.speichereAnlageIntern({ schliessenNachSpeichern: false })) {
+            return false;
+          }
+          this.setzeAnlageBearbeitungSnapshot('anlage');
+        }
+        if (this.anlageOverlay.offen && this.pruefeAnlageBearbeitungDirty('overlay')) {
+          const ok = this.withAnlageKontext('overlay', () =>
+            this.speichereAnlageIntern({ schliessenNachSpeichern: false }),
+          );
+          if (!ok) {
+            return false;
+          }
+          this.setzeAnlageBearbeitungSnapshot('overlay');
+        }
+        if (this.charakterModal.offen && this.pruefeCharakterModalDirty()) {
+          if (!this.speichereCharakterModal({ schliessenNachSpeichern: false })) {
+            return false;
+          }
+          this.setzeCharakterModalSnapshot();
+        }
+        return true;
+      },
+      async bearbeitungAlleUngespeichertAbfragen(kontext) {
+        if (!this.hatUngespeicherteBearbeitungImModal()) {
+          return true;
+        }
+        const H = this.bearbeitungDirtyHilfe();
+        const beschreibung =
+          kontext === 'welt'
+            ? 'In einem Bearbeitungsfenster gibt es ungespeicherte Änderungen. Wenn du die interaktive Welt schließt, gehen sie verloren — außer du speicherst jetzt.'
+            : 'In einem Bearbeitungsfenster gibt es ungespeicherte Änderungen. Wenn du die Seite verlässt, gehen sie verloren — außer du speicherst jetzt.';
+        const ergebnis = H
+          ? await H.bestaetigeUngespeichertSchliessen({ beschreibung })
+          : window.confirm('Ungespeicherte Änderungen. Jetzt speichern?')
+            ? 'save'
+            : 'cancel';
+        if (ergebnis === 'cancel') {
+          return false;
+        }
+        if (ergebnis === 'discard') {
+          return true;
+        }
+        return this.speichereAlleUngespeicherteBearbeitungen();
+      },
+      async bestaetigeVerlassenMitUngespeichert() {
+        return this.bearbeitungAlleUngespeichertAbfragen('navigation');
+      },
+      async schliessenMitPruefung() {
+        const darf = await this.bearbeitungAlleUngespeichertAbfragen('welt');
+        if (!darf) {
+          return false;
+        }
+        this.schliesseAlleBearbeitungsModalsOhnePruefung();
+        this.$emit('schliessen');
+        return true;
       },
       entitaetTypLabelFuerMentions(typ) {
         const map = {
@@ -1125,8 +1373,8 @@ var HTBAH_REFACTOR_UTILS =
       vollbildUmschalten() {
         this.modal.istVollbild = !this.modal.istVollbild;
       },
-      schliessen() {
-        this.$emit('schliessen');
+      async schliessen() {
+        await this.schliesseMitPruefung();
       },
       aktualisiereZustand() {
         this.zustand = window.HTBAH.ladeZufallstabellenZustand(this.gruppeId);
@@ -1138,19 +1386,42 @@ var HTBAH_REFACTOR_UTILS =
         const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         return wb && wb.mapLayouts && typeof wb.mapLayouts === 'object' ? wb.mapLayouts : {};
       },
-      speichereLayout(layoutMap) {
+      flushOrtBildLayoutsPersistieren() {
+        if (this.verlauf.ortBildLayoutSpeicherTimer) {
+          window.clearTimeout(this.verlauf.ortBildLayoutSpeicherTimer);
+          this.verlauf.ortBildLayoutSpeicherTimer = 0;
+        }
+        if (
+          !this.offen ||
+          !this.mapBildLayoutsLokal ||
+          typeof this.mapBildLayoutsLokal !== 'object' ||
+          !Object.keys(this.mapBildLayoutsLokal).length
+        ) {
+          return;
+        }
+        this.persistiereLokaleOrtBildLayouts();
+      },
+      speichereWeltenbauAusModal(mutator) {
+        this.flushOrtBildLayoutsPersistieren();
         const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
-        wb.mapLayouts = layoutMap;
+        if (typeof mutator === 'function') {
+          mutator(wb);
+        }
         window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
+      },
+      speichereLayout(layoutMap) {
+        this.speichereWeltenbauAusModal((wb) => {
+          wb.mapLayouts = layoutMap;
+        });
       },
       ladeBildLayouts() {
         const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         return wb && wb.mapBildLayouts && typeof wb.mapBildLayouts === 'object' ? wb.mapBildLayouts : {};
       },
       speichereBildLayouts(layoutMap) {
-        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
-        wb.mapBildLayouts = layoutMap;
-        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
+        this.speichereWeltenbauAusModal((wb) => {
+          wb.mapBildLayouts = layoutMap;
+        });
       },
       ladeFreieBildAuswahl() {
         const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
@@ -1197,14 +1468,14 @@ var HTBAH_REFACTOR_UTILS =
           .filter(Boolean);
       },
       speichereFreieNotizen(liste) {
-        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
-        const map = wb && wb.mapFreieNotizen && typeof wb.mapFreieNotizen === 'object' ? wb.mapFreieNotizen : {};
-        wb.mapFreieNotizen = {
-          ...map,
-          [gruppeKey]: Array.isArray(liste) ? liste.slice() : [],
-        };
-        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
+        this.speichereWeltenbauAusModal((wb) => {
+          const map = wb && wb.mapFreieNotizen && typeof wb.mapFreieNotizen === 'object' ? wb.mapFreieNotizen : {};
+          wb.mapFreieNotizen = {
+            ...map,
+            [gruppeKey]: Array.isArray(liste) ? liste.slice() : [],
+          };
+        });
       },
       ladeFreiePfeile() {
         const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
@@ -1226,24 +1497,24 @@ var HTBAH_REFACTOR_UTILS =
           .filter(Boolean);
       },
       speichereFreiePfeile(liste) {
-        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
-        const map = wb && wb.mapFreiePfeile && typeof wb.mapFreiePfeile === 'object' ? wb.mapFreiePfeile : {};
-        wb.mapFreiePfeile = {
-          ...map,
-          [gruppeKey]: Array.isArray(liste) ? liste.slice() : [],
-        };
-        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
+        this.speichereWeltenbauAusModal((wb) => {
+          const map = wb && wb.mapFreiePfeile && typeof wb.mapFreiePfeile === 'object' ? wb.mapFreiePfeile : {};
+          wb.mapFreiePfeile = {
+            ...map,
+            [gruppeKey]: Array.isArray(liste) ? liste.slice() : [],
+          };
+        });
       },
       speichereFreieBildAuswahl(liste) {
-        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
-        const map = wb && wb.mapFreieBilder && typeof wb.mapFreieBilder === 'object' ? wb.mapFreieBilder : {};
-        wb.mapFreieBilder = {
-          ...map,
-          [gruppeKey]: Array.isArray(liste) ? liste.slice() : [],
-        };
-        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
+        this.speichereWeltenbauAusModal((wb) => {
+          const map = wb && wb.mapFreieBilder && typeof wb.mapFreieBilder === 'object' ? wb.mapFreieBilder : {};
+          wb.mapFreieBilder = {
+            ...map,
+            [gruppeKey]: Array.isArray(liste) ? liste.slice() : [],
+          };
+        });
       },
       migriereBildLayoutsLokal(gruppeLayouts) {
         const quelle = gruppeLayouts && typeof gruppeLayouts === 'object' ? gruppeLayouts : {};
@@ -1295,7 +1566,13 @@ var HTBAH_REFACTOR_UTILS =
         const alleLayouts = this.ladeBildLayouts();
         const roh =
           alleLayouts[gruppeKey] && typeof alleLayouts[gruppeKey] === 'object' ? alleLayouts[gruppeKey] : {};
-        const migriert = this.migriereBildLayoutsLokal(roh);
+        const defaultRoh =
+          gruppeKey !== 'default' &&
+          alleLayouts.default &&
+          typeof alleLayouts.default === 'object'
+            ? alleLayouts.default
+            : {};
+        const migriert = this.migriereBildLayoutsLokal({ ...defaultRoh, ...roh });
         this.mapBildLayoutsLokal = JSON.parse(JSON.stringify(migriert.layouts));
         if (migriert.geaendert) {
           this.persistiereLokaleOrtBildLayouts();
@@ -1378,17 +1655,17 @@ var HTBAH_REFACTOR_UTILS =
         );
       },
       speichereElementLocksDirekt(lockMap) {
-        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
         const gruppeKey = this.gruppeId || 'default';
-        const alle =
-          wb && wb.mapElementLocks && typeof wb.mapElementLocks === 'object'
-            ? wb.mapElementLocks
-            : {};
-        wb.mapElementLocks = {
-          ...alle,
-          [gruppeKey]: { ...(lockMap || {}) },
-        };
-        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
+        this.speichereWeltenbauAusModal((wb) => {
+          const alle =
+            wb && wb.mapElementLocks && typeof wb.mapElementLocks === 'object'
+              ? wb.mapElementLocks
+              : {};
+          wb.mapElementLocks = {
+            ...alle,
+            [gruppeKey]: { ...(lockMap || {}) },
+          };
+        });
       },
       uebernehmeMapEinstellungen() {
         this.mapViewportPersistPause = true;
@@ -1413,18 +1690,18 @@ var HTBAH_REFACTOR_UTILS =
         if (!key) {
           return;
         }
-        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
-        const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
         const gruppeKey = this.gruppeId || 'default';
-        const gruppe = alle[gruppeKey] && typeof alle[gruppeKey] === 'object' ? alle[gruppeKey] : {};
-        wb.mapEinstellungen = {
-          ...alle,
-          [gruppeKey]: {
-            ...gruppe,
-            [key]: value,
-          },
-        };
-        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
+        this.speichereWeltenbauAusModal((wb) => {
+          const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
+          const gruppe = alle[gruppeKey] && typeof alle[gruppeKey] === 'object' ? alle[gruppeKey] : {};
+          wb.mapEinstellungen = {
+            ...alle,
+            [gruppeKey]: {
+              ...gruppe,
+              [key]: value,
+            },
+          };
+        });
       },
       mapEinstellungenZuruecksetzen() {
         const defaults = MAP_STANDARD_EINSTELLUNGEN;
@@ -1440,26 +1717,26 @@ var HTBAH_REFACTOR_UTILS =
         });
         this.sichtbarkeitsFilter = { ...defaults.sichtbarkeitsFilter };
         this.elementLocks = {};
-        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
-        const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
         const gruppeKey = this.gruppeId || 'default';
-        const next = { ...alle };
-        delete next[gruppeKey];
-        wb.mapEinstellungen = next;
-        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
+        this.speichereWeltenbauAusModal((wb) => {
+          const alle = wb && wb.mapEinstellungen && typeof wb.mapEinstellungen === 'object' ? wb.mapEinstellungen : {};
+          const next = { ...alle };
+          delete next[gruppeKey];
+          wb.mapEinstellungen = next;
+        });
       },
       speichereMapHintergrund(dataUrl) {
         const key = this.gruppeId || 'default';
-        const wb = window.HTBAH.ladeWeltenbauZustand(this.gruppeId);
-        const map = wb && wb.mapHintergruende && typeof wb.mapHintergruende === 'object' ? wb.mapHintergruende : {};
-        const nextMap = { ...map };
-        if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
-          nextMap[key] = dataUrl;
-        } else {
-          delete nextMap[key];
-        }
-        wb.mapHintergruende = nextMap;
-        window.HTBAH.speichereWeltenbauZustand(wb, this.gruppeId);
+        this.speichereWeltenbauAusModal((wb) => {
+          const map = wb && wb.mapHintergruende && typeof wb.mapHintergruende === 'object' ? wb.mapHintergruende : {};
+          const nextMap = { ...map };
+          if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
+            nextMap[key] = dataUrl;
+          } else {
+            delete nextMap[key];
+          }
+          wb.mapHintergruende = nextMap;
+        });
         this.mapHintergrundTick += 1;
       },
       hintergrundDateiInputClick() {
@@ -1589,8 +1866,8 @@ var HTBAH_REFACTOR_UTILS =
         });
         this.speichereFreieNotizen(liste);
         this.setzeStartLayoutImViewportZentrum(notizId, {
-          width: 2200,
-          height: 560,
+          width: 220,
+          height: 56,
         });
         this.mapFreieElementeTick += 1;
         this.$nextTick(() => this.refreshGraph());
@@ -1601,8 +1878,8 @@ var HTBAH_REFACTOR_UTILS =
         liste.push({ pfeilId, farbe: '#509b4a' });
         this.speichereFreiePfeile(liste);
         this.setzeStartLayoutImViewportZentrum(pfeilId, {
-          width: 2200,
-          height: 560,
+          width: 220,
+          height: 56,
         });
         this.mapFreieElementeTick += 1;
         this.$nextTick(() => this.refreshGraph());
@@ -3131,6 +3408,83 @@ var HTBAH_REFACTOR_UTILS =
         }
         return Math.min(100, v + b);
       },
+      charakterModalProbeEffektivwert(kategorie, faehigkeit) {
+        return this.charakterModalEffektivwert(kategorie, faehigkeit);
+      },
+      charakterModalProbeOeffnenBegabung(kategorie) {
+        const stats = this.charakterModalFaehigkeitenStats;
+        if (!stats) {
+          return;
+        }
+        this.$refs.charakterProbeWurfModal?.oeffnen({
+          modus: 'begabung',
+          zielwert: stats.begabungen[kategorie] || 0,
+          titel: 'Probe: Begabung ' + this.charakterModalKategorieLabel(kategorie),
+          untertitel:
+            'Nur der Begabungswert — ohne einzelne Fähigkeit. Keine kritischen Erfolge (Regelwerk).',
+        });
+      },
+      charakterModalProbeOeffnenFaehigkeit(kategorie, faehigkeit) {
+        const stats = this.charakterModalFaehigkeitenStats;
+        if (!stats || !faehigkeit) {
+          return;
+        }
+        const b = stats.begabungen[kategorie] || 0;
+        const fWert = Number(faehigkeit.value) || 0;
+        const roh = fWert + b;
+        const z = this.charakterModalProbeEffektivwert(kategorie, faehigkeit);
+        let untertitel =
+          'Effektivwert ' +
+          z +
+          ' (' +
+          fWert +
+          ' + ' +
+          b +
+          ' Begabung, ' +
+          this.charakterModalKategorieLabel(kategorie) +
+          ')';
+        if (roh > 100) {
+          untertitel += '. Überzählige Punkte zählen für die Probe nicht (Regelwerk 3.4, Ziel 100).';
+        }
+        this.$refs.charakterProbeWurfModal?.oeffnen({
+          modus: 'faehigkeit',
+          zielwert: z,
+          titel: 'Probe: ' + (faehigkeit.name || 'Fähigkeit'),
+          untertitel,
+        });
+      },
+      charakterModalSchadenOeffnen() {
+        const charakter = this.charakterModal.charakter;
+        if (!charakter) {
+          return;
+        }
+        const name = String(charakter.name || '').trim();
+        this.$refs.charakterSchadenModal?.oeffnen({
+          titel: name ? `Schaden erwürfeln: ${name}` : 'Schaden erwürfeln',
+          charakter,
+        });
+      },
+      charakterModalParadeOeffnen() {
+        const charakter = this.charakterModal.charakter;
+        if (!charakter) {
+          return;
+        }
+        const stats = this.charakterModalFaehigkeitenStats;
+        const basiswert = stats ? stats.begabungen.handeln : 0;
+        const inventar = Array.isArray(charakter.inventar) ? charakter.inventar : [];
+        const ruestungen = inventar
+          .filter((eintrag) => eintrag && eintrag.typ === 'rustung')
+          .map((eintrag) => ({
+            name: typeof eintrag.name === 'string' ? eintrag.name : '',
+            rustwert: eintrag.rustwert,
+          }));
+        const name = String(charakter.name || '').trim();
+        this.$refs.charakterParadeModal?.oeffnen({
+          titel: name ? `Parade-Probe: ${name}` : 'Parade-Probe (Charakter)',
+          basiswert,
+          ruestungen,
+        });
+      },
       winkelGradZwischenPunkten(vonX, vonY, nachX, nachY) {
         const dx = Number(nachX) - Number(vonX);
         const dy = Number(nachY) - Number(vonY);
@@ -3273,6 +3627,9 @@ var HTBAH_REFACTOR_UTILS =
           }),
         );
         charakter.fraktionen = this.normalisiereFraktionenArray(charakter.fraktionen);
+        if (typeof window.HTBAH.initialisiereCharakterKampfZustand === 'function') {
+          window.HTBAH.initialisiereCharakterKampfZustand(charakter);
+        }
         this.charakterModal.offen = true;
         this.charakterModal.mitgliedId = mitgliedId;
         this.charakterModal.charakter = charakter;
@@ -3282,11 +3639,17 @@ var HTBAH_REFACTOR_UTILS =
         this.charakterModal.lpEingabeAktiv = false;
         this.charakterModal.lpAenderungWaehrenEingabe = false;
         this.charakterQuillSession += 1;
-        this.$nextTick(() => this.initialisiereCharakterFenster());
+        this.$nextTick(() => {
+          this.initialisiereCharakterFenster();
+          this.setzeCharakterModalSnapshot();
+        });
       },
-      oeffneCharakterBearbeitung(node) {
+      async oeffneCharakterBearbeitung(node) {
         const mitgliedId = node && node.data ? node.data.entityId : '';
         if (!mitgliedId || !this.gruppeId) {
+          return;
+        }
+        if (!(await this.bestaetigeVerlassenMitUngespeichert())) {
           return;
         }
         const zustand = window.HTBAH.ladeSpielleiterZustand();
@@ -3296,8 +3659,8 @@ var HTBAH_REFACTOR_UTILS =
           [this.gruppeId]: mitgliedId,
         };
         window.HTBAH.speichereSpielleiterZustand(zustand);
-        this.schliesseCharakterModal();
-        this.schliessen();
+        this.schliesseAlleBearbeitungsModalsOhnePruefung();
+        this.$emit('schliessen');
         if (this.$router && typeof this.$router.push === 'function') {
           const ziel =
             window.HTBAH && typeof window.HTBAH.kampagnenPfad === 'function'
@@ -3309,7 +3672,13 @@ var HTBAH_REFACTOR_UTILS =
           }
         }
       },
-      schliesseCharakterModal() {
+      async schliesseCharakterModal() {
+        if (!(await this.bearbeitungSchliessenAbfragen('charakter'))) {
+          return;
+        }
+        this.schliesseCharakterModalOhnePruefung();
+      },
+      schliesseCharakterModalOhnePruefung() {
         this.charakterQuillAufraeumen();
         this.uebernehmeCharakterInventarQuillInModel();
         this.beendeCharakterInventarEditoren();
@@ -3324,6 +3693,8 @@ var HTBAH_REFACTOR_UTILS =
         this.charakterModal.lpEingabeAktiv = false;
         this.charakterModal.lpAenderungWaehrenEingabe = false;
         this.charakterModal.fenster.istVollbild = false;
+        this.bearbeitungSnapshots.charakter = '';
+        this.bearbeitungUngespeichert.charakter = false;
       },
       begrenzeCharakterFensterGroesse(breite, hoehe) {
         return window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(breite, hoehe, 420, 320);
@@ -3602,7 +3973,6 @@ var HTBAH_REFACTOR_UTILS =
           if (!d.kampagneId || d.kampagneId !== this.gruppeId) {
             return;
           }
-          this.uebernehmeBildLayouts();
           this.mapFreieElementeTick += 1;
         } else if (d.art === 'spielleiter') {
           this.spielleiterTick += 1;
@@ -3639,6 +4009,14 @@ var HTBAH_REFACTOR_UTILS =
         if (!this.charakterModal.charakter) {
           return;
         }
+        if (typeof window.HTBAH.aktualisiereCharakterKampfZustandAusLp === 'function') {
+          window.HTBAH.aktualisiereCharakterKampfZustandAusLp(
+            this.charakterModal.charakter,
+            vorher,
+            nach,
+          );
+          return;
+        }
         const charakter = this.charakterModal.charakter;
         const n = this.normalisiereLp(nach);
         const v = this.normalisiereLp(vorher);
@@ -3656,6 +4034,13 @@ var HTBAH_REFACTOR_UTILS =
         if (v > 10 && n >= 1 && n <= 10) {
           charakter.lpBewusstlosAusgeblendet = false;
         }
+      },
+      setzeCharakterModalKampfZustand(zustand) {
+        if (!this.charakterModal.charakter || typeof window.HTBAH.setzeCharakterKampfZustand !== 'function') {
+          return;
+        }
+        window.HTBAH.setzeCharakterKampfZustand(this.charakterModal.charakter, zustand);
+        this.refreshGraph();
       },
       onCharakterLebenspunkteFocus() {
         this.charakterModal.lpEingabeAktiv = true;
@@ -3868,18 +4253,20 @@ var HTBAH_REFACTOR_UTILS =
         this.aktualisiereCharakterLpStatus(char);
         this.refreshGraph();
       },
-      speichereCharakterModal() {
+      speichereCharakterModal(optionen) {
+        const opts = optionen && typeof optionen === 'object' ? optionen : {};
+        const schliessenNachSpeichern = opts.schliessenNachSpeichern === true;
         if (!this.charakterModal.charakter || !this.charakterModal.mitgliedId || !this.gruppeId) {
-          return;
+          return false;
         }
         const z = window.HTBAH.ladeSpielleiterZustand();
         const g = (z.gruppen || []).find((gr) => gr && gr.id === this.gruppeId);
         if (!g || !Array.isArray(g.mitglieder)) {
-          return;
+          return false;
         }
         const idx = g.mitglieder.findIndex((m) => m && m.id === this.charakterModal.mitgliedId);
         if (idx < 0) {
-          return;
+          return false;
         }
         const charakter = JSON.parse(JSON.stringify(this.charakterModal.charakter));
         this.uebernehmeCharakterInventarQuillInModel();
@@ -3918,8 +4305,12 @@ var HTBAH_REFACTOR_UTILS =
         };
         window.HTBAH.speichereSpielleiterZustand(z);
         this.spielleiterTick += 1;
-        this.schliesseCharakterModal();
+        this.setzeCharakterModalSnapshot();
         this.refreshGraph();
+        if (schliessenNachSpeichern) {
+          this.schliesseCharakterModalOhnePruefung();
+        }
+        return true;
       },
       springeZumCharakterAusModal() {
         const node = {
@@ -3997,6 +4388,9 @@ var HTBAH_REFACTOR_UTILS =
         if (this.verlauf.ortBildLayoutSpeicherTimer) {
           window.clearTimeout(this.verlauf.ortBildLayoutSpeicherTimer);
           this.verlauf.ortBildLayoutSpeicherTimer = 0;
+          if (this.offen) {
+            this.persistiereLokaleOrtBildLayouts();
+          }
         }
         this.verlauf.undoStack = [];
         this.verlauf.redoStack = [];
@@ -4659,7 +5053,7 @@ var HTBAH_REFACTOR_UTILS =
         if (!this.loescheAnlageIntern(typ, index)) {
           return;
         }
-        this.schliesseAnlageModal();
+        this.schliesseAnlageModalOhnePruefung();
         this.$nextTick(() => this.refreshGraph());
       },
       loescheAnlageIntern(typ, index) {
@@ -4726,7 +5120,7 @@ var HTBAH_REFACTOR_UTILS =
         }
         this.aktualisiereZustand();
         const neuId = res.ergebnisse && res.ergebnisse[0] ? res.ergebnisse[0].neuId : '';
-        this.schliesseAnlageModal();
+        this.schliesseAnlageModalOhnePruefung();
         this.$nextTick(() => {
           this.refreshGraph();
           if (neuId) {
@@ -4757,7 +5151,9 @@ var HTBAH_REFACTOR_UTILS =
                 ? this.zustand.fraktionen || []
               : typ === 'bestie'
                 ? this.zustand.bestien || []
-                : typ === 'raetsel'
+              : typ === 'pantheon'
+                ? this.zustand.pantheon || []
+              : typ === 'raetsel'
                   ? this.zustand.raetsel || []
                   : this.zustand.gegenstaende || [];
         const index = liste.findIndex((z) => z && z.id === this.detail.entityId);
@@ -4783,12 +5179,14 @@ var HTBAH_REFACTOR_UTILS =
           this.overlayZeileMentionController = null;
           this.overlayZeileQuillHostElement = null;
           this.overlayZeileQuillSession += 1;
+          this.$nextTick(() => this.setzeAnlageBearbeitungSnapshot('overlay'));
         } else {
           this.anlage.typ = typ;
           this.anlage.index = index;
           this.anlage.zeile = zeile;
           this.anlage.offen = true;
           this.zeileQuillSession += 1;
+          this.$nextTick(() => this.setzeAnlageBearbeitungSnapshot('anlage'));
         }
         this.modal.detailsOffen = false;
       },
@@ -4832,8 +5230,7 @@ var HTBAH_REFACTOR_UTILS =
             initiative: '',
             fraktion: '',
             glaube: '',
-            lpBewusstlosAusgeblendet: false,
-            lpMassenschadenBewusstlos: false,
+            kampfZustand: 'vital',
             inventar: [],
             notizenHtml: '',
             medien: [],
@@ -4863,8 +5260,7 @@ var HTBAH_REFACTOR_UTILS =
             geheimnis: '',
             beschreibungHtml: '',
             aggressivitaetSkala: 5,
-            lpBewusstlosAusgeblendet: false,
-            lpMassenschadenBewusstlos: false,
+            kampfZustand: 'vital',
             inventar: [],
             medien: [],
             primaryMediumId: '',
@@ -4957,6 +5353,7 @@ var HTBAH_REFACTOR_UTILS =
         this.anlage.offen = true;
         this.speicherStatusHinweis = '';
         this.zeileQuillSession += 1;
+        this.$nextTick(() => this.setzeAnlageBearbeitungSnapshot('anlage'));
       },
       zufallsvorschlagUebernehmen() {
         if (!this.anlage.zeile || !this.anlage.typ || !this.zufallsgeneratorBereit) {
@@ -5100,11 +5497,7 @@ var HTBAH_REFACTOR_UTILS =
           });
         }
         this.overlayZeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitungOverlay();
-        this.overlayZeileQuillSelectionHandler = (range, oldRange) => {
-          if (this.anlageOverlay.offen && this.anlageOverlay.index >= 0 && oldRange && !range) {
-            this.anlageOverlayBeiBlurSpeichern();
-          }
-        };
+        this.overlayZeileQuillSelectionHandler = () => {};
         this.overlayZeileQuillInstanz.on('selection-change', this.overlayZeileQuillSelectionHandler);
       },
       zeileQuillHostRef(el) {
@@ -5164,11 +5557,7 @@ var HTBAH_REFACTOR_UTILS =
           });
         }
         this.zeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitung();
-        this.zeileQuillSelectionHandler = (range, oldRange) => {
-          if (this.anlage.offen && this.anlage.index >= 0 && oldRange && !range) {
-            this.anlageBearbeitungBeiBlurSpeichern();
-          }
-        };
+        this.zeileQuillSelectionHandler = () => {};
         this.zeileQuillInstanz.on('selection-change', this.zeileQuillSelectionHandler);
       },
       quillHtmlInBearbeitungSchreiben() {
@@ -5223,7 +5612,7 @@ var HTBAH_REFACTOR_UTILS =
         if (!String(this.anlage.zeile.primaryMediumId || '').trim()) {
           this.anlage.zeile.primaryMediumId = neuerEintrag.id;
         }
-        this.anlageBearbeitungBeiBlurSpeichern();
+        this.planBearbeitungDirtyPruefung('anlage');
         this.bildImportNaechstesAusWarteschlange();
       },
       onZeilenBildImportAbgebrochen() {
@@ -5289,7 +5678,7 @@ var HTBAH_REFACTOR_UTILS =
           }
         }
         this.anlage.zeile.medien = [...(Array.isArray(this.anlage.zeile.medien) ? this.anlage.zeile.medien : []), ...neu];
-        this.anlageBearbeitungBeiBlurSpeichern();
+        this.planBearbeitungDirtyNachAenderung();
         if (this.medienImportWarteschlange.length) {
           this.bildImportNaechstesAusWarteschlange();
         }
@@ -5397,7 +5786,7 @@ var HTBAH_REFACTOR_UTILS =
           }
         }
         this.anlage.zeile.primaryMediumId = id;
-        this.anlageBearbeitungBeiBlurSpeichern();
+        this.planBearbeitungDirtyNachAenderung();
         if (this.anlage.typ === 'ort') {
           this.ortBildLayoutBeimNodeInitialisieren(this.anlage.zeile.id);
         }
@@ -5437,9 +5826,15 @@ var HTBAH_REFACTOR_UTILS =
           const fallback = (this.anlage.zeile.medien || []).find((m) => this.mediumIstBild(m));
           this.anlage.zeile.primaryMediumId = fallback && fallback.id ? fallback.id : '';
         }
-        this.anlageBearbeitungBeiBlurSpeichern();
+        this.planBearbeitungDirtyNachAenderung();
       },
-      schliesseAnlageModal() {
+      async schliesseAnlageModal() {
+        if (!(await this.bearbeitungSchliessenAbfragen('anlage'))) {
+          return;
+        }
+        this.schliesseAnlageModalOhnePruefung();
+      },
+      schliesseAnlageModalOhnePruefung() {
         this.anlageZeileQuillAufraeumen();
         this.medienUploadLaeuft = false;
         this.abbrecheMedienImportWarteschlange();
@@ -5448,21 +5843,39 @@ var HTBAH_REFACTOR_UTILS =
         this.anlage.typ = '';
         this.anlage.zeile = null;
         this.anlage.index = -1;
+        this.bearbeitungSnapshots.anlage = '';
+        this.bearbeitungUngespeichert.anlage = false;
       },
-      schliesseAnlageOverlayModal() {
-        this.withAnlageKontext('overlay', () => this.schliesseAnlageModal());
+      async schliesseAnlageOverlayModal() {
+        if (!(await this.bearbeitungSchliessenAbfragen('overlay'))) {
+          return;
+        }
+        this.schliesseAnlageOverlayModalOhnePruefung();
+      },
+      schliesseAnlageOverlayModalOhnePruefung() {
         this.anlageOverlayZeileQuillAufraeumen();
         this.anlageOverlay.offen = false;
         this.anlageOverlay.typ = '';
         this.anlageOverlay.zeile = null;
         this.anlageOverlay.index = -1;
+        this.bearbeitungSnapshots.overlay = '';
+        this.bearbeitungUngespeichert.overlay = false;
+      },
+      speichereAnlage() {
+        const ok = this.speichereAnlageIntern({ schliessenNachSpeichern: false });
+        if (ok) {
+          this.setzeAnlageBearbeitungSnapshot('anlage');
+          this.$nextTick(() => this.refreshGraph());
+        }
       },
       speichereAnlageOverlay() {
-        this.withAnlageKontext('overlay', () => this.speichereAnlageIntern({ schliessenNachSpeichern: true }));
-        this.schliesseAnlageOverlayModal();
-      },
-      anlageOverlayBeiBlurSpeichern() {
-        this.withAnlageKontext('overlay', () => this.anlageBearbeitungBeiBlurSpeichern());
+        const ok = this.withAnlageKontext('overlay', () =>
+          this.speichereAnlageIntern({ schliessenNachSpeichern: false }),
+        );
+        if (ok) {
+          this.setzeAnlageBearbeitungSnapshot('overlay');
+          this.$nextTick(() => this.refreshGraph());
+        }
       },
       zufallsvorschlagOverlayUebernehmen() {
         this.withAnlageKontext('overlay', () => this.zufallsvorschlagUebernehmen());
@@ -5484,9 +5897,6 @@ var HTBAH_REFACTOR_UTILS =
       },
       dupliziereAnlageAusOverlayModal() {
         this.withAnlageKontext('overlay', () => this.dupliziereAnlageAusModal());
-      },
-      speichereAnlage() {
-        this.speichereAnlageIntern({ schliessenNachSpeichern: true });
       },
       notizQuillToolbarKonfiguration() {
         return [
@@ -5991,19 +6401,13 @@ var HTBAH_REFACTOR_UTILS =
         this.speichereFreieNotizen(liste);
         this.mapFreieElementeTick += 1;
       },
-      anlageBearbeitungBeiBlurSpeichern() {
-        if (!this.anlage.offen || !this.anlage.zeile || !this.anlage.typ || this.anlage.index < 0) {
-          return;
-        }
-        this.speichereAnlageIntern({ schliessenNachSpeichern: false });
-      },
       speichereAnlageIntern({ schliessenNachSpeichern }) {
         if (!this.anlage.offen || !this.anlage.zeile || !this.anlage.typ) {
-          return;
+          return false;
         }
         if (this.medienUploadLaeuft) {
           this.speicherStatusHinweis = 'Dateien werden noch verarbeitet. Speichern ist erst danach möglich.';
-          return;
+          return false;
         }
         this.quillHtmlInBearbeitungSchreiben();
         const typ = this.anlage.typ;
@@ -6060,6 +6464,12 @@ var HTBAH_REFACTOR_UTILS =
           } else {
             this.zustand.gegenstaende = [...(this.zustand.gegenstaende || []), z];
           }
+        } else if (typ === 'pantheon') {
+          if (index >= 0) {
+            this.zustand.pantheon = (this.zustand.pantheon || []).map((row, i) => (i === index ? z : row));
+          } else {
+            this.zustand.pantheon = [...(this.zustand.pantheon || []), z];
+          }
         }
         try {
           this.speichereZustand();
@@ -6069,13 +6479,19 @@ var HTBAH_REFACTOR_UTILS =
             : 'Speichern fehlgeschlagen. Bitte erneut versuchen.';
           this.speicherStatusHinweis = msg;
           window.HTBAH.ui.notify({ text: msg, typ: 'danger' });
-          return;
+          return false;
         }
         if (index < 0) {
           this.speicherStatusHinweis = '';
+          const liste = this.listeFuerAnlageTyp(typ);
+          const neuerIndex = (liste || []).findIndex((row) => row && row.id === z.id);
+          if (neuerIndex >= 0) {
+            this.anlage.index = neuerIndex;
+            this.anlage.zeile = JSON.parse(JSON.stringify(liste[neuerIndex]));
+          }
         }
         if (schliessenNachSpeichern) {
-          this.schliesseAnlageModal();
+          this.schliesseAnlageModalOhnePruefung();
         }
         if (index < 0 && z && z.id) {
           const nodeIdPrefix =
@@ -6115,6 +6531,7 @@ var HTBAH_REFACTOR_UTILS =
             this.$nextTick(() => this.fokussiereNeuGespeicherteEntitaet(typ, z.id));
           }
         });
+        return true;
       },
       onResize() {
         if (this.offen) {
@@ -6128,6 +6545,30 @@ var HTBAH_REFACTOR_UTILS =
       },
     },
     watch: {
+      'anlage.zeile': {
+        deep: true,
+        handler() {
+          if (this.anlage.offen) {
+            this.planBearbeitungDirtyPruefung('anlage');
+          }
+        },
+      },
+      'anlageOverlay.zeile': {
+        deep: true,
+        handler() {
+          if (this.anlageOverlay.offen) {
+            this.planBearbeitungDirtyPruefung('overlay');
+          }
+        },
+      },
+      'charakterModal.charakter': {
+        deep: true,
+        handler() {
+          if (this.charakterModal.offen) {
+            this.planBearbeitungDirtyPruefung('charakter');
+          }
+        },
+      },
       offen(neu) {
         if (neu) {
           this.synceInteraktiveWeltStatsFlag();
@@ -6151,14 +6592,17 @@ var HTBAH_REFACTOR_UTILS =
             });
           });
         } else {
-          this.persistiereLokaleOrtBildLayouts();
+          this.flushOrtBildLayoutsPersistieren();
           this.persistiereElementLocks();
           this.beendeAlleNotizEditoren();
+          if (this.anlage.offen) {
+            this.schliesseAnlageModalOhnePruefung();
+          }
           if (this.anlageOverlay.offen) {
-            this.schliesseAnlageOverlayModal();
+            this.schliesseAnlageOverlayModalOhnePruefung();
           }
           if (this.charakterModal.offen) {
-            this.schliesseCharakterModal();
+            this.schliesseCharakterModalOhnePruefung();
           }
           this.nodeDrag.aktiv = false;
           this.map.panning = false;
@@ -6257,6 +6701,7 @@ var HTBAH_REFACTOR_UTILS =
       },
     },
     mounted() {
+      window.HTBAH._weltenbauUebersichtModalInstanz = this;
       window.addEventListener('resize', this.onResize);
       window.addEventListener('pointermove', this.onMapPointerMove);
       window.addEventListener('pointerup', this.onMapPointerUp);
@@ -6268,6 +6713,9 @@ var HTBAH_REFACTOR_UTILS =
       window.addEventListener('htbah:kampagne-daten-geaendert', this.onKampagneDatenExternGeaendert);
     },
     beforeUnmount() {
+      if (window.HTBAH._weltenbauUebersichtModalInstanz === this) {
+        window.HTBAH._weltenbauUebersichtModalInstanz = null;
+      }
       this.abbrecheMedienImportWarteschlange();
       if (this.zuletztGezogeneNodeTimeoutId != null) {
         window.clearTimeout(this.zuletztGezogeneNodeTimeoutId);
@@ -6302,7 +6750,7 @@ var HTBAH_REFACTOR_UTILS =
       window.removeEventListener('htbah:interaktive-welt-stats-anzeigen-geaendert', this.synceInteraktiveWeltStatsFlag);
       window.removeEventListener('htbah:kampagne-daten-geaendert', this.onKampagneDatenExternGeaendert);
       if (this.anlageOverlay.offen) {
-        this.schliesseAnlageOverlayModal();
+        this.schliesseAnlageOverlayModalOhnePruefung();
       }
     },
     template: `
@@ -6858,11 +7306,12 @@ var HTBAH_REFACTOR_UTILS =
           :orte-namen-liste="orteNamenListe"
           :speicher-deaktiviert="speicherAnlageDeaktiviert"
           :speicher-hinweis="speicherAnlageHinweis"
+          interaktive-welt-bearbeitung
+          :hat-ungespeicherte-aenderungen="bearbeitungUngespeichert.anlage"
           :zeile-quill-session="zeileQuillSession"
           :zeile-quill-host-ref-fn="zeileQuillHostRefFn"
           @close="schliesseAnlageModal"
           @save="speichereAnlage"
-          @edit-blur="anlageBearbeitungBeiBlurSpeichern"
           @random="zufallsvorschlagUebernehmen"
           @media-upload="onBearbeitungsMedienDateienGewaehlt"
           @media-remove="mediumAusBearbeitungEntfernen"
@@ -6891,11 +7340,12 @@ var HTBAH_REFACTOR_UTILS =
           :orte-namen-liste="orteNamenListe"
           :speicher-deaktiviert="speicherAnlageDeaktiviert"
           :speicher-hinweis="speicherAnlageHinweis"
+          interaktive-welt-bearbeitung
+          :hat-ungespeicherte-aenderungen="bearbeitungUngespeichert.overlay"
           :zeile-quill-session="overlayZeileQuillSession"
           :zeile-quill-host-ref-fn="overlayZeileQuillHostRefFn"
           @close="schliesseAnlageOverlayModal"
           @save="speichereAnlageOverlay"
-          @edit-blur="anlageOverlayBeiBlurSpeichern"
           @random="zufallsvorschlagOverlayUebernehmen"
           @media-upload="onBearbeitungsMedienDateienOverlayGewaehlt"
           @media-remove="mediumAusOverlayBearbeitungEntfernen"
@@ -6969,6 +7419,25 @@ var HTBAH_REFACTOR_UTILS =
                 <span class="material-symbols-outlined">{{ charakterVollbildIcon }}</span>
               </button>
               <button type="button" class="btn-close" aria-label="Charakterfenster schließen" @click="schliesseCharakterModal"></button>
+            </div>
+          </div>
+          <div
+            class="px-2 py-2 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2 htbah-modal-speicher-leiste">
+            <span v-if="bearbeitungUngespeichert.charakter" class="badge rounded-pill text-bg-warning">
+              Ungespeicherte Änderungen
+            </span>
+            <span v-else class="small text-body-secondary">Alle Änderungen gespeichert</span>
+            <div class="d-flex gap-2 ms-auto">
+              <button type="button" class="btn btn-sm btn-outline-secondary" @click="schliesseCharakterModal">
+                Schließen
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-primary"
+                :disabled="!bearbeitungUngespeichert.charakter"
+                @click="speichereCharakterModal()">
+                Speichern
+              </button>
             </div>
           </div>
           <div class="card-body py-2 small htbah-weltenbau-charakter-modal-body">
@@ -7068,14 +7537,50 @@ var HTBAH_REFACTOR_UTILS =
                 <div v-else class="small text-body-secondary">Keine Fraktionen vorhanden.</div>
               </div>
             </div>
+            <div class="row g-2 mt-1 mb-2">
+              <div class="col-12">
+                <label class="form-label small text-secondary mb-1">Zustand</label>
+                <div class="btn-group w-100 htbah-kampf-zustand-toggle" role="group" aria-label="Kampfzustand">
+                  <button
+                    v-for="opt in charakterKampfZustandOptionen"
+                    :key="'wb-char-kz-' + opt.id"
+                    type="button"
+                    class="btn btn-sm"
+                    :class="charakterModal.charakter.kampfZustand === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
+                    :aria-pressed="charakterModal.charakter.kampfZustand === opt.id ? 'true' : 'false'"
+                    @click="setzeCharakterModalKampfZustand(opt.id)">
+                    <span aria-hidden="true">{{ opt.emoji }}</span>
+                    <span class="ms-1">{{ opt.label }}</span>
+                  </button>
+                </div>
+                <p class="form-text mb-0 mt-1">
+                  Wird bei LP-Änderung automatisch gesetzt (0 = tot, 1–10 oder −60+ auf einmal = bewusstlos).
+                </p>
+              </div>
+              <div class="col-6">
+                <button
+                  type="button"
+                  class="btn btn-outline-primary btn-sm w-100"
+                  @click="charakterModalSchadenOeffnen">
+                  💥 Schaden erwürfeln
+                </button>
+              </div>
+              <div class="col-6">
+                <button
+                  type="button"
+                  class="btn btn-outline-primary btn-sm w-100"
+                  @click="charakterModalParadeOeffnen">
+                  🛡️ Parieren
+                </button>
+              </div>
+            </div>
             <div
               v-if="charakterModalFaehigkeitenStats"
               class="htbah-iw-charakter-stats mt-2"
               role="region"
-              aria-label="Begabungen und Fähigkeiten (nur Anzeige)">
+              aria-label="Begabungen und Fähigkeiten">
               <p class="form-label small text-secondary mb-1">
                 Fähigkeiten &amp; Begabungen
-                <span class="text-body-secondary fw-normal">(nur Anzeige)</span>
               </p>
               <div class="row g-2">
                 <div
@@ -7087,10 +7592,17 @@ var HTBAH_REFACTOR_UTILS =
                       <h6 class="card-title small text-uppercase fw-bold mb-1">
                         {{ charakterModalKategorieLabel(kategorie) }}
                       </h6>
-                      <div class="d-flex flex-wrap gap-1 mb-2">
+                      <div class="d-flex flex-wrap align-items-center gap-1 mb-2">
                         <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-begabung">
                           Begabung {{ charakterModalFaehigkeitenStats.begabungen[kategorie] }}
                         </span>
+                        <button
+                          type="button"
+                          class="faehigkeiten-stat-info-btn faehigkeiten-probe-wuerfel-btn"
+                          :aria-label="'W100-Probe auf Begabung ' + charakterModalKategorieLabel(kategorie)"
+                          @click="charakterModalProbeOeffnenBegabung(kategorie)">
+                          <span class="faehigkeiten-wuerfel-emoji" aria-hidden="true">🎲</span>
+                        </button>
                         <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-summe">
                           Summe {{ charakterModalFaehigkeitenStats.summen[kategorie] }}
                         </span>
@@ -7107,12 +7619,21 @@ var HTBAH_REFACTOR_UTILS =
                           :key="kategorie + '-' + (faehigkeit.name || '')"
                           class="htbah-iw-faehigkeit-zeile">
                           <span class="htbah-iw-faehigkeit-name" :title="faehigkeit.name">{{ faehigkeit.name }}</span>
-                          <span
-                            class="htbah-iw-faehigkeit-werte"
-                            :title="'Basis ' + charakterModalFaehigkeitBasiswert(faehigkeit) + ', effektiv ' + charakterModalEffektivwert(kategorie, faehigkeit)">
-                            <span class="text-muted">{{ charakterModalFaehigkeitBasiswert(faehigkeit) }}</span>
-                            <span class="text-body-secondary mx-1" aria-hidden="true">→</span>
-                            <span>{{ charakterModalEffektivwert(kategorie, faehigkeit) }}</span>
+                          <span class="d-inline-flex align-items-center gap-1 flex-shrink-0">
+                            <span
+                              class="htbah-iw-faehigkeit-werte"
+                              :title="'Basis ' + charakterModalFaehigkeitBasiswert(faehigkeit) + ', effektiv ' + charakterModalEffektivwert(kategorie, faehigkeit)">
+                              <span class="text-muted">{{ charakterModalFaehigkeitBasiswert(faehigkeit) }}</span>
+                              <span class="text-body-secondary mx-1" aria-hidden="true">→</span>
+                              <span>{{ charakterModalEffektivwert(kategorie, faehigkeit) }}</span>
+                            </span>
+                            <button
+                              type="button"
+                              class="faehigkeiten-stat-info-btn faehigkeiten-probe-wuerfel-btn py-0 px-1"
+                              :aria-label="'W100-Probe: ' + faehigkeit.name"
+                              @click="charakterModalProbeOeffnenFaehigkeit(kategorie, faehigkeit)">
+                              <span class="faehigkeiten-wuerfel-emoji" aria-hidden="true">🎲</span>
+                            </button>
                           </span>
                         </li>
                       </ul>
@@ -7165,9 +7686,22 @@ var HTBAH_REFACTOR_UTILS =
               <button type="button" class="btn btn-sm btn-outline-secondary" @click="springeZumCharakterAusModal">
                 Zum Charakter springen
               </button>
-              <div class="d-flex gap-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" @click="schliesseCharakterModal">Abbrechen</button>
-                <button type="button" class="btn btn-sm btn-primary" @click="speichereCharakterModal">Speichern</button>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <span
+                  v-if="bearbeitungUngespeichert.charakter"
+                  class="badge rounded-pill text-bg-warning">
+                  Ungespeichert
+                </span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @click="schliesseCharakterModal">
+                  Schließen
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-primary"
+                  :disabled="!bearbeitungUngespeichert.charakter"
+                  @click="speichereCharakterModal()">
+                  Speichern
+                </button>
               </div>
             </div>
           </div>
@@ -7181,6 +7715,9 @@ var HTBAH_REFACTOR_UTILS =
         <div class="d-none" aria-hidden="true">
           <wuerfelbecher-wurf ref="charakterInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
         </div>
+        <probe-wurf-modal ref="charakterProbeWurfModal" />
+        <schaden-modal ref="charakterSchadenModal" />
+        <parade-modal ref="charakterParadeModal" />
       </div>
     `,
   };

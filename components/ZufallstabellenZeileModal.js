@@ -5,6 +5,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
   components: {
     ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
+    ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
   },
   props: {
     anlage: { type: Object, required: true },
@@ -22,6 +23,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     orteNamenListe: { type: Array, default: () => [] },
     speicherDeaktiviert: { type: Boolean, default: false },
     speicherHinweis: { type: String, default: '' },
+    interaktiveWeltBearbeitung: { type: Boolean, default: false },
+    hatUngespeicherteAenderungen: { type: Boolean, default: false },
     zeileQuillSession: { type: Number, default: 0 },
     zeileQuillHostRefFn: { type: Function, required: true },
   },
@@ -54,6 +57,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       fraktionOrtEingabe: '',
       aktiverBearbeitungsTab: 'daten',
       fokusVorModal: null,
+      lpSnapshotVorEingabe: null,
+      kampfZustandSyncAusLpAktiv: false,
     };
   },
   computed: {
@@ -114,6 +119,17 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       return Array.isArray(this.anlage.zeile.inventar) ? this.anlage.zeile.inventar : [];
     },
+    zeigtKampfSchnellaktionen() {
+      const typ = this.anlage && this.anlage.typ;
+      return typ === 'npc' || typ === 'bestie';
+    },
+    kampfZustandOptionen() {
+      return [
+        { id: 'vital', label: 'Vital', emoji: '💚' },
+        { id: 'bewusstlos', label: 'Bewusstlos', emoji: '😵' },
+        { id: 'tot', label: 'Tot', emoji: '💀' },
+      ];
+    },
   },
   watch: {
     'anlage.offen'(offen) {
@@ -132,7 +148,21 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       this.fraktionOrtEingabe = '';
       if (offen) {
         this.aktiverBearbeitungsTab = 'daten';
+        this.kampfZustandSyncAusLpAktiv = false;
+        this.initialisiereKampfZustandBeiOeffnen();
+        this.$nextTick(() => {
+          this.kampfZustandSyncAusLpAktiv = true;
+        });
+      } else {
+        this.lpSnapshotVorEingabe = null;
+        this.kampfZustandSyncAusLpAktiv = false;
       }
+    },
+    'anlage.zeile.lebenspunkte'() {
+      if (!this.zeigtKampfSchnellaktionen || !this.kampfZustandSyncAusLpAktiv) {
+        return;
+      }
+      this.synchronisiereKampfZustandAusLp();
     },
   },
   mounted() {
@@ -324,6 +354,66 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       this.anlage.zeile.fraktionen = liste;
     },
+    normalisiereLp(wert) {
+      const n = Math.round(Number(String(wert ?? '').trim()) || 0);
+      return Math.max(0, Number.isFinite(n) ? n : 0);
+    },
+    initialisiereKampfZustandBeiOeffnen() {
+      if (!this.zeigtKampfSchnellaktionen || !this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      const zeile = this.anlage.zeile;
+      const lp = this.normalisiereLp(zeile.lebenspunkte);
+      this.lpSnapshotVorEingabe = lp;
+      const gespeichert =
+        window.HTBAH && typeof window.HTBAH.normalisiereKampfZustand === 'function'
+          ? window.HTBAH.normalisiereKampfZustand(zeile.kampfZustand)
+          : '';
+      if (gespeichert) {
+        zeile.kampfZustand = gespeichert;
+        return;
+      }
+      if (typeof window.HTBAH.ermittleKampfZustandFuerNpcBestie === 'function') {
+        zeile.kampfZustand = window.HTBAH.ermittleKampfZustandFuerNpcBestie(zeile);
+      } else if (typeof window.HTBAH.berechneKampfZustandAusLp === 'function') {
+        zeile.kampfZustand = window.HTBAH.berechneKampfZustandAusLp(lp, lp);
+      }
+    },
+    onKampfLebenspunkteFocus() {
+      if (!this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      this.lpSnapshotVorEingabe = this.normalisiereLp(this.anlage.zeile.lebenspunkte);
+    },
+    onKampfLebenspunkteBlur() {
+      if (!this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      this.lpSnapshotVorEingabe = this.normalisiereLp(this.anlage.zeile.lebenspunkte);
+    },
+    synchronisiereKampfZustandAusLp() {
+      const zeile = this.anlage && this.anlage.zeile;
+      if (!zeile || typeof window.HTBAH.berechneKampfZustandAusLp !== 'function') {
+        return;
+      }
+      const aktuell = this.normalisiereLp(zeile.lebenspunkte);
+      const vorher =
+        this.lpSnapshotVorEingabe != null ? this.lpSnapshotVorEingabe : aktuell;
+      zeile.kampfZustand = window.HTBAH.berechneKampfZustandAusLp(aktuell, vorher);
+    },
+    setzeKampfZustand(zustand) {
+      if (!this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      const normalisiert =
+        window.HTBAH && typeof window.HTBAH.normalisiereKampfZustand === 'function'
+          ? window.HTBAH.normalisiereKampfZustand(zustand)
+          : '';
+      if (!normalisiert) {
+        return;
+      }
+      this.anlage.zeile.kampfZustand = normalisiert;
+    },
     berechneHandelnFuerInitiative() {
       if (!this.anlage || !this.anlage.zeile) {
         return 0;
@@ -360,6 +450,47 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         return;
       }
       this.anlage.zeile.initiative = '';
+    },
+    begabungKategorieLabel(kategorie) {
+      if (kategorie === 'handeln') {
+        return 'Handeln';
+      }
+      if (kategorie === 'wissen') {
+        return 'Wissen';
+      }
+      if (kategorie === 'soziales') {
+        return 'Soziales';
+      }
+      return kategorie;
+    },
+    begabungZielwert(kategorie) {
+      if (!this.anlage || !this.anlage.zeile) {
+        return 0;
+      }
+      return Math.max(0, Math.min(100, Math.round(Number(this.anlage.zeile[kategorie]) || 0)));
+    },
+    begabungProbeOeffnen(kategorie) {
+      if (!this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      const typLabel = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
+      const name = String(this.anlage.zeile.name || '').trim();
+      const zielwert = this.begabungZielwert(kategorie);
+      this.$refs.probeWurfModal?.oeffnen({
+        modus: 'begabung',
+        zielwert,
+        titel:
+          'Probe: Begabung ' +
+          this.begabungKategorieLabel(kategorie) +
+          ' (' +
+          typLabel +
+          (name ? ': ' + name : '') +
+          ')',
+        untertitel:
+          'Begabungswert ' +
+          zielwert +
+          ' — ohne kritische Erfolge (Regelwerk).',
+      });
     },
     paradeModalOeffnenFuerZeile() {
       if (!this.anlage || !this.anlage.zeile) {
@@ -398,7 +529,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       });
     },
     datenBereichBlur(event) {
-      if (!this.istBearbeitung) {
+      if (!this.istBearbeitung || this.interaktiveWeltBearbeitung) {
         return;
       }
       const current = event && event.currentTarget;
@@ -514,6 +645,22 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>
         </div>
+        <div
+          v-if="interaktiveWeltBearbeitung"
+          class="px-2 py-2 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2 htbah-modal-speicher-leiste">
+          <span v-if="hatUngespeicherteAenderungen" class="badge rounded-pill text-bg-warning">Ungespeicherte Änderungen</span>
+          <span v-else class="small text-body-secondary">Alle Änderungen gespeichert</span>
+          <div class="d-flex gap-2 ms-auto">
+            <button type="button" class="btn btn-sm btn-outline-secondary" @click="schliessen">Schließen</button>
+            <button
+              type="button"
+              class="btn btn-sm btn-primary"
+              :disabled="speicherDeaktiviert || !hatUngespeicherteAenderungen"
+              @click="$emit('save')">
+              Speichern
+            </button>
+          </div>
+        </div>
         <div class="card-body py-2 small" style="max-height:70vh; overflow:auto;">
         <div v-if="istBearbeitung" class="mb-3">
           <ul class="nav nav-pills nav-fill htbah-weltenbau-pill-tabs">
@@ -538,6 +685,92 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           </ul>
         </div>
         <div v-if="zeigtDatenTab" @focusout="datenBereichBlur">
+        <section v-if="zeigtKampfSchnellaktionen" class="htbah-entitaet-bereich">
+          <h6 class="htbah-entitaet-bereich-titel">⚔️ Kampf &amp; Proben</h6>
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label small text-secondary mb-1">Zustand</label>
+              <div class="btn-group w-100 htbah-kampf-zustand-toggle" role="group" aria-label="Kampfzustand">
+                <button
+                  v-for="opt in kampfZustandOptionen"
+                  :key="'kz-' + opt.id"
+                  type="button"
+                  class="btn btn-sm"
+                  :class="anlage.zeile.kampfZustand === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
+                  :aria-pressed="anlage.zeile.kampfZustand === opt.id ? 'true' : 'false'"
+                  @click="setzeKampfZustand(opt.id)">
+                  <span aria-hidden="true">{{ opt.emoji }}</span>
+                  <span class="ms-1">{{ opt.label }}</span>
+                </button>
+              </div>
+              <p class="form-text mb-0 mt-1">
+                Wird bei LP-Änderung automatisch gesetzt (0 = tot, 1–10 oder −60+ auf einmal = bewusstlos).
+              </p>
+            </div>
+            <div class="col-12">
+              <div class="d-flex flex-wrap gap-2">
+                <button
+                  v-for="kategorie in ['handeln', 'wissen', 'soziales']"
+                  :key="'kampf-probe-' + kategorie"
+                  type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  :aria-label="'W100-Probe Begabung ' + begabungKategorieLabel(kategorie)"
+                  @click="begabungProbeOeffnen(kategorie)">
+                  🎲 {{ begabungKategorieLabel(kategorie) }} ({{ begabungZielwert(kategorie) }})
+                </button>
+              </div>
+            </div>
+            <div class="col-6">
+              <button
+                type="button"
+                class="btn btn-outline-primary btn-sm w-100"
+                @click="schadenModalOeffnenFuerZeile">
+                💥 Schaden erwürfeln
+              </button>
+            </div>
+            <div class="col-6">
+              <button
+                type="button"
+                class="btn btn-outline-primary btn-sm w-100"
+                @click="paradeModalOeffnenFuerZeile">
+                🛡️ Parieren
+              </button>
+            </div>
+            <div class="col-12">
+              <label class="form-label small text-secondary mb-1">Initiative</label>
+              <div class="input-group">
+                <input
+                  class="form-control"
+                  type="number"
+                  min="1"
+                  :max="10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0)))"
+                  v-model="anlage.zeile.initiative"
+                  placeholder="z. B. 12"
+                  inputmode="numeric"
+                  autocomplete="off" />
+                <button
+                  type="button"
+                  class="btn btn-outline-primary"
+                  title="1W10 + Begabung Handeln"
+                  @click="initiativeWuerfelnFuerZeile">
+                  🎲
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline-danger htbah-input-icon-btn"
+                  title="Initiative leeren"
+                  aria-label="Initiative leeren"
+                  :disabled="!String(anlage.zeile.initiative || '').trim()"
+                  @click="initiativeZuruecksetzen">
+                  <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
+              </div>
+              <p class="form-text mb-0">
+                Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).
+              </p>
+            </div>
+          </div>
+        </section>
         <template v-if="anlage.typ === 'npc'">
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
@@ -591,9 +824,9 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             </div>
           </section>
           <section class="htbah-entitaet-bereich">
-            <h6 class="htbah-entitaet-bereich-titel">⚔️ Werte & Kampf</h6>
+            <h6 class="htbah-entitaet-bereich-titel">⚔️ Kampfwerte</h6>
             <div class="row g-2">
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Lebenspunkte</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder="Lebenspunkte" inputmode="numeric" autocomplete="off" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Lebenspunkte neu würfeln" @click="npcFeldNeuWuerfeln('lebenspunkte', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Lebenspunkte</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder="Lebenspunkte" inputmode="numeric" autocomplete="off" @focus="onKampfLebenspunkteFocus" @blur="onKampfLebenspunkteBlur" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Lebenspunkte neu würfeln" @click="npcFeldNeuWuerfeln('lebenspunkte', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
@@ -616,62 +849,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                     <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('waffenloserKampf', 'einzeln')">Nur waffenloser Kampf neu</button></li>
                     <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('statur', 'mitAbhaengigen')">Statur + {{ npcAbhaengigkeitsLabel('statur') }}</button></li>
                   </ul>
-                </div>
-              </div>
-              <div class="col-md-6" v-if="istBearbeitung">
-                <label class="form-label small text-secondary mb-1">Initiative</label>
-                <div class="input-group">
-                  <input
-                    class="form-control"
-                    type="number"
-                    min="1"
-                    :max="10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0)))"
-                    v-model="anlage.zeile.initiative"
-                    placeholder="z. B. 14"
-                    inputmode="numeric"
-                    autocomplete="off" />
-                  <button
-                    type="button"
-                    class="btn btn-outline-primary"
-                    @click="initiativeWuerfelnFuerZeile">
-                    🎲
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-outline-danger htbah-input-icon-btn"
-                    title="Initiative leeren"
-                    aria-label="Initiative leeren"
-                    :disabled="!String(anlage.zeile.initiative || '').trim()"
-                    @click="initiativeZuruecksetzen">
-                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
-                  </button>
-                </div>
-                <div class="mt-2">
-                  <icon-text-button
-                    type="button"
-                    class="btn btn-outline-primary btn-sm w-100 mb-2"
-                    symbol="💥"
-                    @click="schadenModalOeffnenFuerZeile">
-                    Schaden
-                  </icon-text-button>
-                  <icon-text-button
-                    type="button"
-                    class="btn btn-outline-primary btn-sm w-100"
-                    symbol="🛡️"
-                    @click="paradeModalOeffnenFuerZeile">
-                    Parieren
-                  </icon-text-button>
-                </div>
-                <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
-              </div>
-              <div class="col-12" v-if="istBearbeitung">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpBewusstlosAusgeblendet" id="wb-npc-ausblenden" />
-                  <label class="form-check-label small" for="wb-npc-ausblenden">Bewusstlos-Status aus LP-Bereich ausblenden</label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpMassenschadenBewusstlos" id="wb-npc-massen" />
-                  <label class="form-check-label small" for="wb-npc-massen">Bewusstlos durch Massenschaden erzwingen</label>
                 </div>
               </div>
             </div>
@@ -884,69 +1061,13 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <div class="row g-2">
               <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.angriff" placeholder=" " autocomplete="off" /><label>Angriff</label></div></div>
               <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.verteidigung" placeholder=" " autocomplete="off" /><label>Verteidigung</label></div></div>
-              <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " autocomplete="off" /><label>Lebenspunkte</label></div></div>
+              <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " autocomplete="off" @focus="onKampfLebenspunkteFocus" @blur="onKampfLebenspunkteBlur" /><label>Lebenspunkte</label></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.waffe" placeholder=" " /><label>Waffe</label></div></div>
               <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schaden NK</label></div></div>
               <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schaden FK</label></div></div>
               <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
               <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
               <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
-              <div class="col-md-6">
-                <label class="form-label small text-secondary mb-1">Initiative</label>
-                <div class="input-group">
-                  <input
-                    class="form-control"
-                    type="number"
-                    min="1"
-                    :max="10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0)))"
-                    v-model="anlage.zeile.initiative"
-                    placeholder="z. B. 11"
-                    inputmode="numeric"
-                    autocomplete="off" />
-                  <button
-                    type="button"
-                    class="btn btn-outline-primary"
-                    @click="initiativeWuerfelnFuerZeile">
-                    🎲
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-outline-danger htbah-input-icon-btn"
-                    title="Initiative leeren"
-                    aria-label="Initiative leeren"
-                    :disabled="!String(anlage.zeile.initiative || '').trim()"
-                    @click="initiativeZuruecksetzen">
-                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
-                  </button>
-                </div>
-                <div class="mt-2">
-                  <icon-text-button
-                    type="button"
-                    class="btn btn-outline-primary btn-sm w-100 mb-2"
-                    symbol="💥"
-                    @click="schadenModalOeffnenFuerZeile">
-                    Schaden
-                  </icon-text-button>
-                  <icon-text-button
-                    type="button"
-                    class="btn btn-outline-primary btn-sm w-100"
-                    symbol="🛡️"
-                    @click="paradeModalOeffnenFuerZeile">
-                    Parieren
-                  </icon-text-button>
-                </div>
-                <div class="form-text">Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).</div>
-              </div>
-              <div class="col-12">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpBewusstlosAusgeblendet" id="wb-bestie-ausblenden" />
-                  <label class="form-check-label small" for="wb-bestie-ausblenden">Bewusstlos-Status aus LP-Bereich ausblenden</label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" v-model="anlage.zeile.lpMassenschadenBewusstlos" id="wb-bestie-massen" />
-                  <label class="form-check-label small" for="wb-bestie-massen">Bewusstlos durch Massenschaden erzwingen</label>
-                </div>
-              </div>
             </div>
           </section>
           <section class="htbah-entitaet-bereich">
@@ -1135,15 +1256,29 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <button v-if="kannDuplizieren" type="button" class="btn btn-sm btn-outline-primary" @click="$emit('duplicate')">Duplizieren</button>
             <button v-if="kannLoeschen" type="button" class="btn btn-sm btn-outline-danger" @click="$emit('delete')">Löschen</button>
           </div>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" @click="schliessen">Abbrechen</button>
-            <button type="button" class="btn btn-sm btn-primary" :disabled="speicherDeaktiviert" @click="$emit('save')">Speichern</button>
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span
+              v-if="interaktiveWeltBearbeitung && hatUngespeicherteAenderungen"
+              class="badge rounded-pill text-bg-warning me-1">
+              Ungespeichert
+            </span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @click="schliessen">
+              {{ interaktiveWeltBearbeitung ? 'Schließen' : 'Abbrechen' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-primary"
+              :disabled="speicherDeaktiviert || (interaktiveWeltBearbeitung && !hatUngespeicherteAenderungen)"
+              @click="$emit('save')">
+              Speichern
+            </button>
           </div>
         </div>
         <div v-if="speicherHinweis" class="form-text text-end mt-1">{{ speicherHinweis }}</div>
         </div>
         <parade-modal ref="paradeModal" />
         <schaden-modal ref="schadenModal" />
+        <probe-wurf-modal ref="probeWurfModal" />
         <div
           v-if="!modal.istVollbild"
           class="regelwerk-modal-resize-handle"

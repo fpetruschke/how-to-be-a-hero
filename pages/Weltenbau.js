@@ -279,6 +279,11 @@ window.HTBAH_SEITEN.Weltenbau = {
     '$route.fullPath'() {
       this.pruefeMentionNavigationTarget();
     },
+    '$route.params.tab'(neu, alt) {
+      if (alt === 'welt' && neu !== 'welt' && this.weltenbauMapModalOffen) {
+        void this.schliesseInteraktiveWeltBeiTabWechsel(alt);
+      }
+    },
   },
   methods: {
     pruefeMentionNavigationTarget() {
@@ -327,7 +332,28 @@ window.HTBAH_SEITEN.Weltenbau = {
         this.$router.replace(ziel);
       }
     },
-    wechsleWeltenbauTab(tabId) {
+    async schliesseInteraktiveWeltBeiTabWechsel(vorherigerTab) {
+      const modal = this.$refs.weltenbauMapModal;
+      if (modal && typeof modal.schliesseMitPruefung === 'function') {
+        const geschlossen = await modal.schliesseMitPruefung();
+        if (!geschlossen && vorherigerTab) {
+          const ziel = window.HTBAH.kampagnenPfad(vorherigerTab, this.ausgewaehlteKampagneId);
+          if (ziel !== this.$route.path) {
+            this.$router.replace(ziel);
+          }
+        }
+        return geschlossen;
+      }
+      this.weltenbauMapModalOffen = false;
+      return true;
+    },
+    async wechsleWeltenbauTab(tabId) {
+      if (this.aktiveWeltenbauTab === 'welt' && tabId !== 'welt' && this.weltenbauMapModalOffen) {
+        const geschlossen = await this.schliesseInteraktiveWeltBeiTabWechsel('welt');
+        if (!geschlossen) {
+          return;
+        }
+      }
       const ziel = window.HTBAH.kampagnenPfad(tabId, this.ausgewaehlteKampagneId);
       if (ziel !== this.$route.path) {
         this.$router.push(ziel);

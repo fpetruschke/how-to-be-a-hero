@@ -26,7 +26,11 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       warnhinweisAnzeigen: true,
       _onBestaetigen: null,
       _onAbbrechen: null,
+      _onSekundaer: null,
+      sekundaerText: '',
+      sekundaerButtonClass: 'btn-outline-secondary',
       _hatBestaetigt: false,
+      _hatSekundaerAktion: false,
       modalInstanz: null,
       _fokusVorModal: null,
     };
@@ -37,6 +41,9 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       beschreibung,
       onBestaetigen,
       onAbbrechen,
+      onSekundaer,
+      sekundaerText = '',
+      sekundaerButtonClass = 'btn-outline-secondary',
       bestaetigenText = 'Ja, löschen',
       bestaetigenButtonClass = 'btn-danger',
       warnhinweisAnzeigen = true,
@@ -49,7 +56,11 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       this.warnhinweisAnzeigen = warnhinweisAnzeigen;
       this._onBestaetigen = typeof onBestaetigen === 'function' ? onBestaetigen : null;
       this._onAbbrechen = typeof onAbbrechen === 'function' ? onAbbrechen : null;
+      this._onSekundaer = typeof onSekundaer === 'function' ? onSekundaer : null;
+      this.sekundaerText = typeof sekundaerText === 'string' ? sekundaerText : '';
+      this.sekundaerButtonClass = sekundaerButtonClass || 'btn-outline-secondary';
       this._hatBestaetigt = false;
+      this._hatSekundaerAktion = false;
 
       this.$nextTick(() => {
         const el = this.$refs.modalElement;
@@ -67,6 +78,13 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       }
       this.schliessen();
     },
+    sekundaerAktion() {
+      this._hatSekundaerAktion = true;
+      if (this._onSekundaer) {
+        this._onSekundaer();
+      }
+      this.schliessen();
+    },
     schliessen() {
       if (this.modalInstanz) {
         this.modalInstanz.hide();
@@ -75,10 +93,13 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
     zuruecksetzenCallbacks() {
       this._onBestaetigen = null;
       this._onAbbrechen = null;
+      this._onSekundaer = null;
+      this.sekundaerText = '';
       this._hatBestaetigt = false;
+      this._hatSekundaerAktion = false;
     },
     modalGeschlossen() {
-      if (!this._hatBestaetigt && this._onAbbrechen) {
+      if (!this._hatBestaetigt && !this._hatSekundaerAktion && this._onAbbrechen) {
         this._onAbbrechen();
       }
       if (this._fokusVorModal && this._fokusVorModal.isConnected) {
@@ -135,6 +156,13 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
               class="btn btn-secondary"
               data-bs-dismiss="modal">
               Abbrechen
+            </button>
+            <button
+              v-if="sekundaerText"
+              type="button"
+              :class="['btn', sekundaerButtonClass]"
+              @click="sekundaerAktion">
+              {{ sekundaerText }}
             </button>
             <button
               type="button"

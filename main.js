@@ -459,8 +459,7 @@ function normalisiereZufallstabellenNpcZeile(z) {
     stimme: typeof z.stimme === 'string' ? z.stimme : '',
     waffe: typeof z.waffe === 'string' ? z.waffe : '',
     lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
-    lpBewusstlosAusgeblendet: Boolean(z.lpBewusstlosAusgeblendet),
-    lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
+    kampfZustand: ermittleKampfZustandFuerNpcBestie(z),
     schadenswertNahkampf,
     schadenswertFernkampf,
     waffenloserKampf: typeof z.waffenloserKampf === 'string' ? z.waffenloserKampf : '',
@@ -863,8 +862,7 @@ function normalisiereZufallstabellenBestieZeile(z) {
     wissen,
     soziales,
     initiative: typeof z.initiative === 'string' ? z.initiative : '',
-    lpBewusstlosAusgeblendet: Boolean(z.lpBewusstlosAusgeblendet),
-    lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
+    kampfZustand: ermittleKampfZustandFuerNpcBestie(z),
     staerke: typeof z.staerke === 'string' ? z.staerke : '',
     schwaeche: typeof z.schwaeche === 'string' ? z.schwaeche : '',
     geheimnis: typeof z.geheimnis === 'string' ? z.geheimnis : '',
@@ -4264,9 +4262,29 @@ function istNurSpielleitungRoute(pfad) {
   return false;
 }
 
-router.beforeEach((to) => {
+function istWeltenbauRoutePfad(pfad) {
+  const p = typeof pfad === 'string' ? pfad : '';
+  return p === '/weltenbau' || p.startsWith('/weltenbau/');
+}
+
+router.beforeEach(async (to, from) => {
   const rolle = window.HTBAH.ladeAppRolle();
   const ziel = to.path || '/';
+
+  const weltenbauModal = window.HTBAH._weltenbauUebersichtModalInstanz;
+  if (
+    weltenbauModal &&
+    weltenbauModal.offen &&
+    !istWeltenbauRoutePfad(ziel) &&
+    typeof weltenbauModal.bestaetigeVerlassenMitUngespeichert === 'function'
+  ) {
+    const darfVerlassen = await weltenbauModal.bestaetigeVerlassenMitUngespeichert();
+    if (!darfVerlassen) {
+      return false;
+    }
+    weltenbauModal.schliesseAlleBearbeitungsModalsOhnePruefung();
+    weltenbauModal.$emit('schliessen');
+  }
 
   if (ziel === '/') {
     return true;
@@ -4310,11 +4328,159 @@ const lebenspunkteStatus = Vue.reactive({
   bewusstlos: false,
 });
 
+const HTBAH_KAMPF_ZUSTAENDE = ['vital', 'bewusstlos', 'tot'];
+
+function normalisiereKampfZustand(wert) {
+  const z = typeof wert === 'string' ? wert.trim().toLowerCase() : '';
+  return HTBAH_KAMPF_ZUSTAENDE.includes(z) ? z : '';
+}
+
+function parseLebenspunkteZahl(wert) {
+  const n = Math.round(Number(String(wert ?? '').trim()) || 0);
+  return Math.max(0, Number.isFinite(n) ? n : 0);
+}
+
+function berechneKampfZustandAusLp(aktuell, vorher) {
+  const lp = parseLebenspunkteZahl(aktuell);
+  const prev = parseLebenspunkteZahl(vorher);
+  if (lp === 0) {
+    return 'tot';
+  }
+  const verlust = prev - lp;
+  if ((lp >= 1 && lp <= 10) || verlust >= 60) {
+    return 'bewusstlos';
+  }
+  return 'vital';
+}
+
+function ermittleKampfZustandFuerNpcBestie(zeile) {
+  if (!zeile || typeof zeile !== 'object') {
+    return 'vital';
+  }
+  const explizit = normalisiereKampfZustand(zeile.kampfZustand);
+  if (explizit) {
+    return explizit;
+  }
+  const lp = parseLebenspunkteZahl(zeile.lebenspunkte);
+  if (lp === 0) {
+    return 'tot';
+  }
+  if (Boolean(zeile.lpMassenschadenBewusstlos) && lp > 10) {
+    return 'bewusstlos';
+  }
+  if (lp >= 1 && lp <= 10 && !Boolean(zeile.lpBewusstlosAusgeblendet)) {
+    return 'bewusstlos';
+  }
+  return berechneKampfZustandAusLp(lp, lp);
+}
+
+function ermittleKampfZustandFuerCharakter(charakter) {
+  if (!charakter || typeof charakter !== 'object') {
+    return 'vital';
+  }
+  const explizit = normalisiereKampfZustand(charakter.kampfZustand);
+  if (explizit) {
+    return explizit;
+  }
+  const lp = parseLebenspunkteZahl(charakter.lebenspunkte);
+  if (lp === 0) {
+    return 'tot';
+  }
+  if (Boolean(charakter.lpMassenschadenBewusstlos) && lp > 10) {
+    return 'bewusstlos';
+  }
+  if (lp >= 1 && lp <= 10 && !Boolean(charakter.lpBewusstlosAusgeblendet)) {
+    return 'bewusstlos';
+  }
+  return 'vital';
+}
+
+function syncCharakterLegacyAusKampfZustand(charakter) {
+  if (!charakter || typeof charakter !== 'object') {
+    return;
+  }
+  const kz = normalisiereKampfZustand(charakter.kampfZustand) || 'vital';
+  charakter.kampfZustand = kz;
+  charakter.lpStatusTot = kz === 'tot';
+  if (kz === 'vital') {
+    charakter.lpMassenschadenBewusstlos = false;
+    return;
+  }
+  if (kz === 'tot') {
+    charakter.lpMassenschadenBewusstlos = false;
+    return;
+  }
+  const lp = parseLebenspunkteZahl(charakter.lebenspunkte);
+  charakter.lpBewusstlosAusgeblendet = false;
+  charakter.lpMassenschadenBewusstlos = lp > 10;
+}
+
+function initialisiereCharakterKampfZustand(charakter) {
+  if (!charakter || typeof charakter !== 'object') {
+    return;
+  }
+  const gespeichert = normalisiereKampfZustand(charakter.kampfZustand);
+  if (gespeichert) {
+    charakter.kampfZustand = gespeichert;
+    syncCharakterLegacyAusKampfZustand(charakter);
+    return;
+  }
+  charakter.kampfZustand = ermittleKampfZustandFuerCharakter(charakter);
+  syncCharakterLegacyAusKampfZustand(charakter);
+}
+
+function aktualisiereCharakterKampfZustandAusLp(charakter, vorher, nach) {
+  if (!charakter || typeof charakter !== 'object') {
+    return;
+  }
+  let n = parseLebenspunkteZahl(nach);
+  const v = parseLebenspunkteZahl(vorher);
+  if (n !== charakter.lebenspunkte) {
+    charakter.lebenspunkte = n;
+  }
+  charakter.kampfZustand = berechneKampfZustandAusLp(n, v);
+  if (n === 0) {
+    charakter.lpStatusTot = true;
+    charakter.lpMassenschadenBewusstlos = false;
+    return;
+  }
+  charakter.lpStatusTot = false;
+  const verlust = v - n;
+  if (verlust >= 60) {
+    charakter.lpMassenschadenBewusstlos = true;
+  }
+  if (v > 10 && n >= 1 && n <= 10) {
+    charakter.lpBewusstlosAusgeblendet = false;
+  }
+  if (verlust >= 60) {
+    charakter.lpBewusstlosAusgeblendet = false;
+  }
+  if (n < v && n >= 1 && n <= 10 && v >= 1 && v <= 10) {
+    charakter.lpBewusstlosAusgeblendet = false;
+  }
+}
+
+function setzeCharakterKampfZustand(charakter, zustand) {
+  const kz = normalisiereKampfZustand(zustand);
+  if (!kz || !charakter || typeof charakter !== 'object') {
+    return;
+  }
+  charakter.kampfZustand = kz;
+  syncCharakterLegacyAusKampfZustand(charakter);
+}
+
 function berechneLebenspunkteStatus(charakter) {
   if (!charakter || typeof charakter !== 'object') {
     return { tot: false, bewusstlos: false };
   }
-  const lp = Math.max(0, Math.round(Number(charakter.lebenspunkte) || 0));
+  const kampfZustand = normalisiereKampfZustand(charakter.kampfZustand);
+  if (kampfZustand) {
+    return {
+      tot: kampfZustand === 'tot',
+      bewusstlos: kampfZustand === 'bewusstlos',
+    };
+  }
+  const lp = parseLebenspunkteZahl(charakter.lebenspunkte);
   const tot = lp === 0;
   const ausgeblendet = Boolean(charakter.lpBewusstlosAusgeblendet);
   const massenschaden = Boolean(charakter.lpMassenschadenBewusstlos);
@@ -4334,6 +4500,13 @@ function syncLebenspunkteStatusFromCharakter(charakter) {
 
 window.HTBAH.lebenspunkteStatus = lebenspunkteStatus;
 window.HTBAH.berechneLebenspunkteStatus = berechneLebenspunkteStatus;
+window.HTBAH.berechneKampfZustandAusLp = berechneKampfZustandAusLp;
+window.HTBAH.normalisiereKampfZustand = normalisiereKampfZustand;
+window.HTBAH.ermittleKampfZustandFuerNpcBestie = ermittleKampfZustandFuerNpcBestie;
+window.HTBAH.ermittleKampfZustandFuerCharakter = ermittleKampfZustandFuerCharakter;
+window.HTBAH.initialisiereCharakterKampfZustand = initialisiereCharakterKampfZustand;
+window.HTBAH.aktualisiereCharakterKampfZustandAusLp = aktualisiereCharakterKampfZustandAusLp;
+window.HTBAH.setzeCharakterKampfZustand = setzeCharakterKampfZustand;
 window.HTBAH.syncLebenspunkteStatusFromCharakter = syncLebenspunkteStatusFromCharakter;
 
 const app = Vue.createApp({

@@ -142,6 +142,7 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       wissen: [],
       soziales: [],
       geistesblitzVerbleibend: null,
+      kampfZustand: 'vital',
       lpStatusTot: false,
       lpBewusstlosAusgeblendet: false,
       lpMassenschadenBewusstlos: false,
@@ -220,6 +221,10 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
             : '',
       },
       geistesblitzVerbleibend,
+      kampfZustand:
+        typeof quelle.kampfZustand === 'string' && quelle.kampfZustand.trim()
+          ? quelle.kampfZustand.trim().toLowerCase()
+          : basis.kampfZustand,
       lpStatusTot: Boolean(quelle.lpStatusTot),
       lpBewusstlosAusgeblendet: Boolean(quelle.lpBewusstlosAusgeblendet),
       lpMassenschadenBewusstlos: Boolean(quelle.lpMassenschadenBewusstlos),

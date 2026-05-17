@@ -1388,7 +1388,7 @@ input::placeholder {
 
 .htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeit-zeile {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.2rem 0;
@@ -3288,6 +3288,11 @@ input::placeholder {
 
 .htbah-wuerfel-action-btn {
   min-height: 2.9rem;
+}
+
+.htbah-kampf-zustand-toggle .btn {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* Startseite: Hero-Kopf */

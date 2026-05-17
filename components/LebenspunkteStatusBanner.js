@@ -49,8 +49,12 @@ window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner = {
       if (kontext && typeof kontext.getCharakter === 'function') {
         const ref = kontext.getCharakter();
         if (ref && typeof ref === 'object') {
-          ref.lpBewusstlosAusgeblendet = true;
-          ref.lpMassenschadenBewusstlos = false;
+          if (typeof window.HTBAH.setzeCharakterKampfZustand === 'function') {
+            window.HTBAH.setzeCharakterKampfZustand(ref, 'vital');
+          } else {
+            ref.lpBewusstlosAusgeblendet = true;
+            ref.lpMassenschadenBewusstlos = false;
+          }
           if (typeof kontext.speichern === 'function') {
             kontext.speichern();
           }
@@ -62,8 +66,12 @@ window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner = {
       if (!c || typeof c !== 'object') {
         return;
       }
-      c.lpBewusstlosAusgeblendet = true;
-      c.lpMassenschadenBewusstlos = false;
+      if (typeof window.HTBAH.setzeCharakterKampfZustand === 'function') {
+        window.HTBAH.setzeCharakterKampfZustand(c, 'vital');
+      } else {
+        c.lpBewusstlosAusgeblendet = true;
+        c.lpMassenschadenBewusstlos = false;
+      }
       window.HTBAH.speichereCharakter(c);
       window.HTBAH.syncLebenspunkteStatusFromCharakter(c);
     },

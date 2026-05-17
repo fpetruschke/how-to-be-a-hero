@@ -201,13 +201,27 @@ window.HTBAH_SEITEN.Charakter = {
     spielleiterInitiativeMax() {
       return Math.max(1, 10 + this.spielleiterInitiativeBegabungHandelnGekappt);
     },
+    zeigtKampfZustandToggle() {
+      return !!this.spielleiterMitglied;
+    },
+    kampfZustandOptionen() {
+      return [
+        { id: 'vital', label: 'Vital', emoji: '💚' },
+        { id: 'bewusstlos', label: 'Bewusstlos', emoji: '😵' },
+        { id: 'tot', label: 'Tot', emoji: '💀' },
+      ];
+    },
   },
   created() {
     this.initialisiereCharakterAusRoute();
     this.initialisiereGeistesblitzVerbleibend();
     this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
     this._prevLpSnapshot = this.normalisiereLp(this.charakter.lebenspunkte);
-    this.charakter.lpStatusTot = this._prevLpSnapshot === 0;
+    if (typeof window.HTBAH.initialisiereCharakterKampfZustand === 'function') {
+      window.HTBAH.initialisiereCharakterKampfZustand(this.charakter);
+    } else {
+      this.charakter.lpStatusTot = this._prevLpSnapshot === 0;
+    }
     window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
   },
   mounted() {
@@ -355,6 +369,9 @@ window.HTBAH_SEITEN.Charakter = {
         this.initialisiereGeistesblitzVerbleibend();
         this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
         this._prevLpSnapshot = this.normalisiereLp(this.charakterLokal.lebenspunkte);
+        if (typeof window.HTBAH.initialisiereCharakterKampfZustand === 'function') {
+          window.HTBAH.initialisiereCharakterKampfZustand(this.charakterLokal);
+        }
         window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakterLokal);
         this.autosaveSnapshotAktualisieren();
         this._autosaveTemporarAussetzen = false;
@@ -382,6 +399,9 @@ window.HTBAH_SEITEN.Charakter = {
       this.initialisiereGeistesblitzVerbleibend();
       this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
       this._prevLpSnapshot = this.normalisiereLp(this.charakterLokal.lebenspunkte);
+      if (typeof window.HTBAH.initialisiereCharakterKampfZustand === 'function') {
+        window.HTBAH.initialisiereCharakterKampfZustand(this.charakterLokal);
+      }
       window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakterLokal);
       this.autosaveSnapshotAktualisieren();
       this._autosaveTemporarAussetzen = false;
@@ -745,25 +765,24 @@ window.HTBAH_SEITEN.Charakter = {
       window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
     },
     verarbeiteLebenspunkteAenderung(vorher, nach) {
+      if (typeof window.HTBAH.aktualisiereCharakterKampfZustandAusLp === 'function') {
+        window.HTBAH.aktualisiereCharakterKampfZustandAusLp(this.charakter, vorher, nach);
+        return;
+      }
       let n = this.normalisiereLp(nach);
       const v = this.normalisiereLp(vorher);
-
       if (n !== this.charakter.lebenspunkte) {
         this.charakter.lebenspunkte = n;
       }
-
       if (n === 0) {
         this.charakter.lpStatusTot = true;
         return;
       }
-
       this.charakter.lpStatusTot = false;
-
       const verlust = v - n;
       if (verlust >= 60) {
         this.charakter.lpMassenschadenBewusstlos = true;
       }
-
       if (v > 10 && n >= 1 && n <= 10) {
         this.charakter.lpBewusstlosAusgeblendet = false;
       }
@@ -773,6 +792,13 @@ window.HTBAH_SEITEN.Charakter = {
       if (n < v && n >= 1 && n <= 10 && v >= 1 && v <= 10) {
         this.charakter.lpBewusstlosAusgeblendet = false;
       }
+    },
+    setzeCharakterKampfZustand(zustand) {
+      if (!this.charakter || typeof window.HTBAH.setzeCharakterKampfZustand !== 'function') {
+        return;
+      }
+      window.HTBAH.setzeCharakterKampfZustand(this.charakter, zustand);
+      window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakter);
     },
     initialisiereGeistesblitzVerbleibend() {
       const m = this.geistesblitzWerte;
@@ -2074,6 +2100,25 @@ window.HTBAH_SEITEN.Charakter = {
       <div v-if="spielleiterMitglied || istSpielTabAktiv || istNeuModus" class="card p-3 mb-2">
         <div class="row g-2">
           <div v-if="spielleiterMitglied || istSpielTabAktiv" class="col-12">
+            <div v-if="zeigtKampfZustandToggle" class="mb-2">
+              <label class="form-label small text-secondary mb-1">Zustand</label>
+              <div class="btn-group w-100 htbah-kampf-zustand-toggle" role="group" aria-label="Kampfzustand">
+                <button
+                  v-for="opt in kampfZustandOptionen"
+                  :key="'char-kz-' + opt.id"
+                  type="button"
+                  class="btn btn-sm"
+                  :class="charakter.kampfZustand === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
+                  :aria-pressed="charakter.kampfZustand === opt.id ? 'true' : 'false'"
+                  @click="setzeCharakterKampfZustand(opt.id)">
+                  <span aria-hidden="true">{{ opt.emoji }}</span>
+                  <span class="ms-1">{{ opt.label }}</span>
+                </button>
+              </div>
+              <p class="form-text mb-0 mt-1">
+                Wird bei LP-Änderung automatisch gesetzt (0 = tot, 1–10 oder −60+ auf einmal = bewusstlos).
+              </p>
+            </div>
             <div class="row g-2">
               <div class="col-12 col-md-4">
                 <icon-text-button
@@ -2377,7 +2422,7 @@ window.HTBAH_SEITEN.Charakter = {
         accept="image/*"
         @change="charakterbildDateiAusgewaehlt" />
       <vor-nachteile-modal ref="vorNachteileModal" :charakter="charakter" />
-      <initiative-modal v-if="!spielleiterMitglied" ref="initiativeModal" :charakter="charakter" />
+      <initiative-modal ref="initiativeModal" :charakter="charakter" />
       <div v-if="spielleiterMitglied" class="d-none" aria-hidden="true">
         <wuerfelbecher-wurf ref="spielleiterInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
       </div>
