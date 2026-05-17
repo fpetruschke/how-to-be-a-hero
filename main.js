@@ -6,6 +6,7 @@ const SPEICHER_KEY_PRESETS = 'htbah_presets';
 const SPEICHER_KEY_THEME = 'htbah_theme';
 const SPEICHER_KEY_CHARAKTER_BILD_LEGACY = 'htbah_character_image';
 const SPEICHER_KEY_SPIELLEITER = 'htbah_spielleiter_kampagnen';
+const SPEICHER_KEY_KAMPAGNEN_LABELS_KATALOG = 'htbah_kampagnen_labels_katalog';
 const SPEICHER_KEY_ZUFALLSTABELLEN = 'htbah_zufallstabellen';
 const SPEICHER_KEY_WELTENBAU = 'htbah_weltenbau';
 const SPEICHER_KEY_WUERFEL_AUDIO = 'htbah_wuerfel_audio';
@@ -235,8 +236,10 @@ function normalisiereSpielleiterKampagne(g) {
   const mitglieder = Array.isArray(g.mitglieder)
     ? g.mitglieder.map(normalisiereSpielleiterMitglied).filter(Boolean)
     : [];
-  const abenteuerbuchHtml =
-    typeof g.abenteuerbuchHtml === 'string' ? g.abenteuerbuchHtml : '';
+  const AB = window.HTBAH_SHARED;
+  const abenteuerbuch = AB
+    ? AB.normalisiereAbenteuerbuch(g.abenteuerbuch, g.abenteuerbuchHtml)
+    : { reiter: [], aktiverReiterId: null };
   const atmosphaere = normalisiereAtmosphaereZustand(g.atmosphaere);
   const atmosphaereBadgePos = normalisiereAtmosphaereBadgePosition(g.atmosphaereBadgePos);
   const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
@@ -248,16 +251,158 @@ function normalisiereSpielleiterKampagne(g) {
   const zeitmessungBadgePos = ZU
     ? ZU.normalisiereBadgePosition(g.zeitmessungBadgePos)
     : normalisiereAtmosphaereBadgePosition(g.zeitmessungBadgePos);
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  const labels = KL ? KL.normalisiereKampagneLabels(g.labels) : [];
   return {
     id: typeof g.id === 'string' && g.id ? g.id : neueEntropieId(),
     name: typeof g.name === 'string' && g.name.trim() ? g.name.trim() : 'Kampagne',
     mitglieder,
-    abenteuerbuchHtml,
+    labels,
+    abenteuerbuch,
     atmosphaere,
     atmosphaereBadgePos,
     zeitmessung,
     zeitmessungBadgePos,
   };
+}
+
+function ladeKampagnenLabelsKatalog() {
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL) {
+    return { version: 1, eintraege: [] };
+  }
+  const roh = htbahSpeicher.leseJson(SPEICHER_KEY_KAMPAGNEN_LABELS_KATALOG, null);
+  return KL.normalisiereKatalog(roh);
+}
+
+function speichereKampagnenLabelsKatalog(katalog) {
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL) {
+    return false;
+  }
+  const norm = KL.normalisiereKatalog(katalog);
+  return htbahSpeicher.schreibeJson(SPEICHER_KEY_KAMPAGNEN_LABELS_KATALOG, norm);
+}
+
+function erstelleKampagnenLabelImKatalog(meta) {
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL) {
+    return { katalog: null, eintrag: null, neu: false };
+  }
+  const katalog = ladeKampagnenLabelsKatalog();
+  const ergebnis = KL.erstelleKatalogEintrag(katalog, meta, neueEntropieId);
+  if (ergebnis.katalog) {
+    speichereKampagnenLabelsKatalog(ergebnis.katalog);
+  }
+  return ergebnis;
+}
+
+function aktualisiereKampagnenLabelImKatalog(eintragId, patch) {
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL) {
+    return false;
+  }
+  const next = KL.aktualisiereKatalogEintrag(ladeKampagnenLabelsKatalog(), eintragId, patch);
+  return speichereKampagnenLabelsKatalog(next);
+}
+
+function importiereKampagnenLabelsInGlobalenKatalog(labelListe) {
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL) {
+    return false;
+  }
+  const snaps = KL.normalisiereKampagneLabels(labelListe);
+  if (!snaps.length) {
+    return true;
+  }
+  const next = KL.importLabelsInKatalog(ladeKampagnenLabelsKatalog(), snaps);
+  return speichereKampagnenLabelsKatalog(next);
+}
+
+function loescheKampagnenLabelAusKatalog(eintragId) {
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL) {
+    return false;
+  }
+  const next = KL.entferneKatalogEintrag(ladeKampagnenLabelsKatalog(), eintragId);
+  return speichereKampagnenLabelsKatalog(next);
+}
+
+function aktualisiereKampagneLabels(kampagneId, labels) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return false;
+  }
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  const normLabels = KL ? KL.normalisiereKampagneLabels(labels) : [];
+  const sl = ladeSpielleiterZustand();
+  const idx = (Array.isArray(sl.kampagnen) ? sl.kampagnen : []).findIndex((k) => k && k.id === kid);
+  if (idx < 0) {
+    return false;
+  }
+  const kampagnen = sl.kampagnen.slice();
+  kampagnen[idx] = { ...kampagnen[idx], labels: normLabels };
+  sl.kampagnen = kampagnen;
+  speichereSpielleiterZustand(sl);
+  return true;
+}
+
+function setzeKampagneLabelAktiv(kampagneId, labelId, aktiv) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  const lid = typeof labelId === 'string' && labelId.trim() ? labelId.trim() : '';
+  if (!kid || !lid) {
+    return false;
+  }
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL) {
+    return false;
+  }
+  const sl = ladeSpielleiterZustand();
+  const kampagne = (Array.isArray(sl.kampagnen) ? sl.kampagnen : []).find((k) => k && k.id === kid);
+  if (!kampagne) {
+    return false;
+  }
+  let eintrag = KL.findeKatalogEintrag(ladeKampagnenLabelsKatalog(), { id: lid });
+  if (!eintrag) {
+    const snap = KL.normalisiereKampagneLabels(kampagne.labels).find((l) => l.id === lid);
+    if (snap) {
+      eintrag = snap;
+    }
+  }
+  if (!eintrag && aktiv) {
+    return false;
+  }
+  const labels = eintrag
+    ? KL.setzeKampagneLabelAktiv(kampagne, eintrag, aktiv)
+    : KL.normalisiereKampagneLabels(kampagne.labels).filter((l) => l.id !== lid);
+  return aktualisiereKampagneLabels(kid, labels);
+}
+
+function kampagneLabelNachNameZuweisen(kampagneId, name) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return false;
+  }
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL) {
+    return false;
+  }
+  const eintrag = KL.findeKatalogEintrag(ladeKampagnenLabelsKatalog(), { name });
+  if (!eintrag) {
+    return false;
+  }
+  return setzeKampagneLabelAktiv(kid, eintrag.id, true);
+}
+
+function kampagnenLabelBadgeKlasse(labelOderKategorie) {
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL) {
+    return 'text-bg-secondary';
+  }
+  if (labelOderKategorie && typeof labelOderKategorie === 'object') {
+    return KL.badgeKlasseFuerLabel(labelOderKategorie);
+  }
+  return KL.badgeKlasseFuerKategorie(labelOderKategorie);
 }
 
 function ladeSpielleiterZustand() {
@@ -1377,23 +1522,68 @@ function speichereZeitmessungBadgePosition(pos) {
   }
 }
 
-function ladeKampagnenAbenteuerbuchHtml(kampagneId) {
+function ladeKampagnenAbenteuerbuch(kampagneId) {
   const kampagne = findeKampagneById(ladeSpielleiterZustand(), kampagneId);
-  return kampagne && typeof kampagne.abenteuerbuchHtml === 'string'
-    ? kampagne.abenteuerbuchHtml
-    : '';
+  const AB = window.HTBAH_SHARED;
+  if (!AB || typeof AB.normalisiereAbenteuerbuch !== 'function') {
+    return { reiter: [], aktiverReiterId: null };
+  }
+  if (!kampagne) {
+    return AB.erstelleLeeresAbenteuerbuch();
+  }
+  return AB.normalisiereAbenteuerbuch(kampagne.abenteuerbuch, kampagne.abenteuerbuchHtml);
+}
+
+function speichereKampagnenAbenteuerbuch(kampagneId, abenteuerbuch) {
+  const AB = window.HTBAH_SHARED;
+  const norm =
+    AB && typeof AB.normalisiereAbenteuerbuch === 'function'
+      ? AB.normalisiereAbenteuerbuch(abenteuerbuch)
+      : abenteuerbuch;
+  return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
+    kampagne.abenteuerbuch = norm;
+    delete kampagne.abenteuerbuchHtml;
+  });
+}
+
+function ladeKampagnenAbenteuerbuchHtml(kampagneId) {
+  const AB = window.HTBAH_SHARED;
+  if (AB && typeof AB.abenteuerbuchErsterReiterHtml === 'function') {
+    return AB.abenteuerbuchErsterReiterHtml(ladeKampagnenAbenteuerbuch(kampagneId));
+  }
+  return '';
 }
 
 function speichereKampagnenAbenteuerbuchHtml(kampagneId, html) {
-  return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
-    kampagne.abenteuerbuchHtml = typeof html === 'string' ? html : '';
-  });
+  const AB = window.HTBAH_SHARED;
+  const basis = ladeKampagnenAbenteuerbuch(kampagneId);
+  const reiter = Array.isArray(basis.reiter) ? basis.reiter.map((t) => ({ ...t })) : [];
+  if (!reiter.length) {
+    const id =
+      AB && typeof AB.neueAbenteuerbuchReiterId === 'function'
+        ? AB.neueAbenteuerbuchReiterId()
+        : `ab-${Date.now()}`;
+    reiter.push({
+      id,
+      name: AB ? AB.ABENTEUERBUCH_DEFAULT_REITER_NAME : 'Übersicht',
+      html: typeof html === 'string' ? html : '',
+    });
+    basis.aktiverReiterId = id;
+  } else {
+    const ziel =
+      reiter.find((t) => t.id === basis.aktiverReiterId) || reiter[0];
+    ziel.html = typeof html === 'string' ? html : '';
+  }
+  return speichereKampagnenAbenteuerbuch(kampagneId, { ...basis, reiter });
 }
 
 function loescheKampagnenAbenteuerbuch(kampagneId) {
-  return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
-    kampagne.abenteuerbuchHtml = '';
-  });
+  const AB = window.HTBAH_SHARED;
+  const leer =
+    AB && typeof AB.erstelleLeeresAbenteuerbuch === 'function'
+      ? AB.erstelleLeeresAbenteuerbuch()
+      : { reiter: [], aktiverReiterId: null };
+  return speichereKampagnenAbenteuerbuch(kampagneId, leer);
 }
 
 function normalisiereWeltenbauEintrag(e) {
@@ -1849,6 +2039,9 @@ function importiereSpielleiterKampagneTeilPaket(zielKampagneId, roh) {
   }
   sl.kampagnen = kampagnen;
   speichereSpielleiterZustand(sl);
+  if (merged.labels && merged.labels.length) {
+    importiereKampagnenLabelsInGlobalenKatalog(merged.labels);
+  }
   return { ok: true };
 }
 
@@ -1922,6 +2115,7 @@ function erstelleSpielleiterAbenteuerbuchExportPaket(kampagneId) {
     typ: EXPORT_TYP_SL_ABENTEUERBUCH,
     kampagneId: kid,
     exportiertAm: new Date().toISOString(),
+    abenteuerbuch: ladeKampagnenAbenteuerbuch(kid),
     abenteuerbuchHtml: ladeKampagnenAbenteuerbuchHtml(kid),
   };
 }
@@ -1942,10 +2136,19 @@ function importiereSpielleiterAbenteuerbuchPaket(zielKampagneId, roh) {
   if (spielleiterKampagneIndexNachId(ziel) < 0) {
     return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
   }
-  speichereKampagnenAbenteuerbuchHtml(
-    ziel,
-    typeof roh.abenteuerbuchHtml === 'string' ? roh.abenteuerbuchHtml : '',
-  );
+  const AB = window.HTBAH_SHARED;
+  const importiert =
+    AB && typeof AB.abenteuerbuchAusImportPaket === 'function'
+      ? AB.abenteuerbuchAusImportPaket(roh)
+      : null;
+  if (importiert) {
+    speichereKampagnenAbenteuerbuch(ziel, importiert);
+  } else {
+    speichereKampagnenAbenteuerbuchHtml(
+      ziel,
+      typeof roh.abenteuerbuchHtml === 'string' ? roh.abenteuerbuchHtml : '',
+    );
+  }
   return { ok: true };
 }
 
@@ -2476,6 +2679,9 @@ function sicherstelleSpielleiterKampagneFuerBeispielImport(kampagneId, opts) {
   kampagnen.push(merged);
   sl.kampagnen = kampagnen;
   speichereSpielleiterZustand(sl);
+  if (merged.labels && merged.labels.length) {
+    importiereKampagnenLabelsInGlobalenKatalog(merged.labels);
+  }
   return { ok: true, status: 'neu', kampagneId: kid };
 }
 
@@ -2592,6 +2798,58 @@ function kampagneIdsAusLokalerSpeicherPaket(paket) {
     }
   });
   return ids;
+}
+
+/** Labels aus einem `lokaler-speicher`-Paket (Beispiel-Kampagne-Vorschau vor Import). */
+function extrahiereKampagneLabelsAusLokalerSpeicherPaket(paket) {
+  const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  if (!KL || typeof KL.normalisiereKampagneLabels !== 'function') {
+    return [];
+  }
+  const sammeln = (labels) => {
+    const n = KL.normalisiereKampagneLabels(labels);
+    return Array.isArray(n) && n.length ? n : [];
+  };
+  const daten = Array.isArray(paket && paket.daten) ? paket.daten : [];
+  for (const e of daten) {
+    if (!e || !e.vorhanden || typeof e.wert !== 'string') {
+      continue;
+    }
+    if (e.key === 'htbah_spielleiter_kampagnen') {
+      try {
+        const p = JSON.parse(e.wert);
+        for (const k of Array.isArray(p.kampagnen) ? p.kampagnen : []) {
+          if (k && Array.isArray(k.labels) && k.labels.length) {
+            return sammeln(k.labels);
+          }
+        }
+      } catch {
+        /* ignorieren */
+      }
+      continue;
+    }
+    const meta = parseLsExportKeyMetaBeispiel(e.key);
+    if (!meta || !meta.kampagneId) {
+      continue;
+    }
+    let p = null;
+    try {
+      p = JSON.parse(e.wert);
+    } catch {
+      continue;
+    }
+    if (
+      (meta.lsTyp === 'spielleiter_teil' || meta.lsTyp === 'spielleiter_ohne_gruppe') &&
+      p &&
+      p.kampagne
+    ) {
+      return sammeln(p.kampagne.labels);
+    }
+    if (meta.lsTyp === 'kampagne_komplett_bundle' && p && p.spielleiterTeil && p.spielleiterTeil.kampagne) {
+      return sammeln(p.spielleiterTeil.kampagne.labels);
+    }
+  }
+  return [];
 }
 
 /**
@@ -3952,6 +4210,7 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   theme: SPEICHER_KEY_THEME,
   legacyCharakterBild: SPEICHER_KEY_CHARAKTER_BILD_LEGACY,
   spielleiter: SPEICHER_KEY_SPIELLEITER,
+  kampagnenLabelsKatalog: SPEICHER_KEY_KAMPAGNEN_LABELS_KATALOG,
   zufallstabellen: SPEICHER_KEY_ZUFALLSTABELLEN,
   weltenbau: SPEICHER_KEY_WELTENBAU,
   /** Präfix aller pro-Kampagne-Keys (Zufallstabellen), inkl. „__“. */
@@ -4008,6 +4267,16 @@ window.HTBAH = {
   neueEntropieId,
   ladeSpielleiterZustand,
   speichereSpielleiterZustand,
+  ladeKampagnenLabelsKatalog,
+  speichereKampagnenLabelsKatalog,
+  erstelleKampagnenLabelImKatalog,
+  aktualisiereKampagnenLabelImKatalog,
+  importiereKampagnenLabelsInGlobalenKatalog,
+  loescheKampagnenLabelAusKatalog,
+  setzeKampagneLabelAktiv,
+  kampagneLabelNachNameZuweisen,
+  kampagnenLabelBadgeKlasse,
+  aktualisiereKampagneLabels,
   kampagnenSlugAusName,
   kampagnenPfad,
   erstelleCharakterExportPaket,
@@ -4018,6 +4287,8 @@ window.HTBAH = {
   speichereZufallstabellenZustand,
   erstellePantheonExportPaket,
   pantheonImportAusPaket,
+  ladeKampagnenAbenteuerbuch,
+  speichereKampagnenAbenteuerbuch,
   ladeKampagnenAbenteuerbuchHtml,
   speichereKampagnenAbenteuerbuchHtml,
   loescheKampagnenAbenteuerbuch,
@@ -4061,6 +4332,7 @@ window.HTBAH = {
   erstelleKampagneKomplettOhneGruppeBackupBundle,
   importiereKampagneKomplettBackupBundle,
   wendeBeispielLokalerSpeicherPaketAdditivAn,
+  extrahiereKampagneLabelsAusLokalerSpeicherPaket,
   importierePantheonPaketInKampagne,
   ladeKampagnenAtmosphaereZustand,
   speichereKampagnenAtmosphaereZustand,
@@ -4588,6 +4860,14 @@ app.component('eingabe-modal', window.HTBAH_KOMPONENTEN.EingabeModal);
 app.component('ui-toast-host', window.HTBAH_KOMPONENTEN.UiToastHost);
 app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner);
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);
+app.component(
+  'kampagnen-labels-editor',
+  window.HTBAH_KOMPONENTEN.KampagnenLabelsEditor,
+);
+app.component(
+  'kampagnen-labels-verwaltung',
+  window.HTBAH_KOMPONENTEN.KampagnenLabelsVerwaltung,
+);
 app.component('bildbetrachter-host', window.HTBAH_KOMPONENTEN.BildbetrachterHost);
 app.mount('#app');
 if (HTBAH_ORIENTIERUNG && typeof HTBAH_ORIENTIERUNG.initialisiereListener === 'function') {

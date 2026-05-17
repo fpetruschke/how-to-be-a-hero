@@ -37,6 +37,12 @@ const GLOBAL_BLATT_DEFINITIONEN = [
     label: 'Fähigkeiten-Presets',
     nurSpielleitung: true,
   },
+  {
+    id: 'kampagnen_labels',
+    key: 'htbah_kampagnen_labels_katalog',
+    label: 'Kampagnen-Label-Katalog',
+    nurSpielleitung: true,
+  },
 ];
 
 /** Legacy-Sammel- und Teilexporte (Import-Label, weiterhin importierbar). */

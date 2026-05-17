@@ -12,6 +12,7 @@ window.HTBAH_KOMPONENTEN.InitiativeModal = {
     return {
       modalInstanz: null,
       letzterW10: null,
+      wurfGeneration: 0,
     };
   },
   computed: {
@@ -38,15 +39,60 @@ window.HTBAH_KOMPONENTEN.InitiativeModal = {
       if (!el) {
         return;
       }
-      this.letzterW10 = null;
+      this.ergebnisZuruecksetzen();
+      this.bindHiddenListener();
       this.modalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
       this.modalInstanz.show();
     },
     wuerfeln() {
-      this.$refs.wuerfelbecher?.wuerfeln('1W10').then((werte) => {
+      const gen = this.wurfGeneration;
+      const promise = this.$refs.wuerfelbecher?.wuerfeln('1W10');
+      if (!promise || typeof promise.then !== 'function') {
+        return;
+      }
+      promise.then((werte) => {
+        if (gen !== this.wurfGeneration) {
+          return;
+        }
         this.letzterW10 = Array.isArray(werte) && werte.length ? Number(werte[0]) || null : null;
       });
     },
+    ergebnisZuruecksetzen() {
+      this.wurfGeneration += 1;
+      this.letzterW10 = null;
+    },
+    bindHiddenListener() {
+      const el = this.$refs.modalElement;
+      const H = window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper;
+      if (!el || this._hiddenListenerGebunden) {
+        return;
+      }
+      if (H) {
+        H.bindHiddenEvent(el, this.ergebnisZuruecksetzen);
+      } else {
+        el.addEventListener('hidden.bs.modal', this.ergebnisZuruecksetzen);
+      }
+      this._hiddenListenerGebunden = true;
+    },
+    unbindHiddenListener() {
+      const el = this.$refs.modalElement;
+      const H = window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper;
+      if (!el || !this._hiddenListenerGebunden) {
+        return;
+      }
+      if (H) {
+        H.unbindHiddenEvent(el, this.ergebnisZuruecksetzen);
+      } else {
+        el.removeEventListener('hidden.bs.modal', this.ergebnisZuruecksetzen);
+      }
+      this._hiddenListenerGebunden = false;
+    },
+  },
+  mounted() {
+    this.$nextTick(() => this.bindHiddenListener());
+  },
+  beforeUnmount() {
+    this.unbindHiddenListener();
   },
   template: `
     <div

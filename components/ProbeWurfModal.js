@@ -4,6 +4,9 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
   components: {
     WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
   },
+  props: {
+    modalDomId: { type: String, default: 'probeWurfModal' },
+  },
   data() {
     return {
       modalInstanz: null,
@@ -14,9 +17,14 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
         untertitel: '',
       },
       letzterWurf: null,
+      /** Veraltete Wuerfelbecher-Promises ignorieren (3D-Animation dauert laenger als Modalwechsel). */
+      wurfGeneration: 0,
     };
   },
   computed: {
+    modalTitleId() {
+      return this.modalDomId + 'Label';
+    },
     auswertung() {
       if (this.letzterWurf === null) {
         return null;
@@ -64,7 +72,7 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
         titel: payload.titel || 'Probe',
         untertitel: payload.untertitel || '',
       };
-      this.letzterWurf = null;
+      this.ergebnisZuruecksetzen();
 
       this.$nextTick(() => {
         const el = this.$refs.modalElement;
@@ -76,23 +84,55 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
       });
     },
     wuerfeln() {
-      this.$refs.wuerfelbecher?.wuerfeln('1W100').then((werte) => {
+      const gen = this.wurfGeneration;
+      const promise = this.$refs.wuerfelbecher?.wuerfeln('1W100');
+      if (!promise || typeof promise.then !== 'function') {
+        return;
+      }
+      promise.then((werte) => {
+        if (gen !== this.wurfGeneration) {
+          return;
+        }
         this.letzterWurf = Array.isArray(werte) && werte.length ? Number(werte[0]) || null : null;
       });
     },
+    ergebnisZuruecksetzen() {
+      this.wurfGeneration += 1;
+      this.letzterWurf = null;
+      this.$refs.wuerfelbecher?.anzeigeZuruecksetzen?.();
+    },
+    onModalVerborgen() {
+      this.ergebnisZuruecksetzen();
+    },
+    schliessenUndZuruecksetzen() {
+      this.ergebnisZuruecksetzen();
+      if (this.modalInstanz) {
+        this.modalInstanz.hide();
+      }
+    },
+  },
+  beforeUnmount() {
+    const el = this.$refs.modalElement;
+    if (el && window.bootstrap && window.bootstrap.Modal) {
+      const instanz = window.bootstrap.Modal.getInstance(el);
+      if (instanz) {
+        instanz.hide();
+      }
+    }
   },
   template: `
     <div
       class="modal fade"
-      id="probeWurfModal"
+      :id="modalDomId"
       ref="modalElement"
       tabindex="-1"
-      aria-labelledby="probeWurfModalLabel"
-      aria-hidden="true">
+      :aria-labelledby="modalTitleId"
+      aria-hidden="true"
+      v-on="{ 'hidden.bs.modal': onModalVerborgen }">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow">
           <div class="modal-header">
-            <h5 class="modal-title d-flex align-items-center gap-2" id="probeWurfModalLabel">
+            <h5 class="modal-title d-flex align-items-center gap-2" :id="modalTitleId">
               <span class="material-symbols-outlined" aria-hidden="true">casino</span>
               {{ kontext.titel }}
             </h5>

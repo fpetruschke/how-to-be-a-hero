@@ -59,6 +59,11 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       fokusVorModal: null,
       lpSnapshotVorEingabe: null,
       kampfZustandSyncAusLpAktiv: false,
+      kampfModalDomPrefix:
+        'htbah-zeile-kampf-' + Math.random().toString(36).slice(2, 11),
+      probeModalGeneration: 0,
+      paradeModalGeneration: 0,
+      schadenModalGeneration: 0,
     };
   },
   computed: {
@@ -172,6 +177,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     window.removeEventListener('resize', this.onResize);
     this.beendeZiehen();
     this.beendeResize();
+    this.kampfWuerfelModalsSchliessenUndZuruecksetzen();
   },
   methods: {
     ermittleViewportGroesse() {
@@ -303,7 +309,20 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       this.fokusVorModal = null;
     },
+    kampfWuerfelModalsSchliessenUndZuruecksetzen() {
+      if (!this.zeigtKampfSchnellaktionen) {
+        return;
+      }
+      ['probeWurfModal', 'paradeModal', 'schadenModal'].forEach((refName) => {
+        const komponente = this.$refs[refName];
+        if (!komponente || typeof komponente.schliessenUndZuruecksetzen !== 'function') {
+          return;
+        }
+        komponente.schliessenUndZuruecksetzen();
+      });
+    },
     schliessen() {
+      this.kampfWuerfelModalsSchliessenUndZuruecksetzen();
       this.$emit('close');
     },
     onResize() {
@@ -476,7 +495,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       const typLabel = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
       const name = String(this.anlage.zeile.name || '').trim();
       const zielwert = this.begabungZielwert(kategorie);
-      this.$refs.probeWurfModal?.oeffnen({
+      const payload = {
         modus: 'begabung',
         zielwert,
         titel:
@@ -490,6 +509,10 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           'Begabungswert ' +
           zielwert +
           ' — ohne kritische Erfolge (Regelwerk).',
+      };
+      this.probeModalGeneration += 1;
+      this.$nextTick(() => {
+        this.$refs.probeWurfModal?.oeffnen(payload);
       });
     },
     paradeModalOeffnenFuerZeile() {
@@ -498,10 +521,14 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       const basiswert = this.berechneHandelnFuerInitiative();
       const titelTeil = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
-      this.$refs.paradeModal?.oeffnen({
+      const payload = {
         titel: `Parade-Probe (${titelTeil})`,
         basiswert,
         ruestungen: [],
+      };
+      this.paradeModalGeneration += 1;
+      this.$nextTick(() => {
+        this.$refs.paradeModal?.oeffnen(payload);
       });
     },
     schadenModalOeffnenFuerZeile() {
@@ -512,7 +539,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       const typ = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
       const name = String(zeile.name || '').trim();
       const waffenName = String(zeile.waffe || '').trim() || 'Waffe';
-      this.$refs.schadenModal?.oeffnen({
+      const payload = {
         titel: `Schaden würfeln (${typ}${name ? `: ${name}` : ''})`,
         charakter: {
           inventar: [
@@ -526,6 +553,10 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           ],
           handeln: [],
         },
+      };
+      this.schadenModalGeneration += 1;
+      this.$nextTick(() => {
+        this.$refs.schadenModal?.oeffnen(payload);
       });
     },
     datenBereichBlur(event) {
@@ -1276,9 +1307,20 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         </div>
         <div v-if="speicherHinweis" class="form-text text-end mt-1">{{ speicherHinweis }}</div>
         </div>
-        <parade-modal ref="paradeModal" />
-        <schaden-modal ref="schadenModal" />
-        <probe-wurf-modal ref="probeWurfModal" />
+        <teleport to="body">
+          <parade-modal
+            :key="kampfModalDomPrefix + '-parade-' + paradeModalGeneration"
+            :modal-dom-id="kampfModalDomPrefix + '-parade'"
+            ref="paradeModal" />
+          <schaden-modal
+            :key="kampfModalDomPrefix + '-schaden-' + schadenModalGeneration"
+            :modal-dom-id="kampfModalDomPrefix + '-schaden'"
+            ref="schadenModal" />
+          <probe-wurf-modal
+            :key="kampfModalDomPrefix + '-probe-' + probeModalGeneration"
+            :modal-dom-id="kampfModalDomPrefix + '-probe'"
+            ref="probeWurfModal" />
+        </teleport>
         <div
           v-if="!modal.istVollbild"
           class="regelwerk-modal-resize-handle"

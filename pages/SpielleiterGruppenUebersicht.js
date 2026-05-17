@@ -46,6 +46,8 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       ausgewaehltesBeispielDatei: '',
       beispielLaeuftDatei: '',
       beispielKampagnenInhaltOffen: false,
+      beispielVorschauLabels: [],
+      beispielVorschauLabelsLaden: false,
     };
   },
   computed: {
@@ -63,6 +65,15 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
   },
   mounted() {
     this.ladeBeispielManifest();
+  },
+  watch: {
+    ausgewaehltesBeispielDatei(datei) {
+      this.beispielVorschauLabels = [];
+      if (!datei) {
+        return;
+      }
+      void this.ladeBeispielLabelsVorschau(datei);
+    },
   },
   methods: {
     kampagnenNameExistiert(name, ausgenommeneId = '') {
@@ -207,6 +218,73 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         this.beispielManifestLaedt = false;
       }
     },
+    beispielHtmlEscape(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    },
+    beispielLabelBadgeKlasse(label) {
+      return window.HTBAH && typeof window.HTBAH.kampagnenLabelBadgeKlasse === 'function'
+        ? window.HTBAH.kampagnenLabelBadgeKlasse(label)
+        : 'text-bg-secondary';
+    },
+    async ladeBeispielLabelsVorschau(datei) {
+      const zielDatei = typeof datei === 'string' ? datei.trim() : '';
+      if (!zielDatei) {
+        this.beispielVorschauLabels = [];
+        return;
+      }
+      this.beispielVorschauLabelsLaden = true;
+      try {
+        const url = `${SL_BEISPIEL_KAMPAGNEN_VERZEICHNIS}/${zielDatei}`;
+        const response = await fetch(url, { cache: 'no-cache' });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const paket = await response.json();
+        if (this.ausgewaehltesBeispielDatei !== zielDatei) {
+          return;
+        }
+        this.beispielVorschauLabels =
+          window.HTBAH &&
+          typeof window.HTBAH.extrahiereKampagneLabelsAusLokalerSpeicherPaket === 'function'
+            ? window.HTBAH.extrahiereKampagneLabelsAusLokalerSpeicherPaket(paket)
+            : [];
+      } catch {
+        if (this.ausgewaehltesBeispielDatei === zielDatei) {
+          this.beispielVorschauLabels = [];
+        }
+      } finally {
+        if (this.ausgewaehltesBeispielDatei === zielDatei) {
+          this.beispielVorschauLabelsLaden = false;
+        }
+      }
+    },
+    beispielLabelsBeschreibungHtml(labels) {
+      const liste = Array.isArray(labels) ? labels : [];
+      if (!liste.length) {
+        return '';
+      }
+      const badges = liste
+        .map(
+          (lab) =>
+            `<span class="badge ${this.beispielLabelBadgeKlasse(lab)}">${this.beispielHtmlEscape(lab.name)}</span>`,
+        )
+        .join('');
+      const hatInhalt = liste.some((lab) => lab && lab.kategorie === 'inhalt');
+      const teile = [
+        '<p class="mb-1"><strong>Kampagnen-Labels:</strong></p>',
+        `<div class="d-flex flex-wrap gap-1 mb-2">${badges}</div>`,
+      ];
+      if (hatInhalt) {
+        teile.push(
+          '<p class="small text-body-secondary mb-0">Enthält Inhaltshinweise — prüfe vor dem Laden, ob das für deine Runde passt.</p>',
+        );
+      }
+      return teile.join('');
+    },
     beispielQuellenZeile(beispiel) {
       if (!beispiel) {
         return '';
@@ -236,14 +314,25 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       if (!beispiel || this.beispielLaeuftDatei) {
         return;
       }
+      if (this.beispielVorschauLabelsLaden) {
+        await this.ladeBeispielLabelsVorschau(beispiel.datei);
+      } else if (!this.beispielVorschauLabels.length) {
+        await this.ladeBeispielLabelsVorschau(beispiel.datei);
+      }
       const quellenZeile = this.beispielQuellenZeile(beispiel);
       const beschreibungTeile = [
-        `<p>Die Kampagne <strong>„${beispiel.titel}“</strong> wird <em>additiv</em> hinzugefügt — ` +
+        `<p>Die Kampagne <strong>„${this.beispielHtmlEscape(beispiel.titel)}“</strong> wird <em>additiv</em> hinzugefügt — ` +
           'vorhandene Kampagnen und Zufallstabellen-Einträge bleiben unverändert. Bereits ' +
           'vorhandene Beispiel-Einträge (gleiche ID) werden übersprungen.</p>',
       ];
+      const labelsHtml = this.beispielLabelsBeschreibungHtml(this.beispielVorschauLabels);
+      if (labelsHtml) {
+        beschreibungTeile.push(labelsHtml);
+      }
       if (quellenZeile) {
-        beschreibungTeile.push(`<p class="mb-0 small text-body-secondary">${quellenZeile}.</p>`);
+        beschreibungTeile.push(
+          `<p class="mb-0 small text-body-secondary">${this.beispielHtmlEscape(quellenZeile)}.</p>`,
+        );
       }
       const bestaetigt = await window.HTBAH.ui.confirm({
         titel: `„${beispiel.titel}“ laden?`,
@@ -352,6 +441,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
             <thead class="table-light">
               <tr>
                 <th scope="col">Name</th>
+                <th scope="col">Labels</th>
               <th scope="col" class="text-nowrap">Mitglieder</th>
                 <th scope="col" class="text-end text-nowrap">Aktionen</th>
               </tr>
@@ -362,6 +452,11 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
                   <button type="button" class="btn btn-link p-0 fw-medium text-decoration-none" @click="kampagneBearbeiten(g)">
                     {{ g.name }}
                   </button>
+                </td>
+                <td style="min-width: 14rem;">
+                  <kampagnen-labels-editor
+                    :kampagne-id="g.id"
+                    nur-anzeige />
                 </td>
               <td>
                 <div class="d-flex flex-wrap gap-1">
@@ -410,7 +505,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
           <div
             v-for="g in zustand.kampagnen"
             :key="'grp-card-' + g.id"
-            class="card zufallstabellen-mobile-card mb-2 p-3">
+            class="card zufallstabellen-mobile-card mb-2 p-3 htbah-kampagne-mobile-card">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
               <button type="button" class="btn btn-link p-0 fw-semibold text-decoration-none" @click="kampagneBearbeiten(g)">
                 {{ g.name }}
@@ -457,6 +552,12 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
                 <span>{{ mitgliedName(m) }}</span>
               </span>
               <span v-if="!g.mitglieder.length" class="small text-body-secondary">Noch keine Charaktere in der Gruppe</span>
+            </div>
+            <div class="mt-2 pt-2 border-top">
+              <div class="small fw-semibold mb-1">Labels</div>
+              <kampagnen-labels-editor
+                :kampagne-id="g.id"
+                nur-anzeige />
             </div>
           </div>
         </div>
@@ -529,6 +630,24 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         <div v-if="aktuellesBeispiel" class="border rounded p-2 small text-body-secondary">
           <p v-if="aktuellesBeispiel.untertitel" class="mb-1">{{ aktuellesBeispiel.untertitel }}</p>
           <p v-if="aktuellesBeispiel.beschreibung" class="mb-2">{{ aktuellesBeispiel.beschreibung }}</p>
+          <div v-if="beispielVorschauLabelsLaden" class="mb-2 text-body-secondary" role="status">
+            Labels werden geladen …
+          </div>
+          <div v-else-if="beispielVorschauLabels.length" class="mb-2">
+            <p class="mb-1 text-body"><strong>Kampagnen-Labels</strong></p>
+            <div class="d-flex flex-wrap gap-1">
+              <span
+                  v-for="lab in beispielVorschauLabels"
+                  :key="'sl-bsp-lbl-' + lab.id"
+                  class="badge"
+                  :class="beispielLabelBadgeKlasse(lab)">{{ lab.name }}</span>
+            </div>
+            <p
+                v-if="beispielVorschauLabels.some((l) => l.kategorie === 'inhalt')"
+                class="mb-0 mt-2 small text-body-secondary">
+              Enthält Inhaltshinweise — prüfe vor dem Laden, ob das für deine Runde passt.
+            </p>
+          </div>
           <p v-if="aktuellesBeispiel.quelleUrl || aktuellesBeispiel.quelleLabel" class="mb-1">
             <strong>Quelle:</strong>
             <a

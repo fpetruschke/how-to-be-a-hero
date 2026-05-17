@@ -7715,9 +7715,17 @@ var HTBAH_REFACTOR_UTILS =
         <div class="d-none" aria-hidden="true">
           <wuerfelbecher-wurf ref="charakterInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
         </div>
-        <probe-wurf-modal ref="charakterProbeWurfModal" />
-        <schaden-modal ref="charakterSchadenModal" />
-        <parade-modal ref="charakterParadeModal" />
+        <teleport to="body">
+          <probe-wurf-modal
+            modal-dom-id="htbahIwCharakterProbeWurf"
+            ref="charakterProbeWurfModal" />
+          <schaden-modal
+            modal-dom-id="htbahIwCharakterSchaden"
+            ref="charakterSchadenModal" />
+          <parade-modal
+            modal-dom-id="htbahIwCharakterParade"
+            ref="charakterParadeModal" />
+        </teleport>
       </div>
     `,
   };

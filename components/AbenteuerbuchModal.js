@@ -12,6 +12,8 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       fokusVorModal: null,
       aktiveKampagneIdLokal: '',
       aktiveKampagneName: '',
+      abenteuerbuchLokal: null,
+      aktiverReiterId: '',
     };
   },
   computed: {
@@ -29,6 +31,18 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
         ? `Abenteuerbuch — ${this.aktiveKampagneName}`
         : 'Abenteuerbuch';
     },
+    reiterListe() {
+      return this.abenteuerbuchLokal && Array.isArray(this.abenteuerbuchLokal.reiter)
+        ? this.abenteuerbuchLokal.reiter
+        : [];
+    },
+    aktiverReiter() {
+      return (
+        this.reiterListe.find((t) => t.id === this.aktiverReiterId) ||
+        this.reiterListe[0] ||
+        null
+      );
+    },
   },
   watch: {
     'uiZustand.abenteuerbuchOffen'(istOffen) {
@@ -41,6 +55,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
         this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         this.$nextTick(() => {
           this.initialisierePosition();
+          this.abenteuerbuchLaden();
           this.editorInitialisieren();
           this.fokussiereFenster();
         });
@@ -52,6 +67,8 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       this.istVollbild = false;
       this.speichernFlushen();
       this.quillAufraeumen();
+      this.abenteuerbuchLokal = null;
+      this.aktiverReiterId = '';
       this.stelleFokusWiederHer();
     },
   },
@@ -131,14 +148,134 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       this.aktiveKampagneIdLokal = kampagne ? kampagne.id : '';
       this.aktiveKampagneName = kampagne ? String(kampagne.name || '') : '';
     },
+    abenteuerbuchLaden() {
+      const geladen = this.aktiveKampagneIdLokal
+        ? window.HTBAH.ladeKampagnenAbenteuerbuch(this.aktiveKampagneIdLokal)
+        : null;
+      const AB = window.HTBAH_SHARED;
+      const norm =
+        AB && typeof AB.normalisiereAbenteuerbuch === 'function'
+          ? AB.normalisiereAbenteuerbuch(geladen)
+          : geladen;
+      this.abenteuerbuchLokal = {
+        reiter: (norm.reiter || []).map((t) => ({ ...t })),
+        aktiverReiterId: norm.aktiverReiterId,
+      };
+      this.aktiverReiterId = norm.aktiverReiterId;
+    },
+    syncQuillZuAktivemReiter() {
+      if (!this.quill || !this.abenteuerbuchLokal || !this.aktiverReiter) {
+        return;
+      }
+      this.aktiverReiter.html = this.quill.root.innerHTML;
+    },
+    ladeQuillVonAktivemReiter() {
+      if (!this.quill || !this.aktiverReiter) {
+        return;
+      }
+      this.quill.root.innerHTML = this.aktiverReiter.html || '';
+    },
+    reiterIstAktiv(reiterId) {
+      return reiterId === this.aktiverReiterId;
+    },
+    reiterKannGeloeschtWerden() {
+      return this.reiterListe.length > 1;
+    },
+    async wechsleReiter(reiterId) {
+      if (!reiterId || reiterId === this.aktiverReiterId) {
+        return;
+      }
+      this.syncQuillZuAktivemReiter();
+      this.aktiverReiterId = reiterId;
+      if (this.abenteuerbuchLokal) {
+        this.abenteuerbuchLokal.aktiverReiterId = reiterId;
+      }
+      this.ladeQuillVonAktivemReiter();
+      this.speichernDebounced();
+    },
+    reiterNameInput(reiter, event) {
+      if (!reiter || !event || !event.target) {
+        return;
+      }
+      reiter.name = String(event.target.value || '').slice(0, 80);
+      this.speichernDebounced();
+    },
+    reiterNameBlur(reiter, event) {
+      if (!reiter) {
+        return;
+      }
+      const roh = event && event.target ? String(event.target.value || '').trim() : String(reiter.name || '').trim();
+      const fallback =
+        (window.HTBAH_SHARED && window.HTBAH_SHARED.ABENTEUERBUCH_DEFAULT_REITER_NAME) || 'Übersicht';
+      reiter.name = roh || fallback;
+      if (event && event.target) {
+        event.target.value = reiter.name;
+      }
+      this.speichernDebounced();
+    },
+    reiterHinzufuegen() {
+      const AB = window.HTBAH_SHARED;
+      if (!this.abenteuerbuchLokal || !AB) {
+        return;
+      }
+      this.syncQuillZuAktivemReiter();
+      const id =
+        typeof AB.neueAbenteuerbuchReiterId === 'function'
+          ? AB.neueAbenteuerbuchReiterId()
+          : `ab-${Date.now()}`;
+      const name =
+        typeof AB.naechsterAbenteuerbuchReiterName === 'function'
+          ? AB.naechsterAbenteuerbuchReiterName(this.reiterListe)
+          : 'Reiter';
+      this.abenteuerbuchLokal.reiter.push({ id, name, html: '' });
+      this.aktiverReiterId = id;
+      this.abenteuerbuchLokal.aktiverReiterId = id;
+      this.ladeQuillVonAktivemReiter();
+      this.speichernDebounced();
+      this.$nextTick(() => {
+        const input = this.$refs[`reiterName-${id}`];
+        const el = Array.isArray(input) ? input[0] : input;
+        if (el && typeof el.focus === 'function') {
+          el.focus();
+          if (typeof el.select === 'function') {
+            el.select();
+          }
+        }
+      });
+    },
+    async reiterLoeschenAnfragen(reiter, index) {
+      if (!reiter || !this.reiterKannGeloeschtWerden()) {
+        return;
+      }
+      const name = String(reiter.name || 'Reiter').trim() || 'Reiter';
+      const ok = await window.HTBAH.ui.confirm({
+        titel: 'Reiter löschen',
+        beschreibung: `Reiter „${name}" und seinen Inhalt endgültig löschen?`,
+        bestaetigenText: 'Löschen',
+        bestaetigenButtonClass: 'btn-danger',
+        warnhinweisAnzeigen: true,
+      });
+      if (!ok) {
+        return;
+      }
+      this.syncQuillZuAktivemReiter();
+      const warAktiv = reiter.id === this.aktiverReiterId;
+      this.abenteuerbuchLokal.reiter.splice(index, 1);
+      if (warAktiv) {
+        const ersatz =
+          this.reiterListe[index] ||
+          this.reiterListe[index - 1] ||
+          this.reiterListe[0];
+        this.aktiverReiterId = ersatz ? ersatz.id : '';
+        this.abenteuerbuchLokal.aktiverReiterId = this.aktiverReiterId;
+        this.ladeQuillVonAktivemReiter();
+      }
+      this.speichernFlushen();
+    },
     editorInitialisieren() {
       if (!window.Quill || !this.$refs.editorHost) {
         return;
       }
-
-      const html = this.aktiveKampagneIdLokal
-        ? window.HTBAH.ladeKampagnenAbenteuerbuchHtml(this.aktiveKampagneIdLokal) || ''
-        : '';
 
       if (!this.quill) {
         this.quill = new window.Quill(this.$refs.editorHost, {
@@ -171,7 +308,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
         }
       }
 
-      this.quill.root.innerHTML = html;
+      this.ladeQuillVonAktivemReiter();
     },
     speichernDebounced() {
       if (this.speichernTimer) {
@@ -183,12 +320,19 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       }, 450);
     },
     speichernFlushen() {
-      if (this.quill && this.aktiveKampagneIdLokal) {
-        window.HTBAH.speichereKampagnenAbenteuerbuchHtml(
-          this.aktiveKampagneIdLokal,
-          this.quill.root.innerHTML,
-        );
+      if (!this.aktiveKampagneIdLokal || !this.abenteuerbuchLokal) {
+        return;
       }
+      this.syncQuillZuAktivemReiter();
+      const payload = {
+        reiter: this.abenteuerbuchLokal.reiter.map((t) => ({
+          id: t.id,
+          name: t.name,
+          html: t.html,
+        })),
+        aktiverReiterId: this.aktiverReiterId,
+      };
+      window.HTBAH.speichereKampagnenAbenteuerbuch(this.aktiveKampagneIdLokal, payload);
     },
   },
   template: `
@@ -219,12 +363,58 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
             <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>
         </div>
+        <div class="abenteuerbuch-reiter-leiste" role="tablist" aria-label="Abenteuerbuch Reiter">
+          <div
+            v-for="(reiter, index) in reiterListe"
+            :key="reiter.id"
+            class="abenteuerbuch-reiter"
+            :class="{ 'abenteuerbuch-reiter--aktiv': reiterIstAktiv(reiter.id) }">
+            <button
+              type="button"
+              class="abenteuerbuch-reiter-tap"
+              role="tab"
+              :aria-selected="reiterIstAktiv(reiter.id) ? 'true' : 'false'"
+              :tabindex="reiterIstAktiv(reiter.id) ? 0 : -1"
+              @click="wechsleReiter(reiter.id)">
+              <input
+                v-if="reiterIstAktiv(reiter.id)"
+                :ref="'reiterName-' + reiter.id"
+                type="text"
+                class="abenteuerbuch-reiter-name-input"
+                :value="reiter.name"
+                maxlength="80"
+                autocomplete="off"
+                spellcheck="false"
+                :aria-label="'Reitername: ' + reiter.name"
+                @click.stop
+                @input="reiterNameInput(reiter, $event)"
+                @blur="reiterNameBlur(reiter, $event)"
+                @keydown.enter.prevent="$event.target.blur()" />
+              <span v-else class="abenteuerbuch-reiter-name-text text-truncate">{{ reiter.name }}</span>
+            </button>
+            <button
+              v-if="reiterKannGeloeschtWerden()"
+              type="button"
+              class="abenteuerbuch-reiter-loeschen"
+              title="Reiter löschen"
+              aria-label="Reiter löschen"
+              @click.stop="reiterLoeschenAnfragen(reiter, index)">
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
+          </div>
+          <button
+            type="button"
+            class="abenteuerbuch-reiter-hinzufuegen"
+            title="Reiter hinzufügen"
+            aria-label="Reiter hinzufügen"
+            @click="reiterHinzufuegen">
+            <span class="material-symbols-outlined" aria-hidden="true">add</span>
+          </button>
+        </div>
         <div class="abenteuerbuch-modal-editor-wrap">
           <div ref="editorHost" class="quill-editor-host abenteuerbuch-quill-host"></div>
         </div>
-        <div
-          class="abenteuerbuch-modal-footer d-flex align-items-center justify-content-between px-3 py-2 border-top flex-shrink-0">
-          <small class="text-muted mb-0">Wird automatisch im Browser gespeichert.</small>
+        <div class="abenteuerbuch-modal-footer d-flex justify-content-end px-3 py-2 border-top flex-shrink-0">
           <button type="button" class="btn btn-sm btn-primary" @click="schliessen">Schließen</button>
         </div>
         <div

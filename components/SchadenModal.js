@@ -7,6 +7,7 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
   },
   props: {
     charakter: { type: Object, default: null },
+    modalDomId: { type: String, default: 'schadenModal' },
   },
   data() {
     return {
@@ -17,9 +18,13 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
       kritischerTreffer: false,
       ausgewaehlteWaffeId: 'fallback-unarmed',
       manuellerBonus: 0,
+      wurfGeneration: 0,
     };
   },
   computed: {
+    modalTitleId() {
+      return this.modalDomId + 'Label';
+    },
     aktiveCharakterDaten() {
       return this.kontextCharakter || this.charakter || {};
     },
@@ -131,31 +136,63 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
         payload && typeof payload.titel === 'string' && payload.titel.trim()
           ? payload.titel.trim()
           : 'Schaden erwürfeln';
-      this.letzterWurf = [];
-      this.kritischerTreffer = false;
       this.manuellerBonus = 0;
       this.ausgewaehlteWaffeId = this.inventarWaffen.length ? this.inventarWaffen[0].id : 'fallback-unarmed';
+      this.ergebnisZuruecksetzen();
       this.modalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
       this.modalInstanz.show();
     },
     wuerfeln() {
-      this.$refs.wuerfelbecher?.wuerfeln(this.notation).then((werte) => {
+      const gen = this.wurfGeneration;
+      const promise = this.$refs.wuerfelbecher?.wuerfeln(this.notation);
+      if (!promise || typeof promise.then !== 'function') {
+        return;
+      }
+      promise.then((werte) => {
+        if (gen !== this.wurfGeneration) {
+          return;
+        }
         this.letzterWurf = Array.isArray(werte) ? werte.map((wert) => Number(wert) || 0) : [];
       });
     },
+    ergebnisZuruecksetzen() {
+      this.wurfGeneration += 1;
+      this.letzterWurf = [];
+      this.kritischerTreffer = false;
+      this.$refs.wuerfelbecher?.anzeigeZuruecksetzen?.();
+    },
+    onModalVerborgen() {
+      this.ergebnisZuruecksetzen();
+    },
+    schliessenUndZuruecksetzen() {
+      this.ergebnisZuruecksetzen();
+      if (this.modalInstanz) {
+        this.modalInstanz.hide();
+      }
+    },
+  },
+  beforeUnmount() {
+    const el = this.$refs.modalElement;
+    if (el && window.bootstrap && window.bootstrap.Modal) {
+      const instanz = window.bootstrap.Modal.getInstance(el);
+      if (instanz) {
+        instanz.hide();
+      }
+    }
   },
   template: `
     <div
       class="modal fade"
-      id="schadenModal"
+      :id="modalDomId"
       ref="modalElement"
       tabindex="-1"
-      aria-labelledby="schadenModalLabel"
-      aria-hidden="true">
+      :aria-labelledby="modalTitleId"
+      aria-hidden="true"
+      v-on="{ 'hidden.bs.modal': onModalVerborgen }">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow">
           <div class="modal-header">
-            <h5 class="modal-title d-flex align-items-center gap-2" id="schadenModalLabel">
+            <h5 class="modal-title d-flex align-items-center gap-2" :id="modalTitleId">
               <span class="material-symbols-outlined" aria-hidden="true">swords</span>
               {{ kontextTitel }}
             </h5>

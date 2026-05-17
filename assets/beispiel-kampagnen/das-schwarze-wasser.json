@@ -10,6 +10,13 @@
   },
   "daten": [
     {
+      "id": "ex:sl:teil:demo-das-schwarze-wasser",
+      "key": "htbah_export_ls:spielleiter_teil:demo-das-schwarze-wasser",
+      "label": "Spielleiter-Kampagne",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\":1,\"typ\":\"htbah-spielleiter-kampagne-teil\",\"kampagneId\":\"demo-das-schwarze-wasser\",\"exportiertAm\":\"2026-05-17T12:00:00.000Z\",\"kampagne\":{\"id\":\"demo-das-schwarze-wasser\",\"name\":\"Das schwarze Wasser (Demo)\",\"mitglieder\":[],\"labels\":[{\"id\":\"lbl-setting-mittelalter-fantasy\",\"name\":\"Mittelalter / Fantasy\",\"kategorie\":\"setting\",\"bg\":\"info\",\"text\":\"dark\"},{\"id\":\"lbl-inhalt-drogen\",\"name\":\"Drogen & Suchtmittel\",\"kategorie\":\"inhalt\",\"bg\":\"danger\",\"text\":\"light\"},{\"id\":\"lbl-inhalt-gewalt\",\"name\":\"Gewalt\",\"kategorie\":\"inhalt\",\"bg\":\"danger\",\"text\":\"light\"}]},\"mitgliedWahlMitgliedId\":\"\"}"
+    },
+    {
       "id": "ex:sl:ab:demo-das-schwarze-wasser",
       "key": "htbah_export_ls:sl_abenteuerbuch:demo-das-schwarze-wasser",
       "label": "Abenteuerbuch",

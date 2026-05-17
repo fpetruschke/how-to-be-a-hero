@@ -81,11 +81,20 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '🛑',
     buttonLabel: 'Sicherheitsmechanismen löschen',
   },
+  kampagnenLabels: {
+    key: 'htbah_kampagnen_labels_katalog',
+    titel: 'Kampagnen-Label-Katalog löschen?',
+    beschreibung:
+      'Der globale Label-Katalog (Setting- und Inhaltshinweise) wird zurückgesetzt. Bereits auf Kampagnen kopierte Labels bleiben dort erhalten.',
+    erfolg: 'Kampagnen-Label-Katalog wurde zurückgesetzt.',
+    buttonSymbol: '🏷️',
+    buttonLabel: 'Kampagnen-Label-Katalog löschen',
+  },
   spielleiter: {
     key: 'htbah_spielleiter_kampagnen',
     titel: 'Spielleiter-Kampagnen löschen?',
     beschreibung:
-      'Alle gespeicherten Kampagnen und Charaktere in der Spielleiter-Ansicht werden entfernt — inklusive der jeweils zugehörigen Abenteuerbücher, Wetter/Tageszeit-Daten und Badge-Positionen.',
+      'Alle gespeicherten Kampagnen und Charaktere in der Spielleiter-Ansicht werden entfernt — inklusive Label-Kopien, Abenteuerbücher, Wetter/Tageszeit-Daten und Badge-Positionen.',
     erfolg: 'Spielleiter-Kampagnen wurden gelöscht.',
     buttonSymbol: '👥',
     buttonLabel: 'Spielleiter-Kampagnen löschen',
@@ -100,6 +109,7 @@ const SPEICHER_BEREICHE = {
       'htbah_presets',
       'htbah_theme',
       'htbah_spielleiter_kampagnen',
+      'htbah_kampagnen_labels_katalog',
       'htbah_zufallstabellen',
       'htbah_weltenbau',
       'htbah_wuerfel_audio',
@@ -1610,6 +1620,13 @@ window.HTBAH_SEITEN.Einstellungen = {
         </div>
       </div>
 
+      <template v-if="appRolle === 'spielleitung'">
+        <h5 class="text-start mb-2">Labels</h5>
+        <div class="card p-3 mb-3 text-start">
+          <kampagnen-labels-verwaltung />
+        </div>
+      </template>
+
       <h5 class="text-start mb-2">Würfel</h5>
       <div class="card p-3 mb-3 text-start">
         <div class="form-check form-switch mb-3">
@@ -2054,6 +2071,13 @@ window.HTBAH_SEITEN.Einstellungen = {
                     :symbol="speicherBereiche.presets.buttonSymbol"
                     @click="oeffneLoeschDialog('presets')">
                     {{ speicherBereiche.presets.buttonLabel }}
+                  </icon-text-button>
+                  <icon-text-button
+                    class="btn btn-outline-danger btn-sm w-100 text-start"
+                    type="button"
+                    :symbol="speicherBereiche.kampagnenLabels.buttonSymbol"
+                    @click="oeffneLoeschDialog('kampagnenLabels')">
+                    {{ speicherBereiche.kampagnenLabels.buttonLabel }}
                   </icon-text-button>
                   <icon-text-button
                     class="btn btn-outline-danger btn-sm w-100 text-start"

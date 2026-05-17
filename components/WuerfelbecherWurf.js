@@ -480,6 +480,12 @@ window.HTBAH_KOMPONENTEN.WuerfelbecherWurf = {
         seiten === 10 ? window.HTBAH.wuerfelW10() : window.HTBAH.wuerfelW100(),
       );
     },
+    anzeigeZuruecksetzen() {
+      this.ergebnisse = [];
+      this.prozentwurfDetails = null;
+      this.wuerfelnLaeuft = false;
+      this.abbrecheAnstehenden3dWuerfelSound();
+    },
     async wuerfeln(notationOverride = null) {
       if (this.wuerfelnLaeuft) {
         return [];
