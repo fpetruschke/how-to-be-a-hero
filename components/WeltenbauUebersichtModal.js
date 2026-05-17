@@ -996,7 +996,7 @@ var HTBAH_REFACTOR_UTILS =
       async bestaetigeVerlassenMitUngespeichert() {
         return this.bearbeitungAlleUngespeichertAbfragen('navigation');
       },
-      async schliessenMitPruefung() {
+      async schliesseMitPruefung() {
         const darf = await this.bearbeitungAlleUngespeichertAbfragen('welt');
         if (!darf) {
           return false;
@@ -1623,6 +1623,12 @@ var HTBAH_REFACTOR_UTILS =
                 ? filter.geloesteRaetselAnzeigen
                 : MAP_STANDARD_EINSTELLUNGEN.sichtbarkeitsFilter.geloesteRaetselAnzeigen,
           },
+          kampfwerteAnzeigen:
+            typeof gruppe.kampfwerteAnzeigen === 'boolean'
+              ? gruppe.kampfwerteAnzeigen
+              : window.HTBAH && typeof window.HTBAH.ladeInteraktiveWeltStatsAnzeigen === 'function'
+                ? window.HTBAH.ladeInteraktiveWeltStatsAnzeigen()
+                : false,
           elementLocks: this.ladeElementLocks(),
         };
       },
@@ -1684,6 +1690,7 @@ var HTBAH_REFACTOR_UTILS =
           ...this.sichtbarkeitsFilter,
           ...einstellungen.sichtbarkeitsFilter,
         };
+        this.interaktiveWeltStatsAnzeigen = einstellungen.kampfwerteAnzeigen;
         this.elementLocks = { ...(einstellungen.elementLocks || {}) };
       },
       speichereMapEinstellung(key, value) {
@@ -1716,6 +1723,7 @@ var HTBAH_REFACTOR_UTILS =
           );
         });
         this.sichtbarkeitsFilter = { ...defaults.sichtbarkeitsFilter };
+        this.interaktiveWeltStatsAnzeigen = false;
         this.elementLocks = {};
         const gruppeKey = this.gruppeId || 'default';
         this.speichereWeltenbauAusModal((wb) => {
@@ -3947,17 +3955,15 @@ var HTBAH_REFACTOR_UTILS =
         return t;
       },
       synceInteraktiveWeltStatsFlag() {
-        if (window.HTBAH && typeof window.HTBAH.ladeInteraktiveWeltStatsAnzeigen === 'function') {
-          this.interaktiveWeltStatsAnzeigen = window.HTBAH.ladeInteraktiveWeltStatsAnzeigen();
-        }
+        const einstellungen = this.ladeMapEinstellungen();
+        this.interaktiveWeltStatsAnzeigen = einstellungen.kampfwerteAnzeigen;
       },
       speichereInteraktiveWeltStatsEinstellung() {
-        if (!window.HTBAH || typeof window.HTBAH.speichereInteraktiveWeltStatsAnzeigen !== 'function') {
-          return;
+        const aktiv = !!this.interaktiveWeltStatsAnzeigen;
+        this.speichereMapEinstellung('kampfwerteAnzeigen', aktiv);
+        if (window.HTBAH && typeof window.HTBAH.speichereInteraktiveWeltStatsAnzeigen === 'function') {
+          window.HTBAH.speichereInteraktiveWeltStatsAnzeigen(aktiv);
         }
-        this.interaktiveWeltStatsAnzeigen = window.HTBAH.speichereInteraktiveWeltStatsAnzeigen(
-          this.interaktiveWeltStatsAnzeigen,
-        );
       },
       onKampagneDatenExternGeaendert(ev) {
         if (!this.offen) {

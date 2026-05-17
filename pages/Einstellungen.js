@@ -626,6 +626,12 @@ window.HTBAH_SEITEN.Einstellungen = {
             beschreibung: `Zu „${name}“ werden Kartenlayouts, Hintergründe, freie Bilder, Notizen, Pfeile und Karten-Einstellungen entfernt. Die Galerie unter „Weltenbau“ und Generator-Links bleiben erhalten.`,
             erfolg: `Interaktive Welt zu „${name}“ wurde geleert.`,
           };
+        case 'wb_interaktive_welt_einstellungen':
+          return {
+            titel: 'Interaktive-Welt-Einstellungen löschen?',
+            beschreibung: `Zu „${name}“ werden Canvas-Einstellungen (Zoom, Item-Größe, Linien, Sichtbarkeitsfilter, Kampfwerte-Anzeige) und Element-Verankerungen zurückgesetzt. Karteninhalte und Hintergründe bleiben erhalten.`,
+            erfolg: `Interaktive-Welt-Einstellungen zu „${name}“ wurden zurückgesetzt.`,
+          };
         case 'wb_generatoren':
           return {
             titel: 'Weltenbau-Generatoren zurücksetzen?',
@@ -705,6 +711,17 @@ window.HTBAH_SEITEN.Einstellungen = {
           if (!window.HTBAH.loescheWeltenbauBereichFuerKampagne(p.kampagneId, 'interaktive_welt')) {
             ok = false;
             this.statusAnzeigen('Die interaktive Welt konnte nicht geleert werden.', 'danger');
+          }
+          break;
+        case 'wb_interaktive_welt_einstellungen':
+          if (
+            !window.HTBAH.loescheWeltenbauBereichFuerKampagne(
+              p.kampagneId,
+              'interaktive_welt_einstellungen',
+            )
+          ) {
+            ok = false;
+            this.statusAnzeigen('Die Interaktive-Welt-Einstellungen konnten nicht zurückgesetzt werden.', 'danger');
           }
           break;
         case 'wb_generatoren':

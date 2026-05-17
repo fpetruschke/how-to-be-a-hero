@@ -1104,7 +1104,7 @@ function loescheZufallstabellenListeFuerKampagne(kampagneId, listenSchluessel) {
 
 /**
  * @param {string} kampagneId
- * @param {'alles' | 'galerie' | 'interaktive_welt' | 'generatoren'} bereich
+ * @param {'alles' | 'galerie' | 'interaktive_welt' | 'interaktive_welt_einstellungen' | 'generatoren'} bereich
  */
 function loescheWeltenbauBereichFuerKampagne(kampagneId, bereich) {
   const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
@@ -1129,6 +1129,9 @@ function loescheWeltenbauBereichFuerKampagne(kampagneId, bereich) {
     wb.mapFreieNotizen = {};
     wb.mapFreiePfeile = {};
     wb.mapHintergruende = {};
+    wb.mapEinstellungen = {};
+    wb.mapElementLocks = {};
+  } else if (bereich === 'interaktive_welt_einstellungen') {
     wb.mapEinstellungen = {};
     wb.mapElementLocks = {};
   } else {
@@ -1663,6 +1666,8 @@ function normalisiereWeltenbauMapEinstellungen(roh) {
     const filter = einstellungen.sichtbarkeitsFilter && typeof einstellungen.sichtbarkeitsFilter === 'object'
       ? einstellungen.sichtbarkeitsFilter
       : {};
+    const kampfwerteAnzeigen =
+      typeof einstellungen.kampfwerteAnzeigen === 'boolean' ? einstellungen.kampfwerteAnzeigen : false;
     map[gruppeId] = {
       zoomScale,
       itemScale,
@@ -1670,6 +1675,7 @@ function normalisiereWeltenbauMapEinstellungen(roh) {
       edgeWidth,
       mapCenterX,
       mapCenterY,
+      kampfwerteAnzeigen,
       sichtbarkeitsFilter: {
         toteNpcsAnzeigen: filter.toteNpcsAnzeigen !== false,
         toteBestienAnzeigen: filter.toteBestienAnzeigen !== false,
@@ -1678,6 +1684,19 @@ function normalisiereWeltenbauMapEinstellungen(roh) {
     };
   });
   return map;
+}
+
+function weltenbauInteraktiveWeltEinstellungenExportDaten(wb) {
+  return {
+    mapEinstellungen: JSON.parse(JSON.stringify(wb.mapEinstellungen || {})),
+    mapElementLocks: JSON.parse(JSON.stringify(wb.mapElementLocks || {})),
+  };
+}
+
+function wendeWeltenbauInteraktiveWeltEinstellungenImport(wb, daten) {
+  const d = daten && typeof daten === 'object' ? daten : {};
+  wb.mapEinstellungen = normalisiereWeltenbauMapEinstellungen(d.mapEinstellungen);
+  wb.mapElementLocks = normalisiereWeltenbauMapElementLocks(d.mapElementLocks);
 }
 
 function normalisiereWeltenbauEinzelBildLayout(layout) {
@@ -2400,7 +2419,12 @@ function erstelleWeltenbauBereichExportPaket(kampagneId, bereich) {
   if (!kid || spielleiterKampagneIndexNachId(kid) < 0) {
     return null;
   }
-  if (bereich !== 'galerie' && bereich !== 'interaktive_welt' && bereich !== 'generatoren') {
+  if (
+    bereich !== 'galerie' &&
+    bereich !== 'interaktive_welt' &&
+    bereich !== 'interaktive_welt_einstellungen' &&
+    bereich !== 'generatoren'
+  ) {
     return null;
   }
   const wb = ladeWeltenbauZustand(kid);
@@ -2412,6 +2436,8 @@ function erstelleWeltenbauBereichExportPaket(kampagneId, bereich) {
       generatorUrls: JSON.parse(JSON.stringify(wb.generatorUrls || {})),
       generatorAufrufe: JSON.parse(JSON.stringify(wb.generatorAufrufe || {})),
     };
+  } else if (bereich === 'interaktive_welt_einstellungen') {
+    daten = weltenbauInteraktiveWeltEinstellungenExportDaten(wb);
   } else {
     daten = {
       mapLayouts: JSON.parse(JSON.stringify(wb.mapLayouts || {})),
@@ -2420,8 +2446,7 @@ function erstelleWeltenbauBereichExportPaket(kampagneId, bereich) {
       mapFreieNotizen: JSON.parse(JSON.stringify(wb.mapFreieNotizen || {})),
       mapFreiePfeile: JSON.parse(JSON.stringify(wb.mapFreiePfeile || {})),
       mapHintergruende: JSON.parse(JSON.stringify(wb.mapHintergruende || {})),
-      mapEinstellungen: JSON.parse(JSON.stringify(wb.mapEinstellungen || {})),
-      mapElementLocks: JSON.parse(JSON.stringify(wb.mapElementLocks || {})),
+      ...weltenbauInteraktiveWeltEinstellungenExportDaten(wb),
     };
   }
   return {
@@ -2446,7 +2471,12 @@ function importiereWeltenbauBereichPaket(zielKampagneId, roh) {
     return { ok: false, fehler: 'Ungültige Datei (Weltenbau-Bereich erwartet).' };
   }
   const bereich = roh.bereich;
-  if (bereich !== 'galerie' && bereich !== 'interaktive_welt' && bereich !== 'generatoren') {
+  if (
+    bereich !== 'galerie' &&
+    bereich !== 'interaktive_welt' &&
+    bereich !== 'interaktive_welt_einstellungen' &&
+    bereich !== 'generatoren'
+  ) {
     return { ok: false, fehler: 'Unbekannter Weltenbau-Bereich.' };
   }
   const d = roh.daten && typeof roh.daten === 'object' ? roh.daten : {};
@@ -2458,6 +2488,8 @@ function importiereWeltenbauBereichPaket(zielKampagneId, roh) {
   } else if (bereich === 'generatoren') {
     wb.generatorUrls = normalisiereWeltenbauGeneratorUrls(d.generatorUrls);
     wb.generatorAufrufe = d.generatorAufrufe && typeof d.generatorAufrufe === 'object' ? d.generatorAufrufe : {};
+  } else if (bereich === 'interaktive_welt_einstellungen') {
+    wendeWeltenbauInteraktiveWeltEinstellungenImport(wb, d);
   } else {
     wb.mapLayouts = d.mapLayouts && typeof d.mapLayouts === 'object' ? d.mapLayouts : {};
     wb.mapBildLayouts = normalisiereWeltenbauMapBildLayouts(d.mapBildLayouts);
@@ -2465,8 +2497,7 @@ function importiereWeltenbauBereichPaket(zielKampagneId, roh) {
     wb.mapFreieNotizen = normalisiereWeltenbauMapFreieNotizen(d.mapFreieNotizen);
     wb.mapFreiePfeile = normalisiereWeltenbauMapFreiePfeile(d.mapFreiePfeile);
     wb.mapHintergruende = normalisiereWeltenbauMapHintergruende(d.mapHintergruende);
-    wb.mapEinstellungen = normalisiereWeltenbauMapEinstellungen(d.mapEinstellungen);
-    wb.mapElementLocks = normalisiereWeltenbauMapElementLocks(d.mapElementLocks);
+    wendeWeltenbauInteraktiveWeltEinstellungenImport(wb, d);
   }
   speichereWeltenbauZustand(wb, ziel);
   return { ok: true };
@@ -3016,7 +3047,8 @@ function wendeBeispielLokalerSpeicherPaketAdditivAn(paket) {
         importiereWeltenbauKampagnePaket(kid, p);
       }
     } else if (meta.lsTyp === 'wb_bereich') {
-      if (neuAngelegteKampagnen.has(kid)) {
+      const wbBereich = typeof p.bereich === 'string' ? p.bereich : '';
+      if (wbBereich === 'interaktive_welt_einstellungen' || neuAngelegteKampagnen.has(kid)) {
         importiereWeltenbauBereichPaket(kid, p);
       }
     }

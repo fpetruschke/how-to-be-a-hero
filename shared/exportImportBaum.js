@@ -248,6 +248,14 @@ function baueKampagneKnoten(kampagne, opts) {
       }),
     );
   const kinder = [];
+  kinder.push(
+    blattKnoten(`ex:sl:teil:${kid}`, 'Kampagne (Name & Labels)', {
+      key: `htbah_export_ls:spielleiter_teil:${kid}`,
+      label: 'Kampagne (Name & Labels)',
+      lsTyp: 'spielleiter_teil',
+      kampagneId: kid,
+    }),
+  );
   if (gruppenCharKinder.length) {
     kinder.push(gruppenKnoten(`grp:sl:gruppe:${kid}`, 'Gruppen-Charaktere', gruppenCharKinder));
   }
@@ -293,12 +301,19 @@ function baueKampagneKnoten(kampagne, opts) {
       kampagneId: kid,
       weltenbauBereich: 'galerie',
     }),
-    blattKnoten(`ex:wb:${kid}:iw`, 'Interaktive Welt / Karten', {
+    blattKnoten(`ex:wb:${kid}:iw`, 'Interaktive Welt / Karten (inkl. Einstellungen)', {
       key: `htbah_export_ls:wb_bereich:${kid}:interaktive_welt`,
-      label: 'Interaktive Welt / Karten',
+      label: 'Interaktive Welt / Karten (inkl. Einstellungen)',
       lsTyp: 'wb_bereich',
       kampagneId: kid,
       weltenbauBereich: 'interaktive_welt',
+    }),
+    blattKnoten(`ex:wb:${kid}:iw-einst`, 'Interaktive Welt – Einstellungen', {
+      key: `htbah_export_ls:wb_bereich:${kid}:interaktive_welt_einstellungen`,
+      label: 'Interaktive Welt – Einstellungen',
+      lsTyp: 'wb_bereich',
+      kampagneId: kid,
+      weltenbauBereich: 'interaktive_welt_einstellungen',
     }),
     blattKnoten(`ex:wb:${kid}:gen`, 'Generatoren', {
       key: `htbah_export_ls:wb_bereich:${kid}:generatoren`,
