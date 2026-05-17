@@ -1801,6 +1801,13 @@ input::placeholder {
   cursor: grabbing;
 }
 
+.htbah-zeitmessung-badge__body {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
 .htbah-zeitmessung-badge__tap {
   flex: 1 1 auto;
   margin: 0;
@@ -1836,9 +1843,53 @@ input::placeholder {
   letter-spacing: 0.04em;
 }
 
-.htbah-zeitmessung-badge__pause {
+.htbah-zeitmessung-badge__pause-hint {
   font-weight: 600;
   color: var(--bs-warning);
+}
+
+.htbah-zeitmessung-badge__pause-hint--abgelaufen {
+  color: var(--bs-danger, #c0392b);
+}
+
+.htbah-zeitmessung-badge__ctrl {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid color-mix(in srgb, var(--primary-color) 22%, transparent);
+}
+
+.htbah-zeitmessung-badge__ctrl-btn {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 0.3rem;
+  min-width: 1.5rem;
+  border: none;
+  background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+  color: var(--text-color);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.htbah-zeitmessung-badge__ctrl-btn:hover {
+  background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+}
+
+.htbah-zeitmessung-badge__ctrl-btn:active {
+  filter: brightness(0.95);
+}
+
+.htbah-zeitmessung-badge__ctrl-btn--stop {
+  color: var(--bs-danger, #c0392b);
+}
+
+.htbah-zeitmessung-badge__ctrl-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 
 .htbah-zeitmessung-badge__zeit {
@@ -1847,6 +1898,10 @@ input::placeholder {
   font-weight: 600;
   letter-spacing: 0.06em;
   line-height: 1.1;
+}
+
+.htbah-zeitmessung-badge__zeit--warnung {
+  color: var(--bs-danger, #c0392b);
 }
 
 @media (min-width: 992px) {
@@ -1866,6 +1921,15 @@ input::placeholder {
     gap: 0.25rem;
   }
 
+  .htbah-zeitmessung-badge__ctrl-btn {
+    min-width: 2rem;
+    padding: 0 0.4rem;
+  }
+
+  .htbah-zeitmessung-badge__ctrl-icon {
+    font-size: 1.1rem;
+  }
+
   .htbah-zeitmessung-badge__meta {
     font-size: 1.05rem;
   }
@@ -1878,6 +1942,53 @@ input::placeholder {
 .htbah-zeitmessung-eingabe .form-control {
   font-variant-numeric: tabular-nums;
   text-align: center;
+}
+
+.htbah-zeitmessung-modal-anzeige {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.65rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--primary-color) 10%, var(--bs-body-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color) 28%, transparent);
+}
+
+.htbah-zeitmessung-modal-anzeige__meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  color: var(--secondary-color);
+}
+
+.htbah-zeitmessung-modal-anzeige__modus {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.htbah-zeitmessung-modal-anzeige__pause {
+  font-weight: 600;
+  color: var(--bs-warning);
+}
+
+.htbah-zeitmessung-modal-anzeige__zeit {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2rem, 8vw, 2.75rem);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  color: var(--text-color);
+}
+
+.htbah-zeitmessung-modal-anzeige__zeit--warnung {
+  color: var(--bs-danger, #c0392b);
 }
 
 .htbah-musik-modal-window.regelwerk-modal-window {

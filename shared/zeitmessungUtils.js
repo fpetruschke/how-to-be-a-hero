@@ -190,9 +190,97 @@ function htbahZeitmessungSpieleAbgelaufen(lautstaerkeOverride) {
   }
 }
 
+function htbahZeitmessungNormalisiereBadgePosition(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return null;
+  }
+  if (roh.mode === 'fixed' && typeof roh.left === 'number' && typeof roh.top === 'number') {
+    return { mode: 'fixed', left: roh.left, top: roh.top };
+  }
+  return null;
+}
+
+function htbahZeitmessungLeererKampagnenZustand() {
+  const ms = htbahZeitmessungMsAusTeilen(0, 5, 0);
+  return {
+    modus: 'timer',
+    status: 'bereit',
+    eingabeH: 0,
+    eingabeM: 5,
+    eingabeS: 0,
+    anzeigeMs: ms,
+    basisMs: 0,
+    zielMs: ms,
+    startWallMs: 0,
+    letzteKlickSekunde: -1,
+  };
+}
+
+function htbahZeitmessungNormalisiereKampagnenZustand(roh) {
+  const leer = htbahZeitmessungLeererKampagnenZustand();
+  if (!roh || typeof roh !== 'object') {
+    return leer;
+  }
+  const modus = roh.modus === 'stoppuhr' ? 'stoppuhr' : 'timer';
+  const status =
+    roh.status === 'laeuft' || roh.status === 'pausiert' || roh.status === 'abgelaufen'
+      ? roh.status
+      : 'bereit';
+  const eingabeH = htbahZeitmessungBegrenzeZahl(roh.eingabeH, 0, 99, leer.eingabeH);
+  const eingabeM = htbahZeitmessungBegrenzeZahl(roh.eingabeM, 0, 59, leer.eingabeM);
+  const eingabeS = htbahZeitmessungBegrenzeZahl(roh.eingabeS, 0, 59, leer.eingabeS);
+  const eingabeMs = htbahZeitmessungMsAusTeilen(eingabeH, eingabeM, eingabeS);
+  let anzeigeMs =
+    typeof roh.anzeigeMs === 'number' && Number.isFinite(roh.anzeigeMs)
+      ? Math.max(0, Math.round(roh.anzeigeMs))
+      : eingabeMs;
+  let basisMs =
+    typeof roh.basisMs === 'number' && Number.isFinite(roh.basisMs)
+      ? Math.max(0, Math.round(roh.basisMs))
+      : 0;
+  let zielMs =
+    typeof roh.zielMs === 'number' && Number.isFinite(roh.zielMs)
+      ? Math.max(0, Math.round(roh.zielMs))
+      : eingabeMs;
+  const startWallMs =
+    typeof roh.startWallMs === 'number' && Number.isFinite(roh.startWallMs) && roh.startWallMs > 0
+      ? Math.round(roh.startWallMs)
+      : 0;
+  const letzteKlickSekunde =
+    typeof roh.letzteKlickSekunde === 'number' && Number.isFinite(roh.letzteKlickSekunde)
+      ? Math.round(roh.letzteKlickSekunde)
+      : -1;
+  if (status === 'bereit' && modus === 'timer') {
+    anzeigeMs = eingabeMs;
+    zielMs = eingabeMs;
+    basisMs = 0;
+  }
+  if (status === 'abgelaufen') {
+    anzeigeMs = 0;
+    zielMs = 0;
+    basisMs = 0;
+    startWallMs = 0;
+  }
+  return {
+    modus,
+    status,
+    eingabeH,
+    eingabeM,
+    eingabeS,
+    anzeigeMs,
+    basisMs,
+    zielMs,
+    startWallMs,
+    letzteKlickSekunde,
+  };
+}
+
 window.HTBAH_SHARED.ZeitmessungUtils = {
   DEFAULTS: ZEITMESSUNG_DEFAULTS,
   normalisiereProfil: htbahZeitmessungNormalisiereProfil,
+  normalisiereKampagnenZustand: htbahZeitmessungNormalisiereKampagnenZustand,
+  leererKampagnenZustand: htbahZeitmessungLeererKampagnenZustand,
+  normalisiereBadgePosition: htbahZeitmessungNormalisiereBadgePosition,
   formatHhMmSs: htbahZeitmessungFormatHhMmSs,
   msAusTeilen: htbahZeitmessungMsAusTeilen,
   spieleKlick: htbahZeitmessungSpieleKlick,

@@ -992,6 +992,8 @@ window.HTBAH_SEITEN.Einstellungen = {
             pak = window.HTBAH.erstelleSpielleiterAbenteuerbuchExportPaket(kid);
           } else if (bereich.lsTyp === 'sl_atmosphaere') {
             pak = window.HTBAH.erstelleSpielleiterAtmosphaereExportPaket(kid);
+          } else if (bereich.lsTyp === 'sl_zeitmessung') {
+            pak = window.HTBAH.erstelleSpielleiterZeitmessungExportPaket(kid);
           } else if (bereich.lsTyp === 'ztf_kampagne') {
             pak = window.HTBAH.erstelleZufallstabellenKampagneExportPaket(kid);
           } else if (bereich.lsTyp === 'ztf_pantheon') {
@@ -1348,6 +1350,9 @@ window.HTBAH_SEITEN.Einstellungen = {
           } else if (tail.startsWith('sl_atmosphaere:')) {
             const kid = tail.slice('sl_atmosphaere:'.length);
             r = window.HTBAH.importiereSpielleiterAtmosphaerePaket(kid, p);
+          } else if (tail.startsWith('sl_zeitmessung:')) {
+            const kid = tail.slice('sl_zeitmessung:'.length);
+            r = window.HTBAH.importiereSpielleiterZeitmessungPaket(kid, p);
           } else if (tail.startsWith('ztf_kampagne:')) {
             const kid = tail.slice('ztf_kampagne:'.length);
             r = window.HTBAH.importiereZufallstabellenKampagnePaket(kid, p);
@@ -1443,7 +1448,8 @@ window.HTBAH_SEITEN.Einstellungen = {
             b.key === 'htbah_weltenbau' ||
             b.lsTyp === 'sl_mitglied' ||
             b.lsTyp === 'sl_abenteuerbuch' ||
-            b.lsTyp === 'sl_atmosphaere',
+            b.lsTyp === 'sl_atmosphaere' ||
+            b.lsTyp === 'sl_zeitmessung',
         )
       ) {
         this.kampagnenCacheTick += 1;

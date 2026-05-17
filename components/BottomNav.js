@@ -70,6 +70,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       zeitmessungStartPerformance: 0,
       zeitmessungTickIntervalId: null,
       zeitmessungLetzteKlickSekunde: -1,
+      _zeitmessungGeladeneKampagneId: null,
+      _zeitmessungSpeichernTimer: null,
+      _zeitmessungTickPersistZaehler: 0,
       wuerfelBeutelOffen: false,
       wuerfelBeutelFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       wuerfelBeutelAusloeserElement: null,
@@ -84,10 +87,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
   created() {
     this.synchronisiereKampagnenbasierteDaten();
     this.ladeWuerfelBeutelFenster();
-    this.zeitmessungTimerEingabeGeaendert();
-    if (window.HTBAH && typeof window.HTBAH.ladeZeitmessungBadgePosition === 'function') {
-      this.zeitmessungBadgePos = window.HTBAH.ladeZeitmessungBadgePosition();
-    }
   },
   computed: {
     ergebnisSumme() {
@@ -241,6 +240,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     zeitmessungPausiert() {
       return this.zeitmessungStatus === 'pausiert';
     },
+    zeitmessungAbgelaufen() {
+      return this.zeitmessungStatus === 'abgelaufen';
+    },
     zeitmessungStartPauseLabel() {
       if (this.zeitmessungLaeuft) {
         return 'Pause';
@@ -254,11 +256,33 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       return (
         this.zeitmessungModus === 'timer' &&
         !this.zeitmessungLaeuft &&
-        !this.zeitmessungPausiert
+        !this.zeitmessungPausiert &&
+        !this.zeitmessungAbgelaufen
       );
     },
     zeitmessungOverlaySichtbar() {
-      return this.zeitmessungLaeuft || this.zeitmessungPausiert;
+      return this.zeitmessungLaeuft || this.zeitmessungPausiert || this.zeitmessungAbgelaufen;
+    },
+    zeitmessungCountdownProfil() {
+      return window.HTBAH && typeof window.HTBAH.ladeZeitmessungProfil === 'function'
+        ? window.HTBAH.ladeZeitmessungProfil()
+        : { countdownAbSekunde: 10, klickAktiv: true };
+    },
+    zeitmessungAnzeigeWarnungAktiv() {
+      if (this.zeitmessungModus !== 'timer') {
+        return false;
+      }
+      const ab = Math.max(0, Math.round(Number(this.zeitmessungCountdownProfil.countdownAbSekunde) || 0));
+      if (ab <= 0) {
+        return false;
+      }
+      if (this.zeitmessungAbgelaufen) {
+        return true;
+      }
+      if (!this.zeitmessungLaeuft && !this.zeitmessungPausiert) {
+        return false;
+      }
+      return Math.floor(this.zeitmessungAnzeigeMs / 1000) <= ab;
     },
     zeitmessungBadgeCombinedStyle() {
       const o = {};
@@ -272,6 +296,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     zeitmessungOverlayModusLabel() {
       return this.zeitmessungModus === 'timer' ? 'Timer' : 'Stoppuhr';
+    },
+    zeitmessungBadgePauseAriaLabel() {
+      return this.zeitmessungLaeuft ? 'Pause' : 'Fortsetzen';
+    },
+    zeitmessungBadgePauseIcon() {
+      return this.zeitmessungLaeuft ? 'pause' : 'play_arrow';
     },
     musikNavAktiv() {
       return this.musikboardOffen;
@@ -388,7 +418,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.sicherheitsmechanismenModalOffen = false;
       }
     },
-    aktiveKampagneId() {
+    aktiveKampagneId(neu, alt) {
+      const altId = typeof alt === 'string' && alt.trim() ? alt.trim() : '';
+      if (altId && altId !== (typeof neu === 'string' ? neu.trim() : '')) {
+        this.zeitmessungPersistiereFuerKampagne(altId);
+      }
       this.synchronisiereKampagnenbasierteDaten();
     },
     hatAktiveKampagne(neu) {
@@ -465,7 +499,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           }
         });
       } else {
-        this.zeitmessungStoppeTicker();
         window.removeEventListener('resize', this.wuerfelBeutelBeiViewportResize);
         window.removeEventListener('keydown', this.onWuerfelBeutelKeydown);
         this.wuerfelBeutelBeendeZiehen();
@@ -525,6 +558,8 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.diceModulLadenPromise = null;
     this.abbrecheAnstehenden3dWuerfelSound();
     this.zeitmessungStoppeTicker();
+    this.zeitmessungPersistiereAktuelleKampagne();
+    this.zeitmessungAbbrecheSpeichernTimer();
     if (this.begegnungOpenRequestTimeoutId != null) {
       window.clearTimeout(this.begegnungOpenRequestTimeoutId);
       this.begegnungOpenRequestTimeoutId = null;
@@ -582,7 +617,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     onHtbahKampagneZufallstabellenGeaendert(ev) {
       const d = ev && ev.detail;
-      if (!d || d.art !== 'zufallstabellen') {
+      if (!d || typeof d.art !== 'string') {
         return;
       }
       const kid = typeof d.kampagneId === 'string' ? d.kampagneId.trim() : '';
@@ -590,7 +625,13 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       if (kid && aktiv && kid !== aktiv) {
         return;
       }
-      this.zufallstabellenSpeicherTick += 1;
+      if (d.art === 'zufallstabellen') {
+        this.zufallstabellenSpeicherTick += 1;
+        return;
+      }
+      if (d.art === 'zeitmessung' && aktiv && kid === aktiv) {
+        this.zeitmessungLadeAusKampagne(aktiv);
+      }
     },
     speichereDiceFarbwahl() {
       window.HTBAH.setzeWuerfelAnzeigeProfil({
@@ -890,12 +931,21 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     synchronisiereKampagnenbasierteDaten() {
       const id = this.aktiveKampagneId;
       if (!id) {
+        this.zeitmessungPersistiereAktuelleKampagne();
         this.atmosphaere = {};
         this.badgePos = null;
+        this.zeitmessungSetzeAufStandardZustand();
         return;
+      }
+      if (
+        this._zeitmessungGeladeneKampagneId &&
+        this._zeitmessungGeladeneKampagneId !== id
+      ) {
+        this.zeitmessungPersistiereFuerKampagne(this._zeitmessungGeladeneKampagneId);
       }
       this.atmosphaere = window.HTBAH.ladeKampagnenAtmosphaereZustand(id);
       this.badgePos = window.HTBAH.ladeKampagnenAtmosphaereBadgePosition(id);
+      this.zeitmessungLadeAusKampagne(id);
     },
     speichereAtmosphaere() {
       const id = this.aktiveKampagneId;
@@ -1087,6 +1137,149 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         /* Optional: Speicher gesperrt */
       }
     },
+    zeitmessungAbbrecheSpeichernTimer() {
+      if (this._zeitmessungSpeichernTimer != null) {
+        window.clearTimeout(this._zeitmessungSpeichernTimer);
+        this._zeitmessungSpeichernTimer = null;
+      }
+    },
+    zeitmessungPersistiereDebounced() {
+      this.zeitmessungAbbrecheSpeichernTimer();
+      this._zeitmessungSpeichernTimer = window.setTimeout(() => {
+        this._zeitmessungSpeichernTimer = null;
+        this.zeitmessungPersistiereAktuelleKampagne();
+      }, 350);
+    },
+    zeitmessungSegmentFuerPersistenzAktualisieren() {
+      if (this.zeitmessungStatus !== 'laeuft') {
+        return;
+      }
+      const jetzt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const vergangen = Math.max(0, jetzt - this.zeitmessungStartPerformance);
+      if (this.zeitmessungModus === 'stoppuhr') {
+        this.zeitmessungBasisMs += vergangen;
+        this.zeitmessungAnzeigeMs = this.zeitmessungBasisMs;
+      } else {
+        const rest = Math.max(0, this.zeitmessungZielMs - vergangen);
+        this.zeitmessungZielMs = rest;
+        this.zeitmessungAnzeigeMs = rest;
+      }
+      this.zeitmessungStartPerformance = jetzt;
+    },
+    zeitmessungErzeugeGespeichertenZustand() {
+      if (this.zeitmessungStatus === 'laeuft') {
+        this.zeitmessungSegmentFuerPersistenzAktualisieren();
+      }
+      return {
+        modus: this.zeitmessungModus,
+        status: this.zeitmessungStatus,
+        eingabeH: this.zeitmessungEingabeH,
+        eingabeM: this.zeitmessungEingabeM,
+        eingabeS: this.zeitmessungEingabeS,
+        anzeigeMs: this.zeitmessungAnzeigeMs,
+        basisMs: this.zeitmessungBasisMs,
+        zielMs: this.zeitmessungZielMs,
+        startWallMs: this.zeitmessungStatus === 'laeuft' ? Date.now() : 0,
+        letzteKlickSekunde: this.zeitmessungLetzteKlickSekunde,
+      };
+    },
+    zeitmessungPersistiereFuerKampagne(kampagneId) {
+      const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+      if (!kid || !window.HTBAH || typeof window.HTBAH.speichereKampagnenZeitmessungZustand !== 'function') {
+        return;
+      }
+      if (this._zeitmessungGeladeneKampagneId !== kid) {
+        return;
+      }
+      window.HTBAH.speichereKampagnenZeitmessungZustand(kid, this.zeitmessungErzeugeGespeichertenZustand());
+    },
+    zeitmessungPersistiereAktuelleKampagne() {
+      const kid =
+        this._zeitmessungGeladeneKampagneId ||
+        (typeof this.aktiveKampagneId === 'string' ? this.aktiveKampagneId.trim() : '');
+      if (!kid) {
+        return;
+      }
+      this.zeitmessungPersistiereFuerKampagne(kid);
+    },
+    zeitmessungSetzeAufStandardZustand() {
+      this.zeitmessungStoppeTicker();
+      this._zeitmessungGeladeneKampagneId = null;
+      this._zeitmessungTickPersistZaehler = 0;
+      const ZU = HTBAH_ZEITMESSUNG;
+      const leer =
+        ZU && typeof ZU.leererKampagnenZustand === 'function'
+          ? ZU.leererKampagnenZustand()
+          : { modus: 'timer', status: 'bereit', eingabeH: 0, eingabeM: 5, eingabeS: 0, anzeigeMs: 300000, zielMs: 300000 };
+      this.zeitmessungWendeGespeichertenZustandAn(leer, { badgePos: null });
+    },
+    zeitmessungLadeAusKampagne(kampagneId) {
+      const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+      if (!kid || !window.HTBAH || typeof window.HTBAH.ladeKampagnenZeitmessungZustand !== 'function') {
+        this.zeitmessungSetzeAufStandardZustand();
+        return;
+      }
+      const zustand = window.HTBAH.ladeKampagnenZeitmessungZustand(kid);
+      const badgePos =
+        typeof window.HTBAH.ladeKampagnenZeitmessungBadgePosition === 'function'
+          ? window.HTBAH.ladeKampagnenZeitmessungBadgePosition(kid)
+          : null;
+      this.zeitmessungWendeGespeichertenZustandAn(zustand, { badgePos });
+      this._zeitmessungGeladeneKampagneId = kid;
+    },
+    zeitmessungWendeGespeichertenZustandAn(zustand, opts) {
+      const o = opts && typeof opts === 'object' ? opts : {};
+      this.zeitmessungStoppeTicker();
+      this._zeitmessungTickPersistZaehler = 0;
+      const z =
+        HTBAH_ZEITMESSUNG && typeof HTBAH_ZEITMESSUNG.normalisiereKampagnenZustand === 'function'
+          ? HTBAH_ZEITMESSUNG.normalisiereKampagnenZustand(zustand)
+          : zustand && typeof zustand === 'object'
+            ? zustand
+            : null;
+      if (!z) {
+        return;
+      }
+      this.zeitmessungModus = z.modus === 'stoppuhr' ? 'stoppuhr' : 'timer';
+      this.zeitmessungEingabeH = z.eingabeH;
+      this.zeitmessungEingabeM = z.eingabeM;
+      this.zeitmessungEingabeS = z.eingabeS;
+      this.zeitmessungBasisMs = z.basisMs;
+      this.zeitmessungZielMs = z.zielMs;
+      this.zeitmessungLetzteKlickSekunde = z.letzteKlickSekunde;
+      this.zeitmessungStatus = z.status;
+      this.zeitmessungAnzeigeMs = z.anzeigeMs;
+      if (Object.prototype.hasOwnProperty.call(o, 'badgePos')) {
+        this.zeitmessungBadgePos = o.badgePos;
+      }
+      if (z.status === 'laeuft' && z.startWallMs > 0) {
+        const vergangen = Math.max(0, Date.now() - z.startWallMs);
+        const perfJetzt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (this.zeitmessungModus === 'stoppuhr') {
+          this.zeitmessungAnzeigeMs = z.basisMs + vergangen;
+          this.zeitmessungBasisMs = z.basisMs;
+          this.zeitmessungStartPerformance = perfJetzt - vergangen;
+        } else {
+          const rest = Math.max(0, z.zielMs - vergangen);
+          if (rest <= 0) {
+            this.zeitmessungStatus = 'abgelaufen';
+            this.zeitmessungAnzeigeMs = 0;
+            this.zeitmessungZielMs = 0;
+            this.zeitmessungBasisMs = 0;
+            this.zeitmessungLetzteKlickSekunde = -1;
+            return;
+          }
+          this.zeitmessungZielMs = rest;
+          this.zeitmessungAnzeigeMs = rest;
+          this.zeitmessungStartPerformance = perfJetzt - vergangen;
+        }
+        this.zeitmessungStarteTicker();
+        return;
+      }
+      if (z.status === 'bereit' && this.zeitmessungModus === 'timer') {
+        this.zeitmessungTimerEingabeGeaendert();
+      }
+    },
     zeitmessungMsAusEingabe() {
       if (HTBAH_ZEITMESSUNG && typeof HTBAH_ZEITMESSUNG.msAusTeilen === 'function') {
         return HTBAH_ZEITMESSUNG.msAusTeilen(
@@ -1124,6 +1317,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.zeitmessungBasisMs = 0;
         this.zeitmessungZielMs = ms;
       }
+      this.zeitmessungPersistiereDebounced();
     },
     zeitmessungZuruecksetzen() {
       this.zeitmessungStoppeTicker();
@@ -1139,6 +1333,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.zeitmessungBasisMs = 0;
         this.zeitmessungZielMs = ms;
       }
+      this.zeitmessungPersistiereDebounced();
     },
     zeitmessungAktualisiereAnzeige() {
       const profil =
@@ -1168,9 +1363,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const restSek = Math.floor(rest / 1000);
       if (restSek <= 0) {
         this.zeitmessungStoppeTicker();
-        this.zeitmessungStatus = 'bereit';
+        this.zeitmessungStatus = 'abgelaufen';
         this.zeitmessungAnzeigeMs = 0;
+        this.zeitmessungZielMs = 0;
         this.zeitmessungLetzteKlickSekunde = -1;
+        this.zeitmessungPersistiereDebounced();
         if (profil.klickAktiv) {
           window.HTBAH?.spieleZeitmessungAbgelaufen?.();
         }
@@ -1186,6 +1383,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       }
     },
     zeitmessungStartPause() {
+      if (this.zeitmessungAbgelaufen) {
+        return;
+      }
       const jetzt = typeof performance !== 'undefined' ? performance.now() : Date.now();
       if (this.zeitmessungLaeuft) {
         this.zeitmessungStoppeTicker();
@@ -1199,12 +1399,14 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           this.zeitmessungAnzeigeMs = rest;
           this.zeitmessungZielMs = rest;
         }
+        this.zeitmessungPersistiereDebounced();
         return;
       }
       if (this.zeitmessungPausiert) {
         this.zeitmessungStatus = 'laeuft';
         this.zeitmessungStartPerformance = jetzt;
         this.zeitmessungStarteTicker();
+        this.zeitmessungPersistiereDebounced();
         return;
       }
       if (this.zeitmessungModus === 'timer') {
@@ -1224,20 +1426,33 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.zeitmessungLetzteKlickSekunde = -1;
       this.zeitmessungStartPerformance = jetzt;
       this.zeitmessungStarteTicker();
+      this.zeitmessungPersistiereDebounced();
     },
     zeitmessungStarteTicker() {
       this.zeitmessungStoppeTicker();
+      this._zeitmessungTickPersistZaehler = 0;
       this.zeitmessungTickIntervalId = window.setInterval(() => {
         this.zeitmessungAktualisiereAnzeige();
+        this._zeitmessungTickPersistZaehler += 1;
+        if (this._zeitmessungTickPersistZaehler >= 25) {
+          this._zeitmessungTickPersistZaehler = 0;
+          this.zeitmessungPersistiereDebounced();
+        }
       }, 200);
     },
     zeitmessungTimerEingabeGeaendert() {
-      if (this.zeitmessungModus !== 'timer' || this.zeitmessungLaeuft || this.zeitmessungPausiert) {
+      if (
+        this.zeitmessungModus !== 'timer' ||
+        this.zeitmessungLaeuft ||
+        this.zeitmessungPausiert ||
+        this.zeitmessungAbgelaufen
+      ) {
         return;
       }
       const ms = this.zeitmessungMsAusEingabe();
       this.zeitmessungAnzeigeMs = ms;
       this.zeitmessungZielMs = ms;
+      this.zeitmessungPersistiereDebounced();
     },
     wuerfelModalOeffnen(tab) {
       const erlaubteTabs = ['wuerfel', 'zeitmessung', 'atmosphaere', 'begegnung'];
@@ -1608,7 +1823,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     zeitmessungBadgeOeffnen() {
       this.wuerfelModalOeffnen('zeitmessung');
     },
-    zeitmessungBadgeZiehenCleanup() {
+    zeitmessungBadgeEntferneZiehenListener() {
       if (this._zeitmessungBadgeDragMoveHandler) {
         document.removeEventListener('pointermove', this._zeitmessungBadgeDragMoveHandler);
         this._zeitmessungBadgeDragMoveHandler = null;
@@ -1618,6 +1833,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         document.removeEventListener('pointercancel', this._zeitmessungBadgeDragUpHandler);
         this._zeitmessungBadgeDragUpHandler = null;
       }
+    },
+    zeitmessungBadgeZiehenCleanup() {
+      this.zeitmessungBadgeEntferneZiehenListener();
       this.zeitmessungBadgeZiehenEnd();
     },
     zeitmessungBadgeZiehenStart(e) {
@@ -1638,7 +1856,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         baseLeft: r.left,
         baseTop: r.top,
       };
-      this.zeitmessungBadgeZiehenCleanup();
+      this.zeitmessungBadgeEntferneZiehenListener();
       this._zeitmessungBadgeDragMoveHandler = (ev) => this.zeitmessungBadgeZiehenMove(ev);
       this._zeitmessungBadgeDragUpHandler = () => this.zeitmessungBadgeZiehenCleanup();
       document.addEventListener('pointermove', this._zeitmessungBadgeDragMoveHandler, { passive: false });
@@ -1680,7 +1898,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         }
       }
       this._zeitmessungBadgeDrag = null;
-      if (window.HTBAH && typeof window.HTBAH.speichereZeitmessungBadgePosition === 'function') {
+      const id = this.aktiveKampagneId;
+      if (id && window.HTBAH && typeof window.HTBAH.speichereKampagnenZeitmessungBadgePosition === 'function') {
+        window.HTBAH.speichereKampagnenZeitmessungBadgePosition(id, this.zeitmessungBadgePos);
+      } else if (window.HTBAH && typeof window.HTBAH.speichereZeitmessungBadgePosition === 'function') {
         window.HTBAH.speichereZeitmessungBadgePosition(this.zeitmessungBadgePos);
       }
     },
@@ -1704,7 +1925,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         kontext.speichern();
       }
     },
-    badgeZiehenCleanup() {
+    badgeEntferneZiehenListener() {
       if (this._badgeDragMoveHandler) {
         document.removeEventListener('pointermove', this._badgeDragMoveHandler);
         this._badgeDragMoveHandler = null;
@@ -1714,6 +1935,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         document.removeEventListener('pointercancel', this._badgeDragUpHandler);
         this._badgeDragUpHandler = null;
       }
+    },
+    badgeZiehenCleanup() {
+      this.badgeEntferneZiehenListener();
       this.badgeZiehenEnd();
     },
     badgeZiehenStart(e) {
@@ -1734,7 +1958,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         baseLeft: r.left,
         baseTop: r.top,
       };
-      this.badgeZiehenCleanup();
+      this.badgeEntferneZiehenListener();
       this._badgeDragMoveHandler = (ev) => this.badgeZiehenMove(ev);
       this._badgeDragUpHandler = () => this.badgeZiehenCleanup();
       document.addEventListener('pointermove', this._badgeDragMoveHandler, { passive: false });
@@ -2309,19 +2533,51 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           @pointerdown="zeitmessungBadgeZiehenStart">
           ⠿
         </div>
-        <button
-          type="button"
-          class="htbah-zeitmessung-badge__tap"
-          title="Zeitmessung (Würfelbeutel)"
-          @click="zeitmessungBadgeOeffnen">
-          <span class="htbah-zeitmessung-badge__meta">
-            <span class="htbah-zeitmessung-badge__modus">{{ zeitmessungOverlayModusLabel }}</span>
-            <span v-if="zeitmessungPausiert" class="htbah-zeitmessung-badge__pause">Pause</span>
-          </span>
-          <span class="htbah-zeitmessung-badge__zeit" aria-live="polite" aria-atomic="true">
-            {{ zeitmessungAnzeigeText }}
-          </span>
-        </button>
+        <div class="htbah-zeitmessung-badge__body">
+          <button
+            type="button"
+            class="htbah-zeitmessung-badge__tap"
+            title="Zeitmessung (Würfelbeutel)"
+            @click="zeitmessungBadgeOeffnen">
+            <span class="htbah-zeitmessung-badge__meta">
+              <span class="htbah-zeitmessung-badge__modus">{{ zeitmessungOverlayModusLabel }}</span>
+              <span v-if="zeitmessungPausiert" class="htbah-zeitmessung-badge__pause-hint">Pausiert</span>
+              <span
+                v-else-if="zeitmessungAbgelaufen"
+                class="htbah-zeitmessung-badge__pause-hint htbah-zeitmessung-badge__pause-hint--abgelaufen">
+                Abgelaufen
+              </span>
+            </span>
+            <span
+              class="htbah-zeitmessung-badge__zeit"
+              :class="{ 'htbah-zeitmessung-badge__zeit--warnung': zeitmessungAnzeigeWarnungAktiv }"
+              aria-live="polite"
+              aria-atomic="true">
+              {{ zeitmessungAnzeigeText }}
+            </span>
+          </button>
+          <div class="htbah-zeitmessung-badge__ctrl" role="group" aria-label="Zeitmessung steuern">
+            <button
+              v-if="!zeitmessungAbgelaufen"
+              type="button"
+              class="htbah-zeitmessung-badge__ctrl-btn"
+              :title="zeitmessungBadgePauseAriaLabel"
+              :aria-label="zeitmessungBadgePauseAriaLabel"
+              @click.stop="zeitmessungStartPause">
+              <span
+                class="material-symbols-outlined htbah-zeitmessung-badge__ctrl-icon"
+                aria-hidden="true">{{ zeitmessungBadgePauseIcon }}</span>
+            </button>
+            <button
+              type="button"
+              class="htbah-zeitmessung-badge__ctrl-btn htbah-zeitmessung-badge__ctrl-btn--stop"
+              title="Stopp"
+              aria-label="Stopp"
+              @click.stop="zeitmessungZuruecksetzen">
+              <span class="material-symbols-outlined htbah-zeitmessung-badge__ctrl-icon" aria-hidden="true">stop</span>
+            </button>
+          </div>
+        </div>
       </div>
     </teleport>
 
@@ -2507,7 +2763,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     type="button"
                     class="btn"
                     :class="zeitmessungModus === 'timer' ? 'btn-primary' : 'btn-outline-primary'"
-                    :disabled="zeitmessungLaeuft || zeitmessungPausiert"
+                    :disabled="zeitmessungLaeuft || zeitmessungPausiert || zeitmessungAbgelaufen"
                     @click="zeitmessungSetzeModus('timer')">
                     Timer
                   </button>
@@ -2515,7 +2771,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     type="button"
                     class="btn"
                     :class="zeitmessungModus === 'stoppuhr' ? 'btn-primary' : 'btn-outline-primary'"
-                    :disabled="zeitmessungLaeuft || zeitmessungPausiert"
+                    :disabled="zeitmessungLaeuft || zeitmessungPausiert || zeitmessungAbgelaufen"
                     @click="zeitmessungSetzeModus('stoppuhr')">
                     Stoppuhr
                   </button>
@@ -2568,10 +2824,28 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                   </div>
                 </div>
 
+                <div
+                  v-if="zeitmessungOverlaySichtbar"
+                  class="htbah-zeitmessung-modal-anzeige mb-3"
+                  aria-live="polite"
+                  aria-atomic="true">
+                  <span class="htbah-zeitmessung-modal-anzeige__meta">
+                    <span class="htbah-zeitmessung-modal-anzeige__modus">{{ zeitmessungOverlayModusLabel }}</span>
+                    <span v-if="zeitmessungPausiert" class="htbah-zeitmessung-modal-anzeige__pause">Pause</span>
+                    <span v-else-if="zeitmessungAbgelaufen" class="htbah-zeitmessung-modal-anzeige__pause">Abgelaufen</span>
+                  </span>
+                  <span
+                    class="htbah-zeitmessung-modal-anzeige__zeit"
+                    :class="{ 'htbah-zeitmessung-modal-anzeige__zeit--warnung': zeitmessungAnzeigeWarnungAktiv }">
+                    {{ zeitmessungAnzeigeText }}
+                  </span>
+                </div>
+
                 <div class="d-flex flex-wrap gap-2 mb-2">
                   <button
                     type="button"
                     class="btn btn-primary flex-grow-1"
+                    :disabled="zeitmessungAbgelaufen"
                     @click="zeitmessungStartPause">
                     {{ zeitmessungStartPauseLabel }}
                   </button>
@@ -2584,7 +2858,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                   </button>
                 </div>
                 <p class="small text-body-secondary mb-0">
-                  Während Timer oder Stoppuhr laufen, erscheint die Uhr als schwebendes Overlay (wie das
+                  Während Timer oder Stoppuhr laufen, erscheint die Uhr zusätzlich als schwebendes Overlay (wie das
                   Wetter-Badge). Klick-Töne stellst Du unter
                   <router-link to="/einstellungen">Einstellungen</router-link>
                   ein.

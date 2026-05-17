@@ -239,6 +239,15 @@ function normalisiereSpielleiterKampagne(g) {
     typeof g.abenteuerbuchHtml === 'string' ? g.abenteuerbuchHtml : '';
   const atmosphaere = normalisiereAtmosphaereZustand(g.atmosphaere);
   const atmosphaereBadgePos = normalisiereAtmosphaereBadgePosition(g.atmosphaereBadgePos);
+  const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
+  const zeitmessung = ZU
+    ? ZU.normalisiereKampagnenZustand(g.zeitmessung)
+    : g.zeitmessung && typeof g.zeitmessung === 'object'
+      ? g.zeitmessung
+      : null;
+  const zeitmessungBadgePos = ZU
+    ? ZU.normalisiereBadgePosition(g.zeitmessungBadgePos)
+    : normalisiereAtmosphaereBadgePosition(g.zeitmessungBadgePos);
   return {
     id: typeof g.id === 'string' && g.id ? g.id : neueEntropieId(),
     name: typeof g.name === 'string' && g.name.trim() ? g.name.trim() : 'Kampagne',
@@ -246,6 +255,8 @@ function normalisiereSpielleiterKampagne(g) {
     abenteuerbuchHtml,
     atmosphaere,
     atmosphaereBadgePos,
+    zeitmessung,
+    zeitmessungBadgePos,
   };
 }
 
@@ -1253,11 +1264,96 @@ function speichereKampagnenAtmosphaereBadgePosition(kampagneId, pos) {
   });
 }
 
-function ladeZeitmessungBadgePosition() {
+function normalisiereKampagnenZeitmessungZustand(roh) {
+  const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
+  if (ZU && typeof ZU.normalisiereKampagnenZustand === 'function') {
+    return ZU.normalisiereKampagnenZustand(roh);
+  }
+  return roh && typeof roh === 'object' ? roh : null;
+}
+
+function normalisiereKampagnenZeitmessungBadgePosition(roh) {
+  const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
+  if (ZU && typeof ZU.normalisiereBadgePosition === 'function') {
+    return ZU.normalisiereBadgePosition(roh);
+  }
+  return normalisiereAtmosphaereBadgePosition(roh);
+}
+
+function migriereGlobaleZeitmessungBadgePosZuKampagne(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return null;
+  }
+  const kampagne = findeKampagneById(ladeSpielleiterZustand(), kid);
+  if (!kampagne) {
+    return null;
+  }
+  const vorhanden = normalisiereKampagnenZeitmessungBadgePosition(kampagne.zeitmessungBadgePos);
+  if (vorhanden) {
+    return vorhanden;
+  }
   try {
     const roh = htbahSpeicher.leseText(SPEICHER_KEY_ZEITMESSUNG_BADGE_POS, null);
     if (roh && String(roh).trim().startsWith('{')) {
-      return normalisiereAtmosphaereBadgePosition(JSON.parse(roh));
+      const global = normalisiereKampagnenZeitmessungBadgePosition(JSON.parse(roh));
+      if (global) {
+        speichereKampagnenZeitmessungBadgePosition(kid, global);
+        try {
+          htbahSpeicher.loescheKey(SPEICHER_KEY_ZEITMESSUNG_BADGE_POS);
+        } catch {
+          /* optional */
+        }
+        return global;
+      }
+    }
+  } catch {
+    /* defektes JSON */
+  }
+  return null;
+}
+
+function ladeKampagnenZeitmessungZustand(kampagneId) {
+  const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
+  const leer =
+    ZU && typeof ZU.leererKampagnenZustand === 'function'
+      ? ZU.leererKampagnenZustand()
+      : { modus: 'timer', status: 'bereit', eingabeH: 0, eingabeM: 5, eingabeS: 0 };
+  const kampagne = findeKampagneById(ladeSpielleiterZustand(), kampagneId);
+  return normalisiereKampagnenZeitmessungZustand(kampagne && kampagne.zeitmessung) || leer;
+}
+
+function speichereKampagnenZeitmessungZustand(kampagneId, zustand) {
+  return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
+    kampagne.zeitmessung = normalisiereKampagnenZeitmessungZustand(zustand);
+  });
+}
+
+function ladeKampagnenZeitmessungBadgePosition(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return null;
+  }
+  migriereGlobaleZeitmessungBadgePosZuKampagne(kid);
+  const kampagne = findeKampagneById(ladeSpielleiterZustand(), kid);
+  return normalisiereKampagnenZeitmessungBadgePosition(kampagne && kampagne.zeitmessungBadgePos);
+}
+
+function speichereKampagnenZeitmessungBadgePosition(kampagneId, pos) {
+  return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
+    kampagne.zeitmessungBadgePos = normalisiereKampagnenZeitmessungBadgePosition(pos);
+  });
+}
+
+function ladeZeitmessungBadgePosition() {
+  const kid = ermittleKampagneIdFuerKampagnenSpeicher();
+  if (kid) {
+    return ladeKampagnenZeitmessungBadgePosition(kid);
+  }
+  try {
+    const roh = htbahSpeicher.leseText(SPEICHER_KEY_ZEITMESSUNG_BADGE_POS, null);
+    if (roh && String(roh).trim().startsWith('{')) {
+      return normalisiereKampagnenZeitmessungBadgePosition(JSON.parse(roh));
     }
   } catch {
     /* defektes JSON */
@@ -1266,7 +1362,12 @@ function ladeZeitmessungBadgePosition() {
 }
 
 function speichereZeitmessungBadgePosition(pos) {
-  const normalisiert = normalisiereAtmosphaereBadgePosition(pos);
+  const kid = ermittleKampagneIdFuerKampagnenSpeicher();
+  const normalisiert = normalisiereKampagnenZeitmessungBadgePosition(pos);
+  if (kid) {
+    speichereKampagnenZeitmessungBadgePosition(kid, normalisiert);
+    return;
+  }
   if (normalisiert) {
     htbahSpeicher.schreibeText(SPEICHER_KEY_ZEITMESSUNG_BADGE_POS, JSON.stringify(normalisiert));
   } else {
@@ -1645,6 +1746,7 @@ const EXPORT_TYP_LS_KAMPAGNE_KOMPLETT_OHNE_GRUPPE = 'htbah-export-ls-kampagne-ko
 const EXPORT_TYP_SL_MITGLIED = 'htbah-spielleiter-mitglied';
 const EXPORT_TYP_SL_ABENTEUERBUCH = 'htbah-spielleiter-abenteuerbuch-teil';
 const EXPORT_TYP_SL_ATMOSPHAERE = 'htbah-spielleiter-atmosphaere-teil';
+const EXPORT_TYP_SL_ZEITMESSUNG = 'htbah-spielleiter-zeitmessung-teil';
 
 function normalisiereZufallstabellenZeilenListeExportImport(schluessel, arr) {
   if (!ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET.has(schluessel) || !Array.isArray(arr)) {
@@ -1911,6 +2013,74 @@ function importiereSpielleiterAtmosphaerePaket(zielKampagneId, roh) {
   }
   sl.kampagnen = kampagnen;
   speichereSpielleiterZustand(sl);
+  return { ok: true };
+}
+
+function erstelleSpielleiterZeitmessungExportPaket(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid || spielleiterKampagneIndexNachId(kid) < 0) {
+    return null;
+  }
+  const sl = ladeSpielleiterZustand();
+  const g = (Array.isArray(sl.kampagnen) ? sl.kampagnen : []).find((x) => x && x.id === kid);
+  if (!g) {
+    return null;
+  }
+  const mwp =
+    sl.mitgliedWahlProKampagne && typeof sl.mitgliedWahlProKampagne === 'object'
+      ? sl.mitgliedWahlProKampagne
+      : {};
+  return {
+    htbahExportVersion: 1,
+    typ: EXPORT_TYP_SL_ZEITMESSUNG,
+    kampagneId: kid,
+    exportiertAm: new Date().toISOString(),
+    zeitmessung: JSON.parse(JSON.stringify(normalisiereKampagnenZeitmessungZustand(g.zeitmessung))),
+    zeitmessungBadgePos: JSON.parse(
+      JSON.stringify(normalisiereKampagnenZeitmessungBadgePosition(g.zeitmessungBadgePos) || {}),
+    ),
+    mitgliedWahlMitgliedId: typeof mwp[kid] === 'string' ? mwp[kid] : '',
+  };
+}
+
+function importiereSpielleiterZeitmessungPaket(zielKampagneId, roh) {
+  const ziel = typeof zielKampagneId === 'string' && zielKampagneId.trim() ? zielKampagneId.trim() : '';
+  if (!ziel) {
+    return { ok: false, fehler: 'Keine Ziel-Kampagne.' };
+  }
+  if (
+    !roh ||
+    typeof roh !== 'object' ||
+    roh.htbahExportVersion !== 1 ||
+    roh.typ !== EXPORT_TYP_SL_ZEITMESSUNG
+  ) {
+    return { ok: false, fehler: 'Ungültige Datei (Timer/Stoppuhr erwartet).' };
+  }
+  const idx = spielleiterKampagneIndexNachId(ziel);
+  if (idx < 0) {
+    return { ok: false, fehler: 'Ziel-Kampagne nicht gefunden.' };
+  }
+  const sl = ladeSpielleiterZustand();
+  const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen.slice() : [];
+  const kampagne = kampagnen[idx];
+  kampagnen[idx] = {
+    ...kampagne,
+    zeitmessung: normalisiereKampagnenZeitmessungZustand(roh.zeitmessung),
+    zeitmessungBadgePos: normalisiereKampagnenZeitmessungBadgePosition(roh.zeitmessungBadgePos),
+  };
+  if (!sl.mitgliedWahlProKampagne || typeof sl.mitgliedWahlProKampagne !== 'object') {
+    sl.mitgliedWahlProKampagne = {};
+  }
+  if (Object.prototype.hasOwnProperty.call(roh, 'mitgliedWahlMitgliedId')) {
+    if (typeof roh.mitgliedWahlMitgliedId === 'string' && roh.mitgliedWahlMitgliedId) {
+      sl.mitgliedWahlProKampagne[ziel] = roh.mitgliedWahlMitgliedId;
+    } else {
+      delete sl.mitgliedWahlProKampagne[ziel];
+    }
+  }
+  sl.kampagnen = kampagnen;
+  speichereSpielleiterZustand(sl);
+  htbahDispatchKampagneDatenGeaendert({ art: 'zeitmessung', kampagneId: ziel });
   return { ok: true };
 }
 
@@ -2554,6 +2724,8 @@ function wendeBeispielLokalerSpeicherPaketAdditivAn(paket) {
       importiereSpielleiterAbenteuerbuchPaket(kid, p);
     } else if (meta.lsTyp === 'sl_atmosphaere') {
       importiereSpielleiterAtmosphaerePaket(kid, p);
+    } else if (meta.lsTyp === 'sl_zeitmessung') {
+      importiereSpielleiterZeitmessungPaket(kid, p);
     } else if (meta.lsTyp === 'sl_mitglied') {
       importiereSpielleiterMitgliedPaket(kid, p);
     } else if (meta.lsTyp === 'ztf_kategorie') {
@@ -3872,6 +4044,12 @@ window.HTBAH = {
   importiereSpielleiterAbenteuerbuchPaket,
   erstelleSpielleiterAtmosphaereExportPaket,
   importiereSpielleiterAtmosphaerePaket,
+  erstelleSpielleiterZeitmessungExportPaket,
+  importiereSpielleiterZeitmessungPaket,
+  ladeKampagnenZeitmessungZustand,
+  speichereKampagnenZeitmessungZustand,
+  ladeKampagnenZeitmessungBadgePosition,
+  speichereKampagnenZeitmessungBadgePosition,
   erstelleZufallstabellenKampagneExportPaket,
   importiereZufallstabellenKampagnePaket,
   erstelleZufallstabellenKategorieExportPaket,

@@ -68,6 +68,7 @@ function parseLsKampagneIdAusKey(key) {
     typ === 'spielleiter_ohne_gruppe:' ||
     typ === 'sl_abenteuerbuch:' ||
     typ === 'sl_atmosphaere:' ||
+    typ === 'sl_zeitmessung:' ||
     typ === 'ztf_kampagne:' ||
     typ === 'ztf_pantheon:' ||
     typ === 'wb_kampagne:'

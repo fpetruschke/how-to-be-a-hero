@@ -156,6 +156,7 @@ function parseLsExportKeyMeta(key) {
     ['sl_mitglied:', 'sl_mitglied'],
     ['sl_abenteuerbuch:', 'sl_abenteuerbuch'],
     ['sl_atmosphaere:', 'sl_atmosphaere'],
+    ['sl_zeitmessung:', 'sl_zeitmessung'],
     ['ztf_pantheon:', 'ztf_pantheon'],
     ['ztf_kampagne:', 'ztf_kampagne'],
     ['ztf_kategorie:', 'ztf_kategorie'],
@@ -187,7 +188,7 @@ function parseLsExportKeyMeta(key) {
       const weltenbauBereich = li > 0 ? rest.slice(li + 1) : undefined;
       return { lsTyp, kampagneId, weltenbauBereich };
     }
-    if (lsTyp === 'sl_abenteuerbuch' || lsTyp === 'sl_atmosphaere') {
+    if (lsTyp === 'sl_abenteuerbuch' || lsTyp === 'sl_atmosphaere' || lsTyp === 'sl_zeitmessung') {
       return { lsTyp, kampagneId: rest };
     }
     return { lsTyp, kampagneId: rest };
@@ -208,6 +209,9 @@ function lsExportKeyAusSlot(slot) {
   }
   if (slot.lsTyp === 'sl_atmosphaere') {
     return `htbah_export_ls:sl_atmosphaere:${kid}`;
+  }
+  if (slot.lsTyp === 'sl_zeitmessung') {
+    return `htbah_export_ls:sl_zeitmessung:${kid}`;
   }
   if (slot.lsTyp === 'ztf_kategorie') {
     return `htbah_export_ls:ztf_kategorie:${kid}:${slot.kategorie || ''}`;
@@ -254,6 +258,14 @@ function baueKampagneKnoten(kampagne, opts) {
       key: `htbah_export_ls:sl_atmosphaere:${kid}`,
       label: 'Wetter, Jahr- und Tageszeit',
       lsTyp: 'sl_atmosphaere',
+      kampagneId: kid,
+    }),
+  );
+  kinder.push(
+    blattKnoten(`ex:sl:zeit:${kid}`, 'Timer & Stoppuhr', {
+      key: `htbah_export_ls:sl_zeitmessung:${kid}`,
+      label: 'Timer & Stoppuhr',
+      lsTyp: 'sl_zeitmessung',
       kampagneId: kid,
     }),
   );

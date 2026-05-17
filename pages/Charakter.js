@@ -2377,7 +2377,7 @@ window.HTBAH_SEITEN.Charakter = {
         accept="image/*"
         @change="charakterbildDateiAusgewaehlt" />
       <vor-nachteile-modal ref="vorNachteileModal" :charakter="charakter" />
-      <initiative-modal ref="initiativeModal" :charakter="charakter" />
+      <initiative-modal v-if="!spielleiterMitglied" ref="initiativeModal" :charakter="charakter" />
       <div v-if="spielleiterMitglied" class="d-none" aria-hidden="true">
         <wuerfelbecher-wurf ref="spielleiterInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
       </div>
