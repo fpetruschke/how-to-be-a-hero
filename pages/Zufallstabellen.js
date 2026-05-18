@@ -1715,24 +1715,36 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         titel: `Parade-Probe (${typLabel}${name ? `: ${name}` : ''})`,
         basiswert: handeln,
         ruestungen: [],
+        waffenlosParade: true,
       });
     },
     schadenWuerfelnFuerEntitaet(row, typ) {
       const typLabel = typ === 'bestie' ? 'Bestie' : 'NPC';
       const name = this.zeilenWertAlsText(row && row.name);
       const waffenName = this.zeilenWertAlsText(row && row.waffe) || 'Waffe';
+      const inventar = [
+        {
+          id: `${typ}-waffe`,
+          typ: 'waffe',
+          name: waffenName,
+          schadenswertNahkampf: row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '',
+          schadenswertFernkampf: row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '',
+        },
+      ];
+      const waffenlos = row && row.waffenloserKampf ? String(row.waffenloserKampf).trim() : '';
+      if (waffenlos && typ === 'npc') {
+        inventar.push({
+          id: `${typ}-waffenlos`,
+          typ: 'waffe',
+          name: 'Waffenlos (Fäuste, Tritte)',
+          schadenswertNahkampf: waffenlos,
+          schadenswertFernkampf: '',
+        });
+      }
       this.$refs.schadenModal?.oeffnen({
         titel: `Schaden würfeln (${typLabel}${name ? `: ${name}` : ''})`,
         charakter: {
-          inventar: [
-            {
-              id: `${typLabel.toLowerCase()}-waffe`,
-              typ: 'waffe',
-              name: waffenName,
-              schadenswertNahkampf: row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '',
-              schadenswertFernkampf: row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '',
-            },
-          ],
+          inventar,
           handeln: [],
         },
       });

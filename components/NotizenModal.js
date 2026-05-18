@@ -85,7 +85,7 @@ window.HTBAH_KOMPONENTEN.NotizenModal = {
       tabindex="-1"
       aria-labelledby="notizenEditorLabel"
       aria-hidden="true">
-      <div class="modal-dialog modal-fullscreen">
+      <div class="modal-dialog modal-dialog-scrollable htbah-modal-respektiert-nav">
         <div class="modal-content shadow">
           <div class="modal-header">
             <h5 class="modal-title" id="notizenEditorLabel">Notizen</h5>

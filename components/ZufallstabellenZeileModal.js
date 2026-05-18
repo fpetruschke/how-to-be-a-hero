@@ -6,12 +6,14 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
+    InventarEditorPanel: window.HTBAH_KOMPONENTEN.InventarEditorPanel,
   },
   props: {
     anlage: { type: Object, required: true },
     zeileModalTitel: { type: String, default: '' },
     eingebettet: { type: Boolean, default: false },
     randomSichtbar: { type: Boolean, default: true },
+    randomWizardVerfuegbar: { type: Boolean, default: true },
     zufallsgeneratorBereit: { type: Boolean, default: false },
     zufallNpcEpoche: { type: String, default: 'mittelalter' },
     zufallGegenstandEpoche: { type: String, default: 'mittelalter' },
@@ -124,9 +126,27 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       return Array.isArray(this.anlage.zeile.inventar) ? this.anlage.zeile.inventar : [];
     },
+    inventarListeModel() {
+      if (!this.anlage || !this.anlage.zeile) {
+        return [];
+      }
+      if (!Array.isArray(this.anlage.zeile.inventar)) {
+        this.anlage.zeile.inventar = [];
+      }
+      return this.anlage.zeile.inventar;
+    },
     zeigtKampfSchnellaktionen() {
       const typ = this.anlage && this.anlage.typ;
-      return typ === 'npc' || typ === 'bestie';
+      return (typ === 'npc' || typ === 'bestie') && this.istBearbeitung;
+    },
+    zeigtRandomAlsDropdown() {
+      if (!this.randomSichtbar) {
+        return false;
+      }
+      const typ = this.anlage && this.anlage.typ;
+      return (
+        this.randomWizardVerfuegbar && (typ === 'npc' || typ === 'bestie')
+      );
     },
     kampfZustandOptionen() {
       return [
@@ -134,6 +154,23 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         { id: 'bewusstlos', label: 'Bewusstlos', emoji: '😵' },
         { id: 'tot', label: 'Tot', emoji: '💀' },
       ];
+    },
+    bestieAngriffAlsZahl() {
+      if (!this.anlage || this.anlage.typ !== 'bestie' || !this.anlage.zeile) {
+        return null;
+      }
+      const text = String(this.anlage.zeile.angriff == null ? '' : this.anlage.zeile.angriff).trim();
+      if (!text || !/^\d+$/.test(text)) {
+        return null;
+      }
+      const wert = Math.round(Number(text));
+      if (!Number.isFinite(wert) || wert < 0 || wert > 100) {
+        return null;
+      }
+      return wert;
+    },
+    kannBestieAngriffProbe() {
+      return this.bestieAngriffAlsZahl !== null;
     },
   },
   watch: {
@@ -488,6 +525,30 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       return Math.max(0, Math.min(100, Math.round(Number(this.anlage.zeile[kategorie]) || 0)));
     },
+    angriffProbeOeffnen() {
+      if (!this.anlage || !this.anlage.zeile || this.anlage.typ !== 'bestie') {
+        return;
+      }
+      const zielwert = this.bestieAngriffAlsZahl;
+      if (zielwert === null) {
+        return;
+      }
+      const name = String(this.anlage.zeile.name || '').trim();
+      const payload = {
+        modus: 'begabung',
+        basiswert: zielwert,
+        zielwert,
+        zeigtModifikator: true,
+        basisLabel: 'Angriffswert',
+        zielLabel: 'Zielwert Angriff (zu unterbieten)',
+        titel: 'Probe: Angriff' + (name ? ` (${name})` : ''),
+        untertitel: 'Angriffswert ' + zielwert + ' — W100-Probe.',
+      };
+      this.probeModalGeneration += 1;
+      this.$nextTick(() => {
+        this.$refs.probeWurfModal?.oeffnen(payload);
+      });
+    },
     begabungProbeOeffnen(kategorie) {
       if (!this.anlage || !this.anlage.zeile) {
         return;
@@ -497,7 +558,11 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       const zielwert = this.begabungZielwert(kategorie);
       const payload = {
         modus: 'begabung',
+        basiswert: zielwert,
         zielwert,
+        zeigtModifikator: true,
+        basisLabel: 'Begabung ' + this.begabungKategorieLabel(kategorie),
+        zielLabel: 'Zielwert (zu unterbieten)',
         titel:
           'Probe: Begabung ' +
           this.begabungKategorieLabel(kategorie) +
@@ -525,6 +590,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         titel: `Parade-Probe (${titelTeil})`,
         basiswert,
         ruestungen: [],
+        waffenlosParade: true,
       };
       this.paradeModalGeneration += 1;
       this.$nextTick(() => {
@@ -539,18 +605,29 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       const typ = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
       const name = String(zeile.name || '').trim();
       const waffenName = String(zeile.waffe || '').trim() || 'Waffe';
+      const inventar = [
+        {
+          id: `${this.anlage.typ || 'eintrag'}-waffe`,
+          typ: 'waffe',
+          name: waffenName,
+          schadenswertNahkampf: zeile.schadenswertNahkampf || '',
+          schadenswertFernkampf: zeile.schadenswertFernkampf || '',
+        },
+      ];
+      const waffenlos = String(zeile.waffenloserKampf || '').trim();
+      if (waffenlos && this.anlage.typ === 'npc') {
+        inventar.push({
+          id: `${this.anlage.typ || 'eintrag'}-waffenlos`,
+          typ: 'waffe',
+          name: 'Waffenlos (Fäuste, Tritte)',
+          schadenswertNahkampf: waffenlos,
+          schadenswertFernkampf: '',
+        });
+      }
       const payload = {
         titel: `Schaden würfeln (${typ}${name ? `: ${name}` : ''})`,
         charakter: {
-          inventar: [
-            {
-              id: `${this.anlage.typ || 'eintrag'}-waffe`,
-              typ: 'waffe',
-              name: waffenName,
-              schadenswertNahkampf: zeile.schadenswertNahkampf || '',
-              schadenswertFernkampf: zeile.schadenswertFernkampf || '',
-            },
-          ],
+          inventar,
           handeln: [],
         },
       };
@@ -621,6 +698,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         this.$emit('inventar-remove', { gegenstandId });
       }
     },
+    inventarEintragEntfernenEvent(payload) {
+      const gegenstandId = payload && payload.gegenstandId ? String(payload.gegenstandId).trim() : '';
+      if (gegenstandId) {
+        this.$emit('inventar-remove', { gegenstandId });
+      }
+    },
   },
   template: `
     <div v-if="anlage.offen && anlage.zeile" class="regelwerk-modal-layer">
@@ -637,7 +720,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2" @pointerdown="starteZiehen">
           <strong>{{ zeileModalTitel }}</strong>
           <div class="d-flex align-items-center gap-2">
-            <div v-if="randomSichtbar" class="dropdown">
+            <div v-if="randomSichtbar && zeigtRandomAlsDropdown" class="dropdown">
               <button
                 type="button"
                 class="btn btn-sm btn-outline-secondary dropdown-toggle"
@@ -665,6 +748,16 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                 </li>
               </ul>
             </div>
+            <button
+              v-else-if="randomSichtbar"
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              :disabled="!zufallsgeneratorBereit"
+              title="Zufallsvorschlag"
+              aria-label="Zufallsvorschlag"
+              @click="$emit('random')">
+              🎲
+            </button>
             <button
               type="button"
               class="regelwerk-icon-button"
@@ -748,6 +841,15 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   :aria-label="'W100-Probe Begabung ' + begabungKategorieLabel(kategorie)"
                   @click="begabungProbeOeffnen(kategorie)">
                   🎲 {{ begabungKategorieLabel(kategorie) }} ({{ begabungZielwert(kategorie) }})
+                </button>
+                <button
+                  v-if="anlage.typ === 'bestie'"
+                  type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  :disabled="!kannBestieAngriffProbe"
+                  :title="kannBestieAngriffProbe ? '' : 'Angriffswert muss eine Zahl von 0 bis 100 sein (keine Würfelnotation).'"
+                  @click="angriffProbeOeffnen">
+                  🎲 Angriff<template v-if="kannBestieAngriffProbe"> ({{ bestieAngriffAlsZahl }})</template>
                 </button>
               </div>
             </div>
@@ -1258,17 +1360,13 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
 
         <section v-if="zeigtInventarBereich && zeigtDatenTab" class="htbah-entitaet-bereich mt-3">
           <h6 class="htbah-entitaet-bereich-titel">🎒 Inventar</h6>
-          <p class="small text-secondary mb-2">Gegenstände per Drag &amp; Drop auf der interaktiven Welt zuordnen.</p>
-          <div v-if="!inventarListe.length" class="text-secondary small">Keine Gegenstände im Inventar.</div>
-          <ul v-else class="list-group list-group-flush mb-0">
-            <li
-              v-for="(item, idx) in inventarListe"
-              :key="item.id || ('inv-' + idx)"
-              class="list-group-item px-0 d-flex justify-content-between align-items-center gap-2">
-              <span>{{ inventarEintragLabel(item) }}</span>
-              <button type="button" class="btn btn-sm btn-outline-danger" @click="inventarEintragEntfernen(item)">Entfernen</button>
-            </li>
-          </ul>
+          <p class="small text-secondary mb-2">
+            Gegenstände hier bearbeiten oder per Drag &amp; Drop auf der interaktiven Welt zuordnen.
+          </p>
+          <inventar-editor-panel
+            v-if="anlage.zeile"
+            :inventar="inventarListeModel"
+            @remove="inventarEintragEntfernenEvent" />
         </section>
 
         <div v-if="zeigtDatenTab">

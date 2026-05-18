@@ -3,6 +3,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 window.HTBAH_KOMPONENTEN.ParadeModal = {
   components: {
     WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
+    ProbeZielModifikator: window.HTBAH_KOMPONENTEN.ProbeZielModifikator,
   },
   props: {
     modalDomId: { type: String, default: 'paradeModal' },
@@ -14,10 +15,8 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
         titel: 'Parade-Probe',
         basiswert: 0,
         ruestungen: [],
+        waffenlosParade: false,
       },
-      modifikatorArt: 'kein',
-      bonusWert: 1,
-      malusWert: -1,
       letzterWurf: null,
       wurfGeneration: 0,
     };
@@ -32,21 +31,16 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
     hatRuestungenImInventar() {
       return this.ruestungenListe.length > 0;
     },
+    zielModifikator() {
+      return this.$refs.zielModifikator || null;
+    },
     effektiverModifikator() {
-      if (this.modifikatorArt === 'kein') {
-        return 0;
-      }
-      if (this.modifikatorArt === 'bonus') {
-        const b = Math.round(Number(this.bonusWert) || 0);
-        return Math.max(1, Math.min(100, b));
-      }
-      const m = Math.round(Number(this.malusWert) || 0);
-      return Math.max(-100, Math.min(-1, m));
+      return this.zielModifikator ? this.zielModifikator.effektiverModifikator : 0;
     },
     zielwert() {
-      const basis = Math.max(0, Math.round(Number(this.kontext.basiswert) || 0));
-      const mod = this.effektiverModifikator;
-      return Math.max(0, Math.min(100, basis + mod));
+      return this.zielModifikator
+        ? this.zielModifikator.zielwert
+        : Math.max(0, Math.min(100, Math.round(Number(this.kontext.basiswert) || 0)));
     },
     auswertung() {
       if (this.letzterWurf === null) {
@@ -63,36 +57,35 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
       }
       return 'probe-wurf-ergebnis--' + a.stufe.replace(/_/g, '-');
     },
-    kritMissMin() {
-      return Math.ceil(90 + this.zielwert * 0.1);
-    },
     paradeAnzeigeGesamtwert() {
-      if (this.modifikatorArt === 'kein') {
+      if (!this.zielModifikator) {
         return this.letzterWurf;
       }
-      return this.zielwert;
+      return this.zielModifikator.gesamtwertFuerAnzeige(this.letzterWurf);
     },
     paradeModifikatorHatWert() {
-      return this.effektiverModifikator !== 0;
+      return this.zielModifikator ? this.zielModifikator.modifikatorHatWert : false;
     },
     paradeModifikatorBadgeText() {
-      if (!this.paradeModifikatorHatWert) {
-        return '';
-      }
-      return this.effektiverModifikator > 0
-        ? `Bonus: +${this.effektiverModifikator}`
-        : `Malus: ${this.effektiverModifikator}`;
+      return this.zielModifikator ? this.zielModifikator.modifikatorBadgeText : '';
     },
     paradeModifikatorBadgeKlasse() {
-      if (!this.paradeModifikatorHatWert) {
-        return '';
+      return this.zielModifikator ? this.zielModifikator.modifikatorBadgeKlasse : '';
+    },
+    paradeErfolg() {
+      const a = this.auswertung;
+      if (!a) {
+        return false;
       }
-      return this.effektiverModifikator > 0 ? 'text-bg-success' : 'text-bg-danger';
+      return a.stufe === 'kritischer_erfolg' || a.stufe === 'erfolg';
+    },
+    zeigtHalberSchadenHinweis() {
+      return this.kontext.waffenlosParade && this.paradeErfolg;
     },
   },
   methods: {
     /**
-     * @param {{ titel?: string, basiswert: number, ruestungen?: Array<{name?: string, rustwert?: string|number}> }} payload
+     * @param {{ titel?: string, basiswert: number, ruestungen?: Array, waffenlosParade?: boolean }} payload
      */
     oeffnen(payload) {
       const basiswert = Math.max(0, Math.min(100, Math.round(Number(payload?.basiswert) || 0)));
@@ -116,13 +109,11 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
         titel: typeof payload?.titel === 'string' && payload.titel.trim() ? payload.titel.trim() : 'Parade-Probe',
         basiswert,
         ruestungen,
+        waffenlosParade: !!payload?.waffenlosParade,
       };
-      this.modifikatorArt = 'kein';
-      this.bonusWert = 1;
-      this.malusWert = -1;
       this.ergebnisZuruecksetzen();
-
       this.$nextTick(() => {
+        this.$refs.zielModifikator?.zuruecksetzen?.();
         const el = this.$refs.modalElement;
         if (!el) {
           return;
@@ -148,6 +139,7 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
       this.wurfGeneration += 1;
       this.letzterWurf = null;
       this.$refs.wuerfelbecher?.anzeigeZuruecksetzen?.();
+      this.$refs.zielModifikator?.zuruecksetzen?.();
     },
     onModalVerborgen() {
       this.ergebnisZuruecksetzen();
@@ -192,14 +184,12 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
           </div>
           <div class="modal-body">
             <p class="small text-body-secondary mb-2">
-              Regelwerk: Parade ist eine <strong>W100-Probe auf Handeln</strong>. Kritische Angriffe können nicht pariert werden.
+              Regelwerk: Parade ist eine <strong>W100-Probe auf Handeln</strong> (waffenlos / mit bloßen Händen).
+              Kritische Angriffe können nicht pariert werden.
+              <template v-if="kontext.waffenlosParade">
+                Bei erfolgreicher waffenloser Parade wird <strong>halber Schaden</strong> eingesteckt.
+              </template>
             </p>
-            <div class="card p-3 mb-3 probe-wurf-ziel-card">
-              <div class="d-flex justify-content-between align-items-center">
-                <span>Basiswert Handeln</span>
-                <span class="fs-5 fw-bold">{{ kontext.basiswert }}</span>
-              </div>
-            </div>
 
             <div class="card p-3 mb-3 parade-ruestung-info-card">
               <div v-if="hatRuestungenImInventar" class="small text-body-secondary mb-2">
@@ -215,81 +205,14 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
               </p>
             </div>
 
-            <div class="mb-3">
-              <label class="form-label small text-secondary mb-1">SL-Modifikator</label>
-              <div class="d-flex flex-wrap gap-3">
-                <div class="form-check">
-                  <input
-                    id="parade-mod-kein"
-                    class="form-check-input"
-                    type="radio"
-                    value="kein"
-                    v-model="modifikatorArt" />
-                  <label class="form-check-label" for="parade-mod-kein">Kein Modifikator</label>
-                </div>
-                <div class="form-check">
-                  <input
-                    id="parade-mod-bonus"
-                    class="form-check-input"
-                    type="radio"
-                    value="bonus"
-                    v-model="modifikatorArt" />
-                  <label class="form-check-label" for="parade-mod-bonus">Bonus</label>
-                </div>
-                <div class="form-check">
-                  <input
-                    id="parade-mod-malus"
-                    class="form-check-input"
-                    type="radio"
-                    value="malus"
-                    v-model="modifikatorArt" />
-                  <label class="form-check-label" for="parade-mod-malus">Malus</label>
-                </div>
-              </div>
-            </div>
-
-            <div class="row g-2 mb-3">
-              <div class="col-12 col-md-6" v-if="modifikatorArt === 'bonus'">
-                <div class="form-floating">
-                  <input
-                    id="parade-bonus"
-                    type="number"
-                    class="form-control"
-                    v-model.number="bonusWert"
-                    :disabled="modifikatorArt !== 'bonus'"
-                    min="1"
-                    max="100"
-                    step="1"
-                    placeholder=" " />
-                  <label for="parade-bonus">Bonus (1 bis 100)</label>
-                </div>
-              </div>
-              <div class="col-12 col-md-6" v-if="modifikatorArt === 'malus'">
-                <div class="form-floating">
-                  <input
-                    id="parade-malus"
-                    type="number"
-                    class="form-control"
-                    v-model.number="malusWert"
-                    :disabled="modifikatorArt !== 'malus'"
-                    min="-100"
-                    max="-1"
-                    step="1"
-                    placeholder=" " />
-                  <label for="parade-malus">Malus (-1 bis -100)</label>
-                </div>
-              </div>
-            </div>
-
-            <div class="card p-3 mb-3 probe-wurf-ziel-card">
-              <div class="d-flex justify-content-between align-items-center">
-                <span>Zielwert Parade</span>
-                <span class="fs-5 fw-bold">{{ zielwert }}</span>
-              </div>
-              <div class="small text-body-secondary mt-1">
-                Kritischer Misserfolg: {{ kritMissMin }} bis 100
-              </div>
-            </div>
+            <probe-ziel-modifikator
+              ref="zielModifikator"
+              :basiswert="kontext.basiswert"
+              id-prefix="parade-mod"
+              basis-label="Basiswert Handeln"
+              ziel-label="Zielwert Parade"
+              :show-basis-card="true"
+              :show-ziel-card="true" />
 
             <icon-text-button
               type="button"
@@ -311,7 +234,7 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
               :class="ergebnisKlasse">
               <div class="text-center">
                 <div class="small text-body-secondary mb-1">
-                  {{ modifikatorArt === 'kein' ? 'W100' : 'W100 (Rohwurf)' }}
+                  {{ effektiverModifikator === 0 ? 'W100' : 'W100 (Rohwurf)' }}
                 </div>
                 <div class="fs-5 fw-semibold mb-2">{{ letzterWurf }}</div>
                 <div class="small text-body-secondary mb-1">
@@ -331,6 +254,12 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
                 <div class="display-6 fw-bold mb-2">{{ paradeAnzeigeGesamtwert }}</div>
                 <div class="fw-semibold mb-1">{{ auswertung.label }}</div>
                 <div class="small probe-wurf-ergebnis-hinweis">{{ auswertung.kurztext }}</div>
+                <div
+                  v-if="zeigtHalberSchadenHinweis"
+                  class="alert alert-info py-2 px-3 small mt-3 mb-0 text-start">
+                  Waffenlose Parade erfolgreich: Der Verteidiger steckt <strong>halben Schaden</strong> ein
+                  (im Modal „Schaden würfeln“ anwenden).
+                </div>
               </div>
             </div>
           </div>

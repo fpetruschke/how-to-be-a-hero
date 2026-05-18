@@ -6,6 +6,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   const LABEL_GRUPPEN = KL
     ? [
         { kategorie: KL.KATEGORIE_SETTING, titel: 'Setting / Epoche' },
+        { kategorie: KL.KATEGORIE_FORMAT, titel: 'Format' },
         { kategorie: KL.KATEGORIE_INHALT, titel: 'Inhaltshinweis' },
       ]
     : [];
@@ -171,7 +172,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     template: `
       <div class="htbah-kampagnen-labels-verwaltung text-start">
         <p class="small text-body-secondary mb-3">
-          Labels für Kampagnen: 🏰 Setting/Epoche oder 🎭 Inhaltshinweis (z. B. Gewalt, Horror, Lustig). Auf Kampagnen
+          Labels für Kampagnen: 🏰 Setting/Epoche, 📋 Format (z. B. One-Shot) oder 🎭 Inhaltshinweis (z. B. Gewalt). Auf Kampagnen
           werden Kopien inkl. Farben gespeichert. Beim Import fehlende Labels werden global ergänzt; vorhandene bleiben
           unverändert.
         </p>
@@ -203,6 +204,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                           title="Setting / Epoche"
                           @click="bearbeitungPatch.kategorie = 'setting'">
                           🏰
+                        </button>
+                        <button
+                          type="button"
+                          class="btn"
+                          :class="bearbeitungPatch.kategorie === 'format' ? 'btn-primary' : 'btn-outline-secondary'"
+                          title="Format"
+                          @click="bearbeitungPatch.kategorie = 'format'; bearbeitungPatch.bg = 'primary'; bearbeitungPatch.text = 'light'">
+                          📋
                         </button>
                         <button
                           type="button"
@@ -279,6 +288,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   title="Setting / Epoche"
                   @click="setzeNeueKategorie('setting')">
                   🏰
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  :class="neueKategorie === 'format' ? 'btn-primary' : 'btn-outline-secondary'"
+                  title="Format"
+                  @click="setzeNeueKategorie('format')">
+                  📋
                 </button>
                 <button
                   type="button"

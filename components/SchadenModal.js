@@ -16,8 +16,9 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
       kontextCharakter: null,
       letzterWurf: [],
       kritischerTreffer: false,
+      halbeSchadenWaffenloseParade: false,
       ausgewaehlteWaffeId: 'fallback-unarmed',
-      manuellerBonus: 0,
+      ausgewaehlteSchadensart: 'nah',
       wurfGeneration: 0,
     };
   },
@@ -38,30 +39,41 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
             : `Waffe ${index + 1}`;
           const nah = this.parseSchadenswert(eintrag.schadenswertNahkampf);
           const fern = this.parseSchadenswert(eintrag.schadenswertFernkampf);
-          const primaer = nah || fern;
           return {
             id: `inventar-${eintrag.id || index}`,
             label: name,
-            notation: primaer ? primaer.notation : '1W10',
-            bonus: primaer ? primaer.bonus : 0,
-            quelle:
-              nah && fern
-                ? `Inventar: Nahkampf ${nah.original} / Fernkampf ${fern.original}`
-                : nah
-                  ? `Inventar: Nahkampf ${nah.original}`
-                  : fern
-                    ? `Inventar: Fernkampf ${fern.original}`
-                    : 'Inventar: kein Schadenswert hinterlegt (Fallback 1W10)',
+            nah,
+            fern,
           };
         });
     },
     waffenOptionen() {
-      const basis = [...this.inventarWaffen];
+      const basis = this.inventarWaffen.map((waffe) => {
+        const nah = waffe.nah;
+        const fern = waffe.fern;
+        const primaer = nah || fern;
+        return {
+          id: waffe.id,
+          label: waffe.label,
+          nah,
+          fern,
+          notation: primaer ? primaer.notation : '1W10',
+          quelle:
+            nah && fern
+              ? `Nahkampf ${nah.original} / Fernkampf ${fern.original}`
+              : nah
+                ? `Nahkampf ${nah.original}`
+                : fern
+                  ? `Fernkampf ${fern.original}`
+                  : 'Kein Schadenswert hinterlegt (Fallback 1W10)',
+        };
+      });
       basis.push({
         id: 'fallback-unarmed',
         label: 'Waffenlos / improvisiert',
+        nah: { notation: '1W10', bonus: 0, original: '1W10' },
+        fern: null,
         notation: '1W10',
-        bonus: 0,
         quelle: 'Regelwerk-Richtwert: 1W10',
       });
       return basis;
@@ -69,36 +81,90 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
     ausgewaehlteWaffe() {
       return this.waffenOptionen.find((waffe) => waffe.id === this.ausgewaehlteWaffeId) || this.waffenOptionen[0];
     },
+    zeigtSchadensartAuswahl() {
+      const w = this.ausgewaehlteWaffe;
+      return !!(w && w.nah && w.fern);
+    },
+    schadensartOptionen() {
+      const w = this.ausgewaehlteWaffe;
+      if (!w) {
+        return [];
+      }
+      const optionen = [];
+      if (w.nah) {
+        optionen.push({ id: 'nah', label: 'Nahkampf', parsed: w.nah });
+      }
+      if (w.fern) {
+        optionen.push({ id: 'fern', label: 'Fernkampf', parsed: w.fern });
+      }
+      return optionen;
+    },
+    aktiveSchadensart() {
+      const optionen = this.schadensartOptionen;
+      if (!optionen.length) {
+        return null;
+      }
+      const gewaehlt = optionen.find((o) => o.id === this.ausgewaehlteSchadensart);
+      return gewaehlt || optionen[0];
+    },
     notation() {
+      const art = this.aktiveSchadensart;
+      if (art) {
+        return art.parsed.notation;
+      }
       return this.ausgewaehlteWaffe?.notation || '1W10';
     },
-    wurfSumme() {
-      const summe = Array.isArray(this.letzterWurf)
+    waffenBonus() {
+      const art = this.aktiveSchadensart;
+      if (art) {
+        return Number(art.parsed.bonus) || 0;
+      }
+      const w = this.ausgewaehlteWaffe;
+      if (w?.nah) {
+        return Number(w.nah.bonus) || 0;
+      }
+      if (w?.fern) {
+        return Number(w.fern.bonus) || 0;
+      }
+      return 0;
+    },
+    wuerfelSumme() {
+      return Array.isArray(this.letzterWurf)
         ? this.letzterWurf.reduce((sum, wert) => sum + (Number(wert) || 0), 0)
         : 0;
-      const bonus = Number(this.ausgewaehlteWaffe?.bonus) || 0;
-      const manuell = Math.round(Number(this.manuellerBonus) || 0);
-      return summe + bonus + manuell;
     },
-    gesamtSchaden() {
+    wurfSumme() {
+      return this.wuerfelSumme + this.waffenBonus;
+    },
+    gesamtSchadenVorParade() {
       if (!this.letzterWurf.length) {
         return null;
       }
       return this.kritischerTreffer ? this.wurfSumme * 2 : this.wurfSumme;
     },
-    faehigkeitenMitPotenziellerSchadenswirkung() {
-      const handeln = Array.isArray(this.aktiveCharakterDaten?.handeln) ? this.aktiveCharakterDaten.handeln : [];
-      const muster = /(waffenlos|faust|fauskampf|faustkampf|nahkampf|steinwurf|wurf)/i;
-      return handeln
-        .filter((eintrag) => {
-          const name = typeof eintrag?.name === 'string' ? eintrag.name.trim() : '';
-          return !!name && muster.test(name);
-        })
-        .map((eintrag) => ({
-          name: eintrag.name.trim(),
-          wert: Number(eintrag.value) || 0,
-        }))
-        .sort((a, b) => b.wert - a.wert);
+    gesamtSchaden() {
+      const basis = this.gesamtSchadenVorParade;
+      if (basis === null) {
+        return null;
+      }
+      if (this.halbeSchadenWaffenloseParade) {
+        return Math.ceil(basis / 2);
+      }
+      return basis;
+    },
+    schadenswurfAnzeige() {
+      const art = this.aktiveSchadensart;
+      if (!art) {
+        const bonus = this.waffenBonus;
+        return `${this.notation.toUpperCase()}${bonus ? ` + ${bonus}` : ''}`;
+      }
+      const bonus = Number(art.parsed.bonus) || 0;
+      return `${art.parsed.notation.toUpperCase()}${bonus ? ` + ${bonus}` : ''}`;
+    },
+  },
+  watch: {
+    ausgewaehlteWaffeId() {
+      this.syncSchadensartNachWaffe();
     },
   },
   methods: {
@@ -122,6 +188,14 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
         original: `${anzahl}W10${operator ? ` ${operator} ${wert}` : ''}`,
       };
     },
+    syncSchadensartNachWaffe() {
+      const w = this.ausgewaehlteWaffe;
+      if (w?.nah) {
+        this.ausgewaehlteSchadensart = 'nah';
+      } else if (w?.fern) {
+        this.ausgewaehlteSchadensart = 'fern';
+      }
+    },
     oeffnen(payload) {
       const el = this.$refs.modalElement;
       if (!el) {
@@ -136,8 +210,9 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
         payload && typeof payload.titel === 'string' && payload.titel.trim()
           ? payload.titel.trim()
           : 'Schaden erwürfeln';
-      this.manuellerBonus = 0;
+      this.halbeSchadenWaffenloseParade = false;
       this.ausgewaehlteWaffeId = this.inventarWaffen.length ? this.inventarWaffen[0].id : 'fallback-unarmed';
+      this.syncSchadensartNachWaffe();
       this.ergebnisZuruecksetzen();
       this.modalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
       this.modalInstanz.show();
@@ -206,7 +281,7 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
             <p class="small text-body-secondary mb-3">
               Regelwerk/Wiki (Kampf): Schaden wird je nach Waffe mit
               <strong>xW10</strong> gewürfelt. Bei einem <strong>kritischen Treffer</strong>
-              wird der ausgewürfelte Schaden verdoppelt.
+              wird der Schaden verdoppelt. Erfolgreiche waffenlose Parade: halber Schaden auf den Verteidiger.
             </p>
             <div class="form-floating mb-3">
               <select id="schaden-waffenart" class="form-select" v-model="ausgewaehlteWaffeId">
@@ -214,7 +289,15 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
                   {{ waffe.label }}
                 </option>
               </select>
-              <label for="schaden-waffenart">Waffe aus Inventar</label>
+              <label for="schaden-waffenart">Waffe</label>
+            </div>
+            <div v-if="zeigtSchadensartAuswahl" class="form-floating mb-3">
+              <select id="schaden-schadensart" class="form-select" v-model="ausgewaehlteSchadensart">
+                <option v-for="art in schadensartOptionen" :key="art.id" :value="art.id">
+                  {{ art.label }} ({{ art.parsed.original }})
+                </option>
+              </select>
+              <label for="schaden-schadensart">Schadenswert der Waffe</label>
             </div>
             <p class="small text-body-secondary mb-3">
               {{ ausgewaehlteWaffe.quelle }}
@@ -222,33 +305,7 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
             <div class="card p-3 mb-3 probe-wurf-ziel-card">
               <div class="d-flex justify-content-between align-items-center">
                 <span>Schadenswurf</span>
-                <span class="fs-5 fw-bold">
-                  {{ notation.toUpperCase() }}<template v-if="ausgewaehlteWaffe.bonus"> + {{ ausgewaehlteWaffe.bonus }}</template>
-                </span>
-              </div>
-            </div>
-            <div class="form-floating mb-2">
-              <input
-                id="schaden-manueller-bonus"
-                type="number"
-                class="form-control"
-                v-model.number="manuellerBonus"
-                step="1"
-                placeholder=" " />
-              <label for="schaden-manueller-bonus">Optionaler SL-/Fähigkeitsbonus (absolut)</label>
-            </div>
-            <p class="small text-body-secondary mb-3">
-              Das Regelwerk definiert keinen festen Bonus aus einzelnen Fähigkeiten auf Schaden.
-              Trage hier bei Bedarf einen SL-entschiedenen Bonus/Malus ein.
-            </p>
-            <div v-if="faehigkeitenMitPotenziellerSchadenswirkung.length" class="card p-2 mb-3">
-              <div class="small text-body-secondary mb-1">
-                Potenziell passende Handeln-Fähigkeiten (Hinweis):
-              </div>
-              <div class="small">
-                <span v-for="(eintrag, idx) in faehigkeitenMitPotenziellerSchadenswirkung" :key="'fhint-' + idx">
-                  {{ eintrag.name }} ({{ eintrag.wert }})<span v-if="idx < faehigkeitenMitPotenziellerSchadenswirkung.length - 1"> · </span>
-                </span>
+                <span class="fs-5 fw-bold">{{ schadenswurfAnzeige }}</span>
               </div>
             </div>
             <div class="form-check mb-3">
@@ -259,6 +316,16 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
                 v-model="kritischerTreffer" />
               <label class="form-check-label" for="schaden-kritisch">
                 Kritischer Treffer (x2 Schaden)
+              </label>
+            </div>
+            <div class="form-check mb-3">
+              <input
+                id="schaden-waffenlose-parade"
+                class="form-check-input"
+                type="checkbox"
+                v-model="halbeSchadenWaffenloseParade" />
+              <label class="form-check-label" for="schaden-waffenlose-parade">
+                Erfolgreiche waffenlose Parade (halber Schaden auf Verteidiger)
               </label>
             </div>
             <icon-text-button
@@ -279,8 +346,12 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
               <div class="text-center">
                 <div class="small text-body-secondary mb-1">Gesamtschaden</div>
                 <div class="display-6 fw-bold">{{ gesamtSchaden }}</div>
-                <div class="small text-body-secondary mt-1">
-                  Basis {{ wurfSumme }}<template v-if="kritischerTreffer"> x 2</template>
+                <div class="small text-body-secondary mt-2 text-start">
+                  <div>Würfel: {{ letzterWurf.join(' + ') }} = {{ wuerfelSumme }}</div>
+                  <div v-if="waffenBonus">+ Waffe: {{ waffenBonus }}</div>
+                  <div>= Summe: {{ wurfSumme }}</div>
+                  <div v-if="kritischerTreffer">× 2 (kritischer Treffer): {{ gesamtSchadenVorParade }}</div>
+                  <div v-if="halbeSchadenWaffenloseParade">÷ 2 (waffenlose Parade): {{ gesamtSchaden }}</div>
                 </div>
               </div>
             </div>

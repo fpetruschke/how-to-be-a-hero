@@ -86,6 +86,27 @@ body {
   z-index: var(--htbah-z-modal-ui) !important;
 }
 
+/* Inventar/Notizen: Navbar (Bottom-Nav) bleibt sichtbar und klickbar */
+.modal-dialog.htbah-modal-respektiert-nav {
+  margin-top: calc(var(--htbah-top-nav-reserve, 0px) + 0.5rem);
+  margin-bottom: calc(var(--htbah-bottom-nav-reserve, 0px) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  max-height: calc(
+    100dvh - var(--htbah-top-nav-reserve, 0px) - var(--htbah-bottom-nav-reserve, 0px) -
+      env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1rem
+  );
+  height: auto;
+}
+
+@media (min-width: 992px) {
+  .modal-dialog.htbah-modal-respektiert-nav {
+    margin-top: calc(var(--htbah-top-nav-reserve, 0px) + 0.5rem);
+    margin-bottom: 1rem;
+    max-height: calc(
+      100dvh - var(--htbah-top-nav-reserve, 0px) - env(safe-area-inset-top, 0px) - 1.5rem
+    );
+  }
+}
+
 body {
   background-color: var(--bg-color);
   background-image: linear-gradient(
@@ -3388,9 +3409,14 @@ input::placeholder {
 }
 
 .parade-ruestung-info-card {
-  background: #ffffff !important;
+  background: var(--card-bg);
   border: 1px solid var(--border-color);
-  color: #1f2937;
+  color: var(--card-color);
+}
+
+[data-theme='dark'] .htbah-kampagnen-tabelle thead {
+  --bs-table-bg: var(--card-bg);
+  --bs-table-color: var(--card-color);
 }
 
 .faehigkeiten-probe-wuerfel-btn {

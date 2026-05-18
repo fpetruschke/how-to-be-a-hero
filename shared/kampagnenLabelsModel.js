@@ -5,10 +5,12 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 
 (function registerKampagnenLabelsModel(globalObj) {
   const KATEGORIE_SETTING = 'setting';
+  const KATEGORIE_FORMAT = 'format';
   const KATEGORIE_INHALT = 'inhalt';
 
   const KATEGORIEN = [
     { id: KATEGORIE_SETTING, label: 'Setting / Epoche', emoji: '🏰' },
+    { id: KATEGORIE_FORMAT, label: 'Format', emoji: '📋' },
     { id: KATEGORIE_INHALT, label: 'Inhaltshinweis', emoji: '🎭' },
   ];
 
@@ -54,6 +56,13 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       text: 'dark',
     },
     {
+      id: 'lbl-format-one-shot',
+      name: 'One-Shot',
+      kategorie: KATEGORIE_FORMAT,
+      bg: 'primary',
+      text: 'light',
+    },
+    {
       id: 'lbl-inhalt-gewalt',
       name: 'Gewalt',
       kategorie: KATEGORIE_INHALT,
@@ -86,15 +95,30 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   const ICON_BADGE_KLASSE = 'badge text-bg-light text-dark htbah-kampagnen-label-icon-badge';
 
   function kategorieEmoji(kategorie) {
-    return kategorie === KATEGORIE_INHALT ? '🎭' : '🏰';
+    if (kategorie === KATEGORIE_INHALT) {
+      return '🎭';
+    }
+    if (kategorie === KATEGORIE_FORMAT) {
+      return '📋';
+    }
+    return '🏰';
   }
 
   function defaultBgFuerKategorie(kategorie) {
-    return kategorie === KATEGORIE_INHALT ? 'danger' : 'info';
+    if (kategorie === KATEGORIE_INHALT) {
+      return 'danger';
+    }
+    if (kategorie === KATEGORIE_FORMAT) {
+      return 'primary';
+    }
+    return 'info';
   }
 
   function defaultTextFuerKategorie(kategorie) {
-    return kategorie === KATEGORIE_INHALT ? 'light' : 'dark';
+    if (kategorie === KATEGORIE_INHALT || kategorie === KATEGORIE_FORMAT) {
+      return 'light';
+    }
+    return 'dark';
   }
 
   function normalisiereLabelName(name) {
@@ -109,7 +133,13 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   }
 
   function normalisiereKategorie(raw) {
-    return raw === KATEGORIE_INHALT ? KATEGORIE_INHALT : KATEGORIE_SETTING;
+    if (raw === KATEGORIE_INHALT) {
+      return KATEGORIE_INHALT;
+    }
+    if (raw === KATEGORIE_FORMAT) {
+      return KATEGORIE_FORMAT;
+    }
+    return KATEGORIE_SETTING;
   }
 
   function normalisiereHintergrund(raw, kategorie) {
@@ -172,9 +202,20 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         seenIds.add(std.id);
       }
     });
+    const kategorieReihenfolge = (kat) => {
+      if (kat === KATEGORIE_SETTING) {
+        return 0;
+      }
+      if (kat === KATEGORIE_FORMAT) {
+        return 1;
+      }
+      return 2;
+    };
     eintraege.sort((a, b) => {
-      if (a.kategorie !== b.kategorie) {
-        return a.kategorie === KATEGORIE_SETTING ? -1 : 1;
+      const ordA = kategorieReihenfolge(a.kategorie);
+      const ordB = kategorieReihenfolge(b.kategorie);
+      if (ordA !== ordB) {
+        return ordA - ordB;
       }
       return a.name.localeCompare(b.name, 'de');
     });
@@ -213,6 +254,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   function kategorieLabel(kategorie) {
     if (kategorie === KATEGORIE_INHALT) {
       return 'Inhaltshinweis';
+    }
+    if (kategorie === KATEGORIE_FORMAT) {
+      return 'Format';
     }
     return 'Setting';
   }
@@ -366,6 +410,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   globalObj.KampagnenLabels = {
     SPEICHER_KEY: 'htbah_kampagnen_labels_katalog',
     KATEGORIE_SETTING,
+    KATEGORIE_FORMAT,
     KATEGORIE_INHALT,
     KATEGORIEN,
     BOOTSTRAP_HINTERGRUND_FARBEN,

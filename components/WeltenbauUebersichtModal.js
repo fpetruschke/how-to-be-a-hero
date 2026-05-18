@@ -200,12 +200,14 @@ var HTBAH_REFACTOR_UTILS =
         zeileQuillInstanz: null,
         zeileMentionController: null,
         zeileQuillSelectionHandler: null,
+        zeileQuillTextChangeHandler: null,
         zeileQuillHostElement: null,
         zeileQuillSession: 0,
         zeileQuillHostRefFn: null,
         overlayZeileQuillInstanz: null,
         overlayZeileMentionController: null,
         overlayZeileQuillSelectionHandler: null,
+        overlayZeileQuillTextChangeHandler: null,
         overlayZeileQuillHostElement: null,
         overlayZeileQuillSession: 0,
         overlayZeileQuillHostRefFn: null,
@@ -263,47 +265,32 @@ var HTBAH_REFACTOR_UTILS =
       aktiveGruppe() {
         return this.gruppen.find((g) => g.id === this.gruppeId) || null;
       },
-      zeileModalTitel() {
-        if (!this.anlage.typ) {
+      zeileModalTitelBasis(anlage) {
+        if (!anlage || !anlage.typ) {
           return '';
         }
-        if (this.anlage.typ === 'npc') {
-          return '👤 NPC';
+        let basis = '';
+        if (anlage.typ === 'npc') {
+          basis = '👤 NPC';
+        } else if (anlage.typ === 'ort') {
+          basis = '🗺️ Ort';
+        } else if (anlage.typ === 'fraktion') {
+          basis = '🏛️ Fraktion';
+        } else if (anlage.typ === 'bestie') {
+          basis = '🦁 Bestarium';
+        } else if (anlage.typ === 'raetsel') {
+          basis = '🧩 Rätsel';
+        } else {
+          basis = '📦 Gegenstand';
         }
-        if (this.anlage.typ === 'ort') {
-          return '🗺️ Ort';
-        }
-        if (this.anlage.typ === 'fraktion') {
-          return '🏛️ Fraktion';
-        }
-        if (this.anlage.typ === 'bestie') {
-          return '🦁 Bestarium';
-        }
-        if (this.anlage.typ === 'raetsel') {
-          return '🧩 Rätsel';
-        }
-        return '📦 Gegenstand';
+        const name = anlage.zeile && String(anlage.zeile.name || '').trim();
+        return name ? `${basis}: ${name}` : basis;
+      },
+      zeileModalTitel() {
+        return this.zeileModalTitelBasis(this.anlage);
       },
       zeileModalTitelOverlay() {
-        if (!this.anlageOverlay.typ) {
-          return '';
-        }
-        if (this.anlageOverlay.typ === 'npc') {
-          return '👤 NPC';
-        }
-        if (this.anlageOverlay.typ === 'ort') {
-          return '🗺️ Ort';
-        }
-        if (this.anlageOverlay.typ === 'fraktion') {
-          return '🏛️ Fraktion';
-        }
-        if (this.anlageOverlay.typ === 'bestie') {
-          return '🦁 Bestarium';
-        }
-        if (this.anlageOverlay.typ === 'raetsel') {
-          return '🧩 Rätsel';
-        }
-        return '📦 Gegenstand';
+        return this.zeileModalTitelBasis(this.anlageOverlay);
       },
       zufallsgeneratorBereit() {
         return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
@@ -3424,9 +3411,13 @@ var HTBAH_REFACTOR_UTILS =
         if (!stats) {
           return;
         }
+        const zielwert = stats.begabungen[kategorie] || 0;
         this.$refs.charakterProbeWurfModal?.oeffnen({
           modus: 'begabung',
-          zielwert: stats.begabungen[kategorie] || 0,
+          basiswert: zielwert,
+          zielwert,
+          zeigtModifikator: true,
+          basisLabel: 'Begabung ' + this.charakterModalKategorieLabel(kategorie),
           titel: 'Probe: Begabung ' + this.charakterModalKategorieLabel(kategorie),
           untertitel:
             'Nur der Begabungswert — ohne einzelne Fähigkeit. Keine kritischen Erfolge (Regelwerk).',
@@ -3456,7 +3447,10 @@ var HTBAH_REFACTOR_UTILS =
         }
         this.$refs.charakterProbeWurfModal?.oeffnen({
           modus: 'faehigkeit',
+          basiswert: z,
           zielwert: z,
+          zeigtModifikator: true,
+          basisLabel: 'Effektivwert ' + (faehigkeit.name || 'Fähigkeit'),
           titel: 'Probe: ' + (faehigkeit.name || 'Fähigkeit'),
           untertitel,
         });
@@ -3491,6 +3485,7 @@ var HTBAH_REFACTOR_UTILS =
           titel: name ? `Parade-Probe: ${name}` : 'Parade-Probe (Charakter)',
           basiswert,
           ruestungen,
+          waffenlosParade: !ruestungen.length,
         });
       },
       winkelGradZwischenPunkten(vonX, vonY, nachX, nachY) {
@@ -5505,6 +5500,13 @@ var HTBAH_REFACTOR_UTILS =
         this.overlayZeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitungOverlay();
         this.overlayZeileQuillSelectionHandler = () => {};
         this.overlayZeileQuillInstanz.on('selection-change', this.overlayZeileQuillSelectionHandler);
+        this.overlayZeileQuillTextChangeHandler = (_delta, _oldDelta, source) => {
+          if (source !== 'user') {
+            return;
+          }
+          this.onZeileQuillTextChange('overlay');
+        };
+        this.overlayZeileQuillInstanz.on('text-change', this.overlayZeileQuillTextChangeHandler);
       },
       zeileQuillHostRef(el) {
         if (!el) {
@@ -5565,6 +5567,13 @@ var HTBAH_REFACTOR_UTILS =
         this.zeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitung();
         this.zeileQuillSelectionHandler = () => {};
         this.zeileQuillInstanz.on('selection-change', this.zeileQuillSelectionHandler);
+        this.zeileQuillTextChangeHandler = (_delta, _oldDelta, source) => {
+          if (source !== 'user') {
+            return;
+          }
+          this.onZeileQuillTextChange('anlage');
+        };
+        this.zeileQuillInstanz.on('text-change', this.zeileQuillTextChangeHandler);
       },
       quillHtmlInBearbeitungSchreiben() {
         if (!this.anlage.zeile || !this.zeileQuillInstanz) {
@@ -5576,6 +5585,15 @@ var HTBAH_REFACTOR_UTILS =
         } else {
           this.anlage.zeile.beschreibungHtml = html;
         }
+      },
+      onZeileQuillTextChange(kontext) {
+        if (kontext === 'overlay') {
+          this.withAnlageKontext('overlay', () => this.quillHtmlInBearbeitungSchreiben());
+          this.planBearbeitungDirtyPruefung('overlay');
+          return;
+        }
+        this.quillHtmlInBearbeitungSchreiben();
+        this.planBearbeitungDirtyPruefung('anlage');
       },
       bildImportNaechstesAusWarteschlange() {
         if (!this.medienImportWarteschlange.length) {
@@ -6270,15 +6288,23 @@ var HTBAH_REFACTOR_UTILS =
         hostElement = null,
         mentionController = null,
         selectionHandler = null,
+        textChangeHandler = null,
         toolbarContainer = null,
       } = {}) {
+        const handler = [];
+        if (selectionHandler) {
+          handler.push({ event: 'selection-change', fn: selectionHandler });
+        }
+        if (textChangeHandler) {
+          handler.push({ event: 'text-change', fn: textChangeHandler });
+        }
         const lifecycle = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
         if (lifecycle && typeof lifecycle.zerstoereQuillInstanz === 'function') {
           lifecycle.zerstoereQuillInstanz({
             quill,
             hostElement,
             mentionController,
-            handler: selectionHandler ? [{ event: 'selection-change', fn: selectionHandler }] : [],
+            handler,
             toolbarContainer,
           });
         } else if (mentionController && typeof mentionController.destroy === 'function') {
@@ -6301,11 +6327,13 @@ var HTBAH_REFACTOR_UTILS =
           hostElement: this.zeileQuillHostElement,
           mentionController: this.zeileMentionController,
           selectionHandler: this.zeileQuillSelectionHandler,
+          textChangeHandler: this.zeileQuillTextChangeHandler,
         });
         this.zeileMentionController = null;
         this.zeileQuillInstanz = null;
         this.zeileQuillHostElement = null;
         this.zeileQuillSelectionHandler = null;
+        this.zeileQuillTextChangeHandler = null;
       },
       anlageOverlayZeileQuillAufraeumen() {
         this.einzelQuillAufraeumen({
@@ -6313,11 +6341,13 @@ var HTBAH_REFACTOR_UTILS =
           hostElement: this.overlayZeileQuillHostElement,
           mentionController: this.overlayZeileMentionController,
           selectionHandler: this.overlayZeileQuillSelectionHandler,
+          textChangeHandler: this.overlayZeileQuillTextChangeHandler,
         });
         this.overlayZeileMentionController = null;
         this.overlayZeileQuillInstanz = null;
         this.overlayZeileQuillHostElement = null;
         this.overlayZeileQuillSelectionHandler = null;
+        this.overlayZeileQuillTextChangeHandler = null;
       },
       entferneFreiesElementLayoutUndLock(elementId) {
         if (!elementId) {
@@ -7313,6 +7343,7 @@ var HTBAH_REFACTOR_UTILS =
           :speicher-deaktiviert="speicherAnlageDeaktiviert"
           :speicher-hinweis="speicherAnlageHinweis"
           interaktive-welt-bearbeitung
+          :random-wizard-verfuegbar="false"
           :hat-ungespeicherte-aenderungen="bearbeitungUngespeichert.anlage"
           :zeile-quill-session="zeileQuillSession"
           :zeile-quill-host-ref-fn="zeileQuillHostRefFn"
@@ -7347,6 +7378,7 @@ var HTBAH_REFACTOR_UTILS =
           :speicher-deaktiviert="speicherAnlageDeaktiviert"
           :speicher-hinweis="speicherAnlageHinweis"
           interaktive-welt-bearbeitung
+          :random-wizard-verfuegbar="false"
           :hat-ungespeicherte-aenderungen="bearbeitungUngespeichert.overlay"
           :zeile-quill-session="overlayZeileQuillSession"
           :zeile-quill-host-ref-fn="overlayZeileQuillHostRefFn"

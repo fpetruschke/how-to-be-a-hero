@@ -406,7 +406,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         Kampagnen anlegen und verwalten.
       </p>
 
-      <div class="card bg-white p-3 mb-3 text-start">
+      <div class="card p-3 mb-3 text-start">
         <h5 class="mb-2">Kampagne hinzufügen</h5>
         <div class="row g-2 align-items-stretch">
           <div class="col-12 col-sm">
@@ -437,7 +437,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         </div>
 
         <div v-else class="table-responsive rounded border d-none d-md-block">
-          <table class="table table-hover align-middle mb-0">
+          <table class="table table-hover align-middle mb-0 htbah-kampagnen-tabelle">
             <thead class="table-light">
               <tr>
                 <th scope="col">Name</th>

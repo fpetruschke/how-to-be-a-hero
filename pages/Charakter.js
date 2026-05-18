@@ -139,7 +139,7 @@ window.HTBAH_SEITEN.Charakter = {
       if (pfad.endsWith('/aktives-spiel')) {
         return 'spiel';
       }
-      if (pfad.endsWith('/nachbereitung')) {
+      if (pfad.endsWith('/daten')) {
         return 'verwaltung';
       }
       return 'setup';
@@ -413,7 +413,7 @@ window.HTBAH_SEITEN.Charakter = {
       const map = {
         setup: 'session-zero',
         spiel: 'aktives-spiel',
-        verwaltung: 'nachbereitung',
+        verwaltung: 'daten',
       };
       const suffix = map[tab] || 'session-zero';
       const basis = this.istNeuModus ? '/charakter/neu' : `/charakter/${this.charakterId}`;
@@ -1270,6 +1270,7 @@ window.HTBAH_SEITEN.Charakter = {
         titel: 'Parade-Probe (Charakter)',
         basiswert: this.begabungen.handeln,
         ruestungen,
+        waffenlosParade: !ruestungen.length,
       });
     },
     kategorieAnzeige(kategorie) {
@@ -1281,9 +1282,13 @@ window.HTBAH_SEITEN.Charakter = {
       return Math.min(100, basis + this.begabungen[kategorie]);
     },
     probeModalOeffnenBegabung(kategorie) {
+      const zielwert = this.begabungen[kategorie];
       this.$refs.probeWurfModal.oeffnen({
         modus: 'begabung',
-        zielwert: this.begabungen[kategorie],
+        basiswert: zielwert,
+        zielwert,
+        zeigtModifikator: !!this.spielleiterMitglied,
+        basisLabel: 'Begabung ' + this.kategorieAnzeige(kategorie),
         titel: 'Probe: Begabung ' + this.kategorieAnzeige(kategorie),
         untertitel:
           'Nur der Begabungswert — ohne einzelne Fähigkeit. Keine kritischen Erfolge (Regelwerk).',
@@ -1309,7 +1314,10 @@ window.HTBAH_SEITEN.Charakter = {
       }
       this.$refs.probeWurfModal.oeffnen({
         modus: 'faehigkeit',
+        basiswert: z,
         zielwert: z,
+        zeigtModifikator: !!this.spielleiterMitglied,
+        basisLabel: 'Effektivwert ' + faehigkeit.name,
         titel: 'Probe: ' + faehigkeit.name,
         untertitel,
       });
@@ -1370,7 +1378,7 @@ window.HTBAH_SEITEN.Charakter = {
         <span>{{ istEditModus ? 'Charakter bearbeiten' : 'Neuen Charakter erstellen' }}</span>
       </h4>
       <p v-if="!spielleiterMitglied && istEditModus" class="small text-body-secondary text-center mt-n2 mb-2">
-        Session Zero, aktives Spiel und Nachbereitung in einem durchgehenden Flow.
+        Session Zero, aktives Spiel und Daten in einem durchgehenden Flow.
       </p>
       <div
         v-if="spielleiterMitglied && (charakterLebenspunkteStatus.tot || charakterLebenspunkteStatus.bewusstlos)"
@@ -1456,7 +1464,7 @@ window.HTBAH_SEITEN.Charakter = {
             :class="{ active: aktiveCharakterTab === 'verwaltung' }"
             @click="wechsleCharakterTab('verwaltung')">
             <span aria-hidden="true">🗂️</span>
-            <span>Nachbereitung</span>
+            <span>Daten</span>
           </button>
         </li>
       </ul>

@@ -9,10 +9,17 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
     };
   },
   computed: {
+    viewerThemeKey() {
+      return window.HTBAH && typeof window.HTBAH.ladeTheme === 'function' && window.HTBAH.ladeTheme() === 'dark'
+        ? 'dark'
+        : 'light';
+    },
     viewerUrl() {
+      void this.viewerThemeKey;
       const regelwerkUrl = window.HTBAH.ermittleRegelwerkQuelleUrl();
       const viewerBasisUrl = window.HTBAH.ermittleAssetUrl('assets/pdfjs/web/viewer.html');
-      return `${viewerBasisUrl}?file=${encodeURIComponent(regelwerkUrl)}#zoom=page-width&pagemode=thumbs`;
+      const themeParam = this.viewerThemeKey === 'dark' ? 'dark' : 'light';
+      return `${viewerBasisUrl}?file=${encodeURIComponent(regelwerkUrl)}&htbahTheme=${themeParam}#zoom=page-width&pagemode=thumbs`;
     },
     fensterStil() {
       return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this);
@@ -38,6 +45,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
       this.beendeZiehen();
       this.beendeResize();
       this.istVollbild = false;
+      this.entsorgeViewerIframe();
       this.stelleFokusWiederHer();
     },
   },
@@ -47,6 +55,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
   beforeUnmount() {
     this.beendeZiehen();
     this.beendeResize();
+    this.entsorgeViewerIframe();
     window.removeEventListener('resize', this.beiFensterGroesseGeaendert);
   },
   methods: {
@@ -71,6 +80,36 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
     },
     onFensterEscape() {
       this.schliessen();
+    },
+    entsorgeViewerIframe() {
+      const iframe = this.$refs.viewerIframe;
+      if (iframe && typeof iframe.src === 'string' && iframe.src !== 'about:blank') {
+        iframe.src = 'about:blank';
+      }
+    },
+    beimViewerLoad() {
+      const iframe = this.$refs.viewerIframe;
+      const win = iframe && iframe.contentWindow ? iframe.contentWindow : null;
+      if (!win) {
+        return;
+      }
+      const themeVal =
+        window.HTBAH && typeof window.HTBAH.ladeTheme === 'function' && window.HTBAH.ladeTheme() === 'dark'
+          ? 2
+          : 1;
+      const wendeViewerThemeAn = () => {
+        if (win.PDFViewerApplicationOptions && typeof win.PDFViewerApplicationOptions.set === 'function') {
+          win.PDFViewerApplicationOptions.set('viewerCssTheme', themeVal);
+        }
+        if (win.PDFViewerApplication && typeof win.PDFViewerApplication._forceCssTheme === 'function') {
+          win.PDFViewerApplication._forceCssTheme();
+        }
+      };
+      if (win.PDFViewerApplication && win.PDFViewerApplication.initializedPromise) {
+        win.PDFViewerApplication.initializedPromise.then(wendeViewerThemeAn).catch(wendeViewerThemeAn);
+      } else {
+        wendeViewerThemeAn();
+      }
     },
   },
   template: `
@@ -111,7 +150,13 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
             <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>
         </div>
-        <iframe :src="viewerUrl" class="regelwerk-modal-content"></iframe>
+        <iframe
+          ref="viewerIframe"
+          :key="'regelwerk-viewer-' + viewerThemeKey"
+          :src="viewerUrl"
+          class="regelwerk-modal-content"
+          title="Regelwerk PDF"
+          @load="beimViewerLoad"></iframe>
         <div
           v-if="!istVollbild"
           class="regelwerk-modal-resize-handle"

@@ -200,6 +200,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     hatAktiveKampagne() {
       return this.istInKampagneRoute && !!this.aktiveKampagneId;
     },
+    hatSpielleiterKampagneGewaehlt() {
+      return !!this.aktiveKampagneId;
+    },
     presetVerwaltungAktiv() {
       const p = this.$route.path || '';
       return (
@@ -322,9 +325,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         pantheon: Array.isArray(z.pantheon) ? z.pantheon : [],
       };
     },
-    /** Reiter „Begegnung“: nur mit aktiver Kampagne und mindestens NPC oder Bestie (nicht Pantheon allein). */
+    /** Reiter „Zufallsbegegnung“: gewählte Kampagne + mindestens NPC oder Bestie. */
     begegnungReiterMoeglich() {
-      if (!this.hatAktiveKampagne) {
+      if (!this.hatSpielleiterKampagneGewaehlt) {
         return false;
       }
       const { npcs, bestien } = this.begegnungListenAusSpeicher;
@@ -333,6 +336,16 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     begegnungHatBegegnungsEintrag() {
       const { npcs, bestien, pantheon } = this.begegnungListenAusSpeicher;
       return npcs.length > 0 || bestien.length > 0 || pantheon.length > 0;
+    },
+    begegnungKannInWeltOeffnen() {
+      if (!this.begegnungZiehung || !this.begegnungZiehung.zeile) {
+        return false;
+      }
+      const typ = String(this.begegnungZiehung.typ || '').trim();
+      if (typ !== 'npc' && typ !== 'bestie') {
+        return false;
+      }
+      return !!String(this.begegnungZiehung.zeile.id || '').trim();
     },
     wuerfelBeutelFensterStil() {
       return window.HTBAH_MODAL_FENSTER.berechneFensterStil.call(this.wuerfelBeutelFenster);
@@ -430,7 +443,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.synchronisiereKampagnenbasierteDaten();
         return;
       }
-      if (this.wuerfelModalTab === 'atmosphaere' || this.wuerfelModalTab === 'begegnung') {
+      if (this.wuerfelModalTab === 'atmosphaere') {
+        this.wuerfelModalTab = 'wuerfel';
+      }
+    },
+    hatSpielleiterKampagneGewaehlt(neu) {
+      if (!neu && this.wuerfelModalTab === 'begegnung') {
         this.wuerfelModalTab = 'wuerfel';
       }
     },
@@ -2223,11 +2241,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       if (!payload) {
         return;
       }
+      const openPayload = { ...payload, openMode: 'open' };
       const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
       if (mentionApi && typeof mentionApi.oeffneEntitaetGlobal === 'function') {
-        mentionApi.oeffneEntitaetGlobal(payload);
+        mentionApi.oeffneEntitaetGlobal(openPayload);
       } else {
-        this.sendeBegegnungOpenRequest(payload);
+        this.sendeBegegnungOpenRequest(openPayload);
       }
       const zielPfad = '/weltenbau/zufallstabellen';
       const istSchonDort = this.$route && this.$route.path === zielPfad;
@@ -2238,9 +2257,41 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           }
           this.begegnungOpenRequestTimeoutId = window.setTimeout(() => {
             this.begegnungOpenRequestTimeoutId = null;
-            this.sendeBegegnungOpenRequest(payload);
+            this.sendeBegegnungOpenRequest(openPayload);
           }, 120);
         });
+      }
+      this.wuerfelBeutelSchliessen();
+    },
+    begegnungInWeltOeffnen() {
+      if (!this.begegnungKannInWeltOeffnen) {
+        return;
+      }
+      const payload = this.begegnungOpenPayload();
+      if (!payload) {
+        return;
+      }
+      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+      if (!mentionApi || typeof mentionApi.oeffneEntitaetGlobal !== 'function') {
+        window.HTBAH.ui.alert({
+          titel: 'Interaktive Welt nicht verfügbar',
+          beschreibung: 'Die Verknüpfung zur Interaktiven Welt ist aktuell nicht geladen.',
+        });
+        return;
+      }
+      mentionApi.oeffneEntitaetGlobal({ ...payload, openMode: 'focus' });
+      const kampagnenPfad =
+        window.HTBAH && typeof window.HTBAH.kampagnenPfad === 'function'
+          ? window.HTBAH.kampagnenPfad
+          : null;
+      if (kampagnenPfad && this.$router && typeof this.$router.push === 'function') {
+        const ziel = kampagnenPfad('welt', this.aktiveKampagneId);
+        if (!this.$route || this.$route.path !== ziel) {
+          const nav = this.$router.push(ziel);
+          if (nav && typeof nav.catch === 'function') {
+            nav.catch(() => {});
+          }
+        }
       }
       this.wuerfelBeutelSchliessen();
     },
@@ -2314,7 +2365,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             <template v-if="rolle === 'charakter'">
               <router-link
                 :to="charakterLink"
-                title="Charakter (Session Zero, aktives Spiel, Nachbereitung)"
+                title="Charakter (Session Zero, aktives Spiel, Daten)"
                 class="htbah-nav-item"
                 :class="{ 'router-link-active': charakterAktiv }">
                 <span class="htbah-nav-item-emoji" aria-hidden="true">🧙</span>
@@ -2401,7 +2452,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </router-link>
             <router-link
               :to="charakterLink"
-              title="Charakter (Session Zero, aktives Spiel, Nachbereitung)"
+              title="Charakter (Session Zero, aktives Spiel, Daten)"
               :class="{ 'router-link-active': charakterAktiv }">
               🧙
             </router-link>
@@ -2700,7 +2751,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     class="nav-link"
                     :class="{ active: wuerfelModalTab === 'begegnung' }"
                     @click="wuerfelModalTab = 'begegnung'">
-                    Begegnung
+                    Zufallsbegegnung
                   </button>
                 </li>
               </ul>
@@ -3065,20 +3116,20 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                       type="button"
                       class="btn btn-primary"
                       @click="begegnungZiehen('auto')">
-                      Begegnung ziehen
+                      Zufallsbegegnung ziehen
                     </button>
                     <button
                       type="button"
                       class="btn btn-primary dropdown-toggle dropdown-toggle-split"
                       data-bs-toggle="dropdown"
                       aria-expanded="false"
-                      aria-label="Begegnungstyp auswählen">
+                      aria-label="Zufallsbegegnungstyp auswählen">
                       <span class="visually-hidden">Menü öffnen</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end w-100">
                       <li>
                         <button type="button" class="dropdown-item" @click="begegnungZiehen('auto')">
-                          Zufällig (Standard)
+                          Zufällig (NPC oder Bestie)
                         </button>
                       </li>
                       <li><hr class="dropdown-divider"></li>
@@ -3116,8 +3167,21 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     class="card border-0 shadow-sm overflow-hidden">
                     <div
                       class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
-                      <span class="fw-semibold text-truncate me-2">{{ begegnungZiehung.zeile.name || 'Ohne Namen' }}</span>
-                      <div class="d-flex align-items-center gap-2">
+                      <div class="input-group input-group-sm flex-grow-1 me-2" style="min-width: 0;">
+                        <span class="form-control text-truncate fw-semibold bg-transparent border-end-0">
+                          {{ begegnungZiehung.zeile.name || 'Ohne Namen' }}
+                        </span>
+                        <button
+                          v-if="begegnungKannInWeltOeffnen"
+                          type="button"
+                          class="btn btn-outline-secondary htbah-input-icon-btn"
+                          title="In interaktiver Welt öffnen"
+                          aria-label="In interaktiver Welt öffnen"
+                          @click="begegnungInWeltOeffnen">
+                          🌍
+                        </button>
+                      </div>
+                      <div class="d-flex align-items-center gap-2 flex-shrink-0">
                         <span
                           v-if="begegnungZiehung.typ === 'npc'"
                           class="badge rounded-pill text-bg-primary flex-shrink-0">

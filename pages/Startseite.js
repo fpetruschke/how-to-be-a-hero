@@ -147,6 +147,31 @@ window.HTBAH_SEITEN.Startseite = {
       </div>
 
       <div
+          class="card action-card text-start mb-3 cursor-pointer"
+          role="button"
+          tabindex="0"
+          aria-label="Pen und Paper Hilfe öffnen"
+          @click="penPaperInfoOeffnen"
+          @keydown.enter.prevent="penPaperInfoOeffnen"
+          @keydown.space.prevent="penPaperInfoOeffnen">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <div class="htbah-start-card-avatar flex-shrink-0">
+            <span class="htbah-start-card-avatar-emoji" aria-hidden="true">📝</span>
+          </div>
+          <div class="min-w-0 flex-grow-1">
+            <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
+              Pen &amp; Paper
+            </p>
+            <h5 class="mb-1 text-truncate htbah-start-card-charaktername">Wie funktioniert eigentlich Pen &amp; Paper?</h5>
+            <p class="mb-0 small text-body-secondary">Ein schneller Einstieg für Neulinge.</p>
+          </div>
+          <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
+            chevron_right
+          </span>
+        </div>
+      </div>
+      
+      <div
         class="card action-card text-start mb-3 cursor-pointer"
         role="button"
         tabindex="0"
@@ -164,31 +189,6 @@ window.HTBAH_SEITEN.Startseite = {
             </p>
             <h5 class="mb-1 text-truncate htbah-start-card-charaktername">{{ projektTitel }}</h5>
             <p class="mb-0 small text-body-secondary">{{ projektUntertitel }}</p>
-          </div>
-          <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
-            chevron_right
-          </span>
-        </div>
-      </div>
-
-      <div
-        class="card action-card text-start mb-3 cursor-pointer"
-        role="button"
-        tabindex="0"
-        aria-label="Pen und Paper Hilfe öffnen"
-        @click="penPaperInfoOeffnen"
-        @keydown.enter.prevent="penPaperInfoOeffnen"
-        @keydown.space.prevent="penPaperInfoOeffnen">
-        <div class="d-flex align-items-center justify-content-between gap-2">
-          <div class="htbah-start-card-avatar flex-shrink-0">
-            <span class="htbah-start-card-avatar-emoji" aria-hidden="true">📝</span>
-          </div>
-          <div class="min-w-0 flex-grow-1">
-            <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
-              Pen &amp; Paper
-            </p>
-            <h5 class="mb-1 text-truncate htbah-start-card-charaktername">Wie funktioniert eigentlich Pen &amp; Paper?</h5>
-            <p class="mb-0 small text-body-secondary">Ein schneller Einstieg für Neulinge.</p>
           </div>
           <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
             chevron_right

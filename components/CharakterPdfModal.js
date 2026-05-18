@@ -41,11 +41,22 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
         this.fokusVorModal.focus();
       }
       this.fokusVorModal = null;
+      this.entsorgeViewerIframe();
     },
+  },
+  beforeUnmount() {
+    this.entsorgeViewerIframe();
   },
   methods: {
     schliessen() {
+      this.entsorgeViewerIframe();
       this.$emit('schliessen');
+    },
+    entsorgeViewerIframe() {
+      const iframe = this.$refs.pdfIframe;
+      if (iframe && typeof iframe.src === 'string' && iframe.src !== 'about:blank') {
+        iframe.src = 'about:blank';
+      }
     },
     onFensterEscape() {
       this.schliessen();
