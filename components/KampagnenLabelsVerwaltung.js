@@ -277,7 +277,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
         <div class="border-top pt-3">
           <div class="small fw-semibold mb-2">Neues Label</div>
-          <div class="row g-2 align-items-end">
+          <div class="row g-2 align-items-end htbah-klv-neu-form">
             <div class="col-auto">
               <span class="form-label small d-block mb-1">Typ</span>
               <div class="btn-group btn-group-sm" role="group" aria-label="Typ für neues Label">
@@ -307,20 +307,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 </button>
               </div>
             </div>
-            <div class="col-12 col-md">
+            <div class="col-12 col-lg-auto htbah-klv-neu-name">
               <label class="form-label small mb-0" for="klv-neu-name">Name</label>
               <input
                 id="klv-neu-name"
                 v-model="neuerName"
                 type="text"
                 class="form-control form-control-sm"
-                placeholder="z. B. Horror oder Lustig"
+                placeholder="z. B. Horror"
                 autocomplete="off"
                 @keydown.enter.prevent="labelHinzufuegen" />
             </div>
-            <div class="col-12">
+            <div class="col-12 col-lg-auto htbah-klv-neu-hintergrund">
               <span class="form-label small d-block mb-1" id="klv-neu-bg-label">Hintergrund</span>
-              <div class="d-flex flex-wrap gap-1" role="radiogroup" aria-labelledby="klv-neu-bg-label">
+              <div class="d-flex flex-wrap gap-1 htbah-klv-neu-hintergrund-swatches" role="radiogroup" aria-labelledby="klv-neu-bg-label">
                 <button
                   v-for="f in hintergrundFarbenMeta"
                   :key="'neu-farbe-' + f.id"
@@ -336,20 +336,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 </button>
               </div>
             </div>
-            <div class="col-6 col-md-auto">
+            <div class="col-6 col-lg-auto">
               <label class="form-label small mb-0" for="klv-neu-text">Text</label>
               <select id="klv-neu-text" v-model="neuerText" class="form-select form-select-sm">
                 <option value="light">Hell</option>
                 <option value="dark">Dunkel</option>
               </select>
             </div>
-            <div class="col-12 d-flex flex-wrap align-items-center gap-2">
+            <div class="col-12 col-lg-auto d-flex flex-wrap align-items-end gap-2 htbah-klv-neu-aktion">
               <span
                 class="badge"
                 :class="badgeKlasse({ kategorie: neueKategorie, bg: neuerBg, text: neuerText, name: neuerName })">
                 {{ neuerName || 'Vorschau' }}
               </span>
-              <button type="button" class="btn btn-sm btn-primary ms-auto" :disabled="!neuerName.trim()" @click="labelHinzufuegen">
+              <button type="button" class="btn btn-sm btn-primary ms-auto ms-lg-0" :disabled="!neuerName.trim()" @click="labelHinzufuegen">
                 Anlegen
               </button>
             </div>

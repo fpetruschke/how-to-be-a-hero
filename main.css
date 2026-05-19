@@ -2143,6 +2143,21 @@ input::placeholder {
   max-height: 90vh;
 }
 
+/* Charakter: Inventar (breites, verschiebbares Fenster) */
+.htbah-inventar-modal-window.regelwerk-modal-window {
+  width: min(96vw, 1400px);
+  height: min(88vh, 860px);
+  max-height: min(92dvh, 900px);
+  overflow: hidden;
+  padding: 0;
+}
+
+.htbah-inventar-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
 .abenteuerbuch-modal-editor-wrap {
   flex: 1 1 auto;
   min-height: 12rem;
@@ -4479,5 +4494,24 @@ body.htbah-bestien-wizard-offen .modal-backdrop {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (min-width: 992px) {
+  .htbah-klv-neu-form {
+    flex-wrap: nowrap;
+  }
+
+  .htbah-klv-neu-form .htbah-klv-neu-name .form-control {
+    width: 8.5rem;
+    max-width: 8.5rem;
+  }
+
+  .htbah-klv-neu-hintergrund-swatches {
+    flex-wrap: nowrap;
+  }
+
+  .htbah-klv-neu-aktion {
+    margin-left: auto;
+  }
 }
 

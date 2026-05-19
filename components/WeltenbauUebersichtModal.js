@@ -265,27 +265,6 @@ var HTBAH_REFACTOR_UTILS =
       aktiveGruppe() {
         return this.gruppen.find((g) => g.id === this.gruppeId) || null;
       },
-      zeileModalTitelBasis(anlage) {
-        if (!anlage || !anlage.typ) {
-          return '';
-        }
-        let basis = '';
-        if (anlage.typ === 'npc') {
-          basis = '👤 NPC';
-        } else if (anlage.typ === 'ort') {
-          basis = '🗺️ Ort';
-        } else if (anlage.typ === 'fraktion') {
-          basis = '🏛️ Fraktion';
-        } else if (anlage.typ === 'bestie') {
-          basis = '🦁 Bestarium';
-        } else if (anlage.typ === 'raetsel') {
-          basis = '🧩 Rätsel';
-        } else {
-          basis = '📦 Gegenstand';
-        }
-        const name = anlage.zeile && String(anlage.zeile.name || '').trim();
-        return name ? `${basis}: ${name}` : basis;
-      },
       zeileModalTitel() {
         return this.zeileModalTitelBasis(this.anlage);
       },
@@ -734,6 +713,27 @@ var HTBAH_REFACTOR_UTILS =
       },
     },
     methods: {
+      zeileModalTitelBasis(anlage) {
+        if (!anlage || !anlage.typ) {
+          return '';
+        }
+        let basis = '';
+        if (anlage.typ === 'npc') {
+          basis = '👤 NPC';
+        } else if (anlage.typ === 'ort') {
+          basis = '🗺️ Ort';
+        } else if (anlage.typ === 'fraktion') {
+          basis = '🏛️ Fraktion';
+        } else if (anlage.typ === 'bestie') {
+          basis = '🦁 Bestarium';
+        } else if (anlage.typ === 'raetsel') {
+          basis = '🧩 Rätsel';
+        } else {
+          basis = '📦 Gegenstand';
+        }
+        const name = anlage.zeile && String(anlage.zeile.name || '').trim();
+        return name ? `${basis}: ${name}` : basis;
+      },
       withAnlageKontext(ziel, fn) {
         if (ziel !== 'overlay') {
           return fn();

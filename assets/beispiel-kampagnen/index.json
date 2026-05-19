@@ -1,17 +1,25 @@
 [
   {
-    "datei": "das-schwarze-wasser.json",
-    "titel": "Das schwarze Wasser (Demo)",
-    "untertitel": "Einstiegs-One-Shot für Spielleiter",
-    "beschreibung": "Dauer etwas 60 Minuten - überschaubarer Umfang.Küstendorf, Alchemielabor unter den Klippen und Leckgift ins Grundwasser — klares Ziel, wenige NPCs, mehrere Lösungswege in etwa 60 Minuten.",
-    "autoren": "Florian Petruschke"
+    "datei": "1-heldenpruefung-fuer-anfaenger.json",
+    "titel": "Heldenprüfung für Anfänger (Tutorial)",
+    "untertitel": "Tutorial-Abenteuer zur Krummen Kerze",
+    "beschreibung": "Humorvolles Regel-Tutorial: Gilde, Heldentypen, Proben, Soziales, Kampf, Parieren und Finale gegen den Schleimschlucker — für neue Spieler und Spielleiter.",
+    "autoren": "Florian Petruschke",
+    "kontext": "Tutorial / Einsteiger"
   },
   {
-    "datei": "schroeders-heisse-kastanien.json",
+    "datei": "2-schroeders-heisse-kastanien.json",
     "titel": "Schröders heiße Kastanien (Demo)",
     "untertitel": "HTBAH-Einsteigerabenteuer",
     "beschreibung": "Ca. 1,5–3 Stunden am Dorfmarkt: Kastanien verkaufen, Regeln spielerisch lernen, Diebstahl, Lüge und moralische Entscheidung — für Neulinge und neue Spielleiter.",
     "autoren": "Florian Petruschke",
     "kontext": "Tutorial / Session-0-Folge"
+  },
+  {
+    "datei": "3-das-schwarze-wasser.json",
+    "titel": "Das schwarze Wasser (Demo)",
+    "untertitel": "Einstiegs-One-Shot für Spielleiter",
+    "beschreibung": "Dauer etwas 60 Minuten - überschaubarer Umfang.Küstendorf, Alchemielabor unter den Klippen und Leckgift ins Grundwasser — klares Ziel, wenige NPCs, mehrere Lösungswege in etwa 60 Minuten.",
+    "autoren": "Florian Petruschke"
   }
 ]
