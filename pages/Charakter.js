@@ -244,6 +244,14 @@ window.HTBAH_SEITEN.Charakter = {
     '$route.fullPath'() {
       if (!this.spielleiterMitglied) {
         this.initialisiereCharakterAusRoute();
+        if (
+          this.istNeuModus &&
+          this.$route.path.startsWith('/charakter/neu/') &&
+          !this.$route.path.endsWith('/session-zero')
+        ) {
+          this.$router.replace('/charakter/neu/session-zero');
+          return;
+        }
       }
       this.zeigePresetAktionen = !this.spielleiterMitglied && this.istSetupTabAktiv;
     },
@@ -296,59 +304,11 @@ window.HTBAH_SEITEN.Charakter = {
     },
   },
   methods: {
-    hatMindestensEineFaehigkeit(charakter) {
-      const c = charakter && typeof charakter === 'object' ? charakter : {};
-      return ['handeln', 'wissen', 'soziales'].some((kategorie) => {
-        const liste = Array.isArray(c[kategorie]) ? c[kategorie] : [];
-        return liste.some((eintrag) => {
-          if (!eintrag || typeof eintrag !== 'object') {
-            return false;
-          }
-          const name = typeof eintrag.name === 'string' ? eintrag.name.trim() : '';
-          const wert = Number(eintrag.value);
-          return !!name || Number.isFinite(wert);
-        });
-      });
-    },
-    hatImportierteSicherheitsmechanismen(charakter) {
-      const sicher = charakter && charakter.sicherheitsmechanismen && typeof charakter.sicherheitsmechanismen === 'object'
-        ? charakter.sicherheitsmechanismen
-        : {};
-      const tabu = typeof sicher.tabuHtml === 'string' ? sicher.tabuHtml.replace(/<[^>]*>/g, '').trim() : '';
-      const schleier =
-        typeof sicher.schleierHtml === 'string' ? sicher.schleierHtml.replace(/<[^>]*>/g, '').trim() : '';
-      return !!tabu || !!schleier;
-    },
-    hatMindestensEinAusgefuelltesCharakterfeld(charakter) {
-      const c = charakter && typeof charakter === 'object' ? charakter : {};
-      const textFelder = [
-        'name',
-        'geschlecht',
-        'initiative',
-        'aufenthaltsort',
-        'fraktion',
-        'statur',
-        'glaube',
-        'beruf',
-        'familienstand',
-      ];
-      if (textFelder.some((feld) => typeof c[feld] === 'string' && c[feld].trim())) {
-        return true;
+    merkeAktivesSpielBegonnen() {
+      if (this.spielleiterMitglied || this.charakter.aktivesSpielBegonnen) {
+        return;
       }
-      if (Number.isFinite(Number(c.alter)) && c.alter !== null && c.alter !== '') {
-        return true;
-      }
-      if (Array.isArray(c.fraktionen) && c.fraktionen.some((eintrag) => typeof eintrag === 'string' && eintrag.trim())) {
-        return true;
-      }
-      return false;
-    },
-    sollMitAktivemSpielStarten(charakter) {
-      const hatBasisdaten = this.hatMindestensEinAusgefuelltesCharakterfeld(charakter);
-      if (!hatBasisdaten) {
-        return false;
-      }
-      return this.hatImportierteSicherheitsmechanismen(charakter) || this.hatMindestensEineFaehigkeit(charakter);
+      this.charakter.aktivesSpielBegonnen = true;
     },
     initialisiereCharakterAusRoute() {
       if (this.spielleiterMitglied) {
@@ -408,6 +368,9 @@ window.HTBAH_SEITEN.Charakter = {
       // Kein erzwungener Tab-Sprung: Session Zero und Aktives Spiel müssen frei wechselbar bleiben.
     },
     wechsleCharakterTab(tab) {
+      if (tab === 'spiel' && this.aktiveCharakterTab === 'setup') {
+        this.merkeAktivesSpielBegonnen();
+      }
       const map = {
         setup: 'session-zero',
         spiel: 'aktives-spiel',
@@ -1407,37 +1370,7 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div
-        v-if="!spielleiterMitglied && istNeuModus"
-        class="alert alert-info mb-2">
-        <p class="small mb-2">
-          Bestehenden Charakter importieren (Einzel-Export oder Komplett-Export).
-          Bei mehreren enthaltenen Charakteren kannst du danach einen auswählen.
-        </p>
-        <div class="row g-2">
-          <div class="col-12 col-md-6">
-            <div class="form-floating">
-              <input
-                id="ce-char-import"
-                type="file"
-                accept="application/json,.json"
-                class="form-control"
-                @change="importDateiAusgewaehlt" />
-              <label for="ce-char-import">Charakter aus Datei importieren</label>
-            </div>
-          </div>
-          <div v-if="importDateiname" class="col-12">
-            <p class="small text-body-secondary mb-0">
-              Datei: {{ importDateiname }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="importHinweis && !spielleiterMitglied" class="alert alert-secondary py-2 mb-2">
-        {{ importHinweis }}
-      </div>
-      <div v-if="!spielleiterMitglied && istSetupTabAktiv" class="card p-3 mb-2">
+      <div v-if="!spielleiterMitglied && istNeuModus" class="card p-3 mb-2">
         <h6 class="mb-2">Blanko-PDF-Export</h6>
         <p class="small text-body-secondary mb-2">
           Exportiert ein leeres Charakterblatt (inkl. Seite 2), damit Werte handschriftlich eingetragen werden können.
@@ -1466,8 +1399,49 @@ window.HTBAH_SEITEN.Charakter = {
           </div>
         </div>
       </div>
+
+      <div
+        v-if="!spielleiterMitglied && istNeuModus"
+        class="card p-3 mb-2">
+        <h6 class="mb-2">Bestehenden Charakter importieren</h6>
+        <p class="small text-body-secondary mb-2">
+          Einzel-Export oder Komplett-Export. Bei mehreren enthaltenen Charakteren kannst du danach einen auswählen.
+        </p>
+        <div class="row g-2">
+          <div class="col-12 col-md-6">
+            <div class="form-floating">
+              <input
+                id="ce-char-import"
+                type="file"
+                accept="application/json,.json"
+                class="form-control"
+                @change="importDateiAusgewaehlt" />
+              <label for="ce-char-import">Charakter aus Datei importieren</label>
+            </div>
+          </div>
+          <div v-if="importDateiname" class="col-12">
+            <p class="small text-body-secondary mb-0">
+              Datei: {{ importDateiname }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="importHinweis && !spielleiterMitglied && istNeuModus" class="alert alert-secondary py-2 mb-2">
+        {{ importHinweis }}
+      </div>
+
+      <div
+        v-if="!spielleiterMitglied && istNeuModus"
+        class="alert alert-info mb-2"
+        role="note">
+        <p class="small mb-0">
+          Wie sieht Dein Charakter aus? Gibt es eine Hintergrundgeschichte? Was steckt bereits im Inventar?
+        </p>
+      </div>
+
       <ul
-        v-if="!spielleiterMitglied"
+        v-if="!spielleiterMitglied && istEditModus"
         class="nav htbah-weltenbau-pill-tabs mb-2"
         role="tablist"
         aria-label="Charakter Bereiche">
@@ -1502,9 +1476,9 @@ window.HTBAH_SEITEN.Charakter = {
           </button>
         </li>
       </ul>
-      <div v-if="!spielleiterMitglied" class="alert alert-info py-2 px-3 small mb-2" role="note">
+      <div v-if="!spielleiterMitglied && istEditModus" class="alert alert-info py-2 px-3 small mb-2" role="note">
         <span v-if="aktiveCharakterTab === 'setup'">
-          Session Zero: Stammdaten, Sicherheitsmechanismen sowie Vor- und Nachteile pflegen. PDF-Export ist hier ebenfalls möglich.
+          Session Zero: Stammdaten, Sicherheitsmechanismen sowie Vor- und Nachteile pflegen.
         </span>
         <span v-else-if="aktiveCharakterTab === 'spiel'">
           Aktives Spiel: Fähigkeiten, Initiative, Inventar und Notizen laufend aktualisieren (Autosave aktiv).
@@ -1619,7 +1593,7 @@ window.HTBAH_SEITEN.Charakter = {
         </label>
       </div>
 
-      <div v-if="spielleiterMitglied || istSetupTabAktiv" class="card p-3 mb-2">
+      <div v-if="spielleiterMitglied || istNeuModus || istSetupTabAktiv" class="card p-3 mb-2">
         <div class="row g-3 htbah-charakter-stammdaten-row">
           <div class="col-12 col-lg order-lg-2">
             <div class="mb-3">

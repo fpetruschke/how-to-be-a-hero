@@ -100,7 +100,11 @@ window.HTBAH_SEITEN.Startseite = {
     rolleCharakterMitIdWaehlen(id) {
       window.HTBAH.speichereAppRolle('charakter');
       window.HTBAH.setzeAktivenCharakterId(id);
-      this.$router.push(`/charakter/${id}`);
+      const eintrag = window.HTBAH.ladeCharakterEintrag(id);
+      const suffix = eintrag
+        ? window.HTBAH_CHARAKTER_MODEL.charakterStandardTabSuffix(eintrag.charakter)
+        : 'session-zero';
+      this.$router.push(`/charakter/${id}/${suffix}`);
     },
     rolleSpielleitungWaehlen() {
       window.HTBAH.speichereAppRolle('spielleitung');

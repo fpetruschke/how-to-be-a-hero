@@ -228,7 +228,14 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       if (!id && pfad.startsWith('/charakter/neu/')) {
         return pfad;
       }
-      return id ? `/charakter/${id}/session-zero` : '/charakter/neu/session-zero';
+      if (!id) {
+        return '/charakter/neu/session-zero';
+      }
+      const eintrag = window.HTBAH.ladeCharakterEintrag(id);
+      const suffix = eintrag
+        ? window.HTBAH_CHARAKTER_MODEL.charakterStandardTabSuffix(eintrag.charakter)
+        : 'session-zero';
+      return `/charakter/${id}/${suffix}`;
     },
     einstellungenAktiv() {
       const p = this.$route.path || '';
@@ -332,11 +339,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         pantheon: Array.isArray(z.pantheon) ? z.pantheon : [],
       };
     },
-    /** Reiter „Zufallsbegegnung“: gewählte Kampagne + mindestens NPC oder Bestie. */
+    /** Reiter „Zufallsbegegnung“: Spielleitung mit gewählter Kampagne (Einträge optional). */
     begegnungReiterMoeglich() {
-      if (!this.hatSpielleiterKampagneGewaehlt) {
-        return false;
-      }
+      return this.hatSpielleiterKampagneGewaehlt;
+    },
+    begegnungHatNpcOderBestie() {
       const { npcs, bestien } = this.begegnungListenAusSpeicher;
       return npcs.length > 0 || bestien.length > 0;
     },
@@ -2189,20 +2196,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       return HTBAH_BEGEGNUNG_UTILS && HTBAH_BEGEGNUNG_UTILS.stripHtmlText(inhalt) ? inhalt : '';
     },
     begegnungNpcWaffenWerteText(row) {
-      const nah = String(row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '').trim();
-      const fern = String(row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '').trim();
-      const waffenlos = String(row && row.waffenloserKampf ? row.waffenloserKampf : '').trim();
-      const teile = [];
-      if (nah) {
-        teile.push(`Nahkampf ${nah}`);
+      const M = window.HTBAH_CHARAKTER_MODEL;
+      if (M && typeof M.entitaetInventarWaffenAnzeigeText === 'function') {
+        return M.entitaetInventarWaffenAnzeigeText(row, { waffenloser: true });
       }
-      if (fern) {
-        teile.push(`Fernkampf ${fern}`);
-      }
-      if (waffenlos) {
-        teile.push(`Waffenlos ${waffenlos}`);
-      }
-      return teile.length ? teile.join(' · ') : '—';
+      return '—';
     },
     begegnungBestieEpocheLabel(epoche) {
       return HTBAH_BEGEGNUNG_UTILS
@@ -3111,13 +3109,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 v-if="istSpielleitung"
                 v-show="wuerfelModalTab === 'begegnung'"
                 class="htbah-begegnung-modal text-start">
-                <div v-if="!begegnungHatBegegnungsEintrag" class="alert alert-info mb-0" role="status">
-                  Noch keine passenden Einträge. Lege zuerst unter
+                <div v-if="!begegnungHatNpcOderBestie" class="alert alert-info mb-0" role="status">
+                  Noch keine NPCs und Bestien. Lege zuerst unter
                   <router-link to="/weltenbau/zufallstabellen" class="alert-link">Zufallstabellen</router-link>
-                  mindestens einen NPC, eine Bestie oder eine Gottheit im Pantheon an — sonst kann hier
-                  nichts gezogen werden.
+                  entsprechende Einträge an — sonst kann hier nichts gezogen werden.
                 </div>
-                <template v-else>
+                <template v-else-if="begegnungHatBegegnungsEintrag">
                   <div class="btn-group w-100 mb-3">
                     <button
                       type="button"
@@ -3249,8 +3246,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                               <h6 class="htbah-begegnung-kompaktkarte-titel">Kampf</h6>
                               <dl class="htbah-begegnung-kompaktliste mb-0">
                                 <dt>LP</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.lebenspunkte) }}</dd>
-                                <dt>Waffe</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.waffe) }}</dd>
-                                <dt>Schaden</dt><dd>{{ begegnungNpcWaffenWerteText(begegnungZiehung.zeile) }}</dd>
+                                <dt>Waffen</dt><dd>{{ begegnungNpcWaffenWerteText(begegnungZiehung.zeile) }}</dd>
                               </dl>
                             </section>
                           </div>
@@ -3295,12 +3291,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                             <section class="htbah-begegnung-kompaktkarte">
                               <h6 class="htbah-begegnung-kompaktkarte-titel">Kampf</h6>
                               <dl class="htbah-begegnung-kompaktliste mb-0">
-                                <dt>Angriff</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.angriff) }}</dd>
-                                <dt>Verteidigung</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.verteidigung) }}</dd>
                                 <dt>LP</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.lebenspunkte) }}</dd>
                                 <dt>Aggro</dt><dd>{{ begegnungBestieAggressivitaetText(begegnungZiehung.zeile) }}</dd>
-                                <dt>Waffe</dt><dd>{{ begegnungZeileWert(begegnungZiehung.zeile.waffe) }}</dd>
-                                <dt>Schaden</dt><dd>{{ begegnungNpcWaffenWerteText(begegnungZiehung.zeile) }}</dd>
+                                <dt>Waffen</dt><dd>{{ begegnungNpcWaffenWerteText(begegnungZiehung.zeile) }}</dd>
                               </dl>
                             </section>
                           </div>

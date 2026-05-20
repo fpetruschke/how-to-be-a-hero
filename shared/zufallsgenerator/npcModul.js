@@ -580,6 +580,32 @@ window.HTBAH = window.HTBAH || {};
       const lebenspunkte = lebenspunkteFuerStaturUndAlter(statur, alter);
       const schadenWaffenlos = waffenloserNahkampfSchaden(statur);
       const begabung = begabungswerteVerteilen(beruf);
+      const M = window.HTBAH_CHARAKTER_MODEL;
+      const inventar = [];
+      if (M && typeof M.inventarEintragNachTypBereinigen === 'function') {
+        inventar.push(
+          M.inventarEintragNachTypBereinigen({
+            id: M.neueInventarId(),
+            typ: 'waffe',
+            name: waffe.name,
+            beschreibungHtml: '',
+            schadenswertNahkampf: waffenwerte.schadenswertNahkampf,
+            schadenswertFernkampf: waffenwerte.schadenswertFernkampf,
+          }),
+        );
+        if (schadenWaffenlos) {
+          inventar.push(
+            M.inventarEintragNachTypBereinigen({
+              id: M.neueInventarId(),
+              typ: 'waffe',
+              name: 'Waffenlos (Fäuste, Tritte)',
+              beschreibungHtml: '',
+              schadenswertNahkampf: schadenWaffenlos,
+              schadenswertFernkampf: '',
+            }),
+          );
+        }
+      }
 
       const aufenthaltsort = aufenthaltsortAusOrteListe(opts.orteNamen);
       const fraktion = fraktionAusFraktionenListe(opts.fraktionNamen);
@@ -602,9 +628,6 @@ window.HTBAH = window.HTBAH || {};
         ziel,
         geheimnis,
         stimme,
-        waffe: waffe.name,
-        schadenswertNahkampf: waffenwerte.schadenswertNahkampf,
-        schadenswertFernkampf: waffenwerte.schadenswertFernkampf,
         waffenloserKampf: schadenWaffenlos,
         lebenspunkte,
         aufenthaltsort,
@@ -614,6 +637,7 @@ window.HTBAH = window.HTBAH || {};
         fraktion,
         glaube,
         notizenHtml,
+        inventar,
       };
     },
   };

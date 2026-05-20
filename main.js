@@ -585,11 +585,8 @@ function normalisiereZufallstabellenNpcZeile(z) {
   const wissen = Math.max(0, Math.min(40, Math.round(Number(z.wissen) || 0)));
   const soziales = Math.max(0, Math.min(40, Math.round(Number(z.soziales) || 0)));
   const medien = normalisiereZufallstabellenMedienListe(z.medien);
-  const schadenswertNahkampf =
-    typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '';
-  const schadenswertFernkampf =
-    typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '';
-  return {
+  const M = window.HTBAH_CHARAKTER_MODEL;
+  const rohZeile = {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     name: typeof z.name === 'string' ? z.name : '',
     spitzname: typeof z.spitzname === 'string' ? z.spitzname : '',
@@ -605,8 +602,8 @@ function normalisiereZufallstabellenNpcZeile(z) {
     waffe: typeof z.waffe === 'string' ? z.waffe : '',
     lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
     kampfZustand: ermittleKampfZustandFuerNpcBestie(z),
-    schadenswertNahkampf,
-    schadenswertFernkampf,
+    schadenswertNahkampf: typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '',
+    schadenswertFernkampf: typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '',
     waffenloserKampf: typeof z.waffenloserKampf === 'string' ? z.waffenloserKampf : '',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
     handeln,
@@ -620,6 +617,9 @@ function normalisiereZufallstabellenNpcZeile(z) {
     medien,
     primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
   };
+  return M && typeof M.migriereLegacyKampfwerteNachInventar === 'function'
+    ? M.migriereLegacyKampfwerteNachInventar(rohZeile, { npc: true })
+    : rohZeile;
 }
 
 function normalisiereZufallstabellenOrtZeile(z) {
@@ -989,11 +989,8 @@ function normalisiereZufallstabellenBestieZeile(z) {
   const handeln = Math.max(0, Math.min(40, Math.round(Number(z.handeln) || 0)));
   const wissen = Math.max(0, Math.min(40, Math.round(Number(z.wissen) || 0)));
   const soziales = Math.max(0, Math.min(40, Math.round(Number(z.soziales) || 0)));
-  const schadenswertNahkampf =
-    typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '';
-  const schadenswertFernkampf =
-    typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '';
-  return {
+  const M = window.HTBAH_CHARAKTER_MODEL;
+  const rohZeile = {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     epoche,
     kategorie,
@@ -1016,11 +1013,14 @@ function normalisiereZufallstabellenBestieZeile(z) {
       : [],
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
     aggressivitaetSkala: agg,
-    schadenswertNahkampf,
-    schadenswertFernkampf,
+    schadenswertNahkampf: typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '',
+    schadenswertFernkampf: typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '',
     inventar: normalisiereZufallstabellenInventarListe(z.inventar),
     medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
+  return M && typeof M.migriereLegacyKampfwerteNachInventar === 'function'
+    ? M.migriereLegacyKampfwerteNachInventar(rohZeile, { bestie: true })
+    : rohZeile;
 }
 
 function zufallstabellenSpeicherKeyFuerKampagne(kampagneId) {
@@ -3604,6 +3604,17 @@ function ladeCharakterEintrag(charakterId) {
   return eintrag || null;
 }
 
+function charakterPfadMitStandardTab(charakterId) {
+  if (typeof charakterId !== 'string' || !charakterId) {
+    return '/charakter/neu/session-zero';
+  }
+  const eintrag = ladeCharakterEintrag(charakterId);
+  const suffix = eintrag
+    ? window.HTBAH_CHARAKTER_MODEL.charakterStandardTabSuffix(eintrag.charakter)
+    : 'session-zero';
+  return `/charakter/${charakterId}/${suffix}`;
+}
+
 function speichereCharakterEintrag(payload) {
   const roh = payload && typeof payload === 'object' ? payload : {};
   const sammlung = ladeCharakterSammlung();
@@ -4491,17 +4502,17 @@ const routes = [
   { path: '/spieler', redirect: '/charakter' },
   {
     path: '/charakter',
-    redirect: () => {
-      const aktiveId = window.HTBAH.ladeAktivenCharakterId();
-      return aktiveId ? `/charakter/${aktiveId}/session-zero` : '/charakter/neu/session-zero';
-    },
+    redirect: () => charakterPfadMitStandardTab(window.HTBAH.ladeAktivenCharakterId()),
   },
   { path: '/charakter/neu', redirect: '/charakter/neu/session-zero' },
   { path: '/charakter/neu/session-zero', component: window.HTBAH_SEITEN.Charakter },
   { path: '/charakter/neu/aktives-spiel', component: window.HTBAH_SEITEN.Charakter },
   { path: '/charakter/neu/daten', component: window.HTBAH_SEITEN.Charakter },
   { path: '/charakter/neu/nachbereitung', redirect: '/charakter/neu/daten' },
-  { path: '/charakter/:id', redirect: (to) => `/charakter/${to.params.id}/session-zero` },
+  {
+    path: '/charakter/:id',
+    redirect: (to) => charakterPfadMitStandardTab(to.params.id),
+  },
   { path: '/charakter/:id/session-zero', component: window.HTBAH_SEITEN.Charakter },
   { path: '/charakter/:id/aktives-spiel', component: window.HTBAH_SEITEN.Charakter },
   { path: '/charakter/:id/daten', component: window.HTBAH_SEITEN.Charakter },
@@ -4601,8 +4612,7 @@ router.beforeEach(async (to, from) => {
   }
 
   if (rolle === 'charakter' && istNurSpielleitungRoute(ziel)) {
-    const aktiveId = window.HTBAH.ladeAktivenCharakterId();
-    return { path: aktiveId ? `/charakter/${aktiveId}/session-zero` : '/charakter/neu/session-zero' };
+    return { path: charakterPfadMitStandardTab(window.HTBAH.ladeAktivenCharakterId()) };
   }
 
   if (rolle === 'spielleitung' && istNurCharakterRoute(ziel)) {

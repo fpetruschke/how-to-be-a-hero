@@ -263,9 +263,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           plain('Aufenthaltsort', z.aufenthaltsort),
           plain('Ziel', z.ziel),
           plain('Stimme', z.stimme),
-          plain('Waffe', z.waffe),
-          plain('Schadenswert Nahkampf', z.schadenswertNahkampf),
-          plain('Schadenswert Fernkampf', z.schadenswertFernkampf),
+          plain('Waffen (Inventar)', this.entitaetInventarWaffenAnzeigeText(z, { waffenloser: true })),
           plain('Waffenloser Kampf (Fäuste, Tritte)', z.waffenloserKampf),
           plain('Initiative', z.initiative),
           rich('Notizen', this.bereinigeNpcNotizenHtml(z.notizenHtml)),
@@ -313,11 +311,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return [
           plain('Kategorie', this.bestieKategorieLabel(z.kategorie)),
           plain('Name', z.name),
-          plain('Waffe', z.waffe),
-          plain('Schadenswert Nahkampf', z.schadenswertNahkampf),
-          plain('Schadenswert Fernkampf', z.schadenswertFernkampf),
-          plain('Angriff', z.angriff),
-          plain('Verteidigung', z.verteidigung),
+          plain('Waffen (Inventar)', this.entitaetInventarWaffenAnzeigeText(z)),
           plain('Lebenspunkte', z.lebenspunkte),
           plain('Handeln (Begabungswert)', z.handeln),
           plain('Wissen (Begabungswert)', z.wissen),
@@ -402,9 +396,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           'ziel',
           'geheimnis',
           'stimme',
-          'waffe',
-          'schadenswertNahkampf',
-          'schadenswertFernkampf',
           'waffenloserKampf',
           'initiative',
           'notizenHtml',
@@ -489,8 +480,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           row,
           [
             'name',
-            'angriff',
-            'verteidigung',
             'lebenspunkte',
             'handeln',
             'wissen',
@@ -503,7 +492,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             'beschreibungHtml',
           ],
           q,
-          kat,
+          `${kat} ${this.entitaetInventarWaffenAnzeigeText(row)}`,
         );
       });
     },
@@ -556,9 +545,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           'ziel',
           'geheimnis',
           'stimme',
-          'waffe',
-          'schadenswertNahkampf',
-          'schadenswertFernkampf',
           'waffenloserKampf',
           'initiative',
           'notizenHtml',
@@ -633,9 +619,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         const kat = this.bestieKategorieLabel(row.kategorie);
         return this.trifftSucheZu(
           row,
-          ['name', 'angriff', 'verteidigung', 'lebenspunkte', 'handeln', 'wissen', 'soziales', 'aufenthaltsort', 'initiative', 'staerke', 'schwaeche', 'geheimnis', 'beschreibungHtml'],
+          ['name', 'lebenspunkte', 'handeln', 'wissen', 'soziales', 'aufenthaltsort', 'initiative', 'staerke', 'schwaeche', 'geheimnis', 'beschreibungHtml'],
           gq,
-          kat,
+          `${kat} ${this.entitaetInventarWaffenAnzeigeText(row)}`,
         );
       });
     },
@@ -1654,29 +1640,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
     },
     npcWaffenWerteText(row) {
-      const schadenswertNahkampf = String(
-        row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '',
-      ).trim();
-      const schadenswertFernkampf = String(
-        row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '',
-      ).trim();
-      const waffenloserKampf = String(
-        row && row.waffenloserKampf ? row.waffenloserKampf : '',
-      ).trim();
-      const teile = [];
-      if (schadenswertNahkampf) {
-        teile.push(`Nahkampf ${schadenswertNahkampf}`);
-      }
-      if (schadenswertFernkampf) {
-        teile.push(`Fernkampf ${schadenswertFernkampf}`);
-      }
-      if (waffenloserKampf) {
-        teile.push(`Waffenlos ${waffenloserKampf}`);
-      }
-      if (!teile.length) {
-        return '—';
-      }
-      return teile.join(' · ');
+      return this.entitaetInventarWaffenAnzeigeText(row, { waffenloser: true });
     },
     bestieKategorieLabel(kategorie) {
       if (kategorie === 'fantasy_tier') {
@@ -1718,29 +1682,21 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         waffenlosParade: true,
       });
     },
+    entitaetInventarWaffenAnzeigeText(zeile, opts) {
+      const M = window.HTBAH_CHARAKTER_MODEL;
+      if (M && typeof M.entitaetInventarWaffenAnzeigeText === 'function') {
+        return M.entitaetInventarWaffenAnzeigeText(zeile, opts);
+      }
+      return '—';
+    },
     schadenWuerfelnFuerEntitaet(row, typ) {
       const typLabel = typ === 'bestie' ? 'Bestie' : 'NPC';
       const name = this.zeilenWertAlsText(row && row.name);
-      const waffenName = this.zeilenWertAlsText(row && row.waffe) || 'Waffe';
-      const inventar = [
-        {
-          id: `${typ}-waffe`,
-          typ: 'waffe',
-          name: waffenName,
-          schadenswertNahkampf: row && row.schadenswertNahkampf ? row.schadenswertNahkampf : '',
-          schadenswertFernkampf: row && row.schadenswertFernkampf ? row.schadenswertFernkampf : '',
-        },
-      ];
-      const waffenlos = row && row.waffenloserKampf ? String(row.waffenloserKampf).trim() : '';
-      if (waffenlos && typ === 'npc') {
-        inventar.push({
-          id: `${typ}-waffenlos`,
-          typ: 'waffe',
-          name: 'Waffenlos (Fäuste, Tritte)',
-          schadenswertNahkampf: waffenlos,
-          schadenswertFernkampf: '',
-        });
-      }
+      const M = window.HTBAH_CHARAKTER_MODEL;
+      const inventar =
+        M && typeof M.inventarWaffenAusEntitaet === 'function'
+          ? M.inventarWaffenAusEntitaet(row, { prefix: typ, waffenloser: typ === 'npc' })
+          : [];
       this.$refs.schadenModal?.oeffnen({
         titel: `Schaden würfeln (${typLabel}${name ? `: ${name}` : ''})`,
         charakter: {
@@ -1797,9 +1753,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         stimme: '',
         lebenspunkte: '',
         kampfZustand: 'vital',
-        waffe: '',
-        schadenswertNahkampf: '',
-        schadenswertFernkampf: '',
         waffenloserKampf: '',
         aufenthaltsort: '',
         handeln: 12,
@@ -1898,11 +1851,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         id: window.HTBAH.neueEntropieId(),
         kategorie: 'normales_tier',
         name: '',
-        waffe: '',
-        schadenswertNahkampf: '',
-        schadenswertFernkampf: '',
-        angriff: '',
-        verteidigung: '',
         lebenspunkte: '',
         aufenthaltsort: '',
         initiative: '',
@@ -2302,7 +2250,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       });
       if (patch && typeof patch === 'object') {
         Object.assign(this.bearbeitung.zeile, patch);
+        this.migriereNpcZeileKampfwerteNachInventar(this.bearbeitung.zeile);
       }
+    },
+    migriereNpcZeileKampfwerteNachInventar(zeile) {
+      const M = window.HTBAH_CHARAKTER_MODEL;
+      if (!zeile || !M || typeof M.migriereLegacyKampfwerteNachInventar !== 'function') {
+        return;
+      }
+      const migriert = M.migriereLegacyKampfwerteNachInventar(zeile, { npc: true });
+      Object.assign(zeile, migriert);
     },
     overlayNpcFeldNeuWuerfeln(payload) {
       if (!this.bearbeitungOverlay || this.bearbeitungOverlay.typ !== 'npc' || !this.bearbeitungOverlay.zeile) {
@@ -2328,6 +2285,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       });
       if (patch && typeof patch === 'object') {
         Object.assign(this.bearbeitungOverlay.zeile, patch);
+        this.migriereNpcZeileKampfwerteNachInventar(this.bearbeitungOverlay.zeile);
       }
     },
     npcWizardOeffnen() {
@@ -2434,6 +2392,13 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         orteNamen,
       });
       Object.assign(this.bearbeitung.zeile, felder);
+      const M = window.HTBAH_CHARAKTER_MODEL;
+      if (M && typeof M.migriereLegacyKampfwerteNachInventar === 'function') {
+        Object.assign(
+          this.bearbeitung.zeile,
+          M.migriereLegacyKampfwerteNachInventar(this.bearbeitung.zeile, { bestie: true }),
+        );
+      }
       this.$nextTick(() => this.quillAusBearbeitungSetzen());
     },
     bestienWizardUebernehmen(payload) {
@@ -3265,15 +3230,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <th>Aufenthaltsort</th>
                   <th>Ziel</th>
                   <th>Stimme</th>
-                  <th>Waffe</th>
-                  <th>Werte</th>
+                  <th>Waffen (Inventar)</th>
                   <th>Notizen</th>
                   <th class="text-end text-nowrap">Aktionen</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!anzeigeNpcs.length">
-                  <td :colspan="entitaetenAuswahlModus ? 20 : 19" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 19 : 18" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.npcs || []).length, sucheNpcs) }}
                   </td>
                 </tr>
@@ -3312,7 +3276,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <td>{{ karteWert(row.aufenthaltsort) }}</td>
                   <td>{{ karteWert(row.ziel) }}</td>
                   <td>{{ karteWert(row.stimme) }}</td>
-                  <td>{{ karteWert(row.waffe) }}</td>
                   <td class="small">{{ npcWaffenWerteText(row) }}</td>
                   <td class="small">
                     <div
@@ -3917,8 +3880,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   </th>
                   <th>Art</th>
                   <th>Name</th>
-                  <th>Angriff</th>
-                  <th>Verteidigung</th>
+                  <th>Waffen (Inventar)</th>
                   <th>LP</th>
                   <th>Aufenthaltsort</th>
                   <th>Begabungen</th>
@@ -3931,7 +3893,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeBestien.length">
-                  <td :colspan="entitaetenAuswahlModus ? 13 : 12" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 12 : 11" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.bestien || []).length, sucheBestien) }}
                   </td>
                 </tr>
@@ -3957,8 +3919,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     </span>
                     <span v-if="statusEmoji(row)">{{ statusEmoji(row) }}</span>
                   </td>
-                  <td class="small">{{ karteWert(row.angriff) }}</td>
-                  <td class="small">{{ karteWert(row.verteidigung) }}</td>
+                  <td class="small">{{ entitaetInventarWaffenAnzeigeText(row) }}</td>
                   <td class="small">{{ karteWert(row.lebenspunkte) }}</td>
                   <td>{{ karteWert(row.aufenthaltsort) }}</td>
                   <td class="small text-nowrap">{{ begabungswerteKurzText(row) }}</td>
@@ -4021,8 +3982,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                 <div class="small"><span class="text-secondary">Ort:</span> {{ karteWert(row.aufenthaltsort) }}</div>
                 <div class="small"><span class="text-secondary">Begabungen:</span> {{ begabungswerteKurzText(row) }}</div>
                 <div class="small">
-                  <span class="text-secondary">Werte:</span> A {{ karteWert(row.angriff) }} · V {{ karteWert(row.verteidigung) }} · LP
-                  {{ karteWert(row.lebenspunkte) }}
+                  <span class="text-secondary">Waffen:</span> {{ entitaetInventarWaffenAnzeigeText(row) }}
+                </div>
+                <div class="small">
+                  <span class="text-secondary">LP:</span> {{ karteWert(row.lebenspunkte) }}
                 </div>
                 <div class="small mb-2">
                   <span class="text-secondary">Aggressiv / offensiv:</span> {{ bestieAggressivitaetText(row) }}

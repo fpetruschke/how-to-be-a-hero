@@ -155,23 +155,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         { id: 'tot', label: 'Tot', emoji: '💀' },
       ];
     },
-    bestieAngriffAlsZahl() {
-      if (!this.anlage || this.anlage.typ !== 'bestie' || !this.anlage.zeile) {
-        return null;
-      }
-      const text = String(this.anlage.zeile.angriff == null ? '' : this.anlage.zeile.angriff).trim();
-      if (!text || !/^\d+$/.test(text)) {
-        return null;
-      }
-      const wert = Math.round(Number(text));
-      if (!Number.isFinite(wert) || wert < 0 || wert > 100) {
-        return null;
-      }
-      return wert;
-    },
-    kannBestieAngriffProbe() {
-      return this.bestieAngriffAlsZahl !== null;
-    },
   },
   watch: {
     'anlage.offen'(offen) {
@@ -525,30 +508,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       return Math.max(0, Math.min(100, Math.round(Number(this.anlage.zeile[kategorie]) || 0)));
     },
-    angriffProbeOeffnen() {
-      if (!this.anlage || !this.anlage.zeile || this.anlage.typ !== 'bestie') {
-        return;
-      }
-      const zielwert = this.bestieAngriffAlsZahl;
-      if (zielwert === null) {
-        return;
-      }
-      const name = String(this.anlage.zeile.name || '').trim();
-      const payload = {
-        modus: 'begabung',
-        basiswert: zielwert,
-        zielwert,
-        zeigtModifikator: true,
-        basisLabel: 'Angriffswert',
-        zielLabel: 'Zielwert Angriff (zu unterbieten)',
-        titel: 'Probe: Angriff' + (name ? ` (${name})` : ''),
-        untertitel: 'Angriffswert ' + zielwert + ' — W100-Probe.',
-      };
-      this.probeModalGeneration += 1;
-      this.$nextTick(() => {
-        this.$refs.probeWurfModal?.oeffnen(payload);
-      });
-    },
     begabungProbeOeffnen(kategorie) {
       if (!this.anlage || !this.anlage.zeile) {
         return;
@@ -604,26 +563,14 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       const zeile = this.anlage.zeile;
       const typ = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
       const name = String(zeile.name || '').trim();
-      const waffenName = String(zeile.waffe || '').trim() || 'Waffe';
-      const inventar = [
-        {
-          id: `${this.anlage.typ || 'eintrag'}-waffe`,
-          typ: 'waffe',
-          name: waffenName,
-          schadenswertNahkampf: zeile.schadenswertNahkampf || '',
-          schadenswertFernkampf: zeile.schadenswertFernkampf || '',
-        },
-      ];
-      const waffenlos = String(zeile.waffenloserKampf || '').trim();
-      if (waffenlos && this.anlage.typ === 'npc') {
-        inventar.push({
-          id: `${this.anlage.typ || 'eintrag'}-waffenlos`,
-          typ: 'waffe',
-          name: 'Waffenlos (Fäuste, Tritte)',
-          schadenswertNahkampf: waffenlos,
-          schadenswertFernkampf: '',
-        });
-      }
+      const M = window.HTBAH_CHARAKTER_MODEL;
+      const inventar =
+        M && typeof M.inventarWaffenAusEntitaet === 'function'
+          ? M.inventarWaffenAusEntitaet(zeile, {
+              prefix: this.anlage.typ || 'eintrag',
+              waffenloser: this.anlage.typ === 'npc',
+            })
+          : [];
       const payload = {
         titel: `Schaden würfeln (${typ}${name ? `: ${name}` : ''})`,
         charakter: {
@@ -842,15 +789,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   @click="begabungProbeOeffnen(kategorie)">
                   🎲 {{ begabungKategorieLabel(kategorie) }} ({{ begabungZielwert(kategorie) }})
                 </button>
-                <button
-                  v-if="anlage.typ === 'bestie'"
-                  type="button"
-                  class="btn btn-sm btn-outline-primary"
-                  :disabled="!kannBestieAngriffProbe"
-                  :title="kannBestieAngriffProbe ? '' : 'Angriffswert muss eine Zahl von 0 bis 100 sein (keine Würfelnotation).'"
-                  @click="angriffProbeOeffnen">
-                  🎲 Angriff<template v-if="kannBestieAngriffProbe"> ({{ bestieAngriffAlsZahl }})</template>
-                </button>
               </div>
             </div>
             <div class="col-6">
@@ -963,15 +901,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
               <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
-              <div class="col-md-6">
-                <label class="form-label small text-secondary mb-1">Waffe</label>
-                <div class="input-group">
-                  <input class="form-control" v-model="anlage.zeile.waffe" placeholder="Waffe" />
-                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Waffe neu würfeln (mit Schadenswerten)" @click="npcFeldNeuWuerfeln('waffe', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button>
-                </div>
-              </div>
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Schadenswert Nahkampf</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder="Schadenswert Nahkampf" autocomplete="off" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Nahkampfschaden neu würfeln" @click="npcFeldNeuWuerfeln('schadenswertNahkampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Schadenswert Fernkampf</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder="Schadenswert Fernkampf" autocomplete="off" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Fernkampfschaden neu würfeln" @click="npcFeldNeuWuerfeln('schadenswertFernkampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
               <div class="col-md-6">
                 <label class="form-label small text-secondary mb-1">Waffenloser Kampf (Fäuste, Tritte)</label>
                 <div class="input-group">
@@ -1192,12 +1121,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">⚔️ Kampfwerte</h6>
             <div class="row g-2">
-              <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.angriff" placeholder=" " autocomplete="off" /><label>Angriff</label></div></div>
-              <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.verteidigung" placeholder=" " autocomplete="off" /><label>Verteidigung</label></div></div>
               <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " autocomplete="off" @focus="onKampfLebenspunkteFocus" @blur="onKampfLebenspunkteBlur" /><label>Lebenspunkte</label></div></div>
-              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.waffe" placeholder=" " /><label>Waffe</label></div></div>
-              <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schaden NK</label></div></div>
-              <div class="col-md-3"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schaden FK</label></div></div>
               <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
               <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
               <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>

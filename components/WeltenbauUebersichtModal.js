@@ -1379,7 +1379,6 @@ var HTBAH_REFACTOR_UTILS =
           this.verlauf.ortBildLayoutSpeicherTimer = 0;
         }
         if (
-          !this.offen ||
           !this.mapBildLayoutsLokal ||
           typeof this.mapBildLayoutsLokal !== 'object' ||
           !Object.keys(this.mapBildLayoutsLokal).length
@@ -4389,9 +4388,7 @@ var HTBAH_REFACTOR_UTILS =
         if (this.verlauf.ortBildLayoutSpeicherTimer) {
           window.clearTimeout(this.verlauf.ortBildLayoutSpeicherTimer);
           this.verlauf.ortBildLayoutSpeicherTimer = 0;
-          if (this.offen) {
-            this.persistiereLokaleOrtBildLayouts();
-          }
+          this.persistiereLokaleOrtBildLayouts();
         }
         this.verlauf.undoStack = [];
         this.verlauf.redoStack = [];
@@ -5220,9 +5217,6 @@ var HTBAH_REFACTOR_UTILS =
             geheimnis: '',
             stimme: '',
             lebenspunkte: '60',
-            waffe: '',
-            schadenswertNahkampf: '',
-            schadenswertFernkampf: '',
             waffenloserKampf: '',
             aufenthaltsort: ortDefault,
             handeln: 12,
@@ -5244,11 +5238,6 @@ var HTBAH_REFACTOR_UTILS =
             epoche: 'mittelalter',
             kategorie: 'normales_tier',
             name: '',
-            waffe: '',
-            schadenswertNahkampf: '',
-            schadenswertFernkampf: '',
-            angriff: '',
-            verteidigung: '',
             lebenspunkte: '60',
             aufenthaltsort: ortDefault,
             handeln: 16,

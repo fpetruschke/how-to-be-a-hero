@@ -84,6 +84,117 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
     return e;
   };
 
+  M.inventarWaffenAusEntitaet = function inventarWaffenAusEntitaet(zeile, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const prefix = typeof o.prefix === 'string' && o.prefix ? o.prefix : 'entitaet';
+    const inventar = [];
+    (Array.isArray(zeile && zeile.inventar) ? zeile.inventar : []).forEach((item, index) => {
+      if (!item || item.typ !== 'waffe') {
+        return;
+      }
+      const name = String(item.name || '').trim() || 'Waffe';
+      inventar.push({
+        id: item.id || `${prefix}-waffe-${index}`,
+        typ: 'waffe',
+        name,
+        schadenswertNahkampf: item.schadenswertNahkampf || '',
+        schadenswertFernkampf: item.schadenswertFernkampf || '',
+      });
+    });
+    if (o.waffenloser) {
+      const wl = String(zeile && zeile.waffenloserKampf ? zeile.waffenloserKampf : '').trim();
+      if (wl) {
+        inventar.push({
+          id: `${prefix}-waffenlos`,
+          typ: 'waffe',
+          name: 'Waffenlos (Fäuste, Tritte)',
+          schadenswertNahkampf: wl,
+          schadenswertFernkampf: '',
+        });
+      }
+    }
+    return inventar;
+  };
+
+  M.entitaetInventarWaffenAnzeigeText = function entitaetInventarWaffenAnzeigeText(zeile, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const waffen = M.inventarWaffenAusEntitaet(zeile, o);
+    if (!waffen.length) {
+      return '—';
+    }
+    return waffen
+      .map((waffe) => {
+        const nah = String(waffe.schadenswertNahkampf || '').trim();
+        const fern = String(waffe.schadenswertFernkampf || '').trim();
+        const teile = [];
+        if (nah) {
+          teile.push(`NK ${nah}`);
+        }
+        if (fern) {
+          teile.push(`FK ${fern}`);
+        }
+        const schaden = teile.length ? ` (${teile.join(' · ')})` : '';
+        return `${waffe.name}${schaden}`;
+      })
+      .join(' · ');
+  };
+
+  M.migriereLegacyKampfwerteNachInventar = function migriereLegacyKampfwerteNachInventar(zeile, opts) {
+    if (!zeile || typeof zeile !== 'object') {
+      return zeile;
+    }
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const inventar = Array.isArray(zeile.inventar)
+      ? zeile.inventar.map((item) => M.inventarEintragNachTypBereinigen({ ...item }))
+      : [];
+    const hatWaffe = inventar.some((item) => item && item.typ === 'waffe');
+    const waffeName = String(zeile.waffe || '').trim();
+    const nah = String(zeile.schadenswertNahkampf || '').trim();
+    const fern = String(zeile.schadenswertFernkampf || '').trim();
+    if (!hatWaffe && (waffeName || nah || fern)) {
+      inventar.push(
+        M.inventarEintragNachTypBereinigen({
+          id: M.neueInventarId(),
+          typ: 'waffe',
+          name: waffeName || 'Waffe',
+          beschreibungHtml: '',
+          schadenswertNahkampf: nah,
+          schadenswertFernkampf: fern,
+        }),
+      );
+    }
+    if (o.npc) {
+      const wl = String(zeile.waffenloserKampf || '').trim();
+      const hatWl = inventar.some(
+        (item) =>
+          item &&
+          item.typ === 'waffe' &&
+          /waffenlos|fäuste|tritte/i.test(String(item.name || '')),
+      );
+      if (wl && !hatWl) {
+        inventar.push(
+          M.inventarEintragNachTypBereinigen({
+            id: M.neueInventarId(),
+            typ: 'waffe',
+            name: 'Waffenlos (Fäuste, Tritte)',
+            beschreibungHtml: '',
+            schadenswertNahkampf: wl,
+            schadenswertFernkampf: '',
+          }),
+        );
+      }
+    }
+    const migriert = { ...zeile, inventar };
+    delete migriert.waffe;
+    delete migriert.schadenswertNahkampf;
+    delete migriert.schadenswertFernkampf;
+    if (o.bestie) {
+      delete migriert.angriff;
+      delete migriert.verteidigung;
+    }
+    return migriert;
+  };
+
   M.inventarAusQuelle = function inventarAusQuelle(quelle) {
     if (Array.isArray(quelle.inventar) && quelle.inventar.length) {
       return quelle.inventar.map((item, index) => {
@@ -146,7 +257,14 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       lpStatusTot: false,
       lpBewusstlosAusgeblendet: false,
       lpMassenschadenBewusstlos: false,
+      aktivesSpielBegonnen: false,
     };
+  };
+
+  /** URL-Suffix für Standard-Reiter (session-zero | aktives-spiel). */
+  M.charakterStandardTabSuffix = function charakterStandardTabSuffix(charakter) {
+    const c = charakter && typeof charakter === 'object' ? charakter : {};
+    return c.aktivesSpielBegonnen ? 'aktives-spiel' : 'session-zero';
   };
 
   M.charakterMitDefaults = function charakterMitDefaults(gespeicherterCharakter) {
@@ -228,6 +346,7 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       lpStatusTot: Boolean(quelle.lpStatusTot),
       lpBewusstlosAusgeblendet: Boolean(quelle.lpBewusstlosAusgeblendet),
       lpMassenschadenBewusstlos: Boolean(quelle.lpMassenschadenBewusstlos),
+      aktivesSpielBegonnen: Boolean(quelle.aktivesSpielBegonnen),
     };
   };
 })();

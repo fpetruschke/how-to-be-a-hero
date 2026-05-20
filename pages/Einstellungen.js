@@ -400,6 +400,41 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
       return HTBAH_REFACTOR_UTILS.formatBytesDecimal(s.gesamtBytes);
     },
+    /** Typisches localStorage-Limit pro Origin (~5 MiB), nur für die Fortschrittsanzeige. */
+    localStorageReferenzQuotaBytes() {
+      return 5 * 1024 * 1024;
+    },
+    appSpeicherNutzungText() {
+      return this.localStorageHtbahText;
+    },
+    appSpeicherQuotaText() {
+      if (!HTBAH_REFACTOR_UTILS) {
+        return '';
+      }
+      return HTBAH_REFACTOR_UTILS.formatBytesDecimal(this.localStorageReferenzQuotaBytes);
+    },
+    appSpeicherProzent() {
+      const s = this.localStorageStatistik;
+      if (!s || !s.ok) {
+        return 0;
+      }
+      const u = typeof s.htbahBytes === 'number' && Number.isFinite(s.htbahBytes) ? s.htbahBytes : 0;
+      const q = this.localStorageReferenzQuotaBytes;
+      if (q <= 0) {
+        return 0;
+      }
+      return Math.min(100, Math.round((100 * u) / q));
+    },
+    appSpeicherProgressBarKlasse() {
+      const p = this.appSpeicherProzent;
+      if (p >= 95) {
+        return 'bg-danger';
+      }
+      if (p >= 80) {
+        return 'bg-warning text-dark';
+      }
+      return 'bg-success';
+    },
     wuerfelAudioLautProzent() {
       return Math.round(Math.min(1, Math.max(0, Number(this.wuerfelAudioLautstaerke) || 0)) * 100);
     },
@@ -1831,31 +1866,36 @@ window.HTBAH_SEITEN.Einstellungen = {
           <div v-if="browserSpeicherFehler" class="alert alert-warning py-2 mb-2 small">
             {{ browserSpeicherFehler }}
           </div>
-          <p v-if="browserSpeicher" class="small text-body-secondary mb-1">Geschätzter Browser-Speicher (Origin):</p>
-          <template v-if="browserSpeicher">
+          <template v-if="localStorageStatistik && localStorageStatistik.ok">
             <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2 mb-2">
-              <span class="small"><strong>{{ browserSpeicherNutzungText }}</strong> belegt</span>
+              <span class="small"><strong>{{ appSpeicherNutzungText }}</strong> belegt</span>
+              <span class="small text-body-secondary">Referenz: {{ appSpeicherQuotaText }} (typisches localStorage-Limit)</span>
+            </div>
+            <div
+              class="progress"
+              style="height: 1.1rem"
+              role="progressbar"
+              :aria-valuenow="appSpeicherProzent"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="'App-Speicher: ' + appSpeicherProzent + ' Prozent'">
+              <div
+                class="progress-bar"
+                :class="appSpeicherProgressBarKlasse"
+                :style="{ width: appSpeicherProzent + '%' }"></div>
+            </div>
+            <div class="small text-body-secondary mt-1 text-end">
+              {{ appSpeicherProzent }} %
+            </div>
+          </template>
+          <p v-if="browserSpeicher" class="small text-body-secondary mb-1 mt-3">Geschätzter Browser-Speicher (Origin, inkl. IndexedDB &amp; Cache):</p>
+          <template v-if="browserSpeicher">
+            <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2 mb-0">
+              <span class="small">{{ browserSpeicherNutzungText }} belegt</span>
               <span class="small text-body-secondary" v-if="browserSpeicherQuotaEndlich">
                 von {{ browserSpeicherQuotaText }}
               </span>
               <span class="small text-body-secondary" v-else>ohne gemeldetes Obergrenzen-Limit</span>
-            </div>
-            <div
-              v-if="browserSpeicherQuotaEndlich"
-              class="progress"
-              style="height: 1.1rem"
-              role="progressbar"
-              :aria-valuenow="browserSpeicherProzent"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              :aria-label="'Speicher: ' + browserSpeicherProzent + ' Prozent'">
-              <div
-                class="progress-bar"
-                :class="browserSpeicherProgressBarKlasse"
-                :style="{ width: browserSpeicherProzent + '%' }"></div>
-            </div>
-            <div v-if="browserSpeicherQuotaEndlich" class="small text-body-secondary mt-1 text-end">
-              {{ browserSpeicherProzent }} %
             </div>
           </template>
         </template>

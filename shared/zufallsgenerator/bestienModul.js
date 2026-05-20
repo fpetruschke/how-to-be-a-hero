@@ -220,8 +220,6 @@ window.HTBAH = window.HTBAH || {};
       const kategorie = kategorieVorgabe || kategorieGewichtet(epoche);
       const nameVorgabe = typeof opts.name === 'string' ? opts.name.trim() : '';
       const name = nameVorgabe || nameFuer(epoche, kategorie);
-      const angriff = angriffWert(kategorie);
-      const verteidigung = verteidigungWert(kategorie);
       const lebenspunkte = lebenspunkteWert(kategorie);
       const staerke = optionalText('STAERKEN', 0.72);
       const schwaeche = optionalText('SCHWAECHEN', 0.72);
@@ -238,15 +236,25 @@ window.HTBAH = window.HTBAH || {};
         lebensraum,
         kategorieLabel: KATEGORIE_LABELS[kategorie] || 'Bestie',
       });
+      const M = window.HTBAH_CHARAKTER_MODEL;
+      const waffeName = U.zufaellig(['Klauen', 'Biss', 'Stachel', 'Magischer Stoß', 'Schweifhieb']);
+      const inventar =
+        M && typeof M.inventarEintragNachTypBereinigen === 'function'
+          ? [
+              M.inventarEintragNachTypBereinigen({
+                id: M.neueInventarId(),
+                typ: 'waffe',
+                name: waffeName,
+                beschreibungHtml: '',
+                schadenswertNahkampf: waffenwerte.nah,
+                schadenswertFernkampf: waffenwerte.fern,
+              }),
+            ]
+          : [];
       return {
         kategorie,
         epoche,
         name,
-        waffe: U.zufaellig(['Klauen', 'Biss', 'Stachel', 'Magischer Stoß', 'Schweifhieb']),
-        schadenswertNahkampf: waffenwerte.nah,
-        schadenswertFernkampf: waffenwerte.fern,
-        angriff,
-        verteidigung,
         lebenspunkte,
         staerke,
         schwaeche,
@@ -258,6 +266,7 @@ window.HTBAH = window.HTBAH || {};
         aufenthaltsort: aufenthaltsortAusOrteListe(opts.orteNamen),
         fraktionen: [],
         beschreibungHtml,
+        inventar,
       };
     },
   };
