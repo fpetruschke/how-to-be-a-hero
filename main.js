@@ -4543,6 +4543,22 @@ const routes = [
   },
   { path: '/settings', redirect: '/einstellungen' },
   { path: '/gm', redirect: '/spielleiter' },
+  {
+    path: '/nicht-gefunden',
+    name: 'nicht-gefunden',
+    component: window.HTBAH_SEITEN.NichtGefunden,
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: (to) => ({
+      path: '/nicht-gefunden',
+      query: {
+        ...to.query,
+        grund: typeof to.query.grund === 'string' ? to.query.grund : 'route',
+        von: to.path,
+      },
+    }),
+  },
 ];
 
 const router = VueRouter.createRouter({
@@ -4603,7 +4619,7 @@ router.beforeEach(async (to, from) => {
     weltenbauModal.$emit('schliessen');
   }
 
-  if (ziel === '/') {
+  if (ziel === '/' || ziel === '/nicht-gefunden') {
     return true;
   }
 
@@ -4624,7 +4640,10 @@ router.beforeEach(async (to, from) => {
     if (charakterId) {
       const eintrag = window.HTBAH.ladeCharakterEintrag(charakterId);
       if (!eintrag) {
-        return { path: '/charakter/neu/session-zero' };
+        return {
+          name: 'nicht-gefunden',
+          query: { grund: 'charakter', id: charakterId },
+        };
       }
       window.HTBAH.setzeAktivenCharakterId(charakterId);
     }
@@ -4872,6 +4891,10 @@ const app = Vue.createApp({
 app.use(router);
 router.afterEach((to) => {
   if (to.path.startsWith('/spielleiter/kampagne/')) {
+    return;
+  }
+  if (to.path === '/nicht-gefunden') {
+    syncLebenspunkteStatusFromCharakter(null);
     return;
   }
   if (to.path === '/') {

@@ -4514,3 +4514,95 @@ body.htbah-bestien-wizard-offen .modal-backdrop {
   }
 }
 
+/* 404 / Nicht gefunden (Pen-&-Paper-Stil) */
+.htbah-404-page {
+  max-width: 36rem;
+}
+
+.htbah-404-hero {
+  padding-top: 0.5rem;
+}
+
+.htbah-404-wuerfel-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+}
+
+.htbah-404-wuerfel {
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
+  line-height: 1;
+  opacity: 0.92;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+}
+
+.htbah-404-wuerfel--links {
+  transform: rotate(-18deg);
+}
+
+.htbah-404-wuerfel--rechts {
+  transform: rotate(12deg);
+}
+
+.htbah-404-wuerfel-ergebnis {
+  min-width: 7.5rem;
+  padding: 0.85rem 1.1rem;
+  border: 2px solid var(--primary-color);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--card-bg) 92%, var(--primary-color) 8%) 0%,
+    var(--card-bg) 55%
+  );
+}
+
+.htbah-404-wuerfel-kicker {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paragraph-color);
+}
+
+.htbah-404-wuerfel-zahl {
+  font-size: clamp(2.4rem, 8vw, 3.25rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--primary-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.htbah-404-kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.htbah-404-titel {
+  font-size: clamp(1.35rem, 1rem + 2vw, 1.85rem);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--heading-color);
+}
+
+.htbah-404-beschreibung {
+  font-size: 0.98rem;
+  line-height: 1.55;
+  max-width: 32rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.htbah-404-flavor {
+  border-left: 4px solid var(--primary-color);
+  background: color-mix(in srgb, var(--card-bg) 88%, var(--primary-color) 12%);
+}
+
+.htbah-404-flavor-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+

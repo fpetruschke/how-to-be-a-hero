@@ -348,7 +348,10 @@ window.HTBAH_SEITEN.Charakter = {
       const eintrag = window.HTBAH.ladeCharakterEintrag(routeId);
       if (!eintrag) {
         this._autosaveTemporarAussetzen = false;
-        this.$router.replace('/charakter/neu/session-zero');
+        this.$router.replace({
+          name: 'nicht-gefunden',
+          query: { grund: 'charakter', id: routeId },
+        });
         return;
       }
       this.charakterId = eintrag.id;
