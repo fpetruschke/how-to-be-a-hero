@@ -145,13 +145,13 @@ window.HTBAH_SEITEN.Charakter = {
       return 'setup';
     },
     istSetupTabAktiv() {
-      return !this.istEditModus || this.aktiveCharakterTab === 'setup';
+      return this.aktiveCharakterTab === 'setup';
     },
     istSpielTabAktiv() {
-      return !this.istEditModus || this.aktiveCharakterTab === 'spiel';
+      return this.aktiveCharakterTab === 'spiel';
     },
     istVerwaltungTabAktiv() {
-      return !this.istEditModus || this.aktiveCharakterTab === 'verwaltung';
+      return this.aktiveCharakterTab === 'verwaltung';
     },
     importAuswahlHatMehrere() {
       return this.importKandidaten.length > 1;
@@ -405,9 +405,7 @@ window.HTBAH_SEITEN.Charakter = {
       window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakterLokal);
       this.autosaveSnapshotAktualisieren();
       this._autosaveTemporarAussetzen = false;
-      if (pfad.endsWith('/session-zero') && this.sollMitAktivemSpielStarten(this.charakterLokal)) {
-        this.$router.replace(`/charakter/${eintrag.id}/aktives-spiel`);
-      }
+      // Kein erzwungener Tab-Sprung: Session Zero und Aktives Spiel müssen frei wechselbar bleiben.
     },
     wechsleCharakterTab(tab) {
       const map = {
@@ -526,7 +524,9 @@ window.HTBAH_SEITEN.Charakter = {
           });
         }
       };
-      const nav = this.$router.replace(`/charakter/${gespeichert.id}/session-zero`);
+      const suffixMap = { setup: 'session-zero', spiel: 'aktives-spiel', verwaltung: 'daten' };
+      const suffix = suffixMap[this.aktiveCharakterTab] || 'session-zero';
+      const nav = this.$router.replace(`/charakter/${gespeichert.id}/${suffix}`);
       if (nav && typeof nav.then === 'function') {
         nav.then(nachSpeichern).catch(nachSpeichern);
       } else {
@@ -1209,10 +1209,11 @@ window.HTBAH_SEITEN.Charakter = {
       }
       this.charakterPdfDateiname = '';
     },
-    async charakterPdfExportieren() {
+    async charakterPdfExportieren(optionen = {}) {
       if (this.pdfExportLaedt) {
         return;
       }
+      const blanko = !!(optionen && optionen.blanko);
       const fn =
         window.HTBAH && typeof window.HTBAH.erzeugeCharakterPdfBlob === 'function'
           ? window.HTBAH.erzeugeCharakterPdfBlob
@@ -1232,6 +1233,7 @@ window.HTBAH_SEITEN.Charakter = {
         }
         const { blob, dateiname } = await fn(this.charakter, this.charakterBild, {
           stil: this.pdfExportStil,
+          blanko,
         });
         this.charakterPdfBlobUrl = URL.createObjectURL(blob);
         this.charakterPdfDateiname = dateiname;
@@ -1245,6 +1247,9 @@ window.HTBAH_SEITEN.Charakter = {
       } finally {
         this.pdfExportLaedt = false;
       }
+    },
+    async charakterBlankoPdfExportieren() {
+      await this.charakterPdfExportieren({ blanko: true });
     },
     inventarDialogOeffnen() {
       this.$refs.inventarModal.oeffnen();
@@ -1432,8 +1437,37 @@ window.HTBAH_SEITEN.Charakter = {
       <div v-if="importHinweis && !spielleiterMitglied" class="alert alert-secondary py-2 mb-2">
         {{ importHinweis }}
       </div>
+      <div v-if="!spielleiterMitglied && istSetupTabAktiv" class="card p-3 mb-2">
+        <h6 class="mb-2">Blanko-PDF-Export</h6>
+        <p class="small text-body-secondary mb-2">
+          Exportiert ein leeres Charakterblatt (inkl. Seite 2), damit Werte handschriftlich eingetragen werden können.
+        </p>
+        <div class="htbah-pdf-export-gruppe mb-0">
+          <icon-text-button
+            type="button"
+            class="btn btn-outline-primary htbah-pdf-export-gruppe-btn"
+            icon="download"
+            :disabled="pdfExportLaedt"
+            @click="charakterBlankoPdfExportieren">
+            {{ pdfExportLaedt ? 'PDF wird erzeugt …' : 'Blanko-PDF herunterladen' }}
+          </icon-text-button>
+          <div class="htbah-pdf-export-gruppe-theme-wrap">
+            <label for="ce-pdf-stil-blanko" class="form-label small text-body-secondary mb-1 d-md-none">Theme</label>
+            <select
+              id="ce-pdf-stil-blanko"
+              class="form-select htbah-pdf-export-gruppe-select"
+              v-model="pdfExportStil"
+              aria-label="PDF-Stilrichtung auswählen">
+              <option value="fantasy-mittelalter">Fantasy / Mittelalter</option>
+              <option value="gegenwart">Gegenwart</option>
+              <option value="modern-futuristisch">Modern / Futuristisch</option>
+              <option value="einfach">Einfach</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <ul
-        v-if="!spielleiterMitglied && istEditModus"
+        v-if="!spielleiterMitglied"
         class="nav htbah-weltenbau-pill-tabs mb-2"
         role="tablist"
         aria-label="Charakter Bereiche">
@@ -1468,7 +1502,7 @@ window.HTBAH_SEITEN.Charakter = {
           </button>
         </li>
       </ul>
-      <div v-if="!spielleiterMitglied && istEditModus" class="alert alert-info py-2 px-3 small mb-2" role="note">
+      <div v-if="!spielleiterMitglied" class="alert alert-info py-2 px-3 small mb-2" role="note">
         <span v-if="aktiveCharakterTab === 'setup'">
           Session Zero: Stammdaten, Sicherheitsmechanismen sowie Vor- und Nachteile pflegen. PDF-Export ist hier ebenfalls möglich.
         </span>
@@ -2076,35 +2110,6 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div v-if="!spielleiterMitglied && istEditModus && istSetupTabAktiv" class="card p-3 mb-2">
-        <h6 class="mb-2">PDF-Export</h6>
-        <p class="small text-body-secondary mb-2">
-          Für analoge Runden kannst du den Bogen direkt in der Session Zero als PDF ausgeben.
-        </p>
-        <div class="htbah-pdf-export-gruppe mb-0">
-          <icon-text-button
-            type="button"
-            class="btn btn-outline-primary htbah-pdf-export-gruppe-btn"
-            icon="picture_as_pdf"
-            :disabled="pdfExportLaedt"
-            @click="charakterPdfExportieren">
-            {{ pdfExportLaedt ? 'PDF wird erzeugt …' : 'PDF generieren' }}
-          </icon-text-button>
-          <div class="htbah-pdf-export-gruppe-theme-wrap">
-            <label for="ce-pdf-stil-setup" class="form-label small text-body-secondary mb-1 d-md-none">Theme</label>
-            <select
-              id="ce-pdf-stil-setup"
-              class="form-select htbah-pdf-export-gruppe-select"
-              v-model="pdfExportStil"
-              aria-label="PDF-Stilrichtung auswählen">
-              <option value="fantasy-mittelalter">Fantasy / Mittelalter</option>
-              <option value="gegenwart">Gegenwart</option>
-              <option value="modern-futuristisch">Modern / Futuristisch</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
       <div v-if="spielleiterMitglied || istSpielTabAktiv || istNeuModus" class="card p-3 mb-2">
         <div class="row g-2">
           <div v-if="spielleiterMitglied || istSpielTabAktiv" class="col-12">
@@ -2266,6 +2271,7 @@ window.HTBAH_SEITEN.Charakter = {
               <option value="fantasy-mittelalter">Fantasy / Mittelalter</option>
               <option value="gegenwart">Gegenwart</option>
               <option value="modern-futuristisch">Modern / Futuristisch</option>
+              <option value="einfach">Einfach</option>
             </select>
           </div>
         </div>

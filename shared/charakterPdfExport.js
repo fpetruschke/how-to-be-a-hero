@@ -80,6 +80,29 @@
       kartenRahmen: '#6366f1',
       kopfMuster: 'linear-gradient(135deg, #eaf0ff 0%, #f7f9ff 100%)',
     },
+    einfach: {
+      rahmenAussen: '#000000',
+      rahmenInnen: '#000000',
+      akzent: '#000000',
+      kopfTitel: '#000000',
+      kopfUntertitel: '#222222',
+      schrift: "system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
+      hintergrundAussen: '#ffffff',
+      kachelVerlaufStart: '#ffffff',
+      kachelVerlaufEnde: '#ffffff',
+      panelBg: '#ffffff',
+      panelInset: '#f4f4f4',
+      tabellenKopf: '#e8e8e8',
+      zebra: '#ffffff',
+      werteVerlaufStart: '#ffffff',
+      werteVerlaufEnde: '#ffffff',
+      schattenInnen: '#ffffff',
+      dekoTitel: '',
+      dekoAbschnitt: '',
+      tabellenRahmen: '#000000',
+      kartenRahmen: '#000000',
+      kopfMuster: '#ffffff',
+    },
   };
 
   function lesePdfStilKonfiguration(optionen) {
@@ -87,6 +110,10 @@
       ? optionen.stil.trim()
       : '';
     return PDF_STILE[stil] || PDF_STILE['fantasy-mittelalter'];
+  }
+
+  function istBlankoExport(optionen) {
+    return !!(optionen && optionen.blanko);
   }
 
   function leereTabellenZeilenHtml(spalten, anzahl, ersteSpalteZusatzCss) {
@@ -226,27 +253,48 @@
     return `${roh.slice(0, Math.max(0, maxLaenge - 1)).trim()}…`;
   }
 
-  function wertMitSchreiblinieHtml(text, maxLaenge) {
+  function wertMitSchreiblinieHtml(text, maxLaenge, linienBreitePx) {
     const gekuerzt = kuerzeMitEllipse(text, maxLaenge);
+    const breite = Math.max(120, Number(linienBreitePx) || 190);
     if (gekuerzt) {
       return `<div style="display:flex;align-items:flex-end;gap:4px;min-width:0;">
       <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">${escapeHtml(gekuerzt)}</span>
     </div>`;
     }
     return `<div style="display:flex;align-items:flex-end;gap:4px;min-width:0;">
-      <span style="flex:1;border-bottom:1px solid #d7d7d7;height:0.8em;"></span>
+      <span style="display:inline-block;width:${breite}px;max-width:100%;border-bottom:1px solid #d7d7d7;height:0.8em;"></span>
     </div>`;
   }
 
-  function faehigkeitenBlockHtml(kategorie, titel, charakter, begabungen, gbVerbleibend, gbMax, summen) {
-    const zeilen = sortierteFaehigkeiten(kategorie, charakter);
+  function kaestchenReiheHtml(anzahl) {
+    const n = Math.max(1, Number(anzahl) || 1);
+    let html = '<span style="display:inline-flex;gap:2px;vertical-align:middle;">';
+    for (let i = 0; i < n; i++) {
+      html += '<span style="display:inline-block;width:9px;height:9px;border:1px solid #555;background:#fff;"></span>';
+    }
+    html += '</span>';
+    return html;
+  }
+
+  function linienBlockHtml(anzahl) {
+    let html = '';
+    for (let i = 0; i < anzahl; i++) {
+      html += '<div style="height:14px;border-bottom:1px solid #d0d0d0;"></div>';
+    }
+    return html;
+  }
+
+  function faehigkeitenBlockHtml(kategorie, titel, charakter, begabungen, gbVerbleibend, gbMax, summen, optionen, stil) {
+    const blanko = istBlankoExport(optionen);
+    const zeilen = blanko ? [] : sortierteFaehigkeiten(kategorie, charakter);
     const kbeg = begabungen[kategorie];
     const gv = gbVerbleibend[kategorie];
     const gm = gbMax[kategorie];
     const summeKat = summen[kategorie];
     let rows = '';
+    const anzahlLeerzeilen = blanko ? 10 : LEERZEILEN_FAEHIGKEITEN;
     if (!zeilen.length) {
-      rows = leereTabellenZeilenHtml(3, LEERZEILEN_FAEHIGKEITEN, '');
+      rows = leereTabellenZeilenHtml(3, anzahlLeerzeilen, '');
     } else {
       for (const f of zeilen) {
         const eff = effektivwert(kategorie, f, begabungen);
@@ -256,20 +304,27 @@
           <td style="padding:2px 3px;border:1px solid #ccc;text-align:right;white-space:nowrap;">${escapeHtml(String(eff))}</td>
         </tr>`;
       }
-      rows += leereTabellenZeilenHtml(3, LEERZEILEN_FAEHIGKEITEN, '');
+      rows += leereTabellenZeilenHtml(3, anzahlLeerzeilen, '');
     }
+    const metaZeile = blanko
+      ? `<div style="font-size:6.5px;margin-bottom:3px;line-height:1.3;color:#333;display:flex;flex-wrap:wrap;gap:7px;">
+          <span>Summe ${kaestchenReiheHtml(3)}</span>
+          <span>Begabung ${kaestchenReiheHtml(2)}</span>
+          <span>Geistesblitzpunkte ${kaestchenReiheHtml(2)} / ${kaestchenReiheHtml(2)}</span>
+        </div>`
+      : `<div style="font-size:6.5px;margin-bottom:3px;line-height:1.3;color:#333;">
+          Summe ${escapeHtml(String(summeKat))} · Begabung ${escapeHtml(String(kbeg))} · Geistesblitz ${escapeHtml(String(gv))} / ${escapeHtml(String(gm))}
+        </div>`;
     return `
       <div style="flex:1;min-width:0;border:1px solid #999;padding:3px;background:#fafafa;">
         <div style="font-weight:800;font-size:8px;text-transform:uppercase;margin-bottom:2px;color:#222;letter-spacing:0.03em;">${escapeHtml(titel)}</div>
-        <div style="font-size:6.5px;margin-bottom:3px;line-height:1.3;color:#333;">
-          Summe ${escapeHtml(String(summeKat))} · Begabung ${escapeHtml(String(kbeg))} · Geistesblitz ${escapeHtml(String(gv))} / ${escapeHtml(String(gm))}
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:7px;border:1px solid #999;">
+        ${metaZeile}
+        <table style="width:100%;border-collapse:collapse;font-size:7px;border:1px solid ${stil.tabellenRahmen};">
           <thead>
-            <tr style="background:#e8e8e8;">
-              <th style="text-align:left;font-weight:700;border:1px solid #999;padding:2px 3px;border-bottom:1px solid #666;">Name</th>
-              <th style="text-align:right;font-weight:700;border:1px solid #999;padding:2px 3px;border-bottom:1px solid #666;width:22%;">Wert</th>
-              <th style="text-align:right;font-weight:700;border:1px solid #999;padding:2px 3px;border-bottom:1px solid #666;width:22%;">Eff.</th>
+            <tr style="background:${stil.tabellenKopf};">
+              <th style="text-align:left;font-weight:700;border:1px solid ${stil.tabellenRahmen};padding:2px 3px;border-bottom:1px solid ${stil.tabellenRahmen};">Name</th>
+              <th style="text-align:right;font-weight:700;border:1px solid ${stil.tabellenRahmen};padding:2px 3px;border-bottom:1px solid ${stil.tabellenRahmen};width:22%;">Wert</th>
+              <th style="text-align:right;font-weight:700;border:1px solid ${stil.tabellenRahmen};padding:2px 3px;border-bottom:1px solid ${stil.tabellenRahmen};width:22%;">Eff.</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -279,6 +334,7 @@
 
   function baueHtml(charakter, charakterBild, optionen) {
     const stil = lesePdfStilKonfiguration(optionen);
+    const blanko = istBlankoExport(optionen);
     const summen = summenBerechnen(charakter);
     const begabungen = begabungenAusSummen(summen);
     const gbMax = geistesblitzMaxAusCharakter(charakter, begabungen);
@@ -289,13 +345,12 @@
       ? gbRaw
       : { handeln: gbMax.handeln, wissen: gbMax.wissen, soziales: gbMax.soziales };
 
-    const name = typeof charakter.name === 'string' ? charakter.name.trim() : '';
-    const bild =
-      typeof charakterBild === 'string' && charakterBild.startsWith('data:')
-        ? charakterBild
-        : '';
+    const name = blanko ? '' : (typeof charakter.name === 'string' ? charakter.name.trim() : '');
+    const bild = !blanko && typeof charakterBild === 'string' && charakterBild.startsWith('data:')
+      ? charakterBild
+      : '';
 
-    const paare = Array.isArray(charakter.vorNachteilePaare) ? charakter.vorNachteilePaare : [];
+    const paare = blanko ? [] : (Array.isArray(charakter.vorNachteilePaare) ? charakter.vorNachteilePaare : []);
     let vnRows = '';
     if (!paare.length) {
       vnRows = leereTabellenZeilenHtml(2, LEERZEILEN_VOR_NACHTEILE, '');
@@ -309,10 +364,11 @@
       vnRows += leereTabellenZeilenHtml(2, LEERZEILEN_VOR_NACHTEILE, '');
     }
 
-    const inventar = Array.isArray(charakter.inventar) ? charakter.inventar : [];
+    const inventar = blanko ? [] : (Array.isArray(charakter.inventar) ? charakter.inventar : []);
     let invRows = '';
+    const inventarLeerzeilen = blanko ? 15 : LEERZEILEN_INVENTAR;
     if (!inventar.length) {
-      invRows = leereTabellenZeilenHtml(4, LEERZEILEN_INVENTAR, '');
+      invRows = leereTabellenZeilenHtml(4, inventarLeerzeilen, '');
     } else {
       inventar.forEach((e) => {
         const n = escapeHtml(e.name || '—');
@@ -328,13 +384,16 @@
           <td style="vertical-align:top;padding:2px 4px;font-size:7px;border:1px solid #ccc;" class="htbah-pdf-html htbah-pdf-inv-beschr">${beschr}</td>
         </tr>`;
       });
-      invRows += leereTabellenZeilenHtml(4, LEERZEILEN_INVENTAR, '');
+      invRows += leereTabellenZeilenHtml(4, inventarLeerzeilen, '');
     }
 
-    const journalHtml =
-      typeof charakter.journalHtml === 'string' && charakter.journalHtml.trim()
-        ? charakter.journalHtml
-        : '';
+    const journalHtml = blanko
+      ? linienBlockHtml(18)
+      : (
+        typeof charakter.journalHtml === 'string' && charakter.journalHtml.trim()
+          ? charakter.journalHtml
+          : ''
+      );
 
     const jetzt = new Date();
     const heute = jetzt.toLocaleDateString('de-DE', {
@@ -349,29 +408,31 @@
     });
 
     const stammdatenZeilen = [
-      ['Geschlecht', charakter.geschlecht, 18],
-      ['Alter', charakter.alter != null && charakter.alter !== '' ? String(charakter.alter) : '', 6],
-      ['Fraktion(en)', fraktionenText(charakter), 24],
-      ['Statur', charakter.statur, 16],
-      ['Beruf', charakter.beruf, 18],
-      ['Familienstand', charakter.familienstand, 16],
-      ['Glaube', charakter.glaube != null && charakter.glaube !== '' ? charakter.glaube : charakter.religion, 18],
+      ['Geschlecht', blanko ? '' : charakter.geschlecht, 24],
+      ['Alter', blanko ? '' : (charakter.alter != null && charakter.alter !== '' ? String(charakter.alter) : ''), 12],
+      ['Fraktion(en)', blanko ? '' : fraktionenText(charakter), 30],
+      ['Statur', blanko ? '' : charakter.statur, 24],
+      ['Beruf', blanko ? '' : charakter.beruf, 24],
+      ['Familienstand', blanko ? '' : charakter.familienstand, 24],
+      ['Glaube', blanko ? '' : (charakter.glaube != null && charakter.glaube !== '' ? charakter.glaube : charakter.religion), 24],
     ];
 
     let stamTabelle = '';
     for (const [label, wert, maxLaenge] of stammdatenZeilen) {
       stamTabelle += `<tr>
         <td style="color:#555;padding:0 6px 1px 0;white-space:nowrap;font-size:7.5px;">${escapeHtml(label)}</td>
-        <td style="padding-bottom:1px;font-size:7.5px;min-width:0;">${wertMitSchreiblinieHtml(wert, maxLaenge || 20)}</td>
+        <td style="padding-bottom:1px;font-size:7.5px;min-width:0;">${wertMitSchreiblinieHtml(wert, maxLaenge || 20, 190)}</td>
       </tr>`;
     }
-    const lpStartwert = Number.isFinite(Number(charakter.lebenspunkte))
+    const lpStartwert = blanko
+      ? ''
+      : Number.isFinite(Number(charakter.lebenspunkte))
       ? String(Math.max(0, Math.round(Number(charakter.lebenspunkte))))
       : '—';
 
     const bildBlock = bild
       ? `<img src="${bild}" alt="Charakterbild von ${escapeHtml(name || 'Unbenannt')}" crossorigin="anonymous" style="width:92px;height:110px;object-fit:cover;border:1px solid #ccc;border-radius:4px;display:block;background:#f0f0f0;"/>`
-      : `<div style="width:92px;height:110px;border:1px dashed #bbb;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:7px;color:#888;text-align:center;line-height:1.2;">Kein Bild</div>`;
+      : `<div style="width:92px;height:110px;border:1px solid #ccc;border-radius:4px;background:#fff;display:block;box-sizing:border-box;" aria-hidden="true"></div>`;
 
     return `<div class="htbah-pdf-wurzel" style="box-sizing:border-box;width:${PDF_BREITE_PX}px;padding:${PDF_PADDING};background:#fff;color:#111;font-family:${stil.schrift};line-height:1.2;">
       <style>
@@ -397,7 +458,7 @@
         <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid ${stil.akzent};padding-bottom:4px;margin-bottom:5px;">
           <div style="min-width:0;">
             <div style="font-size:8px;color:${stil.kopfUntertitel};margin-bottom:1px;letter-spacing:0.02em;">CHARAKTERBOGEN · HOW TO BE A HERO</div>
-            <div style="font-size:15px;font-weight:800;letter-spacing:-0.02em;color:${stil.kopfTitel};">${stil.dekoAbschnitt}<span style="display:inline-block;margin:0 6px;">${escapeHtml(name || 'Unbenannt')}</span>${stil.dekoAbschnitt}</div>
+            <div style="font-size:15px;font-weight:800;letter-spacing:-0.02em;color:${stil.kopfTitel};">${stil.dekoAbschnitt}<span style="display:inline-block;margin:0 6px;">${escapeHtml(blanko ? '' : (name || 'Unbenannt'))}</span>${stil.dekoAbschnitt}</div>
           </div>
           <div style="font-size:7.5px;color:#666;text-align:right;white-space:nowrap;">Stand: ${escapeHtml(heute)} ${escapeHtml(uhrzeit)}</div>
         </div>
@@ -410,7 +471,7 @@
         <div style="flex-shrink:0;width:188px;font-size:7px;border:2px solid ${stil.kartenRahmen};border-radius:4px;padding:5px;background:${stil.panelBg};box-shadow:inset 0 0 0 1px ${stil.panelInset};">
           <div style="font-weight:700;margin-bottom:3px;color:${stil.akzent};text-transform:uppercase;letter-spacing:0.04em;">${stil.dekoAbschnitt} Lebenspunkte ${stil.dekoAbschnitt}</div>
           <div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px;">
-            <span>Start-LP: <strong>${escapeHtml(lpStartwert)}</strong></span>
+            <span>Start-LP: <strong>${escapeHtml(lpStartwert || '___')}</strong></span>
             <span>Aktuell: <span style="display:inline-block;min-width:28px;border-bottom:1px solid #b6bec8;text-align:center;">&#160;</span></span>
           </div>
           <div style="font-size:5.5px;color:#555;margin-bottom:3px;white-space:nowrap;">Bewusstlos bei LP 1-10 oder Einzelschaden >= 60 · Tot: LP = 0.</div>
@@ -434,10 +495,13 @@
       </div>
 
       <div style="font-weight:800;font-size:8px;margin-bottom:3px;color:#222;letter-spacing:0.04em;text-transform:uppercase;">${stil.dekoAbschnitt} Begabungen und Fähigkeiten ${stil.dekoAbschnitt}</div>
+      <div style="font-size:6.5px;color:#444;margin-bottom:3px;line-height:1.3;">
+        Rechenhilfe: Begabung = Summe / 10 (kaufmännisch gerundet) · Eff. = Wert + Begabung (max. 100)
+      </div>
       <div style="display:flex;gap:4px;margin-bottom:5px;align-items:stretch;">
-        ${faehigkeitenBlockHtml('handeln', 'Handeln', charakter, begabungen, gbVerbleibend, gbMax, summen)}
-        ${faehigkeitenBlockHtml('wissen', 'Wissen', charakter, begabungen, gbVerbleibend, gbMax, summen)}
-        ${faehigkeitenBlockHtml('soziales', 'Soziales', charakter, begabungen, gbVerbleibend, gbMax, summen)}
+        ${faehigkeitenBlockHtml('handeln', 'Handeln', charakter, begabungen, gbVerbleibend, gbMax, summen, optionen, stil)}
+        ${faehigkeitenBlockHtml('wissen', 'Wissen', charakter, begabungen, gbVerbleibend, gbMax, summen, optionen, stil)}
+        ${faehigkeitenBlockHtml('soziales', 'Soziales', charakter, begabungen, gbVerbleibend, gbMax, summen, optionen, stil)}
       </div>
 
       <div style="display:flex;gap:10px;align-items:stretch;width:100%;margin:0;padding:0;">
@@ -472,17 +536,24 @@
 
   function baueSicherheitsseiteHtml(charakter, optionen) {
     const stil = lesePdfStilKonfiguration(optionen);
+    const blanko = istBlankoExport(optionen);
     const sicher = charakter && charakter.sicherheitsmechanismen && typeof charakter.sicherheitsmechanismen === 'object'
       ? charakter.sicherheitsmechanismen
       : {};
-    const tabuHtml =
-      typeof sicher.tabuHtml === 'string' && sicher.tabuHtml.trim()
-        ? sicher.tabuHtml
-        : '<p style="color:#666;">Keine Einträge.</p>';
-    const schleierHtml =
-      typeof sicher.schleierHtml === 'string' && sicher.schleierHtml.trim()
-        ? sicher.schleierHtml
-        : '<p style="color:#666;">Keine Einträge.</p>';
+    const tabuHtml = blanko
+      ? linienBlockHtml(8)
+      : (
+        typeof sicher.tabuHtml === 'string' && sicher.tabuHtml.trim()
+          ? sicher.tabuHtml
+          : '<p style="color:#666;">Keine Einträge.</p>'
+      );
+    const schleierHtml = blanko
+      ? linienBlockHtml(8)
+      : (
+        typeof sicher.schleierHtml === 'string' && sicher.schleierHtml.trim()
+          ? sicher.schleierHtml
+          : '<p style="color:#666;">Keine Einträge.</p>'
+      );
     return `<div class="htbah-pdf-wurzel" style="box-sizing:border-box;width:${PDF_BREITE_PX}px;padding:${PDF_PADDING};background:#fff;color:#111;font-family:${stil.schrift};line-height:1.25;min-height:1110px;display:flex;flex-direction:column;">
       <style>
         .htbah-pdf-wurzel .htbah-pdf-html p { margin: 0 0 2px 0; }
@@ -530,7 +601,10 @@
     </div>`;
   }
 
-  function dateinameAusCharaktername(name) {
+  function dateinameAusCharaktername(name, optionen) {
+    if (istBlankoExport(optionen)) {
+      return 'htbah-charakter-blanko.pdf';
+    }
     const roh = typeof name === 'string' ? name : '';
     const sicher = roh.replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 64) || 'charakter';
     return `htbah-charakter-${sicher}.pdf`;
@@ -607,7 +681,7 @@
     fuegeCanvasAlsA4SeiteHinzu(pdf, canvasSeite2);
     const ab = pdf.output('arraybuffer');
     const blob = new Blob([ab], { type: 'application/pdf' });
-    const dateiname = dateinameAusCharaktername(charakter.name);
+    const dateiname = dateinameAusCharaktername(charakter.name, optionen);
     return { blob, dateiname };
   }
 

@@ -221,6 +221,13 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     charakterLink() {
       const id = window.HTBAH.ladeAktivenCharakterId();
+      const pfad = this.$route && typeof this.$route.path === 'string' ? this.$route.path : '';
+      if (id && pfad.startsWith(`/charakter/${id}/`)) {
+        return pfad;
+      }
+      if (!id && pfad.startsWith('/charakter/neu/')) {
+        return pfad;
+      }
       return id ? `/charakter/${id}/session-zero` : '/charakter/neu/session-zero';
     },
     einstellungenAktiv() {

@@ -4019,7 +4019,6 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   background: color-mix(in srgb, var(--card-bg) 88%, transparent);
   overflow: visible;
   position: relative;
-  z-index: 1;
 }
 
 .htbah-zufall-karten-titel {
