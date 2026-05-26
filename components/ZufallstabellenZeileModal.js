@@ -7,6 +7,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
     InventarEditorPanel: window.HTBAH_KOMPONENTEN.InventarEditorPanel,
+    EntityKartenIconFeld: window.HTBAH_KOMPONENTEN.EntityKartenIconFeld,
+    EntitaetAnzeigeIcon: window.HTBAH_KOMPONENTEN.EntitaetAnzeigeIcon,
   },
   props: {
     anlage: { type: Object, required: true },
@@ -52,6 +54,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     'bestien-wizard',
     'welt-open',
     'inventar-remove',
+    'karten-icon-change',
   ],
   data() {
     return {
@@ -155,8 +158,21 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         { id: 'tot', label: 'Tot', emoji: '💀' },
       ];
     },
+    zeigtKartenIconFeld() {
+      const typ = this.anlage && this.anlage.typ;
+      return ['ort', 'fraktion', 'raetsel', 'gegenstand'].includes(typ);
+    },
+    kartenIconModalSuffix() {
+      return this.interaktiveWeltBearbeitung ? 'iw' : 'zst';
+    },
   },
   watch: {
+    'anlage.zeile': {
+      immediate: true,
+      handler() {
+        this.stelleKartenIconSicher();
+      },
+    },
     'anlage.offen'(offen) {
       if (offen && !this.eingebettet) {
         this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -347,6 +363,27 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     },
     onResize() {
       this.$nextTick(() => this.stelleSichtbaresFensterSicher());
+    },
+    stelleKartenIconSicher() {
+      const api = window.HTBAH_SHARED && window.HTBAH_SHARED.EntityKartenIcon;
+      if (!api || !this.anlage || !this.anlage.zeile || !this.anlage.typ) {
+        return;
+      }
+      if (typeof api.stelleKartenIconSicher === 'function') {
+        api.stelleKartenIconSicher(this.anlage.zeile, this.anlage.typ);
+      }
+    },
+    aufKartenIconAktualisiert(wert) {
+      if (!this.anlage || !this.anlage.zeile || !this.anlage.typ) {
+        return;
+      }
+      const api = window.HTBAH_SHARED && window.HTBAH_SHARED.EntityKartenIcon;
+      const normalisiert =
+        api && typeof api.normalisiereKartenIcon === 'function'
+          ? api.normalisiereKartenIcon(wert, this.anlage.typ)
+          : wert;
+      this.anlage.zeile = { ...this.anlage.zeile, kartenIcon: normalisiert };
+      this.$emit('karten-icon-change', normalisiert);
     },
     fraktionOrtHinzufuegen() {
       if (!this.anlage || this.anlage.typ !== 'fraktion' || !this.anlage.zeile) {
@@ -665,7 +702,16 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         tabindex="-1"
         @keydown.esc.stop.prevent="schliessen">
         <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2" @pointerdown="starteZiehen">
-          <strong>{{ zeileModalTitel }}</strong>
+          <span class="htbah-modal-titel-mit-icon">
+            <entitaet-anzeige-icon
+              v-if="anlage && anlage.typ && anlage.zeile"
+              :key="'zeile-kopf-icon-' + anlage.typ + '-' + (anlage.zeile.kartenIcon && anlage.zeile.kartenIcon.quelle ? anlage.zeile.kartenIcon.quelle : '') + '-' + (anlage.zeile.kartenIcon && anlage.zeile.kartenIcon.emoji ? anlage.zeile.kartenIcon.emoji : '') + '-' + (anlage.zeile.kartenIcon && anlage.zeile.kartenIcon.mediumId ? anlage.zeile.kartenIcon.mediumId : '') + '-' + (anlage.zeile.kartenIcon && anlage.zeile.kartenIcon.form ? anlage.zeile.kartenIcon.form : '')"
+              :entity-typ="anlage.typ"
+              :zeile="anlage.zeile"
+              groesse="sm"
+              :titel="zeileModalTitel" />
+            <strong>{{ zeileModalTitel }}</strong>
+          </span>
           <div class="d-flex align-items-center gap-2">
             <div v-if="randomSichtbar && zeigtRandomAlsDropdown" class="dropdown">
               <button
@@ -1242,44 +1288,53 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         </div>
 
         <div v-if="zeigtMedienTab" class="mt-3 mb-3">
-          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-            <label class="form-label mb-0">Medien & Dateien</label>
-            <label class="btn btn-sm btn-outline-secondary mb-0">
-              Hochladen
-              <input type="file" class="d-none" multiple @change="$emit('media-upload', $event)" />
-            </label>
-          </div>
-          <div v-if="!(anlage.zeile.medien || []).length" class="text-secondary small">Noch keine Medien.</div>
-          <div v-else class="row g-2">
-            <div v-for="(medium, mediumIndex) in (anlage.zeile.medien || [])" :key="'wb-bearbeitung-medium-' + medium.id" class="col-12 col-md-6">
-              <div class="border rounded p-2 h-100 zufallstabellen-medium-karte">
-                <button
-                  v-if="typeof medium.dataUrl === 'string' && medium.dataUrl.startsWith('data:image/')"
-                  type="button"
-                  class="zufallstabellen-medium-thumb-button mb-2"
-                  @click="$emit('media-open', medium)">
-                  <img :src="medium.dataUrl" :alt="medium.name || 'Bild'" />
-                </button>
-                <div class="small">
-                  <div class="fw-semibold">{{ medium.name || 'Datei' }}</div>
-                  <div class="text-secondary">{{ medium.mimeType || 'Datei' }}</div>
-                  <div v-if="Number.isFinite(medium.size)" class="text-secondary">{{ Math.round(medium.size / 1024) }} KiB</div>
-                </div>
-                <div class="d-flex gap-2 mt-2">
+          <entity-karten-icon-feld
+            v-if="zeigtKartenIconFeld"
+            :entity-typ="anlage.typ"
+            :model-value="anlage.zeile.kartenIcon"
+            :medien="anlage.zeile.medien || []"
+            :modal-id-suffix="kartenIconModalSuffix"
+            @update:model-value="aufKartenIconAktualisiert" />
+          <section class="htbah-entitaet-bereich">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <h6 class="htbah-entitaet-bereich-titel mb-0">🖼️ Medien &amp; Dateien</h6>
+              <label class="btn btn-sm btn-outline-secondary mb-0">
+                Hochladen
+                <input type="file" class="d-none" multiple @change="$emit('media-upload', $event)" />
+              </label>
+            </div>
+            <div v-if="!(anlage.zeile.medien || []).length" class="text-secondary small mb-0">Noch keine Medien.</div>
+            <div v-else class="row g-2">
+              <div v-for="(medium, mediumIndex) in (anlage.zeile.medien || [])" :key="'wb-bearbeitung-medium-' + medium.id" class="col-12 col-md-6">
+                <div class="border rounded p-2 h-100 zufallstabellen-medium-karte">
                   <button
                     v-if="typeof medium.dataUrl === 'string' && medium.dataUrl.startsWith('data:image/')"
                     type="button"
-                    class="btn btn-sm"
-                    :class="anlage.zeile.primaryMediumId === medium.id ? 'btn-primary' : 'btn-outline-primary'"
-                    @click="$emit('media-set-primary', medium.id)">
-                    {{ anlage.zeile.primaryMediumId === medium.id ? 'Titelbild' : 'Als Titelbild' }}
+                    class="zufallstabellen-medium-thumb-button mb-2"
+                    @click="$emit('media-open', medium)">
+                    <img :src="medium.dataUrl" :alt="medium.name || 'Bild'" />
                   </button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="$emit('media-download', medium)">Download</button>
-                  <button type="button" class="btn btn-sm btn-outline-danger" @click="$emit('media-remove', mediumIndex)">Entfernen</button>
+                  <div class="small">
+                    <div class="fw-semibold">{{ medium.name || 'Datei' }}</div>
+                    <div class="text-secondary">{{ medium.mimeType || 'Datei' }}</div>
+                    <div v-if="Number.isFinite(medium.size)" class="text-secondary">{{ Math.round(medium.size / 1024) }} KiB</div>
+                  </div>
+                  <div class="d-flex gap-2 mt-2">
+                    <button
+                      v-if="typeof medium.dataUrl === 'string' && medium.dataUrl.startsWith('data:image/')"
+                      type="button"
+                      class="btn btn-sm"
+                      :class="anlage.zeile.primaryMediumId === medium.id ? 'btn-primary' : 'btn-outline-primary'"
+                      @click="$emit('media-set-primary', medium.id)">
+                      {{ anlage.zeile.primaryMediumId === medium.id ? 'Titelbild' : 'Als Titelbild' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="$emit('media-download', medium)">Download</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="$emit('media-remove', mediumIndex)">Entfernen</button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
         </div>
 
         <section v-if="zeigtInventarBereich && zeigtDatenTab" class="htbah-entitaet-bereich mt-3">

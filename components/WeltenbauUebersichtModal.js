@@ -54,11 +54,45 @@ var HTBAH_REFACTOR_UTILS =
     };
   }
 
+  function kartenIconApi() {
+    return window.HTBAH_SHARED && window.HTBAH_SHARED.EntityKartenIcon
+      ? window.HTBAH_SHARED.EntityKartenIcon
+      : null;
+  }
+
+  function graphKnotenLabel(payload, entityTyp) {
+    const api = kartenIconApi();
+    if (api && typeof api.entitaetAnzeigeName === 'function') {
+      return textWert(api.entitaetAnzeigeName(payload, entityTyp));
+    }
+    const name =
+      entityTyp === 'raetsel' && payload
+        ? payload.titel
+        : payload && payload.name;
+    return textWert(name);
+  }
+
+  function graphKnotenIconAnzeige(payload, entityTyp) {
+    const api = kartenIconApi();
+    if (!api || typeof api.kartenIconAnzeige !== 'function') {
+      return { art: 'emoji', emoji: '📌', form: 'eckig', istBenutzerdefiniert: false };
+    }
+    return api.kartenIconAnzeige(payload, entityTyp);
+  }
+
+  function stelleZeileKartenIconSicher(zeile, entityTyp) {
+    const api = kartenIconApi();
+    if (api && typeof api.stelleKartenIconSicher === 'function') {
+      api.stelleKartenIconSicher(zeile, entityTyp);
+    }
+  }
+
   window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal = {
     name: 'WeltenbauUebersichtModal',
     components: {
       ZufallstabellenZeileModal: window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal,
       WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
+      EntitaetAnzeigeIcon: window.HTBAH_KOMPONENTEN.EntitaetAnzeigeIcon,
       WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
       ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
       SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
@@ -719,19 +753,26 @@ var HTBAH_REFACTOR_UTILS =
         }
         let basis = '';
         if (anlage.typ === 'npc') {
-          basis = '👤 NPC';
+          basis = 'NPC';
         } else if (anlage.typ === 'ort') {
-          basis = '🗺️ Ort';
+          basis = 'Ort';
         } else if (anlage.typ === 'fraktion') {
-          basis = '🏛️ Fraktion';
+          basis = 'Fraktion';
         } else if (anlage.typ === 'bestie') {
-          basis = '🦁 Bestarium';
+          basis = 'Bestarium';
         } else if (anlage.typ === 'raetsel') {
-          basis = '🧩 Rätsel';
+          basis = 'Rätsel';
+        } else if (anlage.typ === 'pantheon') {
+          basis = 'Gottheit';
         } else {
-          basis = '📦 Gegenstand';
+          basis = 'Gegenstand';
         }
-        const name = anlage.zeile && String(anlage.zeile.name || '').trim();
+        const name =
+          anlage.zeile && anlage.typ === 'raetsel'
+            ? String(anlage.zeile.titel || '').trim()
+            : anlage.zeile
+              ? String(anlage.zeile.name || '').trim()
+              : '';
         return name ? `${basis}: ${name}` : basis;
       },
       withAnlageKontext(ziel, fn) {
@@ -2031,7 +2072,13 @@ var HTBAH_REFACTOR_UTILS =
             id: key,
             type: 'default',
             position: layout[key] || { x: 180 + idx * 260, y: 180 + (idx % 3) * 220 },
-            data: { label: `🗺️ ${textWert(ort.name)}`, entityType: 'ort', entityId: ort.id, payload: ort },
+            data: {
+              label: graphKnotenLabel(ort, 'ort'),
+              kartenIconAnzeige: graphKnotenIconAnzeige(ort, 'ort'),
+              entityType: 'ort',
+              entityId: ort.id,
+              payload: ort,
+            },
             style: { width: 220, borderWidth: 2 },
           };
         });
@@ -2057,11 +2104,11 @@ var HTBAH_REFACTOR_UTILS =
               type: 'default',
               position: layout[key] || { x: 900, y: 140 + idx * 90 },
               data: {
-                label: `🏛️ ${textWert(fraktion.name)}`,
+                label: graphKnotenLabel(fraktion, 'fraktion'),
+                kartenIconAnzeige: graphKnotenIconAnzeige(fraktion, 'fraktion'),
                 entityType: 'fraktion',
                 entityId: fraktion.id,
                 payload: fraktion,
-                avatarDataUrl: this.entitaetBildDataUrl(fraktion),
                 multiOrtCount: orte.length,
               },
               style: { width: 210, borderWidth: 2 },
@@ -2081,11 +2128,11 @@ var HTBAH_REFACTOR_UTILS =
               type: 'default',
               position: layout[key] || { x: ortAnchor.x + 260 + (ortIndex % 2) * 40, y: ortAnchor.y + 90 + Math.floor(ortIndex / 2) * 70 },
               data: {
-                label: `🏛️ ${textWert(fraktion.name)}`,
+                label: graphKnotenLabel(fraktion, 'fraktion'),
+                kartenIconAnzeige: graphKnotenIconAnzeige(fraktion, 'fraktion'),
                 entityType: 'fraktion',
                 entityId: fraktion.id,
                 payload: fraktion,
-                avatarDataUrl: this.entitaetBildDataUrl(fraktion),
                 multiOrtCount: orte.length,
               },
               style: { width: 210, borderWidth: 2 },
@@ -2178,11 +2225,16 @@ var HTBAH_REFACTOR_UTILS =
                   y: anchor.y + nestOffsetY,
                 },
               data: {
-                label: `${emoji} ${textWert(prefix === 'raetsel' ? row.titel : row.name)}`,
+                label: graphKnotenLabel(row, prefix),
+                kartenIconAnzeige:
+                  prefix === 'raetsel' || prefix === 'gegenstand'
+                    ? graphKnotenIconAnzeige(row, prefix)
+                    : null,
                 entityType: prefix,
                 entityId: row.id,
                 payload: row,
-                avatarDataUrl: this.entitaetBildDataUrl(row),
+                avatarDataUrl:
+                  prefix === 'npc' || prefix === 'bestie' ? this.entitaetBildDataUrl(row) : '',
                 initiative: typeof row.initiative === 'string' ? row.initiative : '',
                 statusEmoji: status.tot ? '💀' : status.bewusstlos ? '😵' : '',
               },
@@ -2567,11 +2619,14 @@ var HTBAH_REFACTOR_UTILS =
         const istDragHoverZiel =
           !!(this.nodeDrag && this.nodeDrag.aktiv && this.map && this.map.dragHoverNodeId && node && node.id === this.map.dragHoverNodeId);
         const istKreisNode = t === 'charakter' || t === 'npc' || t === 'bestie';
+        const istKartenIconRechteck =
+          t === 'ort' || t === 'fraktion' || t === 'raetsel' || t === 'gegenstand';
         return {
           'htbah-map-node': true,
           'htbah-map-node-ort': t === 'ort',
           'htbah-map-node-charakter': t === 'charakter',
           'htbah-map-node-kreis': istKreisNode,
+          'htbah-map-node-rechteck': istKartenIconRechteck,
           'htbah-map-node-drag-hover': istDragHoverZiel,
           'htbah-map-element-locked': this.istElementGesperrt(node && node.id),
           'htbah-map-element-ausgewaehlt': this.istElementAusgewaehlt(node && node.id),
@@ -2591,6 +2646,30 @@ var HTBAH_REFACTOR_UTILS =
           'is-locked': this.istElementGesperrt(elementId),
           'is-unlocked': !this.istElementGesperrt(elementId),
         };
+      },
+      istKartenIconRechteckNode(node) {
+        const t = node && node.data && node.data.entityType;
+        return t === 'ort' || t === 'fraktion' || t === 'raetsel' || t === 'gegenstand';
+      },
+      kartenIconAnzeigeFuerNode(node) {
+        if (node && node.data && node.data.kartenIconAnzeige) {
+          return node.data.kartenIconAnzeige;
+        }
+        const t = node && node.data && node.data.entityType;
+        return graphKnotenIconAnzeige(node && node.data && node.data.payload, t);
+      },
+      kartenIconSlotKlassen(node) {
+        const anzeige = this.kartenIconAnzeigeFuerNode(node);
+        const istRund = !!(anzeige && anzeige.form === 'rund');
+        return {
+          'htbah-map-node-icon-slot': true,
+          'htbah-map-node-icon-slot--rund': istRund,
+          'htbah-map-node-icon-slot--eckig': !istRund,
+        };
+      },
+      kartenIconIstBild(node) {
+        const anzeige = this.kartenIconAnzeigeFuerNode(node);
+        return !!(anzeige && anzeige.art === 'bild' && anzeige.bildDataUrl);
       },
       istElementGesperrt(elementId) {
         if (!elementId) {
@@ -5165,6 +5244,7 @@ var HTBAH_REFACTOR_UTILS =
         if (typeof zeile.primaryMediumId !== 'string') {
           zeile.primaryMediumId = '';
         }
+        stelleZeileKartenIconSicher(zeile, typ);
         if (typ === 'fraktion') {
           zeile.orte = this.fraktionOrteListe(zeile);
         }
@@ -5191,7 +5271,7 @@ var HTBAH_REFACTOR_UTILS =
       neueAnlageZeile(typ) {
         const ortDefault = ((this.zustand.orte || [])[0] && (this.zustand.orte || [])[0].name) || '';
         if (typ === 'ort') {
-          return {
+          const zeile = {
             id: window.HTBAH.neueEntropieId(),
             name: '',
             groesse: '',
@@ -5200,7 +5280,10 @@ var HTBAH_REFACTOR_UTILS =
             notizenHtml: '',
             medien: [],
             primaryMediumId: '',
+            kartenIcon: (() => { const api = kartenIconApi(); return api ? api.leeresKartenIcon() : { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' }; })(),
           };
+          stelleZeileKartenIconSicher(zeile, 'ort');
+          return zeile;
         }
         if (typ === 'npc') {
           return {
@@ -5257,7 +5340,7 @@ var HTBAH_REFACTOR_UTILS =
           };
         }
         if (typ === 'fraktion') {
-          return {
+          const zeile = {
             id: window.HTBAH.neueEntropieId(),
             art: '',
             name: '',
@@ -5267,10 +5350,13 @@ var HTBAH_REFACTOR_UTILS =
             beschreibungHtml: '',
             medien: [],
             primaryMediumId: '',
+            kartenIcon: (() => { const api = kartenIconApi(); return api ? api.leeresKartenIcon() : { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' }; })(),
           };
+          stelleZeileKartenIconSicher(zeile, 'fraktion');
+          return zeile;
         }
         if (typ === 'raetsel') {
-          return {
+          const zeile = {
             id: window.HTBAH.neueEntropieId(),
             art: '',
             titel: '',
@@ -5284,9 +5370,12 @@ var HTBAH_REFACTOR_UTILS =
             notizenHtml: '',
             medien: [],
             primaryMediumId: '',
+            kartenIcon: (() => { const api = kartenIconApi(); return api ? api.leeresKartenIcon() : { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' }; })(),
           };
+          stelleZeileKartenIconSicher(zeile, 'raetsel');
+          return zeile;
         }
-        return {
+        const zeile = {
           id: window.HTBAH.neueEntropieId(),
           name: '',
           istWaffe: false,
@@ -5300,13 +5389,50 @@ var HTBAH_REFACTOR_UTILS =
           beschreibungHtml: '',
           medien: [],
           primaryMediumId: '',
+          kartenIcon: (() => { const api = kartenIconApi(); return api ? api.leeresKartenIcon() : { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' }; })(),
         };
+        stelleZeileKartenIconSicher(zeile, 'gegenstand');
+        return zeile;
       },
       onInventarEintragEntfernen(payload) {
         this.onInventarEintragEntfernenFuerAnlage(this.anlage, payload);
       },
       onInventarEintragEntfernenOverlay(payload) {
         this.withAnlageKontext('overlay', () => this.onInventarEintragEntfernenFuerAnlage(this.anlage, payload));
+      },
+      kartenIconVonAnlageInZustandUebernehmen() {
+        if (!this.anlage || !this.anlage.offen || !this.anlage.zeile || !this.anlage.typ) {
+          return;
+        }
+        const index = this.anlage.index;
+        if (!Number.isInteger(index) || index < 0) {
+          return;
+        }
+        const api = kartenIconApi();
+        if (!api || typeof api.istKartenIconEntityTyp !== 'function' || !api.istKartenIconEntityTyp(this.anlage.typ)) {
+          return;
+        }
+        const kartenIcon =
+          typeof api.normalisiereKartenIcon === 'function'
+            ? api.normalisiereKartenIcon(this.anlage.zeile.kartenIcon, this.anlage.typ)
+            : this.anlage.zeile.kartenIcon;
+        const patchZeile = (row) => (row ? { ...row, kartenIcon } : row);
+        const patchListe = (liste) => (liste || []).map((row, i) => (i === index ? patchZeile(row) : row));
+        const typ = this.anlage.typ;
+        if (typ === 'ort') {
+          this.zustand.orte = patchListe(this.zustand.orte);
+        } else if (typ === 'fraktion') {
+          this.zustand.fraktionen = patchListe(this.zustand.fraktionen);
+        } else if (typ === 'raetsel') {
+          this.zustand.raetsel = patchListe(this.zustand.raetsel);
+        } else if (typ === 'gegenstand') {
+          this.zustand.gegenstaende = patchListe(this.zustand.gegenstaende);
+        }
+      },
+      onKartenIconGeaendert() {
+        this.kartenIconVonAnlageInZustandUebernehmen();
+        this.planBearbeitungDirtyNachAenderung();
+        this.$nextTick(() => this.refreshGraph());
       },
       onInventarEintragEntfernenFuerAnlage(anlage, payload) {
         const gegenstandId =
@@ -5838,6 +5964,14 @@ var HTBAH_REFACTOR_UTILS =
         if (primaryId && entfernt && primaryId === entfernt.id) {
           const fallback = (this.anlage.zeile.medien || []).find((m) => this.mediumIstBild(m));
           this.anlage.zeile.primaryMediumId = fallback && fallback.id ? fallback.id : '';
+        }
+        const kartenIconApiRef = kartenIconApi();
+        if (kartenIconApiRef && entfernt && entfernt.id && typeof kartenIconApiRef.bereinigeKartenIconNachMediumEntfernung === 'function') {
+          kartenIconApiRef.bereinigeKartenIconNachMediumEntfernung(
+            this.anlage.zeile,
+            this.anlage.typ,
+            entfernt.id,
+          );
         }
         this.planBearbeitungDirtyNachAenderung();
       },
@@ -7252,33 +7386,32 @@ var HTBAH_REFACTOR_UTILS =
                       </div>
                     </div>
                   </template>
-                  <template v-else>
-                    <div class="d-flex align-items-center gap-2">
-                      <div
-                        v-if="node.data && node.data.avatarDataUrl"
-                        class="htbah-map-charakter-avatar-wrap">
+                  <template v-else-if="istKartenIconRechteckNode(node)">
+                    <div class="htbah-map-node-rechteck-inhalt">
+                      <div :class="kartenIconSlotKlassen(node)" aria-hidden="true">
                         <img
-                          :src="node.data.avatarDataUrl"
-                          alt="Avatar"
-                          class="htbah-map-charakterbild"
+                          v-if="kartenIconIstBild(node)"
+                          :src="kartenIconAnzeigeFuerNode(node).bildDataUrl"
+                          alt=""
+                          class="htbah-map-node-icon-bild"
                           draggable="false" />
-                        <div v-if="node.data && node.data.statusEmoji" class="htbah-map-charakter-status">{{ node.data.statusEmoji }}</div>
+                        <span v-else class="htbah-map-node-icon-emoji">{{ kartenIconAnzeigeFuerNode(node).emoji }}</span>
                       </div>
-                      <div class="position-relative">
-                        {{ node.data && node.data.label ? node.data.label : 'Eintrag' }}
+                      <div class="htbah-map-node-text position-relative">
+                        <span>{{ node.data && node.data.label ? node.data.label : 'Eintrag' }}</span>
                         <span
                           v-if="node.data && node.data.entityType === 'fraktion' && Number(node.data.multiOrtCount) > 1"
-                          class="badge rounded-pill text-bg-secondary ms-1"
+                          class="badge rounded-pill text-bg-secondary"
                           :title="'Diese Fraktion ist ' + Number(node.data.multiOrtCount) + ' Orten zugeordnet.'">
                           {{ Number(node.data.multiOrtCount) }} Orte
                         </span>
                         <span
                           v-if="node.data && initiativeBadgeText(node.data.initiative) && !interaktiveWeltStatsAnzeigen"
-                          class="badge rounded-pill text-bg-info ms-1">
+                          class="badge rounded-pill text-bg-info">
                           INI {{ initiativeBadgeText(node.data.initiative) }}
                         </span>
                         <div
-                          v-if="node.data && node.data.statusEmoji && !node.data.avatarDataUrl"
+                          v-if="node.data && node.data.statusEmoji"
                           class="htbah-map-charakter-status">
                           {{ node.data.statusEmoji }}
                         </div>
@@ -7347,6 +7480,7 @@ var HTBAH_REFACTOR_UTILS =
           @delete="loescheAnlageMitBestaetigung"
           @duplicate="dupliziereAnlageAusModal"
           @inventar-remove="onInventarEintragEntfernen"
+          @karten-icon-change="onKartenIconGeaendert"
           @update:zufallNpcEpoche="zufallNpcEpoche = $event"
           @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
           @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
@@ -7382,6 +7516,7 @@ var HTBAH_REFACTOR_UTILS =
           @delete="loescheAnlageMitBestaetigung"
           @duplicate="dupliziereAnlageAusModal"
           @inventar-remove="onInventarEintragEntfernenOverlay"
+          @karten-icon-change="onKartenIconGeaendert"
           @update:zufallNpcEpoche="zufallNpcEpoche = $event"
           @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
           @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
@@ -7435,7 +7570,14 @@ var HTBAH_REFACTOR_UTILS =
           :class="{ 'regelwerk-modal-window-fullscreen': charakterModal.fenster.istVollbild }"
           :style="charakterFensterStil">
           <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2" @pointerdown="starteCharakterZiehen($event)">
-            <strong>🧙 Charakter bearbeiten</strong>
+            <span class="htbah-modal-titel-mit-icon">
+              <entitaet-anzeige-icon
+                entity-typ="charakter"
+                :charakter-bild="charakterModal.charakter && charakterModal.charakter.charakterBild ? charakterModal.charakter.charakterBild : ''"
+                groesse="sm"
+                titel="Charakter bearbeiten" />
+              <strong>Charakter bearbeiten</strong>
+            </span>
             <div class="d-flex align-items-center gap-2">
               <button
                 type="button"

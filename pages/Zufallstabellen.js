@@ -168,7 +168,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       const cfg = TABLE_TYPE_CONFIG[this.bearbeitung.typ] || TABLE_TYPE_CONFIG.gegenstand;
       const label = this.bearbeitung.typ === 'bestie' ? 'Bestarium' : cfg.label;
-      return `${cfg.emoji} ${label}`;
+      const name = this.bearbeitung.zeile
+        ? String(
+            this.bearbeitung.typ === 'raetsel'
+              ? this.bearbeitung.zeile.titel || ''
+              : this.bearbeitung.zeile.name || '',
+          ).trim()
+        : '';
+      return name ? `${label}: ${name}` : label;
     },
     zeileModalTitelOverlay() {
       if (!this.bearbeitungOverlay) {
@@ -176,7 +183,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       const cfg = TABLE_TYPE_CONFIG[this.bearbeitungOverlay.typ] || TABLE_TYPE_CONFIG.gegenstand;
       const label = this.bearbeitungOverlay.typ === 'bestie' ? 'Bestarium' : cfg.label;
-      return `${cfg.emoji} ${label}`;
+      const name = this.bearbeitungOverlay.zeile
+        ? String(
+            this.bearbeitungOverlay.typ === 'raetsel'
+              ? this.bearbeitungOverlay.zeile.titel || ''
+              : this.bearbeitungOverlay.zeile.name || '',
+          ).trim()
+        : '';
+      return name ? `${label}: ${name}` : label;
     },
     zufallsgeneratorBereit() {
       return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
@@ -1338,6 +1352,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       const entfernt = this.bearbeitung.zeile.medien[index];
       this.bearbeitung.zeile.medien.splice(index, 1);
+      const kartenIconApi = window.HTBAH_SHARED && window.HTBAH_SHARED.EntityKartenIcon;
+      if (kartenIconApi && entfernt && entfernt.id && this.bearbeitung.typ) {
+        kartenIconApi.bereinigeKartenIconNachMediumEntfernung(
+          this.bearbeitung.zeile,
+          this.bearbeitung.typ,
+          entfernt.id,
+        );
+      }
       const primaryId = String(this.bearbeitung.zeile.primaryMediumId || '').trim();
       if (!primaryId || !entfernt || primaryId !== entfernt.id) {
         this.zeileBearbeitungBeiBlurSpeichern();
@@ -1777,6 +1799,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         notizenHtml: '',
         medien: [],
         primaryMediumId: '',
+        kartenIcon: { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' },
       };
     },
     gegenstandLeer() {
@@ -1799,6 +1822,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         lpMassenschadenBewusstlos: false,
         medien: [],
         primaryMediumId: '',
+        kartenIcon: { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' },
       };
     },
     fraktionLeer() {
@@ -1812,6 +1836,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         beschreibungHtml: '',
         medien: [],
         primaryMediumId: '',
+        kartenIcon: { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' },
       };
     },
     pantheonLeer() {
@@ -1844,6 +1869,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         notizenHtml: '',
         medien: [],
         primaryMediumId: '',
+        kartenIcon: { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' },
       };
     },
     bestieLeer() {
@@ -1889,6 +1915,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       if (typeof zeileKopie.primaryMediumId !== 'string') {
         zeileKopie.primaryMediumId = '';
+      }
+      const kartenIconApi = window.HTBAH_SHARED && window.HTBAH_SHARED.EntityKartenIcon;
+      if (kartenIconApi && typeof kartenIconApi.stelleKartenIconSicher === 'function') {
+        kartenIconApi.stelleKartenIconSicher(zeileKopie, typ);
       }
       if (typ === 'fraktion') {
         zeileKopie.orte = this.fraktionOrteListe(zeileKopie);

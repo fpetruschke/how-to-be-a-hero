@@ -526,6 +526,20 @@ function normalisiereZufallstabellenMedienListe(medien) {
   return medien.map(normalisiereZufallstabellenMedium).filter(Boolean);
 }
 
+function normalisiereZufallstabellenKartenIcon(kartenIcon, entityTyp) {
+  const api = window.HTBAH_SHARED && window.HTBAH_SHARED.EntityKartenIcon;
+  if (!api || typeof api.normalisiereKartenIcon !== 'function') {
+    return {
+      quelle: '',
+      emoji: '',
+      mediumId: '',
+      eigenDataUrl: '',
+      form: 'eckig',
+    };
+  }
+  return api.normalisiereKartenIcon(kartenIcon, entityTyp);
+}
+
 function normalisiereZufallstabellenPrimaryMediumId(primaryMediumId, medien) {
   const bilder = Array.isArray(medien)
     ? medien.filter(
@@ -636,6 +650,7 @@ function normalisiereZufallstabellenOrtZeile(z) {
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
     medien,
     primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
+    kartenIcon: normalisiereZufallstabellenKartenIcon(z.kartenIcon, 'ort'),
   };
 }
 
@@ -667,6 +682,7 @@ function normalisiereZufallstabellenGegenstandZeile(z) {
     lpMassenschadenBewusstlos: Boolean(z.lpMassenschadenBewusstlos),
     medien,
     primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
+    kartenIcon: normalisiereZufallstabellenKartenIcon(z.kartenIcon, 'gegenstand'),
   };
 }
 
@@ -692,6 +708,7 @@ function normalisiereZufallstabellenFraktionZeile(z) {
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
     medien,
     primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
+    kartenIcon: normalisiereZufallstabellenKartenIcon(z.kartenIcon, 'fraktion'),
   };
 }
 
@@ -736,6 +753,7 @@ function normalisiereZufallstabellenRaetselZeile(z) {
     notizenHtml: typeof z.notizenHtml === 'string' ? z.notizenHtml : '',
     medien,
     primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
+    kartenIcon: normalisiereZufallstabellenKartenIcon(z.kartenIcon, 'raetsel'),
   };
 }
 

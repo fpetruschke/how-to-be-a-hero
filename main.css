@@ -1211,6 +1211,252 @@ input::placeholder {
   pointer-events: none;
 }
 
+.htbah-map-node-rechteck {
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem 0 0;
+  overflow: hidden;
+}
+
+.htbah-map-node-rechteck-inhalt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 54px;
+}
+
+.htbah-map-node-icon-slot {
+  --htbah-map-node-icon-kante: 50px;
+  flex: 0 0 var(--htbah-map-node-icon-kante);
+  width: var(--htbah-map-node-icon-kante);
+  height: var(--htbah-map-node-icon-kante);
+  min-width: var(--htbah-map-node-icon-kante);
+  min-height: var(--htbah-map-node-icon-kante);
+  align-self: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.06);
+  margin-right: 0.35rem;
+}
+
+.htbah-map-node-icon-slot--eckig {
+  border-radius: 0.2rem;
+  border: 1px solid rgba(108, 117, 125, 0.35);
+}
+
+.htbah-map-node-icon-slot--rund {
+  border-radius: 50%;
+  border: 1px solid rgba(108, 117, 125, 0.3);
+}
+
+.htbah-map-node-icon-slot--rund .htbah-map-node-icon-bild {
+  border-radius: 50%;
+}
+
+.htbah-map-node-icon-bild {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.htbah-map-node-icon-emoji {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.htbah-map-node-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.35rem;
+  padding: 0.35rem 0;
+}
+
+.htbah-entity-karten-icon-vorschau {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 0.2rem;
+  background: var(--input-bg);
+  overflow: hidden;
+}
+
+.htbah-entity-karten-icon-vorschau--rund {
+  border-radius: 50%;
+}
+
+.htbah-entity-karten-icon-vorschau--rund img {
+  border-radius: 999px;
+}
+
+.htbah-entity-karten-icon-vorschau img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.htbah-entity-karten-icon-vorschau-emoji {
+  font-size: 1.85rem;
+  line-height: 1;
+}
+
+.htbah-entity-karten-icon-vorschau-zeile {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.htbah-entity-karten-icon-emoji-grid {
+  max-height: min(38vh, 220px);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 0.35rem;
+  background: var(--input-bg);
+}
+
+.htbah-entity-karten-icon-galerie {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 0.5rem;
+}
+
+.htbah-entity-karten-icon-galerie-item {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid var(--border-color);
+  border-radius: 0.4rem;
+  overflow: hidden;
+  background: var(--card-bg);
+  cursor: pointer;
+}
+
+.htbah-entity-karten-icon-galerie-item.is-active {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.35);
+}
+
+.htbah-entity-karten-icon-galerie-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.htbah-entitaet-anzeige-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--input-bg, rgba(15, 23, 42, 0.06));
+  border: 1px solid var(--border-color, rgba(108, 117, 125, 0.35));
+  line-height: 1;
+}
+
+.htbah-entitaet-anzeige-icon--sm {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.htbah-entitaet-anzeige-icon--md {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.htbah-entitaet-anzeige-icon--lg {
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
+  min-height: 50px;
+}
+
+.htbah-entitaet-anzeige-icon--eckig {
+  border-radius: 0.2rem;
+}
+
+.htbah-entitaet-anzeige-icon--rund {
+  border-radius: 50%;
+}
+
+.htbah-entitaet-anzeige-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.htbah-entitaet-anzeige-icon--rund img {
+  border-radius: 50%;
+}
+
+.htbah-entitaet-anzeige-icon-emoji {
+  font-size: 1.35rem;
+}
+
+.htbah-entitaet-anzeige-icon--sm .htbah-entitaet-anzeige-icon-emoji {
+  font-size: 1.1rem;
+}
+
+.htbah-entitaet-anzeige-icon--lg .htbah-entitaet-anzeige-icon-emoji {
+  font-size: 1.65rem;
+}
+
+.htbah-modal-titel-mit-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.htbah-modal-titel-mit-icon strong {
+  min-width: 0;
+}
+
+.htbah-quill-emoticon-picker--embedded {
+  position: static;
+  inset: auto;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  box-shadow: none;
+  pointer-events: auto;
+  display: block;
+  border: 1px solid var(--border-color);
+  border-radius: 0.65rem;
+  padding: 0.45rem;
+  background: var(--card-bg);
+  color: var(--card-color);
+}
+
+.htbah-quill-emoticon-picker--embedded:not(.htbah-quill-emoticon-picker--inline) .htbah-quill-emoticon-picker__grid {
+  max-height: min(44vh, 300px);
+}
+
+.htbah-quill-emoticon-picker--embedded .htbah-quill-emoticon-picker__item.is-selected {
+  background: rgba(13, 110, 253, 0.22);
+  outline: 2px solid rgba(13, 110, 253, 0.65);
+  outline-offset: -1px;
+}
+
 .htbah-map-node-ort {
   border-color: #6c757d;
   font-weight: 600;
@@ -4302,6 +4548,54 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 body.htbah-npc-wizard-offen .modal-backdrop,
 body.htbah-bestien-wizard-offen .modal-backdrop {
   z-index: 2070;
+}
+
+/* Karten-Icon-Modal: an body teleportiert, über Zeile-Modal und Interaktive Welt */
+body.htbah-entity-karten-icon-offen .modal-backdrop.show {
+  z-index: 4085 !important;
+}
+
+body.htbah-entity-karten-icon-offen .htbah-entity-karten-icon-modal.modal.show {
+  z-index: 4090 !important;
+}
+
+.htbah-entity-karten-icon-modal-dialog {
+  max-width: min(92vw, 720px);
+  max-height: calc(100dvh - 2rem);
+  margin: 1rem auto;
+}
+
+.htbah-entity-karten-icon-modal-content {
+  max-height: calc(100dvh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.htbah-entity-karten-icon-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.htbah-entity-karten-icon-tab-inhalt {
+  width: 100%;
+}
+
+.htbah-entity-karten-icon-modal .htbah-quill-emoticon-picker--embedded.htbah-quill-emoticon-picker--inline {
+  position: static !important;
+  z-index: auto !important;
+  inset: auto !important;
+  max-width: none;
+  width: 100%;
+  box-shadow: none;
+}
+
+.htbah-entity-karten-icon-modal .htbah-quill-emoticon-picker--embedded .htbah-quill-emoticon-picker__grid {
+  max-height: min(32vh, 280px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .htbah-npc-wizard {
