@@ -14,6 +14,7 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
   data() {
     return {
       fokusVorModal: null,
+      druckIframe: null,
     };
   },
   computed: {
@@ -45,6 +46,7 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
     },
   },
   beforeUnmount() {
+    this.entsorgeDruckIframe();
     this.entsorgeViewerIframe();
   },
   methods: {
@@ -73,16 +75,92 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
       a.click();
       a.remove();
     },
-    drucken() {
+    entsorgeDruckIframe() {
+      if (this.druckIframe && this.druckIframe.parentNode) {
+        this.druckIframe.parentNode.removeChild(this.druckIframe);
+      }
+      this.druckIframe = null;
+    },
+    druckeUeberPdfJsViewer() {
       const iframe = this.$refs.pdfIframe;
       if (!iframe || !iframe.contentWindow) {
         return;
       }
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (e) {
-        console.error(e);
+      const win = iframe.contentWindow;
+      const app = win.PDFViewerApplication;
+      const starten = () => {
+        if (app && app.pdfViewer && app.pdfViewer.pageViewsReady && typeof app.triggerPrinting === 'function') {
+          app.triggerPrinting();
+          return true;
+        }
+        try {
+          win.focus();
+          win.print();
+        } catch (e) {
+          console.error(e);
+        }
+        return false;
+      };
+      if (starten()) {
+        return;
+      }
+      if (app && app.eventBus && typeof app.eventBus.on === 'function') {
+        app.eventBus.on('documentloaded', () => {
+          starten();
+        }, { once: true });
+      }
+    },
+    druckeUeberBlobIframe() {
+      return new Promise((resolve) => {
+        if (!this.pdfUrl) {
+          resolve(false);
+          return;
+        }
+        this.entsorgeDruckIframe();
+        const frame = document.createElement('iframe');
+        frame.setAttribute('aria-hidden', 'true');
+        frame.title = 'Charakterbogen Druck';
+        frame.style.cssText =
+          'position:fixed;left:0;top:0;width:0;height:0;border:0;opacity:0;pointer-events:none;';
+        this.druckIframe = frame;
+        let erledigt = false;
+        const abschliessen = (erfolg) => {
+          if (erledigt) {
+            return;
+          }
+          erledigt = true;
+          this.entsorgeDruckIframe();
+          resolve(!!erfolg);
+        };
+        const nachDruck = () => abschliessen(true);
+        frame.addEventListener('load', () => {
+          try {
+            const win = frame.contentWindow;
+            if (!win) {
+              abschliessen(false);
+              return;
+            }
+            win.addEventListener('afterprint', nachDruck, { once: true });
+            win.focus();
+            win.print();
+            setTimeout(() => abschliessen(true), 120000);
+          } catch (e) {
+            console.error(e);
+            abschliessen(false);
+          }
+        }, { once: true });
+        frame.addEventListener('error', () => abschliessen(false), { once: true });
+        document.body.appendChild(frame);
+        frame.src = this.pdfUrl;
+      });
+    },
+    async drucken() {
+      if (!this.pdfUrl) {
+        return;
+      }
+      const blobOk = await this.druckeUeberBlobIframe();
+      if (!blobOk) {
+        this.druckeUeberPdfJsViewer();
       }
     },
   },

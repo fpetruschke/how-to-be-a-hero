@@ -2104,6 +2104,12 @@ input::placeholder {
   touch-action: auto;
 }
 
+@media print {
+  .regelwerk-modal-header {
+    display: none !important;
+  }
+}
+
 .regelwerk-modal-resize-handle {
   position: absolute;
   right: 0;
