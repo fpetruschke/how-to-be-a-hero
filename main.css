@@ -2402,11 +2402,19 @@ input::placeholder {
   font-size: 1.2rem;
 }
 
+.htbah-zeichen-modal-window .htbah-zeichen-werkzeug-split > .btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 .htbah-zeichen-modal-window .htbah-zeichen-werkzeug-split > .dropdown-toggle-split {
   width: 2.25rem;
   height: 2.25rem;
   padding: 0.15rem;
-  border-radius: 0.4rem;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: 0.4rem;
+  border-bottom-right-radius: 0.4rem;
   cursor: pointer;
 }
 

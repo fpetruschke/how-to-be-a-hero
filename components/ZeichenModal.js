@@ -15,11 +15,25 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   /** CSS-Referenz: 1in = 96px, 1in = 2,54cm — entspricht der Browser-Einheit „cm“ im Layout. */
   const CSS_PX_PRO_CM = 96 / 2.54;
   const KARO_KANTE_CM = 0.5;
-  const ZEICHEN_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck', 'radiergummi', 'fuell', 'pipette'];
-  const ALLE_WERKZEUGE = ['strich', 'rechteck', 'kreis', 'dreieck', 'radiergummi', 'fuell', 'pipette', 'hand', 'auswahl'];
+  const ZEICHEN_WERKZEUGE = [
+    'freihand',
+    'linie',
+    'polygon',
+    'rechteck',
+    'kreis',
+    'dreieck',
+    'radiergummi',
+    'fuell',
+    'pipette',
+  ];
+  const ALLE_WERKZEUGE = [...ZEICHEN_WERKZEUGE, 'hand', 'auswahl'];
+  /** Klick auf den ersten Polygonpunkt (CSS-Pixel), skaliert mit Zoom. */
+  const POLYGON_SNAP_CSS_PX = 14;
 
   const WERKZEUG_META = {
-    strich: { label: 'Freihand-Strich', kurz: 'Strich', icon: 'gesture' },
+    freihand: { label: 'Freihand', kurz: 'Freihand', icon: 'gesture' },
+    linie: { label: 'Strich', kurz: 'Strich', icon: 'diagonal_line' },
+    polygon: { label: 'Polygon', kurz: 'Polygon', icon: 'pentagon' },
     rechteck: { label: 'Rechteck', kurz: 'Rechteck', icon: 'crop_square' },
     kreis: { label: 'Kreis / Ellipse', kurz: 'Kreis', icon: 'radio_button_unchecked' },
     dreieck: { label: 'Dreieck', kurz: 'Dreieck', icon: 'change_history' },
@@ -188,6 +202,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       if (!p.length) return null;
       return { i: id, t: 's', c, d, p };
     }
+    if (typ === 'poly' || typ === 'polygon') {
+      const p = normalisiereStrichPunkte(roh.p != null ? roh.p : roh.punkte);
+      if (p.length < 6) return null;
+      return { i: id, t: 'poly', c, d, p };
+    }
     if (typ === 'r' || typ === 'e' || typ === 'tri') {
       const x = Number(roh.x);
       const y = Number(roh.y);
@@ -229,7 +248,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         c: el.c,
         d: Math.round(el.d * 100) / 100,
       };
-      if (el.t === 's') {
+      if (el.t === 's' || el.t === 'poly') {
         basis.p = el.p.map((v) => Math.round(v * 10) / 10);
       } else if (el.t === 'm') {
         basis.x = Math.round(el.x * 10) / 10;
@@ -269,7 +288,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       const norm = normalisiereBox(el.x, el.y, el.w, el.h);
       return { x: norm.x, y: norm.y, w: norm.w, h: norm.h };
     }
-    if (el.t === 's') {
+    if (el.t === 's' || el.t === 'poly') {
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
@@ -354,6 +373,21 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     return !(hatNeg && hatPos);
   }
 
+  function punktInPolygon(px, py, p) {
+    const n = p.length / 2;
+    if (n < 3) return false;
+    let inside = false;
+    for (let i = 0, j = n - 1; i < n; j = i, i += 1) {
+      const xi = p[i * 2];
+      const yi = p[i * 2 + 1];
+      const xj = p[j * 2];
+      const yj = p[j * 2 + 1];
+      const schneidet = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-12) + xi;
+      if (schneidet) inside = !inside;
+    }
+    return inside;
+  }
+
   function hitTest(el, wx, wy, tol) {
     if (!el) return false;
     if (el.t === 's') {
@@ -368,6 +402,22 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return true;
         }
       }
+      return false;
+    }
+    if (el.t === 'poly') {
+      const p = el.p;
+      const n = p.length / 2;
+      if (n < 2) return false;
+      const grenze = tol + el.d / 2;
+      for (let i = 0; i < n; i += 1) {
+        const j = (i + 1) % n;
+        if (
+          distanzPunktZuStrecke(wx, wy, p[i * 2], p[i * 2 + 1], p[j * 2], p[j * 2 + 1]) <= grenze
+        ) {
+          return true;
+        }
+      }
+      if (n >= 3 && punktInPolygon(wx, wy, p)) return true;
       return false;
     }
     if (el.t === 'r') {
@@ -507,7 +557,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   }
 
   function bewegeElement(el, dx, dy) {
-    if (el.t === 's') {
+    if (el.t === 's' || el.t === 'poly') {
       for (let i = 0; i + 1 < el.p.length; i += 2) {
         el.p[i] += dx;
         el.p[i + 1] += dy;
@@ -525,7 +575,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
         farbe: '#111827',
         dicke: 4,
-        werkzeug: 'strich',
+        werkzeug: 'freihand',
         werkzeugMenuOffen: false,
         elemente: [],
         auswahl: [],
@@ -550,7 +600,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         ]),
         /** Karoraster in Weltkoordinaten: bei 100 % Zoom entspricht eine Kante 0,5 cm auf dem Bildschirm; läuft mit Pan und Zoom mit. */
         karopapierGitter: false,
-        /** CSS-Pixel auf dem Canvas; Vorschau-Rahmen nur bei Werkzeug „Strich“. */
+        /** CSS-Pixel auf dem Canvas; Vorschau-Rahmen nur bei Freihand. */
         stiftVorschauPos: null,
         WERKZEUG_META,
         ZEICHEN_WERKZEUGE,
@@ -570,6 +620,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       this._pinchStart = null;
       this._panMaus = null;
       this._rasterBildCache = new Map();
+      /** { typ: 'linie'|'polygon', p: number[], cursor?: {x,y} } */
+      this._formEntwurf = null;
     },
     computed: {
       fensterStil() {
@@ -582,7 +634,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         return this.istVollbild ? 'Vollbild beenden' : 'Vollbild';
       },
       aktivesZeichenWerkzeug() {
-        return ZEICHEN_WERKZEUGE.includes(this.werkzeug) ? this.werkzeug : 'strich';
+        return ZEICHEN_WERKZEUGE.includes(this.werkzeug) ? this.werkzeug : 'freihand';
+      },
+      istFreihandModus() {
+        return this.werkzeug === 'freihand';
+      },
+      istLinieModus() {
+        return this.werkzeug === 'linie';
+      },
+      istPolygonModus() {
+        return this.werkzeug === 'polygon';
       },
       aktivesZeichenWerkzeugMeta() {
         return WERKZEUG_META[this.aktivesZeichenWerkzeug];
@@ -648,6 +709,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.beendeZiehen();
         this.beendeResize();
         this.stiftVorschauPos = null;
+        this._formEntwurf = null;
         this.unbindCanvas();
         this.flushSpeichern();
         this.stelleFokusWiederHer();
@@ -657,12 +719,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       dicke() {
         if (this.zustandGeladen) this.persistDebounce();
-        if (this.werkzeug === 'strich' && this.stiftVorschauPos) this.zeichneAlles();
+        if (this.werkzeug === 'freihand' && this.stiftVorschauPos) this.zeichneAlles();
       },
       werkzeug(neu) {
         if (this.zustandGeladen) this.persistDebounce();
         let neuZeichnen = false;
-        if (neu !== 'strich') {
+        if (this._formEntwurf) {
+          this.brichFormEntwurf(true);
+          neuZeichnen = true;
+        }
+        if (neu !== 'freihand') {
           if (this.stiftVorschauPos) neuZeichnen = true;
           this.stiftVorschauPos = null;
         }
@@ -724,6 +790,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.werkzeugMenuOffen = false;
           return;
         }
+        if (this._formEntwurf) {
+          this.brichFormEntwurf(true);
+          return;
+        }
         if (this.hatAuswahl) {
           this.auswahl = [];
           this.zeichneAlles();
@@ -744,12 +814,117 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.fokusVorModal = null;
       },
       beiGlobalemPointerdown(event) {
-        if (!this.werkzeugMenuOffen) return;
-        const menu = this.$refs.werkzeugMenu;
-        const toggle = this.$refs.werkzeugToggle;
-        if (menu && menu.contains(event.target)) return;
-        if (toggle && toggle.contains(event.target)) return;
-        this.werkzeugMenuOffen = false;
+        if (this.werkzeugMenuOffen) {
+          const menu = this.$refs.werkzeugMenu;
+          const toggle = this.$refs.werkzeugToggle;
+          if (!menu || !toggle || (!menu.contains(event.target) && !toggle.contains(event.target))) {
+            this.werkzeugMenuOffen = false;
+          }
+        }
+        if (!this.uiZustand?.zeichenModalOffen || !this._formEntwurf) return;
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        if (this.istZoomSteuerungZiel(event.target)) return;
+        if (this.zeichenflaecheEnthaeltZiel(event.target)) return;
+        if (this._formEntwurf.typ === 'linie') {
+          this.brichFormEntwurf();
+          return;
+        }
+        if (this._formEntwurf.typ === 'polygon') {
+          if (this._formEntwurf.p.length >= 6) {
+            this.polygonEntwurfAbschliessen();
+          } else {
+            this.brichFormEntwurf();
+          }
+        }
+      },
+      zeichenflaecheEnthaeltZiel(ziel) {
+        const canvas = this.$refs.canvas;
+        return !!(canvas && ziel instanceof Node && canvas.contains(ziel));
+      },
+      istZoomSteuerungZiel(ziel) {
+        if (!(ziel instanceof Element)) return false;
+        return !!ziel.closest(
+          '[aria-label="Verkleinern"], [aria-label="Vergrößern"], [aria-label="Ansicht zurücksetzen"]',
+        );
+      },
+      polygonSnapRadiusWelt() {
+        const s = this.ansicht.scale || 1;
+        return Math.max(6, POLYGON_SNAP_CSS_PX / s);
+      },
+      nahePolygonStart(wx, wy) {
+        const ent = this._formEntwurf;
+        if (!ent || ent.typ !== 'polygon' || ent.p.length < 6) return false;
+        const dx = wx - ent.p[0];
+        const dy = wy - ent.p[1];
+        return Math.sqrt(dx * dx + dy * dy) <= this.polygonSnapRadiusWelt();
+      },
+      brichFormEntwurf() {
+        if (!this._formEntwurf) return;
+        this._formEntwurf = null;
+        this.zeichneAlles();
+      },
+      polygonEntwurfAbschliessen() {
+        const ent = this._formEntwurf;
+        if (!ent || ent.typ !== 'polygon' || ent.p.length < 6) {
+          this.brichFormEntwurf();
+          return;
+        }
+        this.verlaufSchnappschuss();
+        this.elemente.push({
+          i: neueId(),
+          t: 'poly',
+          c: this.farbe,
+          d: this.dicke,
+          p: ent.p.slice(),
+        });
+        this._formEntwurf = null;
+        this.zeichneAlles();
+        this.persistDebounce();
+      },
+      linieEntwurfSetzen(welt) {
+        if (!this._formEntwurf || this._formEntwurf.typ !== 'linie') return;
+        const p = this._formEntwurf.p;
+        const x1 = p[0];
+        const y1 = p[1];
+        const x2 = welt.x;
+        const y2 = welt.y;
+        if (Math.abs(x2 - x1) < 0.5 / (this.ansicht.scale || 1) && Math.abs(y2 - y1) < 0.5 / (this.ansicht.scale || 1)) {
+          this.brichFormEntwurf();
+          return;
+        }
+        this.verlaufSchnappschuss();
+        this.elemente.push({
+          i: neueId(),
+          t: 's',
+          c: this.farbe,
+          d: this.dicke,
+          p: [x1, y1, x2, y2],
+        });
+        this._formEntwurf = null;
+        this.zeichneAlles();
+        this.persistDebounce();
+      },
+      onLiniePointerDown(welt) {
+        if (!this._formEntwurf) {
+          this._formEntwurf = { typ: 'linie', p: [welt.x, welt.y], cursor: { x: welt.x, y: welt.y } };
+          this.zeichneAlles();
+          return;
+        }
+        this.linieEntwurfSetzen(welt);
+      },
+      onPolygonPointerDown(welt) {
+        if (!this._formEntwurf) {
+          this._formEntwurf = { typ: 'polygon', p: [welt.x, welt.y], cursor: { x: welt.x, y: welt.y } };
+          this.zeichneAlles();
+          return;
+        }
+        if (this.nahePolygonStart(welt.x, welt.y)) {
+          this.polygonEntwurfAbschliessen();
+          return;
+        }
+        this._formEntwurf.p.push(welt.x, welt.y);
+        this._formEntwurf.cursor = { x: welt.x, y: welt.y };
+        this.zeichneAlles();
       },
       werkzeugSetzen(werkzeug) {
         if (!ALLE_WERKZEUGE.includes(werkzeug)) return;
@@ -787,8 +962,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.farbe = normalisiereFarbe(z.einstellungen.farbe);
             const d = Number(z.einstellungen.dicke);
             if (Number.isFinite(d)) this.dicke = clampDicke(d);
-            if (ALLE_WERKZEUGE.includes(z.einstellungen.werkzeug)) {
-              this.werkzeug = z.einstellungen.werkzeug;
+            let gespeichertesWerkzeug = z.einstellungen.werkzeug;
+            if (gespeichertesWerkzeug === 'strich') gespeichertesWerkzeug = 'freihand';
+            if (ALLE_WERKZEUGE.includes(gespeichertesWerkzeug)) {
+              this.werkzeug = gespeichertesWerkzeug;
             }
             if (typeof z.einstellungen.karopapierGitter === 'boolean') {
               this.karopapierGitter = z.einstellungen.karopapierGitter;
@@ -933,6 +1110,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this._panMaus = null;
         this._ctx = null;
         this.stiftVorschauPos = null;
+        this._formEntwurf = null;
         this.rasterBildCacheLeeren();
       },
       beiCanvasGroesseGeaendert() {
@@ -1100,6 +1278,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return;
         }
 
+        if (this.werkzeug === 'linie') {
+          this.onLiniePointerDown(welt);
+          return;
+        }
+        if (this.werkzeug === 'polygon') {
+          this.onPolygonPointerDown(welt);
+          return;
+        }
+
         this.verlaufSchnappschuss();
         const neu = this.erzeugeElementFuerWerkzeug(welt);
         if (!neu) return;
@@ -1112,15 +1299,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const canvas = this.$refs.canvas;
         if (!canvas) return;
         const pos = this.pointerKoordinate(event);
-        if (this.werkzeug === 'strich') {
+        if (this.werkzeug === 'freihand') {
           this.stiftVorschauPos = { x: pos.x, y: pos.y };
         } else {
           this.stiftVorschauPos = null;
         }
+        if (this._formEntwurf) {
+          const weltVorschau = this.canvasZuWelt(pos.x, pos.y);
+          this._formEntwurf.cursor = { x: weltVorschau.x, y: weltVorschau.y };
+          this.zeichneAlles();
+        }
 
         if (!this._aktivePointers) return;
         if (!this._aktivePointers.has(event.pointerId)) {
-          if (this.werkzeug === 'strich') this.zeichneAlles();
+          if (this.werkzeug === 'freihand') this.zeichneAlles();
           return;
         }
         const eintrag = this._aktivePointers.get(event.pointerId);
@@ -1209,7 +1401,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.onPointerUp(event);
           return;
         }
-        if (this.werkzeug === 'strich' && this.stiftVorschauPos) {
+        if (this.werkzeug === 'freihand' && this.stiftVorschauPos) {
           this.stiftVorschauPos = null;
           this.zeichneAlles();
         }
@@ -1261,8 +1453,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       erzeugeElementFuerWerkzeug(welt) {
         if (this.werkzeug === 'pipette' || this.werkzeug === 'fuell') return null;
         const basis = { i: neueId(), c: this.farbe, d: this.dicke };
-        if (this.werkzeug === 'strich') {
+        if (this.werkzeug === 'freihand') {
           return { ...basis, t: 's', p: [welt.x, welt.y] };
+        }
+        if (this.werkzeug === 'linie' || this.werkzeug === 'polygon') {
+          return null;
         }
         if (this.werkzeug === 'rechteck') {
           return { ...basis, t: 'r', x: welt.x, y: welt.y, w: 0, h: 0 };
@@ -1362,7 +1557,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         for (const el of this.elemente) {
           const orig = this._moveOriginal.get(el.i);
           if (!orig) continue;
-          if (orig.t === 's') {
+          if (orig.t === 's' || orig.t === 'poly') {
             el.p = orig.p.map((v, idx) => (idx % 2 === 0 ? v + dx : v + dy));
           } else {
             el.x = orig.x + dx;
@@ -1437,7 +1632,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const neueElemente = this.zwischenablage.map((el) => {
           const kopie = klone([el])[0];
           kopie.i = neueId();
-          if (kopie.t === 's') {
+          if (kopie.t === 's' || kopie.t === 'poly') {
             kopie.p = kopie.p.map((v, idx) => (idx % 2 === 0 ? v + PASTE_VERSATZ : v + PASTE_VERSATZ));
           } else {
             kopie.x += PASTE_VERSATZ;
@@ -1531,12 +1726,51 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         for (const el of this.elemente) {
           this.zeichneElement(ctx, el);
         }
+        this.zeichneFormEntwurf(ctx);
         this.zeichneStiftspitzenRahmen(ctx, canvas, dpr);
         this.zeichneAuswahlOverlay(ctx);
         this.zeichneLasso(ctx);
       },
+      zeichneFormEntwurf(ctx) {
+        const ent = this._formEntwurf;
+        if (!ent || !ent.cursor) return;
+        const p = ent.p;
+        const cur = ent.cursor;
+        ctx.save();
+        ctx.strokeStyle = this.farbe;
+        ctx.lineWidth = this.dicke;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        const skala = this.ansicht.scale || 1;
+        if (ent.typ === 'linie' && p.length >= 2) {
+          ctx.beginPath();
+          ctx.moveTo(p[0], p[1]);
+          ctx.lineTo(cur.x, cur.y);
+          ctx.stroke();
+        } else if (ent.typ === 'polygon' && p.length >= 2) {
+          ctx.beginPath();
+          ctx.moveTo(p[0], p[1]);
+          for (let i = 2; i < p.length; i += 2) {
+            ctx.lineTo(p[i], p[i + 1]);
+          }
+          ctx.lineTo(cur.x, cur.y);
+          ctx.stroke();
+          if (p.length >= 6) {
+            const snap = this.nahePolygonStart(cur.x, cur.y);
+            const r = Math.max(3, this.dicke * 0.65);
+            ctx.beginPath();
+            ctx.fillStyle = snap ? 'rgba(37, 99, 235, 0.35)' : 'rgba(37, 99, 235, 0.18)';
+            ctx.arc(p[0], p[1], r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 1.5 / skala;
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      },
       zeichneStiftspitzenRahmen(ctx, canvas, dpr) {
-        if (this.werkzeug !== 'strich' || !this.stiftVorschauPos) return;
+        if (this.werkzeug !== 'freihand' || !this.stiftVorschauPos) return;
         const cx = this.stiftVorschauPos.x;
         const cy = this.stiftVorschauPos.y;
         if (!Number.isFinite(cx) || !Number.isFinite(cy)) return;
@@ -1803,6 +2037,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           ctx.closePath();
           ctx.stroke();
           return;
+        }
+        if (el.t === 'poly') {
+          if (el.p.length < 4) return;
+          ctx.moveTo(el.p[0], el.p[1]);
+          for (let i = 2; i + 1 < el.p.length; i += 2) {
+            ctx.lineTo(el.p[i], el.p[i + 1]);
+          }
+          ctx.closePath();
+          ctx.stroke();
         }
       },
       zeichneAuswahlOverlay(ctx) {
@@ -2188,6 +2431,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               </template>
               <template v-else-if="istRadierModus">
                 Radiergummi: über Linien ziehen · Größe = Pinseldicke · Strg+Z rückgängig
+              </template>
+              <template v-else-if="istLinieModus">
+                Erster Klick: Startpunkt · Zweiter Klick: Linie setzen · Klick außerhalb des Canvas bricht ab (Zoom ausgenommen)
+              </template>
+              <template v-else-if="istPolygonModus">
+                Pro Klick eine Ecke · Startpunkt erneut anklicken oder außerhalb des Canvas: Polygon schließen (mind. 3 Ecken) · Zoom ausgenommen
+              </template>
+              <template v-else-if="istFreihandModus">
+                Freihand zeichnen · Strg+Z rückgängig
               </template>
               <template v-else>
                 Strg + Mausrad zum Zoomen · Shift + Mausrad horizontal verschieben · Hand-Werkzeug: ziehen und Mausrad zoomen · Pipette / Füllen im Werkzeugmenü · Mit zwei Fingern zoomen &amp; verschieben · Mittlere Maustaste oder Alt+Ziehen zum Verschieben
