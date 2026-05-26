@@ -20,6 +20,7 @@ const HTBAH_APP_ORIGIN = `${window.location.origin}${window.location.pathname.re
 window.HTBAH_KOMPONENTEN.BottomNav = {
   components: {
     WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
+    KonfliktModal: window.HTBAH_KOMPONENTEN.KonfliktModal,
   },
   props: ['uiZustand'],
   data() {
@@ -80,6 +81,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       musikboardFenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
       musikboardAusloeserElement: null,
       sicherheitsmechanismenModalOffen: false,
+      konfliktModalOffen: false,
       _badgeDragMoveHandler: null,
       _badgeDragUpHandler: null,
     };
@@ -438,11 +440,17 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     sicherheitsmodalNurLesen() {
       return this.rolle !== 'spielleitung';
     },
+    konfliktFabAnzeigen() {
+      return this.zeigeNav && this.istSpielleitung && this.hatAktiveKampagne;
+    },
   },
   watch: {
     '$route.fullPath'() {
       if (this.sicherheitsmechanismenModalOffen) {
         this.sicherheitsmechanismenModalOffen = false;
+      }
+      if (this.konfliktModalOffen) {
+        this.konfliktModalOffen = false;
       }
     },
     aktiveKampagneId(neu, alt) {
@@ -2534,6 +2542,24 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         </button>
       </div>
     </teleport>
+
+    <teleport to="body">
+      <div v-if="konfliktFabAnzeigen" class="htbah-konflikt-fab-stack">
+        <button
+          type="button"
+          class="htbah-konflikt-fab"
+          title="Konflikt (Teilnehmer, Initiative, Übersicht)"
+          aria-label="Konflikt-Modal öffnen"
+          @click="konfliktModalOffen = true">
+          <span class="material-symbols-outlined htbah-konflikt-fab-icon" aria-hidden="true">swords</span>
+        </button>
+      </div>
+    </teleport>
+
+    <konflikt-modal
+      :offen="konfliktModalOffen"
+      :kampagne-id="aktiveKampagneId"
+      @update:offen="konfliktModalOffen = $event" />
 
     <teleport to="body">
       <div

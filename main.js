@@ -20,6 +20,7 @@ const SPEICHER_KEY_ZEICHEN_MODAL = 'htbah_zeichen_brett';
 const SPEICHER_KEY_MENTION_NAV_TARGET = 'htbah_mention_nav_target';
 const SPEICHER_KEY_ORIENTATION_MODE = 'htbah_orientation_mode';
 const SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN = 'htbah_interaktive_welt_stats_anzeigen';
+const SPEICHER_KEY_KONFLIKT_FENSTER = 'htbah_konflikt_fenster';
 
 function erstelleLocalStorageBackend() {
   return {
@@ -253,6 +254,8 @@ function normalisiereSpielleiterKampagne(g) {
     : normalisiereAtmosphaereBadgePosition(g.zeitmessungBadgePos);
   const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
   const labels = KL ? KL.normalisiereKampagneLabels(g.labels) : [];
+  const KM = window.HTBAH_SHARED && window.HTBAH_SHARED.KonfliktModel;
+  const konflikt = KM ? KM.normalisiereKonfliktZustand(g.konflikt) : null;
   return {
     id: typeof g.id === 'string' && g.id ? g.id : neueEntropieId(),
     name: typeof g.name === 'string' && g.name.trim() ? g.name.trim() : 'Kampagne',
@@ -263,6 +266,7 @@ function normalisiereSpielleiterKampagne(g) {
     atmosphaereBadgePos,
     zeitmessung,
     zeitmessungBadgePos,
+    konflikt,
   };
 }
 
@@ -1426,6 +1430,26 @@ function speichereKampagnenAtmosphaereBadgePosition(kampagneId, pos) {
   return aktualisiereKampagneFeld(kampagneId, (kampagne) => {
     kampagne.atmosphaereBadgePos = normalisiereAtmosphaereBadgePosition(pos);
   });
+}
+
+function ladeKampagnenKonfliktZustand(kampagneId) {
+  const KM = window.HTBAH_SHARED && window.HTBAH_SHARED.KonfliktModel;
+  const leer = KM ? KM.leererKonfliktZustand() : { teilnehmer: [], aktiverTab: 'auswahl' };
+  const kampagne = findeKampagneById(ladeSpielleiterZustand(), kampagneId);
+  return KM ? KM.normalisiereKonfliktZustand(kampagne && kampagne.konflikt) : leer;
+}
+
+function speichereKampagnenKonfliktZustand(kampagneId, zustand) {
+  const KM = window.HTBAH_SHARED && window.HTBAH_SHARED.KonfliktModel;
+  const normalisiert = KM ? KM.normalisiereKonfliktZustand(zustand) : zustand;
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  const ok = aktualisiereKampagneFeld(kid, (kampagne) => {
+    kampagne.konflikt = normalisiert;
+  });
+  if (ok) {
+    htbahDispatchKampagneDatenGeaendert({ art: 'konflikt', kampagneId: kid });
+  }
+  return ok;
 }
 
 function normalisiereKampagnenZeitmessungZustand(roh) {
@@ -4286,6 +4310,7 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   zeichenModal: SPEICHER_KEY_ZEICHEN_MODAL,
   mentionNavigationTarget: SPEICHER_KEY_MENTION_NAV_TARGET,
   interaktiveWeltStatsAnzeigen: SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN,
+  konfliktFenster: SPEICHER_KEY_KONFLIKT_FENSTER,
 });
 
 window.HTBAH = {
@@ -4399,6 +4424,8 @@ window.HTBAH = {
   speichereKampagnenAtmosphaereZustand,
   ladeKampagnenAtmosphaereBadgePosition,
   speichereKampagnenAtmosphaereBadgePosition,
+  ladeKampagnenKonfliktZustand,
+  speichereKampagnenKonfliktZustand,
   bildbetrachter: bildbetrachterZustand,
   bildbetrachterOeffnen,
   bildbetrachterSchliessen,

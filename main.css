@@ -4140,6 +4140,319 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   filter: brightness(1.06);
 }
 
+/* Konflikt-FAB (rechts oben, orange) */
+.htbah-konflikt-fab-stack {
+  position: fixed;
+  top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 0.6rem);
+  right: max(0.6rem, env(safe-area-inset-right, 0px));
+  z-index: 1045;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+body.htbah-mit-lp-banner .htbah-konflikt-fab-stack {
+  top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 4.2rem);
+}
+
+@media (max-width: 767.98px) {
+  .htbah-konflikt-fab-stack {
+    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 3.75rem);
+  }
+
+  body.htbah-mit-lp-banner .htbah-konflikt-fab-stack {
+    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 7.1rem);
+  }
+}
+
+.htbah-konflikt-fab {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  border: 3px solid #c2410c;
+  background: linear-gradient(145deg, #fff7ed 0%, #ffedd5 55%, #fed7aa 100%);
+  color: #c2410c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(194, 65, 12, 0.38);
+}
+
+.htbah-konflikt-fab:hover,
+.htbah-konflikt-fab:focus-visible {
+  filter: brightness(1.05);
+  color: #9a3412;
+}
+
+.htbah-konflikt-fab-icon {
+  font-size: 1.45rem;
+  font-variation-settings: 'FILL' 1, 'wght' 600;
+}
+
+.htbah-konflikt-modal-layer {
+  z-index: 1055;
+}
+
+.htbah-konflikt-modal-window {
+  display: flex;
+  flex-direction: column;
+  min-width: min(360px, 96vw);
+  min-height: min(320px, 88vh);
+  max-width: calc(100vw - 8px);
+  max-height: calc(100vh - 8px);
+}
+
+.htbah-konflikt-titel-icon {
+  color: #c2410c;
+  font-variation-settings: 'FILL' 1, 'wght' 600;
+}
+
+.htbah-konflikt-suche {
+  flex: 1 1 12rem;
+  min-width: 8rem;
+  max-width: 22rem;
+}
+
+.htbah-konflikt-auswahl-karte {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.65rem;
+  background: var(--bs-body-bg);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.htbah-konflikt-auswahl-karte:hover {
+  border-color: color-mix(in srgb, #c2410c 45%, var(--border-color));
+}
+
+.htbah-konflikt-auswahl-karte--aktiv {
+  border-color: #c2410c;
+  background: color-mix(in srgb, #ffedd5 42%, var(--bs-body-bg));
+  box-shadow: 0 0 0 1px rgba(194, 65, 12, 0.28);
+}
+
+.htbah-konflikt-auswahl-check {
+  flex-shrink: 0;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  background: color-mix(in srgb, #c2410c 12%, transparent);
+  color: #c2410c;
+}
+
+.htbah-konflikt-auswahl-karte--aktiv .htbah-konflikt-auswahl-check {
+  background: #c2410c;
+  color: #fff;
+}
+
+.htbah-konflikt-kampf-spalten {
+  align-items: stretch;
+}
+
+.htbah-konflikt-partei-card {
+  border-width: 2px;
+  overflow: hidden;
+}
+
+.htbah-konflikt-partei-card:not(.htbah-konflikt-partei-card--gegner) {
+  border-color: color-mix(in srgb, var(--primary-color) 45%, var(--border-color));
+}
+
+.htbah-konflikt-partei-card--gegner {
+  border-color: color-mix(in srgb, #c2410c 50%, var(--border-color));
+}
+
+.htbah-konflikt-partei-kopf-btn {
+  background: color-mix(in srgb, var(--primary-color) 10%, var(--bs-body-bg));
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+}
+
+.htbah-konflikt-partei-card--gegner .htbah-konflikt-partei-kopf-btn {
+  background: color-mix(in srgb, #c2410c 10%, var(--bs-body-bg));
+}
+
+.htbah-konflikt-partei-kopf-btn:hover {
+  filter: brightness(1.03);
+}
+
+.htbah-konflikt-collapse-ico {
+  font-size: 1.25rem;
+  line-height: 1;
+  opacity: 0.75;
+}
+
+.htbah-konflikt-karte {
+  border-width: 2px;
+  overflow: hidden;
+}
+
+.htbah-konflikt-teilnehmer-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.htbah-konflikt-teilnehmer-kopf {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem;
+  background: color-mix(in srgb, var(--bs-body-bg) 96%, var(--border-color));
+  cursor: pointer;
+}
+
+.htbah-konflikt-teilnehmer-kopf:hover {
+  background: color-mix(in srgb, var(--bs-secondary-bg) 70%, transparent);
+}
+
+.htbah-konflikt-teilnehmer-aktion-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  width: 1.625rem;
+  height: 1.625rem;
+  padding: 0;
+}
+
+.htbah-konflikt-teilnehmer-aktion-btn > .material-symbols-outlined,
+.htbah-konflikt-teilnehmer-aktion-btn > span {
+  font-size: 1.1rem;
+  line-height: 1;
+  display: block;
+}
+
+.htbah-konflikt-teilnehmer-body {
+  border-top: 1px solid var(--border-color);
+  background: var(--bs-body-bg);
+}
+
+.htbah-konflikt-kat-spalten {
+  align-items: stretch;
+}
+
+.htbah-konflikt-kat-card {
+  font-size: 0.8rem;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.htbah-konflikt-kat-card .card-header {
+  background: color-mix(in srgb, var(--bs-secondary-bg) 65%, var(--bs-body-bg));
+  min-height: 2.1rem;
+}
+
+.htbah-konflikt-kat-kopf-btn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.htbah-konflikt-kat-kopf-btn:hover {
+  background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+}
+
+.htbah-konflikt-kat-card .card-body {
+  background: var(--bs-body-bg);
+}
+
+.htbah-konflikt-karte--vital {
+  border-color: color-mix(in srgb, #198754 55%, var(--border-color));
+  background: color-mix(in srgb, #d1e7dd 18%, var(--bs-body-bg));
+}
+
+.htbah-konflikt-karte--bewusstlos {
+  border-color: #ffc107;
+  background: #fff3cd;
+  color: #664d03;
+}
+
+.htbah-konflikt-karte--tot {
+  border-color: #dc3545;
+  background: #f8d7da;
+  color: #842029;
+}
+
+.htbah-konflikt-karte .htbah-map-node-kampf-stats {
+  font-size: 0.78rem;
+  min-width: 0;
+}
+
+.htbah-konflikt-ini-tabelle th {
+  white-space: nowrap;
+}
+
+.htbah-konflikt-sl-uebersicht {
+  font-size: 0.8rem;
+}
+
+.htbah-konflikt-sl-faehigkeiten {
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.htbah-konflikt-sl-faehigkeit-zeile {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.12rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
+}
+
+.htbah-konflikt-sl-faehigkeit-zeile:last-child {
+  border-bottom: none;
+}
+
+.htbah-konflikt-sl-faehigkeit-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.htbah-konflikt-sl-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.65rem;
+  font-size: inherit;
+}
+
+.htbah-konflikt-sl-dl dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--secondary-color);
+}
+
+.htbah-konflikt-sl-dl dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.htbah-konflikt-sl-inventar {
+  max-height: 8rem;
+  overflow-y: auto;
+}
+
+.htbah-konflikt-sl-inventar-zeile {
+  padding: 0.15rem 0;
+  line-height: 1.35;
+}
+
 .htbah-sicherheits-quill {
   min-height: 12rem;
 }
