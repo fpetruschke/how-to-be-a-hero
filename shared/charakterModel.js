@@ -261,7 +261,10 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
     };
   };
 
-  /** URL-Suffix für Standard-Reiter (session-zero | aktives-spiel). */
+  /**
+   * Standard-Reiter beim Öffnen eines Charakters:
+   * „Aktives Spiel“, sobald der Reiter einmal besucht wurde – sonst Session Zero.
+   */
   M.charakterStandardTabSuffix = function charakterStandardTabSuffix(charakter) {
     const c = charakter && typeof charakter === 'object' ? charakter : {};
     return c.aktivesSpielBegonnen ? 'aktives-spiel' : 'session-zero';

@@ -37,6 +37,8 @@
   --htbah-z-modal-crop: 5000;
   --htbah-z-modal-ui-backdrop: 13000;
   --htbah-z-modal-ui: 13010;
+  /* Quill-Floating-UI (Emoticons, @-Mentions) über allen Modals */
+  --htbah-z-quill-overlay: calc(var(--htbah-z-modal-ui) + 10);
   --htbah-z-dropdown: 1090;
 }
 
@@ -2849,7 +2851,7 @@ input::placeholder {
 
 .htbah-mention-dropdown {
   position: absolute;
-  z-index: 12000;
+  z-index: var(--htbah-z-quill-overlay);
   min-width: 220px;
   max-width: min(92vw, 360px);
   max-height: min(40vh, 320px);
@@ -2898,7 +2900,8 @@ input::placeholder {
 
 .htbah-quill-emoticon-picker {
   position: fixed;
-  z-index: 12050;
+  z-index: var(--htbah-z-quill-overlay);
+  pointer-events: auto;
   max-width: min(92vw, 320px);
   border: 1px solid var(--border-color);
   border-radius: 0.65rem;

@@ -252,6 +252,7 @@ window.HTBAH_SEITEN.Charakter = {
           this.$router.replace('/charakter/neu/session-zero');
           return;
         }
+        this.aktualisiereAktivesSpielBegonnenAusRoute();
       }
       this.zeigePresetAktionen = !this.spielleiterMitglied && this.istSetupTabAktiv;
     },
@@ -309,6 +310,15 @@ window.HTBAH_SEITEN.Charakter = {
         return;
       }
       this.charakter.aktivesSpielBegonnen = true;
+      if (this.istEditModus && this.charakterId) {
+        this.autosaveEinplanen();
+      }
+    },
+    aktualisiereAktivesSpielBegonnenAusRoute(pfad) {
+      const p = typeof pfad === 'string' ? pfad : this.$route?.path || '';
+      if (p.endsWith('/aktives-spiel')) {
+        this.merkeAktivesSpielBegonnen();
+      }
     },
     initialisiereCharakterAusRoute() {
       if (this.spielleiterMitglied) {
@@ -368,10 +378,11 @@ window.HTBAH_SEITEN.Charakter = {
       window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakterLokal);
       this.autosaveSnapshotAktualisieren();
       this._autosaveTemporarAussetzen = false;
+      this.aktualisiereAktivesSpielBegonnenAusRoute(pfad);
       // Kein erzwungener Tab-Sprung: Session Zero und Aktives Spiel müssen frei wechselbar bleiben.
     },
     wechsleCharakterTab(tab) {
-      if (tab === 'spiel' && this.aktiveCharakterTab === 'setup') {
+      if (tab === 'spiel') {
         this.merkeAktivesSpielBegonnen();
       }
       const map = {

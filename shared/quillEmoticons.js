@@ -7,7 +7,49 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   'use strict';
 
   const TOOLBAR_KEY = 'emoticons';
-  const PANEL_Z_INDEX = 10050;
+  const PANEL_Z_INDEX_FALLBACK = 13120;
+
+  function leseQuillOverlayZIndex() {
+    try {
+      const raw = getComputedStyle(document.documentElement)
+        .getPropertyValue('--htbah-z-quill-overlay')
+        .trim();
+      const parsed = parseInt(raw, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+    } catch {
+      /* getComputedStyle nicht verfügbar */
+    }
+    return PANEL_Z_INDEX_FALLBACK;
+  }
+
+  /** Z-Index des Picker-Panels: mindestens über dem umgebenden Modal-Layer. */
+  function panelZIndexFuerQuill(quill) {
+    let z = leseQuillOverlayZIndex();
+    const host = quill && quill.container;
+    if (!host || typeof host.closest !== 'function') {
+      return z;
+    }
+    const schicht = host.closest(
+      '.modal.show, .regelwerk-modal-layer, .htbah-generator-modal-layer, .htbah-weltenbau-charakter-modal-window',
+    );
+    if (!schicht) {
+      return z;
+    }
+    const schichtZ = parseInt(getComputedStyle(schicht).zIndex, 10);
+    if (Number.isFinite(schichtZ) && schichtZ + 10 > z) {
+      return schichtZ + 10;
+    }
+    return z;
+  }
+
+  function wendePanelZIndexAn(quill) {
+    if (!panel) {
+      return;
+    }
+    panel.style.zIndex = String(panelZIndexFuerQuill(quill));
+  }
 
   /** @type {Array<{ emoji?: string, html?: string, label: string, tags: string[] }>} */
   const EMOTICON_EINTRAGE = [
@@ -340,6 +382,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       }
     });
 
+    panel.style.pointerEvents = 'auto';
     document.body.appendChild(panel);
     return panel;
   }
@@ -446,6 +489,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       (quill.container && quill.container.querySelector
         ? quill.container.querySelector(`.ql-${TOOLBAR_KEY}`)
         : null);
+    wendePanelZIndexAn(quill);
     positionPanel(anchor || quill.container);
     if (panelSearchInput) {
       panelSearchInput.focus();
@@ -457,6 +501,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     outsidePointerHandler = (event) => {
       const target = event.target;
       if (panel && panel.contains(target)) {
+        return;
+      }
+      if (activeToolbarButton && activeToolbarButton.contains(target)) {
         return;
       }
       if (anchor && anchor.contains && anchor.contains(target)) {
