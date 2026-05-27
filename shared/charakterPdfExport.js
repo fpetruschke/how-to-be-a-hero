@@ -24,7 +24,8 @@
   const LEERZEILEN_INVENTAR = 10;
   const PDF_ABSCHNITT_UEBERSCHRIFT_PX = 12;
   const PDF_STAMMDATEN_LABEL_PX = 11;
-  const PDF_LP_BREITE_PX = 232;
+  const PDF_LP_BREITE_STANDARD_PX = 232;
+  const PDF_LP_BREITE_SCIFI_PX = 270;
   const PDF_CHARAKTERBILD_BREITE_PX = 138;
   const PDF_INV_ZEILE_HOEHE_PX = 22;
   const PDF_NOTIZ_LINIE_HOEHE_PX = 14;
@@ -37,16 +38,11 @@
       kopfUntertitel: '#6b4f2b',
       schrift: "'Palatino Linotype',Palatino,Georgia,'Times New Roman',serif",
       hintergrundAussen: '#f7f1e3',
-      kachelVerlaufStart: '#fcf8ef',
-      kachelVerlaufEnde: '#ffffff',
       panelBg: '#fcf8ef',
       panelInset: '#fcf8ef',
       tabellenKopf: '#eee6d8',
       zebra: '#fdfaf3',
-      werteVerlaufStart: '#f6f1e4',
-      werteVerlaufEnde: '#ffffff',
       schattenInnen: '#ece1cc',
-      dekoTitel: '✦ ❦ ✦',
       dekoAbschnitt: '❧',
       tabellenRahmen: '#7a5d35',
       tabellenZellenRahmen: '#ddd0b8',
@@ -61,16 +57,11 @@
       kopfUntertitel: '#334155',
       schrift: "system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
       hintergrundAussen: '#f5f7fa',
-      kachelVerlaufStart: '#f8fafc',
-      kachelVerlaufEnde: '#ffffff',
       panelBg: '#f8fafc',
       panelInset: '#f8fafc',
       tabellenKopf: '#e7edf3',
       zebra: '#fbfdff',
-      werteVerlaufStart: '#f2f8ff',
-      werteVerlaufEnde: '#ffffff',
       schattenInnen: '#e8edf3',
-      dekoTitel: '• • •',
       dekoAbschnitt: '•',
       tabellenRahmen: '#66758a',
       tabellenZellenRahmen: '#d5dce5',
@@ -85,16 +76,11 @@
       kopfUntertitel: '#3730a3',
       schrift: "'JetBrains Mono','Fira Code','Consolas','Courier New',monospace",
       hintergrundAussen: '#eef2ff',
-      kachelVerlaufStart: '#f3f6ff',
-      kachelVerlaufEnde: '#ffffff',
       panelBg: '#f3f6ff',
       panelInset: '#f3f6ff',
       tabellenKopf: '#e5eafc',
       zebra: '#f8faff',
-      werteVerlaufStart: '#eef2ff',
-      werteVerlaufEnde: '#ffffff',
       schattenInnen: '#e0e7ff',
-      dekoTitel: '▮ ▯ ▮',
       dekoAbschnitt: '▸',
       tabellenRahmen: '#4f46e5',
       tabellenZellenRahmen: '#d4daf7',
@@ -102,23 +88,18 @@
       kopfMuster: 'linear-gradient(135deg, #eaf0ff 0%, #f7f9ff 100%)',
     },
     einfach: {
-      rahmenAussen: '#000000',
-      rahmenInnen: '#000000',
+      rahmenAussen: '#bcbcbc',
+      rahmenInnen: '#a6a5a5',
       akzent: '#000000',
       kopfTitel: '#000000',
       kopfUntertitel: '#222222',
       schrift: "system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif",
       hintergrundAussen: '#ffffff',
-      kachelVerlaufStart: '#ffffff',
-      kachelVerlaufEnde: '#ffffff',
       panelBg: '#ffffff',
       panelInset: '#f4f4f4',
       tabellenKopf: '#e8e8e8',
       zebra: '#ffffff',
-      werteVerlaufStart: '#ffffff',
-      werteVerlaufEnde: '#ffffff',
       schattenInnen: '#ffffff',
-      dekoTitel: '',
       dekoAbschnitt: '',
       tabellenRahmen: '#000000',
       tabellenZellenRahmen: '#cccccc',
@@ -132,10 +113,7 @@
       ? optionen.stil.trim()
       : '';
     const basis = PDF_STILE[stil] || PDF_STILE['fantasy-mittelalter'];
-    return {
-      ...basis,
-      tabellenZellenRahmen: basis.tabellenZellenRahmen || basis.tabellenRahmen,
-    };
+    return { ...basis };
   }
 
   function istBlankoExport(optionen) {
@@ -163,7 +141,7 @@
     const flex = flexFuellung
       ? 'display:flex;flex-direction:column;flex:1 1 auto;min-height:0;height:100%;'
       : '';
-    return `<div class="htbah-pdf-seitenrahmen" style="border:3px double ${stil.rahmenAussen};border-radius:${PDF_SEITEN_RAHMEN_RADIUS};padding:${PDF_SEITEN_RAHMEN_PADDING};background:${stil.hintergrundAussen};box-sizing:border-box;width:100%;${flex}">`;
+    return `<div class="htbah-pdf-seitenrahmen" style="border:1.5px solid ${stil.rahmenAussen};border-radius:${PDF_SEITEN_RAHMEN_RADIUS};padding:${PDF_SEITEN_RAHMEN_PADDING};background:${stil.hintergrundAussen};box-sizing:border-box;width:100%;${flex}">`;
   }
 
   /** Einheitlicher Innenbereich (Seite 1 + 2): gleiche nutzbare Breite für alle Blöcke */
@@ -460,6 +438,9 @@
       : '';
 
     const zellenRahmen = stil.tabellenZellenRahmen;
+    const lpBlockBreitePx = optionen && optionen.stil === 'modern-futuristisch'
+      ? PDF_LP_BREITE_SCIFI_PX
+      : PDF_LP_BREITE_STANDARD_PX;
     const paare = blanko ? [] : (Array.isArray(charakter.vorNachteilePaare) ? charakter.vorNachteilePaare : []);
     let vnRows = '';
     if (!paare.length) {
@@ -584,7 +565,7 @@
       <div style="display:flex;gap:8px;margin-bottom:5px;align-items:stretch;flex-shrink:0;">
         ${bildBlock}
         ${stamBlock}
-        <div class="htbah-pdf-lp-block" style="flex-shrink:0;width:${PDF_LP_BREITE_PX}px;font-size:8.5px;border:2px solid ${stil.kartenRahmen};border-radius:4px;padding:5px;background:${stil.panelBg};box-shadow:inset 0 0 0 1px ${stil.panelInset};box-sizing:border-box;">
+        <div class="htbah-pdf-lp-block" style="flex-shrink:0;width:${lpBlockBreitePx}px;font-size:8.5px;border:2px solid ${stil.kartenRahmen};border-radius:4px;padding:5px;background:${stil.panelBg};box-shadow:inset 0 0 0 1px ${stil.panelInset};box-sizing:border-box;">
           <div style="font-weight:700;margin-bottom:3px;color:${stil.akzent};text-transform:uppercase;letter-spacing:0.04em;font-size:${PDF_ABSCHNITT_UEBERSCHRIFT_PX}px;">${dekoUm('Lebenspunkte', stil, blanko)}</div>
           <div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px;">
             <span>Start-LP: <strong>${escapeHtml(lpStartwert || '___')}</strong></span>

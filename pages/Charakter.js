@@ -1434,23 +1434,6 @@ window.HTBAH_SEITEN.Charakter = {
       <div
         v-if="!spielleiterMitglied && istNeuModus"
         class="card p-3 mb-2">
-        <h6 class="mb-2">Charaktervorlage (Epoche)</h6>
-        <p class="small text-body-secondary mb-2">
-          Starte mit einem Heldentyp aus Mittelalter/Fantasy, Gegenwart oder Sci-Fi — inklusive
-          vorgeschlagener Fähigkeiten und Inventar (nur Preset-Fähigkeiten).
-        </p>
-        <icon-text-button
-          type="button"
-          class="btn btn-outline-primary w-100"
-          symbol="🧙"
-          @click="charakterVorlageModalOeffnen">
-          Charaktervorlage wählen
-        </icon-text-button>
-      </div>
-
-      <div
-        v-if="!spielleiterMitglied && istNeuModus"
-        class="card p-3 mb-2">
         <h6 class="mb-2">Bestehenden Charakter importieren</h6>
         <p class="small text-body-secondary mb-2">
           Einzel-Export oder Komplett-Export. Bei mehreren enthaltenen Charakteren kannst du danach einen auswählen.
@@ -1820,6 +1803,23 @@ window.HTBAH_SEITEN.Charakter = {
             </div>
           </div>
         </div>
+      </div>
+
+      <div
+        v-if="!spielleiterMitglied && istSetupTabAktiv && !istNeuModus"
+        class="card p-3 mb-2">
+        <h6 class="mb-2">Charaktervorlage (Epoche)</h6>
+        <p class="small text-body-secondary mb-2">
+          Starte mit einem Heldentyp aus Mittelalter/Fantasy, Gegenwart oder Sci-Fi — inklusive
+          vorgeschlagener Fähigkeiten und Inventar (nur Preset-Fähigkeiten).
+        </p>
+        <icon-text-button
+          type="button"
+          class="btn btn-outline-primary w-100"
+          symbol="🧙"
+          @click="charakterVorlageModalOeffnen">
+          Charaktervorlage wählen
+        </icon-text-button>
       </div>
 
       <div v-if="(spielleiterMitglied || istSetupTabAktiv) && !istNeuModus" class="card p-3 mb-2">

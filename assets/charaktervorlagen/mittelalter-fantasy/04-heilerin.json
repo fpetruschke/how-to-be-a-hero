@@ -45,6 +45,13 @@
       "value": 79
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-mf-heilerin",
+      "vorteilHtml": "Ruhige Hände: Unter Stress kannst du Verletzungen und Krankheiten konzentriert versorgen.",
+      "nachteilHtml": "Helfersyndrom: Du bringst dich oft selbst in Gefahr, wenn jemand in deiner Nähe leidet."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-mf-he-kraeuter",
@@ -63,7 +70,7 @@
       "typ": "waffe",
       "name": "Holzstab",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
+      "schadenswertNahkampf": "1W10+5",
       "schadenswertFernkampf": ""
     },
     {

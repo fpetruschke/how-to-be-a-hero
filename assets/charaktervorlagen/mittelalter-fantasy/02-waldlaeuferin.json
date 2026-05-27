@@ -42,14 +42,21 @@
       "value": 80
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-mf-waldlaeuferin",
+      "vorteilHtml": "Fährtensinn: Du erkennst in Wildnis und Ruinen schneller Hinweise auf Wege, Lager und Gefahren.",
+      "nachteilHtml": "Städtescheu: In dichtem Gedränge und bei höfischer Etikette reagierst du oft ungeduldig oder verschlossen."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-mf-wl-bogen",
       "typ": "waffe",
       "name": "Übungsbogen",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
-      "schadenswertFernkampf": "1W6"
+      "schadenswertNahkampf": "1W10",
+      "schadenswertFernkampf": "6W10"
     },
     {
       "id": "inv-mf-wl-seil",
@@ -62,7 +69,7 @@
       "typ": "waffe",
       "name": "Jagdmesser",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
+      "schadenswertNahkampf": "2W10",
       "schadenswertFernkampf": ""
     },
     {

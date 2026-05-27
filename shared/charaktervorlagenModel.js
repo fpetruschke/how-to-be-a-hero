@@ -160,6 +160,32 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
       .filter(Boolean);
   };
 
+  M.normalisiereVorNachteilePaare = function normalisiereVorNachteilePaare(roh) {
+    if (!Array.isArray(roh)) {
+      return [];
+    }
+    return roh
+      .map((paar, index) => {
+        if (!paar || typeof paar !== 'object') {
+          return null;
+        }
+        const vorteilHtml = typeof paar.vorteilHtml === 'string' ? paar.vorteilHtml.trim() : '';
+        const nachteilHtml = typeof paar.nachteilHtml === 'string' ? paar.nachteilHtml.trim() : '';
+        if (!vorteilHtml && !nachteilHtml) {
+          return null;
+        }
+        return {
+          id:
+            typeof paar.id === 'string' && paar.id.trim()
+              ? paar.id.trim()
+              : `vn-vorlage-${index}`,
+          vorteilHtml,
+          nachteilHtml,
+        };
+      })
+      .filter(Boolean);
+  };
+
   /**
    * @returns {{ ok: true, vorlage: object } | { ok: false, fehler: string }}
    */
@@ -197,6 +223,7 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
       wissen: M.normalisiereFaehigkeitenListe(roh.wissen),
       soziales: M.normalisiereFaehigkeitenListe(roh.soziales),
       inventar: M.normalisiereInventarListe(roh.inventar),
+      vorNachteilePaare: M.normalisiereVorNachteilePaare(roh.vorNachteilePaare),
     };
     for (const kat of KATEGORIEN) {
       for (const f of vorlage[kat]) {
@@ -238,6 +265,9 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
     basis.wissen = JSON.parse(JSON.stringify(vorlage.wissen));
     basis.soziales = JSON.parse(JSON.stringify(vorlage.soziales));
     basis.inventar = JSON.parse(JSON.stringify(vorlage.inventar));
+    basis.vorNachteilePaare = JSON.parse(
+      JSON.stringify(Array.isArray(vorlage.vorNachteilePaare) ? vorlage.vorNachteilePaare : []),
+    );
     basis.geistesblitzVerbleibend = null;
     return basis;
   };

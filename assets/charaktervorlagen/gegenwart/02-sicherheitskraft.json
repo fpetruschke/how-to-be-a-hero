@@ -41,13 +41,20 @@
       "value": 44
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-gg-sicherheitskraft",
+      "vorteilHtml": "Praesenz: Dein Auftreten deeskaliert viele Konflikte, bevor sie eskalieren.",
+      "nachteilHtml": "Kontrollzwang: Unklare Lagen ohne klare Befehlskette stressen dich schneller als andere."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-gg-sk-schlagstock",
       "typ": "waffe",
       "name": "Schlagstock",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W6",
+      "schadenswertNahkampf": "1W10+5",
       "schadenswertFernkampf": ""
     },
     {
@@ -55,8 +62,8 @@
       "typ": "waffe",
       "name": "Dienstwaffe",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
-      "schadenswertFernkampf": "1W8"
+      "schadenswertNahkampf": "1W10",
+      "schadenswertFernkampf": "7W10"
     },
     {
       "id": "inv-gg-sk-weste",

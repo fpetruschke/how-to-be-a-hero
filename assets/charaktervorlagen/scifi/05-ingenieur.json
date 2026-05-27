@@ -49,6 +49,13 @@
       "value": 32
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-sf-ingenieur",
+      "vorteilHtml": "Notfallreparatur: Du bringst kritische Technik auch unter widrigen Bedingungen wieder ans Laufen.",
+      "nachteilHtml": "Perfektionismus: Du verlierst Zeit, weil du Loesungen lieber sauber als nur schnell umsetzt."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-sf-in-werkzeug",

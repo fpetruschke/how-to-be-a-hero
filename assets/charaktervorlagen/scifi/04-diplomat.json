@@ -45,6 +45,13 @@
       "value": 42
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-sf-diplomat",
+      "vorteilHtml": "Interkulturelles Gespuer: Du erkennst unausgesprochene Regeln zwischen Fraktionen und Spezies rasch.",
+      "nachteilHtml": "Politische Ruecksicht: Du weichst harten, klaren Entscheidungen manchmal zu lange aus."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-sf-di-abzeichen",

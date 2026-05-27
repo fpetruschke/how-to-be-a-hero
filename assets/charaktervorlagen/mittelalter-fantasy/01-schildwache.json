@@ -45,13 +45,20 @@
       "value": 52
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-mf-schildwache",
+      "vorteilHtml": "Unerschütterlicher Schutzinstinkt: Wenn Verbündete bedroht werden, bleibst du ruhig und hältst die Linie.",
+      "nachteilHtml": "Pflicht vor Freiheit: Du tust dich schwer damit, Befehle oder Schwüre zu brechen, selbst wenn es taktisch klüger wäre."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-mf-sw-schwert",
       "typ": "waffe",
       "name": "Trainingsschwert",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W6+1",
+      "schadenswertNahkampf": "5W10",
       "schadenswertFernkampf": ""
     },
     {
@@ -70,7 +77,7 @@
     {
       "id": "inv-mf-sw-helm",
       "typ": "rustung",
-      "name": "Kochtopfhelm",
+      "name": "einfacher Helm",
       "beschreibungHtml": "",
       "rustwert": "1"
     }

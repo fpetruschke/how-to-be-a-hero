@@ -45,6 +45,13 @@
       "value": 13
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-gg-ueberlebenskuenstler",
+      "vorteilHtml": "Improvisationstalent: Du machst aus wenig Material schnell brauchbare Loesungen.",
+      "nachteilHtml": "Dauernde Alarmbereitschaft: Entspannung faellt dir schwer, was dich in ruhigen sozialen Situationen unsicher wirken laesst."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-gg-ue-rucksack",
@@ -63,7 +70,7 @@
       "typ": "waffe",
       "name": "Taschenmesser",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
+      "schadenswertNahkampf": "2W10",
       "schadenswertFernkampf": ""
     },
     {

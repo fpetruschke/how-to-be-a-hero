@@ -45,13 +45,20 @@
       "value": 47
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-sf-infiltrator",
+      "vorteilHtml": "Schattenprotokoll: Du bleibst in gesicherten Zonen laenger unentdeckt als die meisten.",
+      "nachteilHtml": "Paranoide Gewohnheit: Vertrauen faellt dir schwer, selbst im eigenen Team."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-sf-in-klinge",
       "typ": "waffe",
       "name": "Energieklinge",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W8",
+      "schadenswertNahkampf": "5W10",
       "schadenswertFernkampf": ""
     },
     {

@@ -45,6 +45,13 @@
       "value": 53
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-mf-barde",
+      "vorteilHtml": "Bühnenpräsenz: Mit Stimme und Auftreten gewinnst du rasch Aufmerksamkeit und Sympathie.",
+      "nachteilHtml": "Geltungsdrang: Schweigen fällt dir schwer, wodurch Geheimhaltung und unauffälliges Vorgehen leiden können."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-mf-bd-laute",
@@ -69,7 +76,7 @@
       "typ": "waffe",
       "name": "Kleiner Dolch",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
+      "schadenswertNahkampf": "2W10",
       "schadenswertFernkampf": ""
     }
   ]

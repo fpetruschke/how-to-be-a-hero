@@ -41,21 +41,28 @@
       "value": 52
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-sf-soldat",
+      "vorteilHtml": "Gefechtsdisziplin: Unter Beschuss bleibst du fokussiert und handlungsfaehig.",
+      "nachteilHtml": "Befehlspraegung: Du faellst in Hierarchien schnell in alte Muster und hinterfragst zu spaet."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-sf-so-gewehr",
       "typ": "waffe",
       "name": "Plasmagewehr",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
-      "schadenswertFernkampf": "1W10"
+      "schadenswertNahkampf": "1W10",
+      "schadenswertFernkampf": "8W10"
     },
     {
       "id": "inv-sf-so-messer",
       "typ": "waffe",
       "name": "Energiemesser",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W8",
+      "schadenswertNahkampf": "2W10",
       "schadenswertFernkampf": ""
     },
     {

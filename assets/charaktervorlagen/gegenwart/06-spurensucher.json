@@ -45,6 +45,13 @@
       "value": 13
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-gg-spurensucher",
+      "vorteilHtml": "Detailauge: Kleinste Unstimmigkeiten in Szenen und Aussagen fallen dir sofort auf.",
+      "nachteilHtml": "Verbeisst sich in Spuren: Du laesst ungern los, selbst wenn ein Ansatz offensichtlich ins Leere fuehrt."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-gg-sp-kamera",

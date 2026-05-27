@@ -33,6 +33,7 @@
   --htbah-z-modal-generator: 4060;
   --htbah-z-modal-map: 4070;
   --htbah-z-modal-detail: 4080;
+  --htbah-z-fab-ueber-welt-modal: 4090;
   --htbah-z-modal-crop-backdrop: 4990;
   --htbah-z-modal-crop: 5000;
   --htbah-z-modal-ui-backdrop: 13000;
@@ -4106,7 +4107,7 @@ input::placeholder {
   position: fixed;
   top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 0.6rem);
   left: max(0.6rem, env(safe-area-inset-left, 0px));
-  z-index: 1045;
+  z-index: var(--htbah-z-fab-ueber-welt-modal);
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
@@ -4152,7 +4153,7 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   position: fixed;
   top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 0.6rem);
   right: max(0.6rem, env(safe-area-inset-right, 0px));
-  z-index: 1045;
+  z-index: var(--htbah-z-fab-ueber-welt-modal);
   display: flex;
   flex-direction: column;
   gap: 0.45rem;

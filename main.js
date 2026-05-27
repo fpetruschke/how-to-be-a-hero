@@ -1,6 +1,7 @@
 const SPEICHER_KEY_APP_ROLLE = 'htbah_app_rolle';
 const SPEICHER_KEY_CHARAKTER_LEGACY = 'htbah_character';
 const SPEICHER_KEY_CHARAKTER = 'htbah_characters';
+const SPEICHER_KEY_CHARAKTER_ENTRY_PRAEFIX = 'htbah_character_entry:';
 const SPEICHER_KEY_AKTIVER_CHARAKTER = 'htbah_active_character_id';
 const SPEICHER_KEY_PRESETS = 'htbah_presets';
 const SPEICHER_KEY_THEME = 'htbah_theme';
@@ -3507,6 +3508,7 @@ function parseCharakterImportKandidaten(roh) {
   }
 
   if (roh.typ === 'lokaler-speicher' && Array.isArray(roh.daten)) {
+    const importierteCharakterIds = new Set();
     const bereichZeichenkette = roh.daten.find(
       (eintrag) =>
         eintrag &&
@@ -3520,11 +3522,48 @@ function parseCharakterImportKandidaten(roh) {
         const sammlung = normalisiereCharakterSammlung(parsed);
         sammlung.charaktere.forEach((eintrag) => {
           pushKandidat(eintrag.charakter, eintrag.charakterBild, 'backup-charaktere', eintrag.id);
+          if (typeof eintrag.id === 'string' && eintrag.id) {
+            importierteCharakterIds.add(eintrag.id);
+          }
         });
       } catch {
         // ignorieren, unten ggf. Legacy prüfen
       }
     }
+
+    roh.daten.forEach((eintrag) => {
+      if (
+        !eintrag ||
+        typeof eintrag !== 'object' ||
+        typeof eintrag.key !== 'string' ||
+        !eintrag.key.startsWith(SPEICHER_KEY_CHARAKTER_ENTRY_PRAEFIX) ||
+        !eintrag.vorhanden ||
+        typeof eintrag.wert !== 'string'
+      ) {
+        return;
+      }
+      const keyId = eintrag.key.slice(SPEICHER_KEY_CHARAKTER_ENTRY_PRAEFIX.length);
+      try {
+        const payload = JSON.parse(eintrag.wert);
+        const kandidatId =
+          payload && typeof payload.id === 'string' && payload.id ? payload.id : keyId || null;
+        if (kandidatId && importierteCharakterIds.has(kandidatId)) {
+          return;
+        }
+        const charakterRoh =
+          payload && payload.charakter && typeof payload.charakter === 'object'
+            ? payload.charakter
+            : payload;
+        const charakterBild =
+          payload && typeof payload.charakterBild === 'string' ? payload.charakterBild : '';
+        pushKandidat(charakterRoh, charakterBild, 'backup-charakter-eintrag', kandidatId);
+        if (kandidatId) {
+          importierteCharakterIds.add(kandidatId);
+        }
+      } catch {
+        // ignorieren
+      }
+    });
 
     const legacyChar = roh.daten.find(
       (eintrag) =>

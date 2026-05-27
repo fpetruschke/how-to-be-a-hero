@@ -45,6 +45,13 @@
       "value": 29
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-gg-technikspezialist",
+      "vorteilHtml": "Systemblick: Du erkennst technische Fehlerketten und Schwachstellen besonders schnell.",
+      "nachteilHtml": "Tunnelblick: Im Fokus auf Maschinen uebersiehst du gelegentlich soziale Signale am Tisch."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-gg-te-laptop",

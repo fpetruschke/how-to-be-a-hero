@@ -45,6 +45,13 @@
       "value": 47
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-mf-diebin",
+      "vorteilHtml": "Flinke Finger: Schlösser, Taschen und Mechanismen liegen dir besonders gut.",
+      "nachteilHtml": "Misstrauisch: Du rechnest schnell mit Verrat und hältst selbst Verbündete auf Distanz."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-mf-di-dietriche",
@@ -63,7 +70,7 @@
       "typ": "waffe",
       "name": "Kleine Messer",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
+      "schadenswertNahkampf": "2W10",
       "schadenswertFernkampf": ""
     },
     {

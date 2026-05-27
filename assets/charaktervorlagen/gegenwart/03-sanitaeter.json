@@ -44,6 +44,13 @@
       "value": 73
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-gg-sanitaeter",
+      "vorteilHtml": "Krisenroutine: Unter Zeitdruck priorisierst du Verletzte schnell und effizient.",
+      "nachteilHtml": "Mitgefuehlige Belastung: Schwere Verluste gehen dir lange nach und koennen dich emotional blockieren."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-gg-sa-kit",

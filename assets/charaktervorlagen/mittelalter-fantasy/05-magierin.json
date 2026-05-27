@@ -45,13 +45,20 @@
       "value": 53
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-mf-magierin",
+      "vorteilHtml": "Arkanes Gedächtnis: Du merkst dir Formeln, Muster und Details außergewöhnlich zuverlässig.",
+      "nachteilHtml": "Überheblichkeit der Gelehrten: Du unterschätzt bisweilen einfache, pragmatische Lösungen."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-mf-ma-stab",
       "typ": "waffe",
       "name": "Holzstab",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
+      "schadenswertNahkampf": "1W10+5",
       "schadenswertFernkampf": ""
     },
     {

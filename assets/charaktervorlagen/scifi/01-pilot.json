@@ -44,6 +44,13 @@
       "value": 19
     }
   ],
+  "vorNachteilePaare": [
+    {
+      "id": "vn-sf-pilot",
+      "vorteilHtml": "Reflexass: In Manoevern und turbulenten Lagen behältst du instinktiv die Kontrolle.",
+      "nachteilHtml": "Risikofreude: Du setzt oft auf gewagte Flugmanoever, auch wenn sichere Optionen existieren."
+    }
+  ],
   "inventar": [
     {
       "id": "inv-sf-pi-helm",
@@ -62,8 +69,8 @@
       "typ": "waffe",
       "name": "Seitarm-Laser",
       "beschreibungHtml": "",
-      "schadenswertNahkampf": "1W4",
-      "schadenswertFernkampf": "1W8"
+      "schadenswertNahkampf": "1W10",
+      "schadenswertFernkampf": "7W10"
     },
     {
       "id": "inv-sf-pi-anzug",

@@ -15,6 +15,7 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
     return {
       fokusVorModal: null,
       druckIframe: null,
+      druckFallbackTimeoutId: null,
     };
   },
   computed: {
@@ -76,6 +77,10 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
       a.remove();
     },
     entsorgeDruckIframe() {
+      if (this.druckFallbackTimeoutId) {
+        clearTimeout(this.druckFallbackTimeoutId);
+        this.druckFallbackTimeoutId = null;
+      }
       if (this.druckIframe && this.druckIframe.parentNode) {
         this.druckIframe.parentNode.removeChild(this.druckIframe);
       }
@@ -129,6 +134,10 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
             return;
           }
           erledigt = true;
+          if (this.druckFallbackTimeoutId) {
+            clearTimeout(this.druckFallbackTimeoutId);
+            this.druckFallbackTimeoutId = null;
+          }
           this.entsorgeDruckIframe();
           resolve(!!erfolg);
         };
@@ -143,7 +152,7 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
             win.addEventListener('afterprint', nachDruck, { once: true });
             win.focus();
             win.print();
-            setTimeout(() => abschliessen(true), 120000);
+            this.druckFallbackTimeoutId = setTimeout(() => abschliessen(true), 120000);
           } catch (e) {
             console.error(e);
             abschliessen(false);
