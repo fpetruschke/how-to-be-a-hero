@@ -1,0 +1,74 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-gg-spurensucher",
+  "epoche": "gegenwart",
+  "presetId": "htbah-gegenwart",
+  "name": "Spurensucher",
+  "untertitel": "Beobachten & nachforschen",
+  "beruf": "Spurensucher",
+  "kernFaehigkeiten": [
+    "Wahrnehmung",
+    "Schleichen",
+    "Orientierung"
+  ],
+  "handeln": [
+    {
+      "name": "Schleichen",
+      "value": 77
+    },
+    {
+      "name": "Athletik",
+      "value": 71
+    },
+    {
+      "name": "Klettern",
+      "value": 32
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Wahrnehmung",
+      "value": 90
+    },
+    {
+      "name": "Orientierung",
+      "value": 52
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Menschenkenntnis",
+      "value": 65
+    },
+    {
+      "name": "Lügen",
+      "value": 13
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-gg-sp-kamera",
+      "typ": "gegenstand",
+      "name": "Kompaktkamera",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-sp-notiz",
+      "typ": "gegenstand",
+      "name": "Notizbuch",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-sp-lupe",
+      "typ": "gegenstand",
+      "name": "Lupe",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-sp-mantel",
+      "typ": "gegenstand",
+      "name": "Unauffälliger Mantel",
+      "beschreibungHtml": ""
+    }
+  ]
+}

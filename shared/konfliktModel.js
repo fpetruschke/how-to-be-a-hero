@@ -128,10 +128,74 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     if (!payload || typeof payload !== 'object') {
       return 0;
     }
-    if (typ === 'charakter') {
+    const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+    if (
+      typ === 'charakter' ||
+      (EF &&
+        typeof EF.istFaehigkeitenArrayFormat === 'function' &&
+        EF.istFaehigkeitenArrayFormat(payload))
+    ) {
+      if (EF && typeof EF.begabungenAusEntitaet === 'function') {
+        return EF.begabungenAusEntitaet(payload).handeln;
+      }
       return begabungHandelnAusCharakter(payload);
     }
     return normalisiereBegabungswertHandeln(payload.handeln);
+  }
+
+  function baueFaehigkeitenKategorienAusPayload(payload, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const M = window.HTBAH_CHARAKTER_MODEL;
+    const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+    const summen =
+      M && typeof M.summenAusCharakter === 'function'
+        ? M.summenAusCharakter(payload)
+        : { handeln: 0, wissen: 0, soziales: 0 };
+    const begabungen =
+      EF && typeof EF.begabungenAusEntitaet === 'function'
+        ? EF.begabungenAusEntitaet(payload)
+        : M && typeof M.begabungenAusSummen === 'function'
+          ? M.begabungenAusSummen(summen)
+          : { handeln: 0, wissen: 0, soziales: 0 };
+    const gb = o.mitGeistesblitz ? payload.geistesblitzVerbleibend || {} : null;
+    const kategorien = [];
+    ['handeln', 'wissen', 'soziales'].forEach((kat) => {
+      const b = begabungen[kat] || 0;
+      let gbVerbleibend = 0;
+      let gbMax = 0;
+      if (gb) {
+        gbMax = Math.max(0, Math.round(Number(b) / 10));
+        const gbRoh = Object.prototype.hasOwnProperty.call(gb, kat) ? Number(gb[kat]) : NaN;
+        gbVerbleibend = Number.isFinite(gbRoh)
+          ? Math.max(0, Math.min(gbRoh, gbMax))
+          : gbMax;
+      }
+      const faehigkeiten = (Array.isArray(payload[kat]) ? payload[kat] : [])
+        .map((f) => {
+          const basis = Math.round(Number(f && f.value) || 0);
+          if (basis <= 0) {
+            return null;
+          }
+          const name = typeof f.name === 'string' ? f.name.trim() : '';
+          return {
+            name: name || '—',
+            basis,
+            effektiv: Math.min(100, basis + b),
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+      kategorien.push({
+        id: kat,
+        label: KATEGORIE_LABELS[kat] || kat,
+        summe: summen[kat] || 0,
+        begabung: b,
+        gbVerbleibend,
+        gbMax,
+        faehigkeiten,
+      });
+    });
+    return kategorien;
   }
 
   function normalisiereInitiativeWert(roh, begabungswertHandeln) {
@@ -203,6 +267,16 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return 'Gegenstand';
   }
 
+  function inventarTypBadgeClass(typ) {
+    if (typ === 'rustung') {
+      return 'text-bg-info';
+    }
+    if (typ === 'waffe') {
+      return 'text-bg-warning';
+    }
+    return 'text-bg-secondary';
+  }
+
   function baueKonfliktKampfHandelnUebersicht(typ, payload) {
     const leer = { kategorien: [], kampfZeilen: [], inventarZeilen: [] };
     if (!payload || typeof payload !== 'object') {
@@ -213,44 +287,35 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const kampfZeilen = [];
     const inventarZeilen = [];
 
-    if (typ === 'charakter' && M && typeof M.summenAusCharakter === 'function') {
-      const summen = M.summenAusCharakter(payload);
-      const begabungen =
-        typeof M.begabungenAusSummen === 'function'
-          ? M.begabungenAusSummen(summen)
-          : { handeln: 0, wissen: 0, soziales: 0 };
-      const gb = payload.geistesblitzVerbleibend || {};
-      ['handeln', 'wissen', 'soziales'].forEach((kat) => {
-        const b = begabungen[kat] || 0;
-        const faehigkeiten = (Array.isArray(payload[kat]) ? payload[kat] : [])
-          .map((f) => {
-            const basis = Math.round(Number(f && f.value) || 0);
-            if (basis <= 0) {
-              return null;
-            }
-            const name = typeof f.name === 'string' ? f.name.trim() : '';
-            return {
-              name: name || '—',
-              basis,
-              effektiv: Math.min(100, basis + b),
-            };
-          })
-          .filter(Boolean)
-          .sort((a, b) => a.name.localeCompare(b.name, 'de'));
-        kategorien.push({
-          id: kat,
-          label: KATEGORIE_LABELS[kat] || kat,
-          summe: summen[kat] || 0,
-          begabung: b,
-          gbVerbleibend: Number.isFinite(Number(gb[kat])) ? Number(gb[kat]) : null,
-          gbMax: Math.round(b),
-          faehigkeiten,
-        });
-      });
+    const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+    const hatFaehigkeitenListen =
+      typ === 'charakter' ||
+      (EF &&
+        typeof EF.istFaehigkeitenArrayFormat === 'function' &&
+        EF.istFaehigkeitenArrayFormat(payload));
+
+    if (hatFaehigkeitenListen) {
+      kategorien.push(
+        ...baueFaehigkeitenKategorienAusPayload(payload, {
+          mitGeistesblitz: typ === 'charakter',
+        }),
+      );
       if (M && typeof M.entitaetInventarWaffenAnzeigeText === 'function') {
-        const waffen = M.entitaetInventarWaffenAnzeigeText(payload, { prefix: 'charakter' });
+        const waffen = M.entitaetInventarWaffenAnzeigeText(payload, {
+          prefix: typ === 'charakter' ? 'charakter' : typ,
+          waffenloser: typ === 'npc',
+        });
         if (waffen && waffen !== '—') {
-          kampfZeilen.push({ label: 'Waffen', wert: waffen });
+          kampfZeilen.push({
+            label: typ === 'charakter' ? 'Waffen' : 'Waffen & Angriff',
+            wert: waffen,
+          });
+        }
+      }
+      if (typ === 'npc') {
+        const wl = String(payload.waffenloserKampf || '').trim();
+        if (wl && !kampfZeilen.some((z) => String(z.wert || '').includes(wl))) {
+          kampfZeilen.push({ label: 'Waffenlos', wert: wl });
         }
       }
     } else if (typ === 'npc' || typ === 'bestie') {
@@ -300,6 +365,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       inventarZeilen.push({
         name,
         typ: inventarTypLabel(item.typ),
+        badgeClass: inventarTypBadgeClass(item.typ),
         werte: inventarWerteText(item),
       });
     });

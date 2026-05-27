@@ -1,0 +1,73 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-gg-sanitaeter",
+  "epoche": "gegenwart",
+  "presetId": "htbah-gegenwart",
+  "name": "Sanitäter",
+  "untertitel": "Hilfe unter Druck",
+  "beruf": "Sanitäter",
+  "kernFaehigkeiten": [
+    "Medizin & Erste Hilfe",
+    "Motivation (Gruppe)"
+  ],
+  "handeln": [
+    {
+      "name": "Athletik",
+      "value": 48
+    },
+    {
+      "name": "Fahren",
+      "value": 36
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Medizin & Erste Hilfe",
+      "value": 86
+    },
+    {
+      "name": "Chemie (Basis)",
+      "value": 48
+    },
+    {
+      "name": "Wahrnehmung",
+      "value": 36
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Motivation (Gruppe)",
+      "value": 73
+    },
+    {
+      "name": "Überreden",
+      "value": 73
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-gg-sa-kit",
+      "typ": "gegenstand",
+      "name": "Erste-Hilfe-Koffer",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-sa-defi",
+      "typ": "gegenstand",
+      "name": "Defibrillator (Training)",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-sa-handschuhe",
+      "typ": "gegenstand",
+      "name": "Einweghandschuhe",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-sa-funk",
+      "typ": "gegenstand",
+      "name": "Einsatzfunk",
+      "beschreibungHtml": ""
+    }
+  ]
+}

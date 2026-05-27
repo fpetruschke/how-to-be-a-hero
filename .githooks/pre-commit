@@ -77,4 +77,57 @@ fi
 # Bei jedem Lauf einfach mit-stagen — wenn nichts neu ist, ist es ein No-Op.
 git add "$INDEX"
 
+# --- Charaktervorlagen-Manifest ------------------------------------------------
+VORLAGEN_DIR="assets/charaktervorlagen"
+VORLAGEN_INDEX="$VORLAGEN_DIR/index.json"
+VORLAGEN_GENERATOR="bin/aktualisiere-charaktervorlagen-index"
+
+if [[ -d "$VORLAGEN_DIR" && -x "$VORLAGEN_GENERATOR" ]]; then
+  untracked_vorlagen="$(
+    git ls-files --others --exclude-standard -- "$VORLAGEN_DIR" \
+      | { grep -E '\.json$' || true; } \
+      | { grep -v "^${VORLAGEN_DIR}/index\.json$" || true; }
+  )"
+  if [[ -n "$untracked_vorlagen" ]]; then
+    cat >&2 <<EOF
+
+✗ Pre-commit abgebrochen: neue .json-Datei(en) in ${VORLAGEN_DIR}/ sind nicht gestaged.
+
+$(printf '%s\n' "$untracked_vorlagen" | sed 's/^/    /')
+
+Bitte stagen:
+
+    git add ${VORLAGEN_DIR}/
+
+(Bypass einmalig: git commit --no-verify)
+
+EOF
+    exit 1
+  fi
+
+  deleted_vorlagen="$(
+    git ls-files --deleted -- "$VORLAGEN_DIR" \
+      | { grep -E '\.json$' || true; }
+  )"
+  if [[ -n "$deleted_vorlagen" ]]; then
+    cat >&2 <<EOF
+
+✗ Pre-commit abgebrochen: gelöschte .json-Datei(en) in ${VORLAGEN_DIR}/ sind nicht gestaged.
+
+$(printf '%s\n' "$deleted_vorlagen" | sed 's/^/    /')
+
+Bitte stagen:
+
+    git add -A ${VORLAGEN_DIR}/
+
+(Bypass einmalig: git commit --no-verify)
+
+EOF
+    exit 1
+  fi
+
+  "$VORLAGEN_GENERATOR" >/dev/null
+  git add "$VORLAGEN_INDEX"
+fi
+
 exit 0

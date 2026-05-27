@@ -1,0 +1,74 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-sf-diplomat",
+  "epoche": "scifi",
+  "presetId": "htbah-scifi",
+  "name": "Diplomat",
+  "untertitel": "Frieden zwischen Welten",
+  "beruf": "Diplomat",
+  "kernFaehigkeiten": [
+    "Diplomatie (interstellar)",
+    "Verhandeln",
+    "Fremdsprachen (außerirdisch)"
+  ],
+  "handeln": [
+    {
+      "name": "Schwerelosigkeits-Manöver",
+      "value": 36
+    },
+    {
+      "name": "Exoanzug-Einsatz",
+      "value": 36
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Fremdsprachen (außerirdisch)",
+      "value": 79
+    },
+    {
+      "name": "Außerirdische Spezies deuten",
+      "value": 55
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Diplomatie (interstellar)",
+      "value": 85
+    },
+    {
+      "name": "Verhandeln",
+      "value": 67
+    },
+    {
+      "name": "Begeistern",
+      "value": 42
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-sf-di-abzeichen",
+      "typ": "gegenstand",
+      "name": "Botschafter-Abzeichen",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-di-tablet",
+      "typ": "gegenstand",
+      "name": "Übersetzer-Tablet",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-di-geschenk",
+      "typ": "gegenstand",
+      "name": "Protokollgeschenk",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-di-mantel",
+      "typ": "gegenstand",
+      "name": "Zeremonienmantel",
+      "beschreibungHtml": ""
+    }
+  ]
+}

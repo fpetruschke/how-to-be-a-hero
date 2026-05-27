@@ -599,11 +599,9 @@ function normalisiereZufallstabellenNpcZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
   }
-  const handeln = Math.max(0, Math.min(40, Math.round(Number(z.handeln) || 0)));
-  const wissen = Math.max(0, Math.min(40, Math.round(Number(z.wissen) || 0)));
-  const soziales = Math.max(0, Math.min(40, Math.round(Number(z.soziales) || 0)));
   const medien = normalisiereZufallstabellenMedienListe(z.medien);
   const M = window.HTBAH_CHARAKTER_MODEL;
+  const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
   const rohZeile = {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     name: typeof z.name === 'string' ? z.name : '',
@@ -624,9 +622,10 @@ function normalisiereZufallstabellenNpcZeile(z) {
     schadenswertFernkampf: typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '',
     waffenloserKampf: typeof z.waffenloserKampf === 'string' ? z.waffenloserKampf : '',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
-    handeln,
-    wissen,
-    soziales,
+    presetId: typeof z.presetId === 'string' ? z.presetId : '',
+    handeln: Array.isArray(z.handeln) ? z.handeln : z.handeln,
+    wissen: Array.isArray(z.wissen) ? z.wissen : z.wissen,
+    soziales: Array.isArray(z.soziales) ? z.soziales : z.soziales,
     fraktion: typeof z.fraktion === 'string' ? z.fraktion : '',
     glaube: typeof z.glaube === 'string' ? z.glaube : '',
     initiative: typeof z.initiative === 'string' ? z.initiative : '',
@@ -635,9 +634,14 @@ function normalisiereZufallstabellenNpcZeile(z) {
     medien,
     primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
   };
-  return M && typeof M.migriereLegacyKampfwerteNachInventar === 'function'
-    ? M.migriereLegacyKampfwerteNachInventar(rohZeile, { npc: true })
-    : rohZeile;
+  let migriert =
+    M && typeof M.migriereLegacyKampfwerteNachInventar === 'function'
+      ? M.migriereLegacyKampfwerteNachInventar(rohZeile, { npc: true })
+      : rohZeile;
+  if (EF && typeof EF.normalisiereEntitaetFaehigkeiten === 'function') {
+    migriert = EF.normalisiereEntitaetFaehigkeiten(migriert, { typ: 'npc' });
+  }
+  return migriert;
 }
 
 function normalisiereZufallstabellenOrtZeile(z) {
@@ -1008,10 +1012,8 @@ function normalisiereZufallstabellenBestieZeile(z) {
   if (agg > 10) {
     agg = 10;
   }
-  const handeln = Math.max(0, Math.min(40, Math.round(Number(z.handeln) || 0)));
-  const wissen = Math.max(0, Math.min(40, Math.round(Number(z.wissen) || 0)));
-  const soziales = Math.max(0, Math.min(40, Math.round(Number(z.soziales) || 0)));
   const M = window.HTBAH_CHARAKTER_MODEL;
+  const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
   const rohZeile = {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     epoche,
@@ -1022,9 +1024,10 @@ function normalisiereZufallstabellenBestieZeile(z) {
     verteidigung: typeof z.verteidigung === 'string' ? z.verteidigung : '',
     lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
-    handeln,
-    wissen,
-    soziales,
+    presetId: typeof z.presetId === 'string' ? z.presetId : '',
+    handeln: Array.isArray(z.handeln) ? z.handeln : z.handeln,
+    wissen: Array.isArray(z.wissen) ? z.wissen : z.wissen,
+    soziales: Array.isArray(z.soziales) ? z.soziales : z.soziales,
     initiative: typeof z.initiative === 'string' ? z.initiative : '',
     kampfZustand: ermittleKampfZustandFuerNpcBestie(z),
     staerke: typeof z.staerke === 'string' ? z.staerke : '',
@@ -1040,9 +1043,17 @@ function normalisiereZufallstabellenBestieZeile(z) {
     inventar: normalisiereZufallstabellenInventarListe(z.inventar),
     medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
-  return M && typeof M.migriereLegacyKampfwerteNachInventar === 'function'
-    ? M.migriereLegacyKampfwerteNachInventar(rohZeile, { bestie: true })
-    : rohZeile;
+  let migriert =
+    M && typeof M.migriereLegacyKampfwerteNachInventar === 'function'
+      ? M.migriereLegacyKampfwerteNachInventar(rohZeile, { bestie: true })
+      : rohZeile;
+  if (EF && typeof EF.normalisiereEntitaetFaehigkeiten === 'function') {
+    migriert = EF.normalisiereEntitaetFaehigkeiten(migriert, {
+      typ: 'bestie',
+      fallbackEpocheUi: epoche,
+    });
+  }
+  return migriert;
 }
 
 function zufallstabellenSpeicherKeyFuerKampagne(kampagneId) {
@@ -3749,7 +3760,13 @@ function mergeFaehigkeitenPresetsAusSpeicher(roh) {
     return arr;
   }
   const systemMerged = standard.map((def) => {
-    const user = arr.find((s) => s && s.htbahPresetId === def.htbahPresetId);
+    const legacyIds = Array.isArray(def.legacyPresetIds) ? def.legacyPresetIds : [];
+    const user = arr.find(
+      (s) =>
+        s &&
+        (s.htbahPresetId === def.htbahPresetId ||
+          (s.htbahPresetId && legacyIds.includes(s.htbahPresetId))),
+    );
     if (!user) {
       return JSON.parse(JSON.stringify(def));
     }
@@ -3784,6 +3801,101 @@ function ladePresets() {
 
 function speicherePresets(presets) {
   htbahSpeicher.schreibeJson(SPEICHER_KEY_PRESETS, presets);
+}
+
+const CHARAKTERVORLAGEN_BASIS_PFAD = 'assets/charaktervorlagen';
+let _charaktervorlagenIndexCache = null;
+let _charaktervorlagenInhaltCache = Object.create(null);
+let _charaktervorlagenIndexLadePromise = null;
+
+function charaktervorlagenAssetUrl(relativ) {
+  const teil = String(relativ || '').replace(/^\/+/, '');
+  return ermittleAssetUrl(`${CHARAKTERVORLAGEN_BASIS_PFAD}/${teil}`);
+}
+
+async function ladeCharaktervorlagenIndex() {
+  if (_charaktervorlagenIndexCache) {
+    return _charaktervorlagenIndexCache;
+  }
+  if (_charaktervorlagenIndexLadePromise) {
+    return _charaktervorlagenIndexLadePromise;
+  }
+  _charaktervorlagenIndexLadePromise = (async () => {
+    try {
+      const res = await fetch(charaktervorlagenAssetUrl('index.json'), { cache: 'no-cache' });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const json = await res.json();
+      _charaktervorlagenIndexCache = Array.isArray(json) ? json : [];
+      return _charaktervorlagenIndexCache;
+    } catch (err) {
+      console.warn('Charaktervorlagen-Index konnte nicht geladen werden:', err);
+      _charaktervorlagenIndexCache = [];
+      return _charaktervorlagenIndexCache;
+    } finally {
+      _charaktervorlagenIndexLadePromise = null;
+    }
+  })();
+  return _charaktervorlagenIndexLadePromise;
+}
+
+async function ladeCharaktervorlageInhalt(datei) {
+  const rel = typeof datei === 'string' ? datei.trim() : '';
+  if (!rel) {
+    return null;
+  }
+  if (_charaktervorlagenInhaltCache[rel]) {
+    return _charaktervorlagenInhaltCache[rel];
+  }
+  try {
+    const res = await fetch(charaktervorlagenAssetUrl(rel), { cache: 'no-cache' });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const roh = await res.json();
+    const VM = window.HTBAH_CHARAKTERVORLAGEN_MODEL;
+    if (!VM || typeof VM.validiereVorlage !== 'function') {
+      return null;
+    }
+    const ergebnis = VM.validiereVorlage(roh);
+    if (!ergebnis.ok) {
+      console.warn(`Vorlage ${rel}: ${ergebnis.fehler}`);
+      return null;
+    }
+    _charaktervorlagenInhaltCache[rel] = ergebnis.vorlage;
+    return ergebnis.vorlage;
+  } catch (err) {
+    console.warn(`Charaktervorlage ${rel} konnte nicht geladen werden:`, err);
+    return null;
+  }
+}
+
+async function ladeCharaktervorlagenKatalog() {
+  const index = await ladeCharaktervorlagenIndex();
+  const geladen = await Promise.all(
+    index.map(async (meta) => {
+      const vorlage = await ladeCharaktervorlageInhalt(meta.datei);
+      if (!vorlage) {
+        return null;
+      }
+      return { meta, vorlage };
+    }),
+  );
+  return geladen.filter(Boolean);
+}
+
+function listeCharaktervorlagenEpochen() {
+  const VM = window.HTBAH_CHARAKTERVORLAGEN_MODEL;
+  return VM && Array.isArray(VM.EPOCHEN) ? VM.EPOCHEN : [];
+}
+
+function wendeCharaktervorlageAufCharakter(charakter, vorlage) {
+  const VM = window.HTBAH_CHARAKTERVORLAGEN_MODEL;
+  if (!VM || typeof VM.vorlageAufCharakterAnwenden !== 'function' || !vorlage) {
+    return charakter;
+  }
+  return VM.vorlageAufCharakterAnwenden(charakter, vorlage);
 }
 
 function wuerfelW10() {
@@ -4329,6 +4441,11 @@ window.HTBAH = {
   ladePresets,
   speicherePresets,
   istSystemFaehigkeitenPreset,
+  ladeCharaktervorlagenIndex,
+  ladeCharaktervorlageInhalt,
+  ladeCharaktervorlagenKatalog,
+  listeCharaktervorlagenEpochen,
+  wendeCharaktervorlageAufCharakter,
   wuerfelW10,
   wuerfelW100,
   ladeWuerfelAudioProfil,
@@ -4701,6 +4818,8 @@ const uiZustand = Vue.reactive({
   regelwerkOffen: false,
   abenteuerbuchOffen: false,
   zeichenModalOffen: false,
+  weltenbauUebersichtModalOffen: false,
+  weltenbauUebersichtModalGruppeId: '',
 });
 
 const lebenspunkteStatus = Vue.reactive({
@@ -4888,6 +5007,24 @@ window.HTBAH.initialisiereCharakterKampfZustand = initialisiereCharakterKampfZus
 window.HTBAH.aktualisiereCharakterKampfZustandAusLp = aktualisiereCharakterKampfZustandAusLp;
 window.HTBAH.setzeCharakterKampfZustand = setzeCharakterKampfZustand;
 window.HTBAH.syncLebenspunkteStatusFromCharakter = syncLebenspunkteStatusFromCharakter;
+window.HTBAH.oeffneInteraktiveWeltModal = function oeffneInteraktiveWeltModal(payload) {
+  const kampagneId = typeof payload?.kampagneId === 'string' ? payload.kampagneId.trim() : '';
+  const entityType = typeof payload?.entityType === 'string' ? payload.entityType.trim() : '';
+  const entityId = typeof payload?.entityId === 'string' ? payload.entityId.trim() : '';
+  if (!kampagneId || !entityType || !entityId) {
+    return false;
+  }
+  uiZustand.weltenbauUebersichtModalGruppeId = kampagneId;
+  uiZustand.weltenbauUebersichtModalOffen = true;
+  Vue.nextTick(() => {
+    window.dispatchEvent(
+      new CustomEvent('htbah:open-entity-request', {
+        detail: { entityType, entityId, kampagneId },
+      }),
+    );
+  });
+  return true;
+};
 
 const app = Vue.createApp({
   data() {
@@ -4918,6 +5055,10 @@ const app = Vue.createApp({
   },
   template: `
     <lebenspunkte-status-banner />
+    <weltenbau-uebersicht-modal
+      :offen="uiZustand.weltenbauUebersichtModalOffen"
+      :gruppe-id="uiZustand.weltenbauUebersichtModalGruppeId"
+      @schliessen="uiZustand.weltenbauUebersichtModalOffen = false" />
     <router-view></router-view>
     <bestaetigen-modal ref="globalBestaetigenModal" modal-id="htbahGlobalBestaetigenModal" />
     <hinweis-modal ref="globalHinweisModal" />
@@ -4972,6 +5113,7 @@ app.component('eingabe-modal', window.HTBAH_KOMPONENTEN.EingabeModal);
 app.component('ui-toast-host', window.HTBAH_KOMPONENTEN.UiToastHost);
 app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner);
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);
+app.component('weltenbau-uebersicht-modal', window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal);
 app.component(
   'kampagnen-labels-editor',
   window.HTBAH_KOMPONENTEN.KampagnenLabelsEditor,

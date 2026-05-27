@@ -1,0 +1,76 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-mf-heilerin",
+  "epoche": "mittelalter-fantasy",
+  "presetId": "htbah-mittelalter-fantasy",
+  "name": "Heilerin",
+  "untertitel": "Unterstützung & Wissen",
+  "beruf": "Heilerin",
+  "kernFaehigkeiten": [
+    "Heilkunde",
+    "Pflanzenkunde",
+    "Diplomatie"
+  ],
+  "handeln": [
+    {
+      "name": "Klettern",
+      "value": 42
+    },
+    {
+      "name": "Athletik",
+      "value": 42
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Heilkunde",
+      "value": 79
+    },
+    {
+      "name": "Pflanzenkunde",
+      "value": 55
+    },
+    {
+      "name": "Religion",
+      "value": 36
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Diplomatie",
+      "value": 67
+    },
+    {
+      "name": "Menschenkenntnis",
+      "value": 79
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-mf-he-kraeuter",
+      "typ": "gegenstand",
+      "name": "Kräutertasche",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-he-verbaende",
+      "typ": "gegenstand",
+      "name": "Verbände",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-he-stab",
+      "typ": "waffe",
+      "name": "Holzstab",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": ""
+    },
+    {
+      "id": "inv-mf-he-kraeuter2",
+      "typ": "gegenstand",
+      "name": "Heilkräuter",
+      "beschreibungHtml": ""
+    }
+  ]
+}

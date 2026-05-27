@@ -1,0 +1,75 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-gg-sicherheitskraft",
+  "epoche": "gegenwart",
+  "presetId": "htbah-gegenwart",
+  "name": "Sicherheitskraft",
+  "untertitel": "Schutz & Durchsetzung",
+  "beruf": "Sicherheitskraft",
+  "kernFaehigkeiten": [
+    "Nahkampf",
+    "Schusswaffen",
+    "Einschüchtern"
+  ],
+  "handeln": [
+    {
+      "name": "Nahkampf",
+      "value": 97
+    },
+    {
+      "name": "Schusswaffen",
+      "value": 81
+    },
+    {
+      "name": "Heben & Tragen",
+      "value": 30
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Wahrnehmung",
+      "value": 74
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Einschüchtern",
+      "value": 74
+    },
+    {
+      "name": "Führung",
+      "value": 44
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-gg-sk-schlagstock",
+      "typ": "waffe",
+      "name": "Schlagstock",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W6",
+      "schadenswertFernkampf": ""
+    },
+    {
+      "id": "inv-gg-sk-pistole",
+      "typ": "waffe",
+      "name": "Dienstwaffe",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": "1W8"
+    },
+    {
+      "id": "inv-gg-sk-weste",
+      "typ": "rustung",
+      "name": "Schutzweste",
+      "beschreibungHtml": "",
+      "rustwert": "2"
+    },
+    {
+      "id": "inv-gg-sk-funk",
+      "typ": "gegenstand",
+      "name": "Funkgerät",
+      "beschreibungHtml": ""
+    }
+  ]
+}

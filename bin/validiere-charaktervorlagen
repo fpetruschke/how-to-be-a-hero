@@ -1,0 +1,95 @@
+#!/usr/bin/env node
+/**
+ * Prüft alle Charaktervorlagen gegen ihre Epochen-Presets.
+ * Aufruf: ./bin/validiere-charaktervorlagen
+ */
+
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const ROOT = path.resolve(__dirname, '..');
+const VERZEICHNIS = path.join(ROOT, 'assets', 'charaktervorlagen');
+
+function ladePresets() {
+  const code = fs.readFileSync(
+    path.join(ROOT, 'shared', 'faehigkeitenPresetsStandard.js'),
+    'utf8',
+  );
+  const sandbox = { window: {} };
+  vm.runInNewContext(code, sandbox);
+  return sandbox.window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS;
+}
+
+function ladeModel() {
+  const presets = ladePresets();
+  const code = fs.readFileSync(
+    path.join(ROOT, 'shared', 'charaktervorlagenModel.js'),
+    'utf8',
+  );
+  const sandbox = {
+    window: {
+      HTBAH_CHARAKTERVORLAGEN_MODEL: {},
+      HTBAH_STANDARD_FAEHIGKEITEN_PRESETS: presets,
+      HTBAH_CHARAKTER_MODEL: {
+        inventarEintragNachTypBereinigen(e) {
+          return { ...e };
+        },
+        neueInventarId() {
+          return 'test-id';
+        },
+      },
+    },
+  };
+  vm.runInNewContext(code, sandbox);
+  return sandbox.window.HTBAH_CHARAKTERVORLAGEN_MODEL;
+}
+
+function alleJson(relDir = '') {
+  const dir = path.join(VERZEICHNIS, relDir);
+  const out = [];
+  for (const name of fs.readdirSync(dir)) {
+    const voll = path.join(dir, name);
+    const rel = relDir ? `${relDir}/${name}` : name;
+    if (fs.statSync(voll).isDirectory()) {
+      out.push(...alleJson(rel));
+    } else if (/\.json$/i.test(name) && name !== 'index.json') {
+      out.push(rel.replace(/\\/g, '/'));
+    }
+  }
+  return out;
+}
+
+function main() {
+  const M = ladeModel();
+  const dateien = alleJson();
+  let fehler = 0;
+  dateien.forEach((rel) => {
+    const roh = JSON.parse(fs.readFileSync(path.join(VERZEICHNIS, rel), 'utf8'));
+    const ergebnis = M.validiereVorlage(roh);
+    if (!ergebnis.ok) {
+      console.error(`✗ ${rel}: ${ergebnis.fehler}`);
+      fehler += 1;
+    } else {
+      const v = ergebnis.vorlage;
+      const punkte =
+        M.summeFaehigkeiten(v, 'handeln') +
+        M.summeFaehigkeiten(v, 'wissen') +
+        M.summeFaehigkeiten(v, 'soziales');
+      const b = M.begabungenAusVorlage(v);
+      console.log(
+        `✓ ${rel} — ${punkte} Pkt, Begabungen H${b.handeln} W${b.wissen} S${b.soziales}`,
+      );
+    }
+  });
+  if (fehler) {
+    process.exitCode = 1;
+    console.error(`\n${fehler} Vorlage(n) ungültig.`);
+  } else {
+    console.log(`\nAlle ${dateien.length} Vorlagen gültig.`);
+  }
+}
+
+main();

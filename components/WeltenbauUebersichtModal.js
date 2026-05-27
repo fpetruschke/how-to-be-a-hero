@@ -97,6 +97,7 @@ var HTBAH_REFACTOR_UTILS =
       ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
       SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
       ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
+      FaehigkeitenKompaktPanel: window.HTBAH_KOMPONENTEN.FaehigkeitenKompaktPanel,
     },
     props: {
       offen: { type: Boolean, default: false },
@@ -3439,98 +3440,24 @@ var HTBAH_REFACTOR_UTILS =
         }
         return ok;
       },
-      charakterModalKategorieLabel(kategorie) {
-        if (kategorie === 'handeln') {
-          return 'Handeln';
-        }
-        if (kategorie === 'wissen') {
-          return 'Wissen';
-        }
-        if (kategorie === 'soziales') {
-          return 'Soziales';
-        }
-        return kategorie;
-      },
-      charakterModalSortierteFaehigkeiten(kategorie) {
-        const charakter = this.charakterModal.charakter;
-        if (!charakter || !Array.isArray(charakter[kategorie])) {
-          return [];
-        }
-        return [...charakter[kategorie]].sort((a, b) =>
-          String((a && a.name) || '').localeCompare(String((b && b.name) || ''), 'de'),
-        );
-      },
-      charakterModalFaehigkeitBasiswert(faehigkeit) {
-        const v = Number(faehigkeit && faehigkeit.value);
-        return Number.isFinite(v) ? v : 0;
-      },
-      charakterModalSichtbareFaehigkeiten(kategorie) {
-        return this.charakterModalSortierteFaehigkeiten(kategorie).filter(
-          (faehigkeit) => this.charakterModalFaehigkeitBasiswert(faehigkeit) > 0,
-        );
-      },
-      charakterModalEffektivwert(kategorie, faehigkeit) {
-        const stats = this.charakterModalFaehigkeitenStats;
-        if (!stats) {
-          return 0;
-        }
-        const b = stats.begabungen[kategorie] || 0;
-        const v = Number(faehigkeit && faehigkeit.value);
-        if (Number.isNaN(v)) {
-          return 0;
-        }
-        return Math.min(100, v + b);
-      },
-      charakterModalProbeEffektivwert(kategorie, faehigkeit) {
-        return this.charakterModalEffektivwert(kategorie, faehigkeit);
-      },
-      charakterModalProbeOeffnenBegabung(kategorie) {
-        const stats = this.charakterModalFaehigkeitenStats;
-        if (!stats) {
+      charakterModalFaehigkeitenProbe(payload) {
+        if (!payload || !this.charakterModal.charakter) {
           return;
         }
-        const zielwert = stats.begabungen[kategorie] || 0;
-        this.$refs.charakterProbeWurfModal?.oeffnen({
-          modus: 'begabung',
-          basiswert: zielwert,
-          zielwert,
-          zeigtModifikator: true,
-          basisLabel: 'Begabung ' + this.charakterModalKategorieLabel(kategorie),
-          titel: 'Probe: Begabung ' + this.charakterModalKategorieLabel(kategorie),
-          untertitel:
-            'Nur der Begabungswert — ohne einzelne Fähigkeit. Keine kritischen Erfolge (Regelwerk).',
-        });
-      },
-      charakterModalProbeOeffnenFaehigkeit(kategorie, faehigkeit) {
-        const stats = this.charakterModalFaehigkeitenStats;
-        if (!stats || !faehigkeit) {
-          return;
-        }
-        const b = stats.begabungen[kategorie] || 0;
-        const fWert = Number(faehigkeit.value) || 0;
-        const roh = fWert + b;
-        const z = this.charakterModalProbeEffektivwert(kategorie, faehigkeit);
-        let untertitel =
-          'Effektivwert ' +
-          z +
-          ' (' +
-          fWert +
-          ' + ' +
-          b +
-          ' Begabung, ' +
-          this.charakterModalKategorieLabel(kategorie) +
-          ')';
-        if (roh > 100) {
-          untertitel += '. Überzählige Punkte zählen für die Probe nicht (Regelwerk 3.4, Ziel 100).';
+        const katLabels = { handeln: 'Handeln', wissen: 'Wissen', soziales: 'Soziales' };
+        const katLabel = katLabels[payload.kategorie] || payload.kategorie || '';
+        let basisLabel = 'Effektivwert ' + (payload.faehigkeit?.name || 'Fähigkeit');
+        if (payload.typ === 'begabung') {
+          basisLabel = 'Begabung ' + katLabel;
         }
         this.$refs.charakterProbeWurfModal?.oeffnen({
-          modus: 'faehigkeit',
-          basiswert: z,
-          zielwert: z,
+          modus: payload.typ === 'begabung' ? 'begabung' : 'faehigkeit',
+          basiswert: payload.zielwert,
+          zielwert: payload.zielwert,
           zeigtModifikator: true,
-          basisLabel: 'Effektivwert ' + (faehigkeit.name || 'Fähigkeit'),
-          titel: 'Probe: ' + (faehigkeit.name || 'Fähigkeit'),
-          untertitel,
+          basisLabel,
+          titel: payload.titel || 'Probe',
+          untertitel: payload.untertitel || '',
         });
       },
       charakterModalSchadenOeffnen() {
@@ -4039,10 +3966,21 @@ var HTBAH_REFACTOR_UTILS =
         }
       },
       onKampagneDatenExternGeaendert(ev) {
+        const d = ev && ev.detail ? ev.detail : {};
+        if (d.art === 'spielleiter') {
+          if (d.kampagneId && this.gruppeId && d.kampagneId !== this.gruppeId) {
+            return;
+          }
+          this.spielleiterTick += 1;
+          if (!this.offen) {
+            return;
+          }
+          this.$nextTick(() => this.refreshGraph());
+          return;
+        }
         if (!this.offen) {
           return;
         }
-        const d = ev && ev.detail ? ev.detail : {};
         if (d.art === 'zufallstabellen') {
           if (!d.kampagneId || d.kampagneId !== this.gruppeId) {
             return;
@@ -4053,16 +3991,10 @@ var HTBAH_REFACTOR_UTILS =
             return;
           }
           this.mapFreieElementeTick += 1;
-        } else if (d.art === 'spielleiter') {
-          this.spielleiterTick += 1;
         } else {
           return;
         }
-        this.$nextTick(() => {
-          if (this.offen) {
-            this.refreshGraph();
-          }
-        });
+        this.$nextTick(() => this.refreshGraph());
       },
       mapKampfStatsIniText(node) {
         const ini = node && node.data ? node.data.initiative : '';
@@ -7743,77 +7675,13 @@ var HTBAH_REFACTOR_UTILS =
                 </button>
               </div>
             </div>
-            <div
-              v-if="charakterModalFaehigkeitenStats"
-              class="htbah-iw-charakter-stats mt-2"
-              role="region"
-              aria-label="Begabungen und Fähigkeiten">
-              <p class="form-label small text-secondary mb-1">
-                Fähigkeiten &amp; Begabungen
-              </p>
-              <div class="row g-2">
-                <div
-                  v-for="kategorie in ['handeln', 'wissen', 'soziales']"
-                  :key="'iw-stats-' + kategorie"
-                  class="col-12 col-md-4">
-                  <div class="card h-100 htbah-iw-charakter-begabung-karte">
-                    <div class="card-body py-2 px-2">
-                      <h6 class="card-title small text-uppercase fw-bold mb-1">
-                        {{ charakterModalKategorieLabel(kategorie) }}
-                      </h6>
-                      <div class="d-flex flex-wrap align-items-center gap-1 mb-2">
-                        <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-begabung">
-                          Begabung {{ charakterModalFaehigkeitenStats.begabungen[kategorie] }}
-                        </span>
-                        <button
-                          type="button"
-                          class="faehigkeiten-stat-info-btn faehigkeiten-probe-wuerfel-btn"
-                          :aria-label="'W100-Probe auf Begabung ' + charakterModalKategorieLabel(kategorie)"
-                          @click="charakterModalProbeOeffnenBegabung(kategorie)">
-                          <span class="faehigkeiten-wuerfel-emoji" aria-hidden="true">🎲</span>
-                        </button>
-                        <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-summe">
-                          Summe {{ charakterModalFaehigkeitenStats.summen[kategorie] }}
-                        </span>
-                        <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-geistesblitz">
-                          GB {{ charakterModalFaehigkeitenStats.gbVerbleibend[kategorie] }} /
-                          {{ charakterModalFaehigkeitenStats.gbMax[kategorie] }}
-                        </span>
-                      </div>
-                      <ul
-                        v-if="charakterModalSichtbareFaehigkeiten(kategorie).length"
-                        class="list-unstyled mb-0 htbah-iw-faehigkeiten-kompakt">
-                        <li
-                          v-for="faehigkeit in charakterModalSichtbareFaehigkeiten(kategorie)"
-                          :key="kategorie + '-' + (faehigkeit.name || '')"
-                          class="htbah-iw-faehigkeit-zeile">
-                          <span class="htbah-iw-faehigkeit-name" :title="faehigkeit.name">{{ faehigkeit.name }}</span>
-                          <span class="d-inline-flex align-items-center gap-1 flex-shrink-0">
-                            <span
-                              class="htbah-iw-faehigkeit-werte"
-                              :title="'Basis ' + charakterModalFaehigkeitBasiswert(faehigkeit) + ', effektiv ' + charakterModalEffektivwert(kategorie, faehigkeit)">
-                              <span class="text-muted">{{ charakterModalFaehigkeitBasiswert(faehigkeit) }}</span>
-                              <span class="text-body-secondary mx-1" aria-hidden="true">→</span>
-                              <span>{{ charakterModalEffektivwert(kategorie, faehigkeit) }}</span>
-                            </span>
-                            <button
-                              type="button"
-                              class="faehigkeiten-stat-info-btn faehigkeiten-probe-wuerfel-btn py-0 px-1"
-                              :aria-label="'W100-Probe: ' + faehigkeit.name"
-                              @click="charakterModalProbeOeffnenFaehigkeit(kategorie, faehigkeit)">
-                              <span class="faehigkeiten-wuerfel-emoji" aria-hidden="true">🎲</span>
-                            </button>
-                          </span>
-                        </li>
-                      </ul>
-                      <p v-else class="small text-body-secondary mb-0">
-                        Keine Fähigkeiten mit Punkten.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <faehigkeiten-kompakt-panel
+              v-if="charakterModal.charakter"
+              class="mt-2"
+              :entitaet="charakterModal.charakter"
+              zeige-geistesblitz
+              :geistesblitz-verbleibend="charakterModal.charakter.geistesblitzVerbleibend"
+              @probe="charakterModalFaehigkeitenProbe" />
             <label class="form-label mt-3 mb-1">Inventar</label>
             <div class="d-flex justify-content-end mb-2">
               <button type="button" class="btn btn-sm btn-outline-secondary" @click="inventarEintragHinzufuegen">Eintrag hinzufügen</button>

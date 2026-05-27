@@ -26,6 +26,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     components: {
       WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
       EntitaetAnzeigeIcon: window.HTBAH_KOMPONENTEN.EntitaetAnzeigeIcon,
+      ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
+      SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
+      ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     },
     props: {
       offen: { type: Boolean, default: false },
@@ -557,6 +560,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             });
           }
         }
+        if (
+          (teilnehmer.typ === 'npc' || teilnehmer.typ === 'bestie') &&
+          window.HTBAH &&
+          typeof window.HTBAH.berechneKampfZustandAusLp === 'function'
+        ) {
+          const vorher = teilnehmer.payload ? teilnehmer.payload.lebenspunkte : '';
+          const nach = String(wert == null ? '' : wert);
+          const kz = window.HTBAH.berechneKampfZustandAusLp(nach, vorher);
+          this.persistEntityPatch(teilnehmer, { lebenspunkte: nach, kampfZustand: kz });
+        }
       },
       setzeKampfZustand(teilnehmer, zustand) {
         if (!window.HTBAH || typeof window.HTBAH.normalisiereKampfZustand !== 'function') {
@@ -607,6 +620,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (!teilnehmer || teilnehmer.fehlt) {
           return;
         }
+        const fn = window.HTBAH && typeof window.HTBAH.oeffneInteraktiveWeltModal === 'function'
+          ? window.HTBAH.oeffneInteraktiveWeltModal
+          : null;
+        if (fn) {
+          fn({
+            kampagneId: this.kampagneIdEffektiv,
+            entityType: teilnehmer.typ,
+            entityId: teilnehmer.entityId,
+          });
+          return;
+        }
         window.dispatchEvent(
           new CustomEvent('htbah:open-entity-request', {
             detail: {
@@ -616,6 +640,70 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             },
           }),
         );
+      },
+      probeOeffnen(payload) {
+        const t = payload && payload.teilnehmer ? payload.teilnehmer : null;
+        if (!t || t.fehlt) {
+          return;
+        }
+        const kategorieNamen = { handeln: 'Handeln', wissen: 'Wissen', soziales: 'Soziales' };
+        const kat = payload.kategorie;
+        const katLabel = kategorieNamen[kat] || String(kat || '');
+        if (payload.modus === 'begabung') {
+          const zielwert = Math.max(0, Math.min(40, Math.round(Number(payload.zielwert) || 0)));
+          this.$refs.konfliktProbeWurfModal?.oeffnen?.({
+            modus: 'begabung',
+            basiswert: zielwert,
+            zielwert,
+            zeigtModifikator: false,
+            basisLabel: `Begabung ${katLabel}`,
+            titel: `Probe: Begabung ${katLabel}`,
+            untertitel:
+              'Nur der Begabungswert — ohne einzelne Fähigkeit. Keine kritischen Erfolge (Regelwerk).',
+          });
+          return;
+        }
+        const f = payload.faehigkeit;
+        const zielwert = Number(f && f.effektiv) || 0;
+        const basiswert = Number(f && f.basis) || 0;
+        const name = typeof f?.name === 'string' ? f.name : 'Probe';
+        const untertitel = `Effektivwert ${zielwert} (${basiswert} + Begabung, ${katLabel})`;
+        this.$refs.konfliktProbeWurfModal?.oeffnen?.({
+          modus: 'faehigkeit',
+          basiswert: zielwert,
+          zielwert,
+          zeigtModifikator: false,
+          basisLabel: `Effektivwert ${name}`,
+          titel: `Probe: ${name}`,
+          untertitel,
+        });
+      },
+      schadenOeffnen(teilnehmer) {
+        if (!teilnehmer || teilnehmer.fehlt) {
+          return;
+        }
+        this.$refs.konfliktSchadenModal?.oeffnen?.({
+          titel: `Schaden erwürfeln (${teilnehmer.label || 'Figur'})`,
+          charakter: teilnehmer.payload,
+        });
+      },
+      paradeOeffnen(teilnehmer) {
+        if (!teilnehmer || teilnehmer.fehlt) {
+          return;
+        }
+        const inventar = Array.isArray(teilnehmer?.payload?.inventar) ? teilnehmer.payload.inventar : [];
+        const ruestungen = inventar
+          .filter((eintrag) => eintrag && eintrag.typ === 'rustung')
+          .map((eintrag) => ({
+            name: typeof eintrag.name === 'string' ? eintrag.name : '',
+            rustwert: eintrag.rustwert,
+          }));
+        this.$refs.konfliktParadeModal?.oeffnen?.({
+          titel: `Parade-Probe (${teilnehmer.label || 'Figur'})`,
+          basiswert: teilnehmer.begabungHandeln || 0,
+          ruestungen,
+          waffenlosParade: !ruestungen.length,
+        });
       },
       ladeFensterAusSpeicher() {
         try {
@@ -685,7 +773,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               @pointerdown="starteZiehen($event)">
               <h5 class="modal-title d-flex align-items-center gap-2 mb-0" id="konfliktModalLabel">
                 <span class="material-symbols-outlined htbah-konflikt-titel-icon" aria-hidden="true">swords</span>
-                <span class="text-truncate">{{ modalTitel }}</span>
+                <span class="text-truncate d-sm-none">Konflikt</span>
+                <span class="text-truncate d-none d-sm-inline">{{ modalTitel }}</span>
               </h5>
               <div class="d-flex align-items-center gap-1 flex-shrink-0">
                 <button
@@ -953,7 +1042,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                               @initiative-wuerfeln="initiativeWuerfeln(t)"
                               @lp="onLpInput(t, $event)"
                               @kampf-zustand="setzeKampfZustand(t, $event)"
-                              @welt="inWeltOeffnen(t)" />
+                              @welt="inWeltOeffnen(t)"
+                              @probe="probeOeffnen"
+                              @schaden="schadenOeffnen(t)"
+                              @parade="paradeOeffnen(t)" />
                           </article>
                         </div>
                       </div>
@@ -998,7 +1090,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                               @initiative-wuerfeln="initiativeWuerfeln(t)"
                               @lp="onLpInput(t, $event)"
                               @kampf-zustand="setzeKampfZustand(t, $event)"
-                              @welt="inWeltOeffnen(t)" />
+                              @welt="inWeltOeffnen(t)"
+                              @probe="probeOeffnen"
+                              @schaden="schadenOeffnen(t)"
+                              @parade="paradeOeffnen(t)" />
                           </article>
                         </div>
                       </div>
@@ -1039,6 +1134,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               @pointerdown="starteResize($event)"></div>
           </div>
         </div>
+        <probe-wurf-modal ref="konfliktProbeWurfModal" modal-dom-id="konfliktProbeWurfModal" />
+        <schaden-modal ref="konfliktSchadenModal" modal-dom-id="konfliktSchadenModal" />
+        <parade-modal ref="konfliktParadeModal" modal-dom-id="konfliktParadeModal" />
         <div class="d-none" aria-hidden="true">
           <wuerfelbecher-wurf ref="konfliktInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
         </div>
@@ -1064,6 +1162,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       'lp',
       'kampf-zustand',
       'welt',
+      'probe',
+      'schaden',
+      'parade',
     ],
     data() {
       return {
@@ -1160,6 +1261,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       stopPropagation(event) {
         event.stopPropagation();
       },
+      faehigkeitsProbeWuerfeln(kategorieId, faehigkeit) {
+        this.$emit('probe', { teilnehmer: this.teilnehmer, kategorie: kategorieId, faehigkeit });
+      },
+      begabungProbeWuerfeln(spalte) {
+        if (!spalte || !spalte.id) {
+          return;
+        }
+        this.$emit('probe', {
+          teilnehmer: this.teilnehmer,
+          modus: 'begabung',
+          kategorie: spalte.id,
+          zielwert: spalte.wert,
+        });
+      },
     },
     template: `
       <div class="htbah-konflikt-teilnehmer-wrap">
@@ -1193,23 +1308,25 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               </span>
             </span>
           </span>
-          <span class="d-flex align-items-center gap-1 flex-shrink-0" @click.stop="stopPropagation">
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-secondary htbah-konflikt-teilnehmer-aktion-btn"
-              title="Aus Konflikt entfernen"
-              aria-label="Aus Konflikt entfernen"
-              @click="$emit('entfernen')">
-              <span class="material-symbols-outlined" aria-hidden="true">person_remove</span>
-            </button>
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-secondary htbah-konflikt-teilnehmer-aktion-btn"
-              title="In Kampagne / Welt öffnen"
-              aria-label="Auf Welt anzeigen"
-              @click="$emit('welt')">
-              <span aria-hidden="true">🌍</span>
-            </button>
+          <span class="d-flex align-items-center gap-1 flex-shrink-0">
+            <span class="d-flex align-items-center gap-1 flex-shrink-0">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary htbah-konflikt-teilnehmer-aktion-btn"
+                title="Aus Konflikt entfernen"
+                aria-label="Aus Konflikt entfernen"
+                @click.stop="$emit('entfernen')">
+                <span class="material-symbols-outlined" aria-hidden="true">person_remove</span>
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary htbah-konflikt-teilnehmer-aktion-btn"
+                title="In Kampagne / Welt öffnen"
+                aria-label="Auf Welt anzeigen"
+                @click.stop="$emit('welt')">
+                <span aria-hidden="true">🌍</span>
+              </button>
+            </span>
             <span class="material-symbols-outlined htbah-konflikt-collapse-ico" aria-hidden="true">
               {{ teilnehmerOffen ? 'expand_less' : 'expand_more' }}
             </span>
@@ -1259,6 +1376,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               @click="$emit('seite', teilnehmer.seite === 'helden' ? 'gegner' : 'helden')">
               Seite wechseln
             </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary"
+              @click="$emit('schaden')">
+              💥 Schaden
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary"
+              @click="$emit('parade')">
+              🛡️ Parade
+            </button>
           </div>
           <div
             v-if="hatSlUebersicht"
@@ -1282,6 +1411,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                         <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-begabung">
                           B {{ spalte.wert }}
                         </span>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-primary py-0 px-2"
+                          :aria-label="'Probe würfeln: Begabung ' + spalte.label"
+                          @click.stop="begabungProbeWuerfeln(spalte)">
+                          🎲
+                        </button>
                         <span class="material-symbols-outlined htbah-konflikt-collapse-ico" aria-hidden="true">
                           {{ kategorieIstOffen(spalte.id) ? 'expand_less' : 'expand_more' }}
                         </span>
@@ -1332,10 +1468,19 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                         :key="teilnehmer.refKey + '-f-' + kat.id + '-' + f.name"
                         class="htbah-konflikt-sl-faehigkeit-zeile">
                         <span class="htbah-konflikt-sl-faehigkeit-name" :title="f.name">{{ f.name }}</span>
-                        <span class="tabular-nums flex-shrink-0">
-                          <span class="text-muted">{{ f.basis }}</span>
-                          <span class="text-body-secondary mx-1" aria-hidden="true">→</span>
-                          <span>{{ f.effektiv }}</span>
+                        <span class="d-inline-flex align-items-center gap-2 flex-shrink-0">
+                          <span class="tabular-nums">
+                            <span class="text-muted">{{ f.basis }}</span>
+                            <span class="text-body-secondary mx-1" aria-hidden="true">→</span>
+                            <span>{{ f.effektiv }}</span>
+                          </span>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-primary py-0 px-2"
+                            :aria-label="'Probe würfeln: ' + f.name"
+                            @click="faehigkeitsProbeWuerfeln(kat.id, f)">
+                            🎲
+                          </button>
                         </span>
                       </li>
                     </ul>
@@ -1384,7 +1529,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     v-for="(inv, ii) in slUebersicht.inventarZeilen"
                     :key="teilnehmer.refKey + '-inv-' + ii"
                     class="htbah-konflikt-sl-inventar-zeile">
-                    <span class="badge rounded-pill text-bg-secondary me-1">{{ inv.typ }}</span>
+                    <span class="badge rounded-pill me-1" :class="inv.badgeClass || 'text-bg-secondary'">{{ inv.typ }}</span>
                     <span class="fw-medium">{{ inv.name }}</span>
                     <span v-if="inv.werte && inv.werte !== '—'" class="text-body-secondary ms-1">· {{ inv.werte }}</span>
                   </li>

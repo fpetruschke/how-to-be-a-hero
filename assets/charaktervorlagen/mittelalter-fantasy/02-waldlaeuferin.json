@@ -1,0 +1,75 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-mf-waldlaeuferin",
+  "epoche": "mittelalter-fantasy",
+  "presetId": "htbah-mittelalter-fantasy",
+  "name": "Waldläuferin",
+  "untertitel": "Wahrnehmung & Bewegung",
+  "beruf": "Waldläuferin",
+  "kernFaehigkeiten": [
+    "Fernkampf",
+    "Wahrnehmung",
+    "Athletik",
+    "Schleichen"
+  ],
+  "handeln": [
+    {
+      "name": "Fernkampf",
+      "value": 87
+    },
+    {
+      "name": "Schleichen",
+      "value": 53
+    },
+    {
+      "name": "Athletik",
+      "value": 33
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Wahrnehmung",
+      "value": 80
+    },
+    {
+      "name": "Überleben (Wildnis)",
+      "value": 67
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Menschenkenntnis",
+      "value": 80
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-mf-wl-bogen",
+      "typ": "waffe",
+      "name": "Übungsbogen",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": "1W6"
+    },
+    {
+      "id": "inv-mf-wl-seil",
+      "typ": "gegenstand",
+      "name": "Seil",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-wl-messer",
+      "typ": "waffe",
+      "name": "Jagdmesser",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": ""
+    },
+    {
+      "id": "inv-mf-wl-kapuze",
+      "typ": "gegenstand",
+      "name": "Kapuze",
+      "beschreibungHtml": ""
+    }
+  ]
+}

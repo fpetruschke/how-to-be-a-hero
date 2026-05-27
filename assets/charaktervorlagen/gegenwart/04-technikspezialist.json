@@ -1,0 +1,74 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-gg-technikspezialist",
+  "epoche": "gegenwart",
+  "presetId": "htbah-gegenwart",
+  "name": "Technikspezialist",
+  "untertitel": "Geräte & Systeme",
+  "beruf": "Technikspezialist",
+  "kernFaehigkeiten": [
+    "Technik & Elektronik",
+    "Reparieren",
+    "Computer"
+  ],
+  "handeln": [
+    {
+      "name": "Reparieren",
+      "value": 65
+    },
+    {
+      "name": "Athletik",
+      "value": 53
+    },
+    {
+      "name": "Fahren",
+      "value": 47
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Technik & Elektronik",
+      "value": 76
+    },
+    {
+      "name": "Computer",
+      "value": 65
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Verhandeln",
+      "value": 65
+    },
+    {
+      "name": "Lügen",
+      "value": 29
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-gg-te-laptop",
+      "typ": "gegenstand",
+      "name": "Laptop",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-te-werkzeug",
+      "typ": "gegenstand",
+      "name": "Werkzeugkoffer",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-te-kabel",
+      "typ": "gegenstand",
+      "name": "Adapter & Kabel",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-te-multimeter",
+      "typ": "gegenstand",
+      "name": "Multimeter",
+      "beschreibungHtml": ""
+    }
+  ]
+}

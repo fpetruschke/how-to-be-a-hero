@@ -25,6 +25,7 @@
   const PDF_ABSCHNITT_UEBERSCHRIFT_PX = 12;
   const PDF_STAMMDATEN_LABEL_PX = 11;
   const PDF_LP_BREITE_PX = 232;
+  const PDF_CHARAKTERBILD_BREITE_PX = 138;
   const PDF_INV_ZEILE_HOEHE_PX = 22;
   const PDF_NOTIZ_LINIE_HOEHE_PX = 14;
   const PDF_STILE = {
@@ -48,6 +49,7 @@
       dekoTitel: '✦ ❦ ✦',
       dekoAbschnitt: '❧',
       tabellenRahmen: '#7a5d35',
+      tabellenZellenRahmen: '#ddd0b8',
       kartenRahmen: '#8b6f47',
       kopfMuster: 'linear-gradient(to bottom, #f6ecd9 0%, #fff9ed 100%)',
     },
@@ -71,6 +73,7 @@
       dekoTitel: '• • •',
       dekoAbschnitt: '•',
       tabellenRahmen: '#66758a',
+      tabellenZellenRahmen: '#d5dce5',
       kartenRahmen: '#8a95a5',
       kopfMuster: 'linear-gradient(to bottom, #f2f6fb 0%, #ffffff 100%)',
     },
@@ -94,6 +97,7 @@
       dekoTitel: '▮ ▯ ▮',
       dekoAbschnitt: '▸',
       tabellenRahmen: '#4f46e5',
+      tabellenZellenRahmen: '#d4daf7',
       kartenRahmen: '#6366f1',
       kopfMuster: 'linear-gradient(135deg, #eaf0ff 0%, #f7f9ff 100%)',
     },
@@ -117,6 +121,7 @@
       dekoTitel: '',
       dekoAbschnitt: '',
       tabellenRahmen: '#000000',
+      tabellenZellenRahmen: '#cccccc',
       kartenRahmen: '#000000',
       kopfMuster: '#ffffff',
     },
@@ -126,7 +131,11 @@
     const stil = optionen && typeof optionen.stil === 'string'
       ? optionen.stil.trim()
       : '';
-    return PDF_STILE[stil] || PDF_STILE['fantasy-mittelalter'];
+    const basis = PDF_STILE[stil] || PDF_STILE['fantasy-mittelalter'];
+    return {
+      ...basis,
+      tabellenZellenRahmen: basis.tabellenZellenRahmen || basis.tabellenRahmen,
+    };
   }
 
   function istBlankoExport(optionen) {
@@ -387,7 +396,7 @@
     const gv = gbVerbleibend[kategorie];
     const gm = gbMax[kategorie];
     const summeKat = summen[kategorie];
-    const zellenRahmen = stil.tabellenRahmen;
+    const zellenRahmen = stil.tabellenZellenRahmen;
     let rows = '';
     const anzahlLeerzeilen = blanko ? 10 : LEERZEILEN_FAEHIGKEITEN;
     if (!zeilen.length) {
@@ -450,7 +459,7 @@
       ? charakterBild
       : '';
 
-    const zellenRahmen = stil.tabellenRahmen;
+    const zellenRahmen = stil.tabellenZellenRahmen;
     const paare = blanko ? [] : (Array.isArray(charakter.vorNachteilePaare) ? charakter.vorNachteilePaare : []);
     let vnRows = '';
     if (!paare.length) {
@@ -540,8 +549,8 @@
       : '—';
 
     const bildBlock = bild
-      ? `<div class="htbah-pdf-charakterbild" style="width:92px;align-self:stretch;flex-shrink:0;display:flex;box-sizing:border-box;"><img src="${bild}" alt="Charakterbild von ${escapeHtml(name || 'Unbenannt')}" crossorigin="anonymous" style="width:100%;height:100%;min-height:100%;object-fit:cover;border:1px solid #ccc;border-radius:4px;display:block;background:#f0f0f0;box-sizing:border-box;"/></div>`
-      : '<div class="htbah-pdf-charakterbild" style="width:92px;align-self:stretch;flex-shrink:0;border:1px solid #ccc;border-radius:4px;background:#fff;box-sizing:border-box;" aria-hidden="true"></div>';
+      ? `<div class="htbah-pdf-charakterbild" style="width:${PDF_CHARAKTERBILD_BREITE_PX}px;align-self:stretch;flex-shrink:0;display:flex;box-sizing:border-box;"><img src="${bild}" alt="Charakterbild von ${escapeHtml(name || 'Unbenannt')}" crossorigin="anonymous" style="width:100%;height:100%;min-height:100%;object-fit:cover;border:1px solid #ccc;border-radius:4px;display:block;background:#f0f0f0;box-sizing:border-box;"/></div>`
+      : `<div class="htbah-pdf-charakterbild" style="width:${PDF_CHARAKTERBILD_BREITE_PX}px;align-self:stretch;flex-shrink:0;border:1px solid #ccc;border-radius:4px;background:#fff;box-sizing:border-box;" aria-hidden="true"></div>`;
 
     return `<div class="htbah-pdf-wurzel htbah-pdf-wurzel-seite1" style="box-sizing:border-box;width:${PDF_BREITE_PX}px;max-width:${PDF_BREITE_PX}px;height:${PDF_SEITE1_CANVAS_HOEHE_PX}px;overflow:hidden;padding:${PDF_PADDING};margin:0;background:#fff;color:#111;font-family:${stil.schrift};line-height:1.2;display:flex;flex-direction:column;">
       <style>
@@ -702,7 +711,7 @@
       </div>
 
       <div class="htbah-pdf-xkarte-ausschnitt" style="display:flex;justify-content:center;align-items:center;margin-top:auto;padding-top:12px;flex-shrink:0;">
-        <div style="width:240px;height:336px;border:8px solid #dc2626;border-radius:12px;background:#fff;display:flex;flex-direction:column;justify-content:space-between;padding:14px;box-sizing:border-box;">
+        <div style="width:189px;height:302px;border:8px solid #dc2626;border-radius:12px;background:#fff;display:flex;flex-direction:column;justify-content:space-between;padding:14px;box-sizing:border-box;">
           <div style="font-size:18px;font-weight:800;color:#b91c1c;text-align:center;">X-Karte</div>
           <div style="font-size:140px;line-height:1;text-align:center;color:#dc2626;font-weight:900;">X</div>
           <div style="font-size:10px;line-height:1.35;color:#7f1d1d;text-align:center;">

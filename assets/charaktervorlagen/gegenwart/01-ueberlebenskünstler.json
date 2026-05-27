@@ -1,0 +1,76 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-gg-ueberlebenskünstler",
+  "epoche": "gegenwart",
+  "presetId": "htbah-gegenwart",
+  "name": "Überlebenskünstler",
+  "untertitel": "Urban & wachsam",
+  "beruf": "Überlebenskünstler",
+  "kernFaehigkeiten": [
+    "Überleben (urban)",
+    "Athletik",
+    "Schleichen"
+  ],
+  "handeln": [
+    {
+      "name": "Athletik",
+      "value": 73
+    },
+    {
+      "name": "Schleichen",
+      "value": 67
+    },
+    {
+      "name": "Klettern",
+      "value": 33
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Überleben (urban)",
+      "value": 87
+    },
+    {
+      "name": "Orientierung",
+      "value": 60
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Menschenkenntnis",
+      "value": 67
+    },
+    {
+      "name": "Verhandeln",
+      "value": 13
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-gg-ue-rucksack",
+      "typ": "gegenstand",
+      "name": "Notfallrucksack",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-ue-taschenlampe",
+      "typ": "gegenstand",
+      "name": "Taschenlampe",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-ue-messer",
+      "typ": "waffe",
+      "name": "Taschenmesser",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": ""
+    },
+    {
+      "id": "inv-gg-ue-karte",
+      "typ": "gegenstand",
+      "name": "Stadtplan",
+      "beschreibungHtml": ""
+    }
+  ]
+}

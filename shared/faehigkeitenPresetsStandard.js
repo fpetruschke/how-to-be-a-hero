@@ -1,12 +1,13 @@
 /**
  * Vorgegebene Fähigkeiten-Presets (How to be a Hero: Fähigkeitsnamen je Begabung).
  * Werte sind bewusst leer — Spieler verteilen die 400 Punkte selbst.
+ * Charaktervorlagen und Demo-Archetypen nutzen ausschließlich Namen aus diesen Listen.
  * @see https://howtobeahero.de/index.php/Fähigkeiten
  */
 window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
   {
     htbahPresetId: 'htbah-mittelalter-fantasy',
-    name: 'Mittelalter-Fantasy-Preset',
+    name: 'Mittelalter/Fantasy',
     handeln: [
       { name: 'Schlösser knacken', value: null },
       { name: 'Nahkampf (bewaffnet)', value: null },
@@ -17,6 +18,7 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Klettern', value: null },
       { name: 'Athletik', value: null },
       { name: 'Schwimmen', value: null },
+      { name: 'Heben & Tragen', value: null },
     ],
     wissen: [
       { name: 'Magiekunde', value: null },
@@ -28,6 +30,9 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Tierkunde & -dressur', value: null },
       { name: 'Geografie', value: null },
       { name: 'Überleben (Wildnis)', value: null },
+      { name: 'Wahrnehmung', value: null },
+      { name: 'Pflanzenkunde', value: null },
+      { name: 'Magischer Trick', value: null },
     ],
     soziales: [
       { name: 'Überreden', value: null },
@@ -39,11 +44,14 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Auftreten', value: null },
       { name: 'Diplomatie', value: null },
       { name: 'Verführen', value: null },
+      { name: 'Begeistern', value: null },
     ],
   },
   {
-    htbahPresetId: 'htbah-zombie-apokalypse',
-    name: 'Zombie-Apokalypse',
+    htbahPresetId: 'htbah-gegenwart',
+    /** @deprecated Legacy-ID aus älteren Speicherständen */
+    legacyPresetIds: ['htbah-zombie-apokalypse'],
+    name: 'Gegenwart',
     handeln: [
       { name: 'Schusswaffen', value: null },
       { name: 'Nahkampf', value: null },
@@ -52,6 +60,7 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Fahren', value: null },
       { name: 'Reparieren', value: null },
       { name: 'Klettern', value: null },
+      { name: 'Heben & Tragen', value: null },
     ],
     wissen: [
       { name: 'Medizin & Erste Hilfe', value: null },
@@ -61,6 +70,7 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Chemie (Basis)', value: null },
       { name: 'Orientierung', value: null },
       { name: 'Computer', value: null },
+      { name: 'Wahrnehmung', value: null },
     ],
     soziales: [
       { name: 'Führung', value: null },
@@ -70,11 +80,12 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Menschenkenntnis', value: null },
       { name: 'Verhandeln', value: null },
       { name: 'Motivation (Gruppe)', value: null },
+      { name: 'Begeistern', value: null },
     ],
   },
   {
     htbahPresetId: 'htbah-scifi',
-    name: 'SciFi',
+    name: 'Sci-Fi',
     handeln: [
       { name: 'Laserwaffen', value: null },
       { name: 'Plasmawaffen', value: null },
@@ -84,6 +95,7 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Exoanzug-Einsatz', value: null },
       { name: 'Nahkampf (Energiewaffen)', value: null },
       { name: 'Wartung & Reparatur', value: null },
+      { name: 'Schleichen', value: null },
     ],
     wissen: [
       { name: 'Astrophysik', value: null },
@@ -94,6 +106,7 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Cybernetik', value: null },
       { name: 'Planetare Ökologie', value: null },
       { name: 'Fremdsprachen (außerirdisch)', value: null },
+      { name: 'Wahrnehmung', value: null },
     ],
     soziales: [
       { name: 'Diplomatie (interstellar)', value: null },
@@ -104,6 +117,8 @@ window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS = [
       { name: 'Führung (Crew)', value: null },
       { name: 'Überzeugen', value: null },
       { name: 'Einschüchtern', value: null },
+      { name: 'Begeistern', value: null },
+      { name: 'Lügen', value: null },
     ],
   },
 ];

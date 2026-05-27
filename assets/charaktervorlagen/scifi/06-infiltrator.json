@@ -1,0 +1,76 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-sf-infiltrator",
+  "epoche": "scifi",
+  "presetId": "htbah-scifi",
+  "name": "Infiltrator",
+  "untertitel": "Unbemerkt vorgehen",
+  "beruf": "Infiltrator",
+  "kernFaehigkeiten": [
+    "Schleichen",
+    "Nahkampf (Energiewaffen)",
+    "Lügen"
+  ],
+  "handeln": [
+    {
+      "name": "Schleichen",
+      "value": 86
+    },
+    {
+      "name": "Nahkampf (Energiewaffen)",
+      "value": 67
+    },
+    {
+      "name": "Drohnensteuerung",
+      "value": 47
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Cybernetik",
+      "value": 53
+    },
+    {
+      "name": "Wahrnehmung",
+      "value": 40
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Lügen",
+      "value": 60
+    },
+    {
+      "name": "Einschüchtern",
+      "value": 47
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-sf-in-klinge",
+      "typ": "waffe",
+      "name": "Energieklinge",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W8",
+      "schadenswertFernkampf": ""
+    },
+    {
+      "id": "inv-sf-in-cloak",
+      "typ": "gegenstand",
+      "name": "Tarnumhang",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-in-hack",
+      "typ": "gegenstand",
+      "name": "Hack-Implantat",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-in-seil",
+      "typ": "gegenstand",
+      "name": "Magnetseil",
+      "beschreibungHtml": ""
+    }
+  ]
+}

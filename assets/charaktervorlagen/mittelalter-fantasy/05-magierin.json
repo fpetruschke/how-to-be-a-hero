@@ -1,0 +1,76 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-mf-magierin",
+  "epoche": "mittelalter-fantasy",
+  "presetId": "htbah-mittelalter-fantasy",
+  "name": "Magierin",
+  "untertitel": "Wissen & Tricks",
+  "beruf": "Magierin",
+  "kernFaehigkeiten": [
+    "Magiekunde",
+    "Wahrnehmung",
+    "Magischer Trick"
+  ],
+  "handeln": [
+    {
+      "name": "Nahkampf (unbewaffnet)",
+      "value": 40
+    },
+    {
+      "name": "Schleichen",
+      "value": 40
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Magiekunde",
+      "value": 87
+    },
+    {
+      "name": "Wahrnehmung",
+      "value": 60
+    },
+    {
+      "name": "Magischer Trick",
+      "value": 67
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Auftreten",
+      "value": 53
+    },
+    {
+      "name": "Lügen",
+      "value": 53
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-mf-ma-stab",
+      "typ": "waffe",
+      "name": "Holzstab",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": ""
+    },
+    {
+      "id": "inv-mf-ma-buch",
+      "typ": "gegenstand",
+      "name": "Zauberbuch",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-ma-kreide",
+      "typ": "gegenstand",
+      "name": "Kreide",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-ma-hut",
+      "typ": "gegenstand",
+      "name": "Schiefer Hut",
+      "beschreibungHtml": ""
+    }
+  ]
+}

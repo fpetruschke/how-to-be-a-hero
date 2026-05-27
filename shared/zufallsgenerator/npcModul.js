@@ -215,8 +215,8 @@ window.HTBAH = window.HTBAH || {};
     return U.zufaellig(namen);
   }
 
+  /** @deprecated Nur noch intern; Ausgabe sind Fähigkeiten-Arrays via faehigkeitenPatchAusKontext. */
   function begabungswerteVerteilen(beruf) {
-    // Regelwerk: 400 Fähigkeitspunkte gesamt -> max. Begabungswert pro Gruppe 40.
     const gesamt = 40;
     const profil = berufsProfil(beruf);
     const handeln = U.zufallsInt(profil.handelnMin, profil.handelnMax);
@@ -227,6 +227,30 @@ window.HTBAH = window.HTBAH || {};
     }
     soziales = Math.min(profil.sozialesMax, soziales);
     return { handeln, wissen, soziales: Math.max(0, soziales) };
+  }
+
+  function faehigkeitenPatchAusKontext(kontext, zielBegabungen) {
+    const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+    const epoche = kontext.epoche || E.MITTELALTER;
+    if (!EF || typeof EF.verteileFaehigkeitenFuerNpc !== 'function') {
+      return {};
+    }
+    const presetId = EF.presetIdFuerEpocheUi(epoche);
+    const v = EF.verteileFaehigkeitenFuerNpc({
+      presetId,
+      beruf: kontext.beruf || '',
+      alter: kontext.alter || '',
+      statur: kontext.statur || '',
+      inventar: kontext.inventar || [],
+      waffenloserKampf: kontext.waffenloserKampf || '',
+      zielBegabungen,
+    });
+    return {
+      presetId: v.presetId,
+      handeln: v.handeln,
+      wissen: v.wissen,
+      soziales: v.soziales,
+    };
   }
 
   function zufallsNameUndGeschlecht(vorgabe) {
@@ -373,10 +397,16 @@ window.HTBAH = window.HTBAH || {};
       patch.schadenswertFernkampf = waffenwerte.schadenswertFernkampf;
       patch.lebenspunkte = lebenspunkteFuerStaturUndAlter(neueStatur, wirksamesAlter);
       patch.waffenloserKampf = waffenloserNahkampfSchaden(neueStatur);
-      const begabung = begabungswerteVerteilen(neuerBeruf);
-      patch.handeln = begabung.handeln;
-      patch.wissen = begabung.wissen;
-      patch.soziales = begabung.soziales;
+      Object.assign(
+        patch,
+        faehigkeitenPatchAusKontext({
+          ...kontext,
+          beruf: neuerBeruf,
+          alter: wirksamesAlter,
+          statur: neueStatur,
+          waffenloserKampf: patch.waffenloserKampf,
+        }),
+      );
       return patch;
     }
 
@@ -422,10 +452,13 @@ window.HTBAH = window.HTBAH || {};
       if (!kontext.beruf) {
         patch.beruf = wirksamerBeruf;
       }
-      const begabung = begabungswerteVerteilen(wirksamerBeruf);
-      patch.handeln = begabung.handeln;
-      patch.wissen = begabung.wissen;
-      patch.soziales = begabung.soziales;
+      Object.assign(
+        patch,
+        faehigkeitenPatchAusKontext({
+          ...kontext,
+          beruf: wirksamerBeruf,
+        }),
+      );
       return patch;
     }
 
@@ -514,9 +547,7 @@ window.HTBAH = window.HTBAH || {};
       return patch;
     }
     if (feld === 'begabung') {
-      patch.handeln = U.zufallsInt(8, 22);
-      patch.wissen = U.zufallsInt(8, 22);
-      patch.soziales = U.zufallsInt(8, 22);
+      Object.assign(patch, faehigkeitenPatchAusKontext(kontext));
       return patch;
     }
     return patch;
@@ -579,7 +610,6 @@ window.HTBAH = window.HTBAH || {};
       const geheimnis = geheimnisFuerEpoche(epoche);
       const lebenspunkte = lebenspunkteFuerStaturUndAlter(statur, alter);
       const schadenWaffenlos = waffenloserNahkampfSchaden(statur);
-      const begabung = begabungswerteVerteilen(beruf);
       const M = window.HTBAH_CHARAKTER_MODEL;
       const inventar = [];
       if (M && typeof M.inventarEintragNachTypBereinigen === 'function') {
@@ -616,6 +646,15 @@ window.HTBAH = window.HTBAH || {};
         `<p><strong>Merkmal:</strong> ${U.htmlEsc(U.zufaellig(L.MERKMAL))}.</p>`,
       ].join('');
 
+      const faehigkeiten = faehigkeitenPatchAusKontext({
+        epoche,
+        beruf,
+        alter,
+        statur,
+        inventar,
+        waffenloserKampf: schadenWaffenlos,
+      });
+
       return {
         name,
         spitzname: U.zufaellig(L.SPITZNAMEN),
@@ -631,9 +670,10 @@ window.HTBAH = window.HTBAH || {};
         waffenloserKampf: schadenWaffenlos,
         lebenspunkte,
         aufenthaltsort,
-        handeln: begabung.handeln,
-        wissen: begabung.wissen,
-        soziales: begabung.soziales,
+        presetId: faehigkeiten.presetId,
+        handeln: faehigkeiten.handeln,
+        wissen: faehigkeiten.wissen,
+        soziales: faehigkeiten.soziales,
         fraktion,
         glaube,
         notizenHtml,

@@ -161,16 +161,27 @@ window.HTBAH = window.HTBAH || {};
     return U.zufaellig(namen);
   }
 
-  function begabungswerteVerteilen() {
-    // Regelwerk: 400 Fähigkeitspunkte gesamt -> max. Begabungswert pro Gruppe 40.
-    const gesamt = 40;
-    const handeln = U.zufallsInt(10, 24);
-    const wissen = U.zufallsInt(2, 12);
-    let soziales = gesamt - handeln - wissen;
-    if (soziales < 0) {
-      soziales = 0;
+  function faehigkeitenPatchFuerBestie(opts) {
+    const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+    const o = opts || {};
+    const epoche = o.epoche || E.MITTELALTER;
+    if (!EF || typeof EF.verteileFaehigkeitenFuerBestie !== 'function') {
+      return {};
     }
-    return { handeln, wissen, soziales };
+    const presetId = EF.presetIdFuerEpocheUi(epoche);
+    const v = EF.verteileFaehigkeitenFuerBestie({
+      presetId,
+      kategorie: o.kategorie,
+      aggressivitaetSkala: o.aggressivitaetSkala,
+      inventar: o.inventar || [],
+      zielBegabungen: o.zielBegabungen,
+    });
+    return {
+      presetId: v.presetId,
+      handeln: v.handeln,
+      wissen: v.wissen,
+      soziales: v.soziales,
+    };
   }
 
   const KATEGORIE_LABELS = {
@@ -229,7 +240,6 @@ window.HTBAH = window.HTBAH || {};
         ? Math.min(10, Math.max(1, Math.round(aggressivitaetVorgabe)))
         : aggressivitaetFuer(kategorie);
       const waffenwerte = waffenwerteFuerBestie(kategorie);
-      const begabung = begabungswerteVerteilen();
       const lebensraum = lebensraumFuer(epoche);
       const beschreibungHtml = beschreibungHtmlBauen({
         name,
@@ -251,6 +261,12 @@ window.HTBAH = window.HTBAH || {};
               }),
             ]
           : [];
+      const faehigkeiten = faehigkeitenPatchFuerBestie({
+        epoche,
+        kategorie,
+        aggressivitaetSkala,
+        inventar,
+      });
       return {
         kategorie,
         epoche,
@@ -260,9 +276,10 @@ window.HTBAH = window.HTBAH || {};
         schwaeche,
         geheimnis,
         aggressivitaetSkala,
-        handeln: begabung.handeln,
-        wissen: begabung.wissen,
-        soziales: begabung.soziales,
+        presetId: faehigkeiten.presetId,
+        handeln: faehigkeiten.handeln,
+        wissen: faehigkeiten.wissen,
+        soziales: faehigkeiten.soziales,
         aufenthaltsort: aufenthaltsortAusOrteListe(opts.orteNamen),
         fraktionen: [],
         beschreibungHtml,

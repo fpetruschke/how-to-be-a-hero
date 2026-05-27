@@ -1638,24 +1638,28 @@ input::placeholder {
   overflow: auto;
 }
 
-.htbah-weltenbau-charakter-modal-body .htbah-iw-charakter-begabung-karte {
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-charakter-begabung-karte,
+.htbah-iw-faehigkeiten-stats .htbah-iw-charakter-begabung-karte {
   border-color: var(--border-color);
   background: var(--card-bg);
 }
 
-.htbah-weltenbau-charakter-modal-body .htbah-iw-charakter-begabung-karte .card-title {
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-charakter-begabung-karte .card-title,
+.htbah-iw-faehigkeiten-stats .htbah-iw-charakter-begabung-karte .card-title {
   letter-spacing: 0.04em;
   font-size: 0.72rem;
   color: var(--heading-color);
 }
 
-.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-kompakt {
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeiten-kompakt,
+.htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeiten-kompakt {
   font-size: 0.78rem;
   max-height: 12rem;
   overflow-y: auto;
 }
 
-.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeit-zeile {
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-zeile,
+.htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-zeile {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1664,18 +1668,21 @@ input::placeholder {
   border-bottom: 1px solid var(--border-color);
 }
 
-.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeit-zeile:last-child {
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-zeile:last-child,
+.htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-zeile:last-child {
   border-bottom: none;
 }
 
-.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeit-name {
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-name,
+.htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeit-werte {
+.htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-werte,
+.htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-werte {
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -4186,7 +4193,7 @@ body.htbah-mit-lp-banner .htbah-konflikt-fab-stack {
 
 .htbah-konflikt-fab-icon {
   font-size: 1.45rem;
-  font-variation-settings: 'FILL' 1, 'wght' 600;
+  line-height: 1;
 }
 
 .htbah-konflikt-modal-layer {
@@ -4271,10 +4278,14 @@ body.htbah-mit-lp-banner .htbah-konflikt-fab-stack {
 
 .htbah-konflikt-partei-card--gegner {
   border-color: color-mix(in srgb, #c2410c 50%, var(--border-color));
+  padding: 0;
 }
 
 .htbah-konflikt-partei-kopf-btn {
   background: color-mix(in srgb, var(--primary-color) 10%, var(--bs-body-bg));
+  width: 100%;
+  border: 0;
+  text-align: left;
   border-bottom: 1px solid var(--border-color);
   cursor: pointer;
 }
@@ -4394,6 +4405,18 @@ body.htbah-mit-lp-banner .htbah-konflikt-fab-stack {
 
 .htbah-konflikt-ini-tabelle th {
   white-space: nowrap;
+}
+
+@media (max-width: 767.98px) {
+  .htbah-konflikt-ini-tabelle th:nth-child(2),
+  .htbah-konflikt-ini-tabelle td:nth-child(2) {
+    min-width: 7.75rem;
+    width: 34%;
+  }
+
+  .htbah-konflikt-ini-tabelle td:nth-child(2) .form-select {
+    min-width: 7.5rem;
+  }
 }
 
 .htbah-konflikt-sl-uebersicht {

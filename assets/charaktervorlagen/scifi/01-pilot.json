@@ -1,0 +1,76 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-sf-pilot",
+  "epoche": "scifi",
+  "presetId": "htbah-scifi",
+  "name": "Pilot",
+  "untertitel": "Raumflug & Manöver",
+  "beruf": "Pilot",
+  "kernFaehigkeiten": [
+    "Raumschiff-Pilotieren",
+    "Schwerelosigkeits-Manöver"
+  ],
+  "handeln": [
+    {
+      "name": "Raumschiff-Pilotieren",
+      "value": 91
+    },
+    {
+      "name": "Schwerelosigkeits-Manöver",
+      "value": 71
+    },
+    {
+      "name": "Laserwaffen",
+      "value": 19
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Sternenkartografie",
+      "value": 71
+    },
+    {
+      "name": "Raumschifftechnik",
+      "value": 71
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Führung (Crew)",
+      "value": 58
+    },
+    {
+      "name": "Verhandeln",
+      "value": 19
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-sf-pi-helm",
+      "typ": "gegenstand",
+      "name": "Druckhelm",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-pi-tablet",
+      "typ": "gegenstand",
+      "name": "Navigations-Tablet",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-pi-pistole",
+      "typ": "waffe",
+      "name": "Seitarm-Laser",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": "1W8"
+    },
+    {
+      "id": "inv-sf-pi-anzug",
+      "typ": "rustung",
+      "name": "Leichtanzug",
+      "beschreibungHtml": "",
+      "rustwert": "1"
+    }
+  ]
+}

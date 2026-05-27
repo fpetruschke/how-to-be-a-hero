@@ -1,0 +1,74 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-sf-xenobiologe",
+  "epoche": "scifi",
+  "presetId": "htbah-scifi",
+  "name": "Xenobiologe",
+  "untertitel": "Fremdes Leben verstehen",
+  "beruf": "Xenobiologe",
+  "kernFaehigkeiten": [
+    "Xenobiologie",
+    "Planetare Ökologie",
+    "Kulturelle Anpassung"
+  ],
+  "handeln": [
+    {
+      "name": "Schleichen",
+      "value": 42
+    },
+    {
+      "name": "Drohnensteuerung",
+      "value": 42
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Xenobiologie",
+      "value": 85
+    },
+    {
+      "name": "Planetare Ökologie",
+      "value": 55
+    },
+    {
+      "name": "Astrophysik",
+      "value": 30
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Kulturelle Anpassung",
+      "value": 73
+    },
+    {
+      "name": "Diplomatie (interstellar)",
+      "value": 73
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-sf-xb-proben",
+      "typ": "gegenstand",
+      "name": "Probenkoffer",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-xb-scanner",
+      "typ": "gegenstand",
+      "name": "Bio-Scanner",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-xb-drohne",
+      "typ": "gegenstand",
+      "name": "Feld-Drohne",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-xb-notiz",
+      "typ": "gegenstand",
+      "name": "Forschungsnotizen",
+      "beschreibungHtml": ""
+    }
+  ]
+}

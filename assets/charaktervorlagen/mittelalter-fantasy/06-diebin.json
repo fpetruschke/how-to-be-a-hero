@@ -1,0 +1,76 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-mf-diebin",
+  "epoche": "mittelalter-fantasy",
+  "presetId": "htbah-mittelalter-fantasy",
+  "name": "Diebin",
+  "untertitel": "Schleichen & Geschick",
+  "beruf": "Diebin",
+  "kernFaehigkeiten": [
+    "Schleichen",
+    "Schlösser knacken",
+    "Athletik"
+  ],
+  "handeln": [
+    {
+      "name": "Schleichen",
+      "value": 86
+    },
+    {
+      "name": "Schlösser knacken",
+      "value": 80
+    },
+    {
+      "name": "Athletik",
+      "value": 33
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Wahrnehmung",
+      "value": 47
+    },
+    {
+      "name": "Geografie",
+      "value": 47
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Lügen",
+      "value": 60
+    },
+    {
+      "name": "Verführen",
+      "value": 47
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-mf-di-dietriche",
+      "typ": "gegenstand",
+      "name": "Dietriche",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-di-seil",
+      "typ": "gegenstand",
+      "name": "Seil",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-di-messer",
+      "typ": "waffe",
+      "name": "Kleine Messer",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": ""
+    },
+    {
+      "id": "inv-mf-di-kapuze",
+      "typ": "gegenstand",
+      "name": "Kapuze",
+      "beschreibungHtml": ""
+    }
+  ]
+}

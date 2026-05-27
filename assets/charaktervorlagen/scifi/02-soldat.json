@@ -1,0 +1,75 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-sf-soldat",
+  "epoche": "scifi",
+  "presetId": "htbah-scifi",
+  "name": "Soldat",
+  "untertitel": "Kampf im Vakuum",
+  "beruf": "Soldat",
+  "kernFaehigkeiten": [
+    "Laserwaffen",
+    "Nahkampf (Energiewaffen)",
+    "Einschüchtern"
+  ],
+  "handeln": [
+    {
+      "name": "Laserwaffen",
+      "value": 96
+    },
+    {
+      "name": "Nahkampf (Energiewaffen)",
+      "value": 81
+    },
+    {
+      "name": "Exoanzug-Einsatz",
+      "value": 30
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Wahrnehmung",
+      "value": 74
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Einschüchtern",
+      "value": 67
+    },
+    {
+      "name": "Überzeugen",
+      "value": 52
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-sf-so-gewehr",
+      "typ": "waffe",
+      "name": "Plasmagewehr",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": "1W10"
+    },
+    {
+      "id": "inv-sf-so-messer",
+      "typ": "waffe",
+      "name": "Energiemesser",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W8",
+      "schadenswertFernkampf": ""
+    },
+    {
+      "id": "inv-sf-so-exo",
+      "typ": "rustung",
+      "name": "Exoanzug",
+      "beschreibungHtml": "",
+      "rustwert": "3"
+    },
+    {
+      "id": "inv-sf-so-funk",
+      "typ": "gegenstand",
+      "name": "Taktikfunk",
+      "beschreibungHtml": ""
+    }
+  ]
+}

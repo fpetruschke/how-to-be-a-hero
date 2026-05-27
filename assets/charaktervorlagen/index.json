@@ -1,0 +1,164 @@
+[
+  {
+    "datei": "gegenwart/01-ueberlebenskünstler.json",
+    "id": "vorlage-gg-ueberlebenskünstler",
+    "name": "Überlebenskünstler",
+    "epoche": "gegenwart",
+    "presetId": "htbah-gegenwart",
+    "untertitel": "Urban & wachsam",
+    "beruf": "Überlebenskünstler"
+  },
+  {
+    "datei": "gegenwart/02-sicherheitskraft.json",
+    "id": "vorlage-gg-sicherheitskraft",
+    "name": "Sicherheitskraft",
+    "epoche": "gegenwart",
+    "presetId": "htbah-gegenwart",
+    "untertitel": "Schutz & Durchsetzung",
+    "beruf": "Sicherheitskraft"
+  },
+  {
+    "datei": "gegenwart/03-sanitaeter.json",
+    "id": "vorlage-gg-sanitaeter",
+    "name": "Sanitäter",
+    "epoche": "gegenwart",
+    "presetId": "htbah-gegenwart",
+    "untertitel": "Hilfe unter Druck",
+    "beruf": "Sanitäter"
+  },
+  {
+    "datei": "gegenwart/04-technikspezialist.json",
+    "id": "vorlage-gg-technikspezialist",
+    "name": "Technikspezialist",
+    "epoche": "gegenwart",
+    "presetId": "htbah-gegenwart",
+    "untertitel": "Geräte & Systeme",
+    "beruf": "Technikspezialist"
+  },
+  {
+    "datei": "gegenwart/05-verhandler.json",
+    "id": "vorlage-gg-verhandler",
+    "name": "Verhandler",
+    "epoche": "gegenwart",
+    "presetId": "htbah-gegenwart",
+    "untertitel": "Worte & Deals",
+    "beruf": "Verhandler"
+  },
+  {
+    "datei": "gegenwart/06-spurensucher.json",
+    "id": "vorlage-gg-spurensucher",
+    "name": "Spurensucher",
+    "epoche": "gegenwart",
+    "presetId": "htbah-gegenwart",
+    "untertitel": "Beobachten & nachforschen",
+    "beruf": "Spurensucher"
+  },
+  {
+    "datei": "mittelalter-fantasy/01-schildwache.json",
+    "id": "vorlage-mf-schildwache",
+    "name": "Schildwache",
+    "epoche": "mittelalter-fantasy",
+    "presetId": "htbah-mittelalter-fantasy",
+    "untertitel": "Schutz & Stärke",
+    "beruf": "Schildwache"
+  },
+  {
+    "datei": "mittelalter-fantasy/02-waldlaeuferin.json",
+    "id": "vorlage-mf-waldlaeuferin",
+    "name": "Waldläuferin",
+    "epoche": "mittelalter-fantasy",
+    "presetId": "htbah-mittelalter-fantasy",
+    "untertitel": "Wahrnehmung & Bewegung",
+    "beruf": "Waldläuferin"
+  },
+  {
+    "datei": "mittelalter-fantasy/03-barde.json",
+    "id": "vorlage-mf-barde",
+    "name": "Barde",
+    "epoche": "mittelalter-fantasy",
+    "presetId": "htbah-mittelalter-fantasy",
+    "untertitel": "Soziales & Ablenkung",
+    "beruf": "Barde"
+  },
+  {
+    "datei": "mittelalter-fantasy/04-heilerin.json",
+    "id": "vorlage-mf-heilerin",
+    "name": "Heilerin",
+    "epoche": "mittelalter-fantasy",
+    "presetId": "htbah-mittelalter-fantasy",
+    "untertitel": "Unterstützung & Wissen",
+    "beruf": "Heilerin"
+  },
+  {
+    "datei": "mittelalter-fantasy/05-magierin.json",
+    "id": "vorlage-mf-magierin",
+    "name": "Magierin",
+    "epoche": "mittelalter-fantasy",
+    "presetId": "htbah-mittelalter-fantasy",
+    "untertitel": "Wissen & Tricks",
+    "beruf": "Magierin"
+  },
+  {
+    "datei": "mittelalter-fantasy/06-diebin.json",
+    "id": "vorlage-mf-diebin",
+    "name": "Diebin",
+    "epoche": "mittelalter-fantasy",
+    "presetId": "htbah-mittelalter-fantasy",
+    "untertitel": "Schleichen & Geschick",
+    "beruf": "Diebin"
+  },
+  {
+    "datei": "scifi/01-pilot.json",
+    "id": "vorlage-sf-pilot",
+    "name": "Pilot",
+    "epoche": "scifi",
+    "presetId": "htbah-scifi",
+    "untertitel": "Raumflug & Manöver",
+    "beruf": "Pilot"
+  },
+  {
+    "datei": "scifi/02-soldat.json",
+    "id": "vorlage-sf-soldat",
+    "name": "Soldat",
+    "epoche": "scifi",
+    "presetId": "htbah-scifi",
+    "untertitel": "Kampf im Vakuum",
+    "beruf": "Soldat"
+  },
+  {
+    "datei": "scifi/03-xenobiologe.json",
+    "id": "vorlage-sf-xenobiologe",
+    "name": "Xenobiologe",
+    "epoche": "scifi",
+    "presetId": "htbah-scifi",
+    "untertitel": "Fremdes Leben verstehen",
+    "beruf": "Xenobiologe"
+  },
+  {
+    "datei": "scifi/04-diplomat.json",
+    "id": "vorlage-sf-diplomat",
+    "name": "Diplomat",
+    "epoche": "scifi",
+    "presetId": "htbah-scifi",
+    "untertitel": "Frieden zwischen Welten",
+    "beruf": "Diplomat"
+  },
+  {
+    "datei": "scifi/05-ingenieur.json",
+    "id": "vorlage-sf-ingenieur",
+    "name": "Ingenieur",
+    "epoche": "scifi",
+    "presetId": "htbah-scifi",
+    "untertitel": "Technik retten",
+    "beruf": "Ingenieur"
+  },
+  {
+    "datei": "scifi/06-infiltrator.json",
+    "id": "vorlage-sf-infiltrator",
+    "name": "Infiltrator",
+    "epoche": "scifi",
+    "presetId": "htbah-scifi",
+    "untertitel": "Unbemerkt vorgehen",
+    "beruf": "Infiltrator"
+  }
+]

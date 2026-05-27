@@ -1,0 +1,78 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-sf-ingenieur",
+  "epoche": "scifi",
+  "presetId": "htbah-scifi",
+  "name": "Ingenieur",
+  "untertitel": "Technik retten",
+  "beruf": "Ingenieur",
+  "kernFaehigkeiten": [
+    "Wartung & Reparatur",
+    "KI-Systeme",
+    "Drohnensteuerung"
+  ],
+  "handeln": [
+    {
+      "name": "Wartung & Reparatur",
+      "value": 84
+    },
+    {
+      "name": "Drohnensteuerung",
+      "value": 58
+    },
+    {
+      "name": "Plasmawaffen",
+      "value": 39
+    }
+  ],
+  "wissen": [
+    {
+      "name": "KI-Systeme",
+      "value": 71
+    },
+    {
+      "name": "Raumschifftechnik",
+      "value": 58
+    },
+    {
+      "name": "Cybernetik",
+      "value": 13
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Überzeugen",
+      "value": 45
+    },
+    {
+      "name": "Menschenkenntnis",
+      "value": 32
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-sf-in-werkzeug",
+      "typ": "gegenstand",
+      "name": "Schwerelos-Werkzeugset",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-in-tablet",
+      "typ": "gegenstand",
+      "name": "Diagnose-Tablet",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-in-schweiss",
+      "typ": "gegenstand",
+      "name": "Plasmaschweißer",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-sf-in-ersatz",
+      "typ": "gegenstand",
+      "name": "Ersatzmodule",
+      "beschreibungHtml": ""
+    }
+  ]
+}

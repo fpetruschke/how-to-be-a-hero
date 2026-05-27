@@ -1,0 +1,74 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-gg-verhandler",
+  "epoche": "gegenwart",
+  "presetId": "htbah-gegenwart",
+  "name": "Verhandler",
+  "untertitel": "Worte & Deals",
+  "beruf": "Verhandler",
+  "kernFaehigkeiten": [
+    "Verhandeln",
+    "Überreden",
+    "Begeistern"
+  ],
+  "handeln": [
+    {
+      "name": "Fahren",
+      "value": 40
+    },
+    {
+      "name": "Athletik",
+      "value": 27
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Orientierung",
+      "value": 53
+    },
+    {
+      "name": "Wahrnehmung",
+      "value": 67
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Verhandeln",
+      "value": 93
+    },
+    {
+      "name": "Überreden",
+      "value": 80
+    },
+    {
+      "name": "Begeistern",
+      "value": 40
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-gg-vh-aktentasche",
+      "typ": "gegenstand",
+      "name": "Aktentasche",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-vh-tablet",
+      "typ": "gegenstand",
+      "name": "Tablet",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-vh-karte",
+      "typ": "gegenstand",
+      "name": "Visitenkarten",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-gg-vh-kaffee",
+      "typ": "gegenstand",
+      "name": "Thermoskanne",
+      "beschreibungHtml": ""
+    }
+  ]
+}

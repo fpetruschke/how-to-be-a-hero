@@ -178,6 +178,19 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
               : null;
       }
       this.lokaleCharaktereNeuLaden();
+      this.benachrichtigeInteraktiveWeltUeberMitglied(g.id);
+    },
+    benachrichtigeInteraktiveWeltUeberMitglied(kampagneId) {
+      const kid = typeof kampagneId === 'string' ? kampagneId.trim() : '';
+      if (!kid) {
+        return;
+      }
+      const modal = window.HTBAH && window.HTBAH._weltenbauUebersichtModalInstanz;
+      if (modal && typeof modal.onKampagneDatenExternGeaendert === 'function') {
+        modal.onKampagneDatenExternGeaendert({
+          detail: { art: 'spielleiter', kampagneId: kid },
+        });
+      }
     },
     zeigeStatus(text) {
       window.HTBAH.ui.notify({ text, typ: 'success' });

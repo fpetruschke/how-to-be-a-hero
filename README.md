@@ -112,3 +112,16 @@ Neue oder geänderte `.json`-Dateien (außer `index.json`) eintragen:
 Beim Commit/Push übernimmt das der Git-Hook automatisch (siehe [Einmaliges Setup](#einmaliges-setup)), sofern `./bin/setup-hooks` ausgeführt wurde.
 
 Das Skript prüft, ob im Paket eine Spielleiter-Kampagne erkennbar ist (Legacy `htbah_spielleiter_kampagnen` oder `htbah_export_ls:*` mit Kampagnen-ID). Dateien ohne erkennbare Kampagne werden übersprungen und als Hinweis ausgegeben.
+
+## Charaktervorlagen (Epochen)
+
+Vorlagen liegen unter `assets/charaktervorlagen/` (je Epoche ein Unterordner, Manifest in `index.json`). Jede Vorlage nutzt ausschließlich Fähigkeitsnamen aus dem passenden Preset in `shared/faehigkeitenPresetsStandard.js` und verteilt **400 Fähigkeitspunkte** (wie ein voll ausgebauter Held).
+
+```bash
+./bin/aktualisiere-vorlagen                  # Manifest + Validierung (empfohlen)
+# oder einzeln:
+./bin/aktualisiere-charaktervorlagen-index   # nur Manifest neu erzeugen
+./bin/validiere-charaktervorlagen            # Preset-Namen und 400-Punkte-Budget prüfen
+```
+
+Beim Commit wird `index.json` per Git-Hook mit aktualisiert (wie bei Beispiel-Kampagnen), sofern `./bin/setup-hooks` aktiv ist.

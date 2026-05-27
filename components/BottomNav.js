@@ -334,16 +334,19 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       void this.aktiveKampagneId;
       void this.wuerfelModalTab;
       void this.zufallstabellenSpeicherTick;
-      const z = window.HTBAH.ladeZufallstabellenZustand() || {};
+      if (!this.hatAktiveKampagne) {
+        return { npcs: [], bestien: [], pantheon: [] };
+      }
+      const z = window.HTBAH.ladeZufallstabellenZustand(this.aktiveKampagneId) || {};
       return {
         npcs: Array.isArray(z.npcs) ? z.npcs : [],
         bestien: Array.isArray(z.bestien) ? z.bestien : [],
         pantheon: Array.isArray(z.pantheon) ? z.pantheon : [],
       };
     },
-    /** Reiter „Zufallsbegegnung“: Spielleitung mit gewählter Kampagne (Einträge optional). */
+    /** Reiter „Zufallsbegegnung“: nur in gewählter Kampagne (Kampagnen-Topf für Zufallstabellen). */
     begegnungReiterMoeglich() {
-      return this.hatSpielleiterKampagneGewaehlt;
+      return this.hatAktiveKampagne;
     },
     begegnungHatNpcOderBestie() {
       const { npcs, bestien } = this.begegnungListenAusSpeicher;
@@ -434,6 +437,8 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       return (
         this.zeigeNav &&
         !this.charakterErstellenAktiv &&
+        !this.einstellungenAktiv &&
+        this.hatAktiveKampagne &&
         (this.rolle === 'spielleitung' || this.rolle === 'charakter')
       );
     },
@@ -465,17 +470,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.synchronisiereKampagnenbasierteDaten();
         return;
       }
-      if (this.wuerfelModalTab === 'atmosphaere') {
-        this.wuerfelModalTab = 'wuerfel';
-      }
-    },
-    hatSpielleiterKampagneGewaehlt(neu) {
-      if (!neu && this.wuerfelModalTab === 'begegnung') {
-        this.wuerfelModalTab = 'wuerfel';
-      }
-    },
-    begegnungReiterMoeglich(neu) {
-      if (!neu && this.wuerfelModalTab === 'begegnung') {
+      if (this.wuerfelModalTab === 'atmosphaere' || this.wuerfelModalTab === 'begegnung') {
         this.wuerfelModalTab = 'wuerfel';
       }
     },
@@ -2551,7 +2546,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           title="Konflikt (Teilnehmer, Initiative, Übersicht)"
           aria-label="Konflikt-Modal öffnen"
           @click="konfliktModalOffen = true">
-          <span class="material-symbols-outlined htbah-konflikt-fab-icon" aria-hidden="true">swords</span>
+          <span class="htbah-konflikt-fab-icon" aria-hidden="true">⚔️</span>
         </button>
       </div>
     </teleport>
@@ -2776,7 +2771,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     Wetter &amp; Tageszeit
                   </button>
                 </li>
-                <li v-if="istSpielleitung && begegnungReiterMoeglich" class="nav-item" role="presentation">
+                <li v-if="istSpielleitung && hatAktiveKampagne" class="nav-item" role="presentation">
                   <button
                     type="button"
                     class="nav-link"
@@ -3132,7 +3127,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               </div>
 
               <div
-                v-if="istSpielleitung"
+                v-if="istSpielleitung && hatAktiveKampagne"
                 v-show="wuerfelModalTab === 'begegnung'"
                 class="htbah-begegnung-modal text-start">
                 <div v-if="!begegnungHatNpcOderBestie" class="alert alert-info mb-0" role="status">

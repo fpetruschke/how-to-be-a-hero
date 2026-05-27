@@ -16,6 +16,7 @@ window.HTBAH_SEITEN.Charakter = {
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
     CharakterPdfModal: window.HTBAH_KOMPONENTEN.CharakterPdfModal,
+    CharakterVorlageModal: window.HTBAH_KOMPONENTEN.CharakterVorlageModal,
   },
   props: {
     spielleiterMitglied: { type: Object, default: null },
@@ -854,6 +855,22 @@ window.HTBAH_SEITEN.Charakter = {
       this.charakter.wissen = JSON.parse(JSON.stringify(preset.wissen));
       this.charakter.soziales = JSON.parse(JSON.stringify(preset.soziales));
     },
+    charakterVorlageModalOeffnen() {
+      this.$refs.charakterVorlageModal?.oeffnen();
+    },
+    charakterVorlageAngewendet(vorlage) {
+      if (!vorlage || typeof vorlage !== 'object') {
+        return;
+      }
+      const angewendet = window.HTBAH.wendeCharaktervorlageAufCharakter(
+        this.charakterLokal,
+        vorlage,
+      );
+      this.charakterLokal = angewendet;
+      this.initialisiereGeistesblitzVerbleibend();
+      this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
+      this.importHinweis = `Vorlage „${vorlage.name || 'Unbenannt'}“ übernommen. Zum Abschließen speichern.`;
+    },
     async presetAnwenden() {
       const preset = this.presets.find((eintrag) => eintrag.name === this.ausgewaehltesPreset);
       if (!preset) return;
@@ -1412,6 +1429,23 @@ window.HTBAH_SEITEN.Charakter = {
             </select>
           </div>
         </div>
+      </div>
+
+      <div
+        v-if="!spielleiterMitglied && istNeuModus"
+        class="card p-3 mb-2">
+        <h6 class="mb-2">Charaktervorlage (Epoche)</h6>
+        <p class="small text-body-secondary mb-2">
+          Starte mit einem Heldentyp aus Mittelalter/Fantasy, Gegenwart oder Sci-Fi — inklusive
+          vorgeschlagener Fähigkeiten und Inventar (nur Preset-Fähigkeiten).
+        </p>
+        <icon-text-button
+          type="button"
+          class="btn btn-outline-primary w-100"
+          symbol="🧙"
+          @click="charakterVorlageModalOeffnen">
+          Charaktervorlage wählen
+        </icon-text-button>
       </div>
 
       <div
@@ -2442,6 +2476,10 @@ window.HTBAH_SEITEN.Charakter = {
         :pdf-url="charakterPdfBlobUrl || ''"
         :dateiname="charakterPdfDateiname"
         @schliessen="charakterPdfModalSchliessen"
+      />
+      <charakter-vorlage-modal
+        ref="charakterVorlageModal"
+        @angewendet="charakterVorlageAngewendet"
       />
       <div class="abstandshalter" aria-hidden="true"></div>
     </div>

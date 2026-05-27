@@ -1,0 +1,76 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-mf-barde",
+  "epoche": "mittelalter-fantasy",
+  "presetId": "htbah-mittelalter-fantasy",
+  "name": "Barde",
+  "untertitel": "Soziales & Ablenkung",
+  "beruf": "Barde",
+  "kernFaehigkeiten": [
+    "Auftreten",
+    "Begeistern",
+    "Lügen"
+  ],
+  "handeln": [
+    {
+      "name": "Nahkampf (bewaffnet)",
+      "value": 33
+    },
+    {
+      "name": "Schleichen",
+      "value": 33
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Geschichte & Legenden",
+      "value": 60
+    },
+    {
+      "name": "Magiekunde",
+      "value": 60
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Auftreten",
+      "value": 94
+    },
+    {
+      "name": "Begeistern",
+      "value": 67
+    },
+    {
+      "name": "Lügen",
+      "value": 53
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-mf-bd-laute",
+      "typ": "gegenstand",
+      "name": "Laute",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-bd-hut",
+      "typ": "gegenstand",
+      "name": "Bunter Hut",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-bd-schal",
+      "typ": "gegenstand",
+      "name": "Schal",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-bd-dolch",
+      "typ": "waffe",
+      "name": "Kleiner Dolch",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W4",
+      "schadenswertFernkampf": ""
+    }
+  ]
+}

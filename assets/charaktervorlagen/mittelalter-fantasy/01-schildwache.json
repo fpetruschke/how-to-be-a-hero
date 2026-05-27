@@ -1,0 +1,78 @@
+{
+  "htbahVorlageVersion": 1,
+  "id": "vorlage-mf-schildwache",
+  "epoche": "mittelalter-fantasy",
+  "presetId": "htbah-mittelalter-fantasy",
+  "name": "Schildwache",
+  "untertitel": "Schutz & Stärke",
+  "beruf": "Schildwache",
+  "kernFaehigkeiten": [
+    "Nahkampf (bewaffnet)",
+    "Heben & Tragen",
+    "Einschüchtern"
+  ],
+  "handeln": [
+    {
+      "name": "Nahkampf (bewaffnet)",
+      "value": 96
+    },
+    {
+      "name": "Heben & Tragen",
+      "value": 89
+    },
+    {
+      "name": "Athletik",
+      "value": 22
+    }
+  ],
+  "wissen": [
+    {
+      "name": "Religion",
+      "value": 37
+    },
+    {
+      "name": "Geografie",
+      "value": 37
+    }
+  ],
+  "soziales": [
+    {
+      "name": "Einschüchtern",
+      "value": 67
+    },
+    {
+      "name": "Etikette & Anstand",
+      "value": 52
+    }
+  ],
+  "inventar": [
+    {
+      "id": "inv-mf-sw-schwert",
+      "typ": "waffe",
+      "name": "Trainingsschwert",
+      "beschreibungHtml": "",
+      "schadenswertNahkampf": "1W6+1",
+      "schadenswertFernkampf": ""
+    },
+    {
+      "id": "inv-mf-sw-schild",
+      "typ": "rustung",
+      "name": "Holzschild",
+      "beschreibungHtml": "",
+      "rustwert": "2"
+    },
+    {
+      "id": "inv-mf-sw-handschuhe",
+      "typ": "gegenstand",
+      "name": "Lederhandschuhe",
+      "beschreibungHtml": ""
+    },
+    {
+      "id": "inv-mf-sw-helm",
+      "typ": "rustung",
+      "name": "Kochtopfhelm",
+      "beschreibungHtml": "",
+      "rustwert": "1"
+    }
+  ]
+}

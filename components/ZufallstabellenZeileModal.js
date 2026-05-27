@@ -7,6 +7,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
     InventarEditorPanel: window.HTBAH_KOMPONENTEN.InventarEditorPanel,
+    FaehigkeitenEditorPanel: window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel,
+    FaehigkeitenKompaktPanel: window.HTBAH_KOMPONENTEN.FaehigkeitenKompaktPanel,
     EntityKartenIconFeld: window.HTBAH_KOMPONENTEN.EntityKartenIconFeld,
     EntitaetAnzeigeIcon: window.HTBAH_KOMPONENTEN.EntitaetAnzeigeIcon,
   },
@@ -107,6 +109,27 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         !!typ &&
         ['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand'].includes(typ)
       );
+    },
+    entitaetBegabungen() {
+      const zeile = this.anlage && this.anlage.zeile;
+      const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+      if (!zeile || !EF || typeof EF.begabungenAusEntitaet !== 'function') {
+        return { handeln: 0, wissen: 0, soziales: 0 };
+      }
+      return EF.begabungenAusEntitaet(zeile);
+    },
+    begabungHandelnFuerInitiative() {
+      const b = this.entitaetBegabungen.handeln;
+      return Math.max(0, Math.min(40, Math.round(Number(b) || 0)));
+    },
+    zeilePresetId() {
+      const zeile = this.anlage && this.anlage.zeile;
+      const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+      if (!zeile || !EF || typeof EF.presetIdFuerEntitaet !== 'function') {
+        return '';
+      }
+      const typ = this.anlage.typ === 'bestie' ? 'bestie' : 'npc';
+      return EF.presetIdFuerEntitaet(typ, zeile, this.zufallNpcEpoche);
     },
     kannInWeltOeffnen() {
       if (this.randomSichtbar) {
@@ -491,11 +514,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       this.anlage.zeile.kampfZustand = normalisiert;
     },
     berechneHandelnFuerInitiative() {
-      if (!this.anlage || !this.anlage.zeile) {
-        return 0;
-      }
-      const handeln = Math.round(Number(this.anlage.zeile.handeln) || 0);
-      return Math.max(0, Math.min(40, handeln));
+      return this.begabungHandelnFuerInitiative;
     },
     initiativeWuerfelnFuerZeile() {
       if (!this.anlage || !this.anlage.zeile) {
@@ -543,7 +562,31 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       if (!this.anlage || !this.anlage.zeile) {
         return 0;
       }
-      return Math.max(0, Math.min(100, Math.round(Number(this.anlage.zeile[kategorie]) || 0)));
+      return Math.max(0, Math.min(40, Math.round(Number(this.entitaetBegabungen[kategorie]) || 0)));
+    },
+    faehigkeitenProbeOeffnen(payload) {
+      if (!payload || !this.anlage || !this.anlage.zeile) {
+        return;
+      }
+      const typLabel = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
+      const name = String(this.anlage.zeile.name || '').trim();
+      const suffix = typLabel + (name ? ': ' + name : '');
+      const probePayload = {
+        modus: payload.typ === 'begabung' ? 'begabung' : 'faehigkeit',
+        basiswert: payload.zielwert,
+        zielwert: payload.zielwert,
+        zeigtModifikator: true,
+        basisLabel:
+          payload.typ === 'begabung'
+            ? 'Begabung ' + this.begabungKategorieLabel(payload.kategorie)
+            : 'Effektivwert',
+        titel: (payload.titel || 'Probe') + ' (' + suffix + ')',
+        untertitel: payload.untertitel || '',
+      };
+      this.probeModalGeneration += 1;
+      this.$nextTick(() => {
+        this.$refs.probeWurfModal?.oeffnen(probePayload);
+      });
     },
     begabungProbeOeffnen(kategorie) {
       if (!this.anlage || !this.anlage.zeile) {
@@ -860,7 +903,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   class="form-control"
                   type="number"
                   min="1"
-                  :max="10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0)))"
+                  :max="10 + begabungHandelnFuerInitiative"
                   v-model="anlage.zeile.initiative"
                   placeholder="z. B. 12"
                   inputmode="numeric"
@@ -883,7 +926,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                 </button>
               </div>
               <p class="form-text mb-0">
-                Gültig: 1 bis {{ 10 + Math.max(0, Math.min(40, Math.round(Number(anlage.zeile.handeln) || 0))) }} (1W10 + Handeln).
+                Gültig: 1 bis {{ 10 + begabungHandelnFuerInitiative }} (1W10 + Handeln).
               </p>
             </div>
           </div>
@@ -942,11 +985,21 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           </section>
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">⚔️ Kampfwerte</h6>
-            <div class="row g-2">
+            <div class="row g-2 mb-2">
               <div class="col-md-6"><label class="form-label small text-secondary mb-1">Lebenspunkte</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder="Lebenspunkte" inputmode="numeric" autocomplete="off" @focus="onKampfLebenspunkteFocus" @blur="onKampfLebenspunkteBlur" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Lebenspunkte neu würfeln" @click="npcFeldNeuWuerfeln('lebenspunkte', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button></div></div>
-              <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
-              <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
-              <div class="col-md-6"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
+            </div>
+            <faehigkeiten-kompakt-panel
+              v-if="interaktiveWeltBearbeitung"
+              :entitaet="anlage.zeile"
+              @probe="faehigkeitenProbeOeffnen" />
+            <faehigkeiten-editor-panel
+              v-else
+              :entitaet="anlage.zeile"
+              modus="sl"
+              :preset-id="zeilePresetId"
+              :id-prefix="'zfn-npc-' + (anlage.zeile.id || 'neu')"
+              @probe="faehigkeitenProbeOeffnen" />
+            <div class="row g-2 mt-2">
               <div class="col-md-6">
                 <label class="form-label small text-secondary mb-1">Waffenloser Kampf (Fäuste, Tritte)</label>
                 <div class="input-group">
@@ -1166,12 +1219,20 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           </section>
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">⚔️ Kampfwerte</h6>
-            <div class="row g-2">
+            <div class="row g-2 mb-2">
               <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " autocomplete="off" @focus="onKampfLebenspunkteFocus" @blur="onKampfLebenspunkteBlur" /><label>Lebenspunkte</label></div></div>
-              <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.handeln" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Handeln (0-40)</label></div></div>
-              <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.wissen" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Wissen (0-40)</label></div></div>
-              <div class="col-md-4"><div class="form-floating"><input class="form-control" type="number" min="0" max="40" v-model.number="anlage.zeile.soziales" placeholder=" " inputmode="numeric" autocomplete="off" /><label>Begabung Soziales (0-40)</label></div></div>
             </div>
+            <faehigkeiten-kompakt-panel
+              v-if="interaktiveWeltBearbeitung"
+              :entitaet="anlage.zeile"
+              @probe="faehigkeitenProbeOeffnen" />
+            <faehigkeiten-editor-panel
+              v-else
+              :entitaet="anlage.zeile"
+              modus="sl"
+              :preset-id="zeilePresetId"
+              :id-prefix="'zfn-bestie-' + (anlage.zeile.id || 'neu')"
+              @probe="faehigkeitenProbeOeffnen" />
           </section>
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🐾 Verhalten & Natur</h6>
