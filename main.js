@@ -216,6 +216,14 @@ function neueEntropieId() {
     : `id-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
+function normalisiereKampagneSicherheitsmechanismen(roh) {
+  const quelle = roh && typeof roh === 'object' ? roh : {};
+  return {
+    tabuHtml: typeof quelle.tabuHtml === 'string' ? quelle.tabuHtml : '',
+    schleierHtml: typeof quelle.schleierHtml === 'string' ? quelle.schleierHtml : '',
+  };
+}
+
 function normalisiereSpielleiterMitglied(m) {
   if (!m || typeof m !== 'object') {
     return null;
@@ -268,6 +276,7 @@ function normalisiereSpielleiterKampagne(g) {
     zeitmessung,
     zeitmessungBadgePos,
     konflikt,
+    sicherheitsmechanismen: normalisiereKampagneSicherheitsmechanismen(g.sicherheitsmechanismen),
   };
 }
 
@@ -475,7 +484,7 @@ function kampagnenSlugAusName(name) {
 }
 
 function kampagnenPfad(tab = 'gruppe', kampagneId = null) {
-  const erlaubt = new Set(['gruppe', 'welt', 'zufallstabellen', 'generatoren']);
+  const erlaubt = new Set(['gruppe', 'einstellungen', 'welt', 'zufallstabellen', 'generatoren']);
   const zielTab = erlaubt.has(tab) ? tab : 'gruppe';
   const zustand = ladeSpielleiterZustand();
   const kampagnen = Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
@@ -5160,6 +5169,10 @@ app.component(
 app.component(
   'kampagnen-labels-verwaltung',
   window.HTBAH_KOMPONENTEN.KampagnenLabelsVerwaltung,
+);
+app.component(
+  'kampagne-einstellungen',
+  window.HTBAH_KOMPONENTEN.KampagneEinstellungen,
 );
 app.component('bildbetrachter-host', window.HTBAH_KOMPONENTEN.BildbetrachterHost);
 app.mount('#app');

@@ -6,6 +6,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
     return {
       ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
       fokusVorModal: null,
+      regelwerkTab: 'cheat-sheet',
     };
   },
   computed: {
@@ -30,10 +31,28 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
     vollbildLabel() {
       return this.istVollbild ? 'Vollbild beenden' : 'Vollbild';
     },
+    cheatSheetAnzeigeHtml() {
+      const CS = window.HTBAH_SHARED && window.HTBAH_SHARED.SpielleiterPdfCheatSheet;
+      if (!CS || typeof CS.baueCheatSheetAnzeigeHtml !== 'function') {
+        return '';
+      }
+      const stil =
+        typeof CS.leseCheatSheetStil === 'function'
+          ? CS.leseCheatSheetStil({ stil: 'fantasy-mittelalter' })
+          : null;
+      return CS.baueCheatSheetAnzeigeHtml(stil);
+    },
+    regelwerkTabAktiv() {
+      return this.regelwerkTab === 'regelwerk';
+    },
+    cheatSheetTabAktiv() {
+      return this.regelwerkTab === 'cheat-sheet';
+    },
   },
   watch: {
     'uiZustand.regelwerkOffen'(istOffen) {
       if (istOffen) {
+        this.regelwerkTab = 'cheat-sheet';
         this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         this.$nextTick(() => {
           this.initialisierePosition();
@@ -81,6 +100,11 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
     onFensterEscape() {
       this.schliessen();
     },
+    setzeRegelwerkTab(tab) {
+      if (tab === 'regelwerk' || tab === 'cheat-sheet') {
+        this.regelwerkTab = tab;
+      }
+    },
     entsorgeViewerIframe() {
       const iframe = this.$refs.viewerIframe;
       if (iframe && typeof iframe.src === 'string' && iframe.src !== 'about:blank') {
@@ -121,7 +145,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
         :style="fensterStil"
         role="dialog"
         aria-modal="true"
-        aria-label="Regelwerk"
+        aria-label="Regelwerk und Cheat-Sheet"
         tabindex="-1"
         @keydown.esc.stop.prevent="onFensterEscape">
         <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-3" @pointerdown="starteZiehen">
@@ -150,12 +174,46 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
             <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>
         </div>
+        <ul class="nav nav-tabs px-3 pt-0 border-bottom regelwerk-modal-tabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button
+              type="button"
+              class="nav-link"
+              :class="{ active: cheatSheetTabAktiv }"
+              role="tab"
+              :aria-selected="cheatSheetTabAktiv"
+              @click="setzeRegelwerkTab('cheat-sheet')">
+              Cheat-Sheet
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button
+              type="button"
+              class="nav-link"
+              :class="{ active: regelwerkTabAktiv }"
+              role="tab"
+              :aria-selected="regelwerkTabAktiv"
+              @click="setzeRegelwerkTab('regelwerk')">
+              Regelwerk
+            </button>
+          </li>
+        </ul>
+        <div
+          v-show="cheatSheetTabAktiv"
+          class="regelwerk-modal-cheat-sheet-body"
+          role="tabpanel"
+          aria-label="Cheat-Sheet">
+          <div class="regelwerk-modal-cheat-sheet-inner" v-html="cheatSheetAnzeigeHtml"></div>
+        </div>
         <iframe
+          v-show="regelwerkTabAktiv"
           ref="viewerIframe"
           :key="'regelwerk-viewer-' + viewerThemeKey"
-          :src="viewerUrl"
+          :src="regelwerkTabAktiv ? viewerUrl : 'about:blank'"
           class="regelwerk-modal-content"
           title="Regelwerk PDF"
+          role="tabpanel"
+          aria-label="Regelwerk PDF"
           @load="beimViewerLoad"></iframe>
         <div
           v-if="!istVollbild"

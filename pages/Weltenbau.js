@@ -166,6 +166,7 @@ window.HTBAH_SEITEN.Weltenbau = {
     WeltenbauUebersichtModal: window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal,
     ZufallstabellenSeite: window.HTBAH_SEITEN.Zufallstabellen,
     SpielleiterGruppe: window.HTBAH_SEITEN.SpielleiterGruppe,
+    KampagneEinstellungen: window.HTBAH_KOMPONENTEN.KampagneEinstellungen,
   },
   data() {
     const slInit = window.HTBAH.ladeSpielleiterZustand();
@@ -250,7 +251,13 @@ window.HTBAH_SEITEN.Weltenbau = {
     },
     aktiveWeltenbauTab() {
       const tab = this.$route && this.$route.params ? this.$route.params.tab : '';
-      if (tab === 'gruppe' || tab === 'welt' || tab === 'zufallstabellen' || tab === 'generatoren') {
+      if (
+        tab === 'gruppe' ||
+        tab === 'einstellungen' ||
+        tab === 'welt' ||
+        tab === 'zufallstabellen' ||
+        tab === 'generatoren'
+      ) {
         return tab;
       }
       return 'gruppe';
@@ -929,6 +936,12 @@ window.HTBAH_SEITEN.Weltenbau = {
       </p>
 
       <ul class="nav htbah-weltenbau-pill-tabs mb-3" role="tablist" aria-label="Weltenbau Unterseiten">
+        <li v-if="ausgewaehlteKampagneId" class="nav-item" role="presentation">
+          <button type="button" class="nav-link htbah-weltenbau-pill-tab" :class="{ active: aktiveWeltenbauTab === 'einstellungen' }" @click="wechsleWeltenbauTab('einstellungen')">
+            <span aria-hidden="true">⚙️</span>
+            <span>Einstellungen</span>
+          </button>
+        </li>
         <li class="nav-item" role="presentation">
           <button type="button" class="nav-link htbah-weltenbau-pill-tab" :class="{ active: aktiveWeltenbauTab === 'gruppe' }" @click="wechsleWeltenbauTab('gruppe')">
             <span aria-hidden="true">👥</span>
@@ -1080,6 +1093,15 @@ window.HTBAH_SEITEN.Weltenbau = {
           Nutze die Tabellen für schnelle Ideen und spontane Ereignisse. Die Inhalte werden in der Interaktiven Welt verfügbar.
         </div>
         <zufallstabellen-seite eingebettet :kampagne-id="ausgewaehlteKampagneId" />
+      </template>
+
+      <template v-else-if="aktiveWeltenbauTab === 'einstellungen'">
+        <div class="alert alert-info py-2 px-3 small mb-2" role="note">
+          Name und Labels der aktiven Kampagne bearbeiten.
+        </div>
+        <kampagne-einstellungen
+          :kampagne-id="ausgewaehlteKampagneId"
+          @geaendert="syncKampagneAusRoute" />
       </template>
 
       <template v-else-if="aktiveWeltenbauTab === 'generatoren'">

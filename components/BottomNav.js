@@ -407,11 +407,30 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         ? window.HTBAH._aktiverCharakterKontext
         : null;
     },
+    aktiveKampagne() {
+      const id = typeof this.aktiveKampagneId === 'string' ? this.aktiveKampagneId.trim() : '';
+      if (!id || !window.HTBAH || typeof window.HTBAH.ladeSpielleiterZustand !== 'function') {
+        return null;
+      }
+      const sl = window.HTBAH.ladeSpielleiterZustand();
+      const liste = Array.isArray(sl.kampagnen) ? sl.kampagnen : [];
+      return liste.find((k) => k && k.id === id) || null;
+    },
     aktiveSicherheitsmechanismen() {
       const fallback = {
         tabuHtml: '',
         schleierHtml: '',
       };
+      if (this.rolle === 'spielleitung' && this.aktiveKampagne) {
+        const s = this.aktiveKampagne.sicherheitsmechanismen;
+        if (s && typeof s === 'object') {
+          return {
+            tabuHtml: typeof s.tabuHtml === 'string' ? s.tabuHtml : '',
+            schleierHtml: typeof s.schleierHtml === 'string' ? s.schleierHtml : '',
+          };
+        }
+        return { ...fallback };
+      }
       const kontext = this.aktiverCharakterKontext;
       if (!kontext || typeof kontext.getCharakter !== 'function') {
         return fallback;
@@ -1944,6 +1963,19 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.sicherheitsmechanismenModalOffen = true;
     },
     sichereSicherheitsmechanismen(neueWerte) {
+      const daten = {
+        tabuHtml: typeof neueWerte?.tabuHtml === 'string' ? neueWerte.tabuHtml : '',
+        schleierHtml: typeof neueWerte?.schleierHtml === 'string' ? neueWerte.schleierHtml : '',
+      };
+      if (this.rolle === 'spielleitung' && this.aktiveKampagneId) {
+        const sl = window.HTBAH.ladeSpielleiterZustand();
+        const kampagne = (sl.kampagnen || []).find((k) => k && k.id === this.aktiveKampagneId);
+        if (kampagne) {
+          kampagne.sicherheitsmechanismen = { ...daten };
+          window.HTBAH.speichereSpielleiterZustand(sl);
+        }
+        return;
+      }
       const kontext = this.aktiverCharakterKontext;
       if (!kontext || typeof kontext.getCharakter !== 'function') {
         return;
@@ -1952,10 +1984,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       if (!charakter || typeof charakter !== 'object') {
         return;
       }
-      charakter.sicherheitsmechanismen = {
-        tabuHtml: typeof neueWerte?.tabuHtml === 'string' ? neueWerte.tabuHtml : '',
-        schleierHtml: typeof neueWerte?.schleierHtml === 'string' ? neueWerte.schleierHtml : '',
-      };
+      charakter.sicherheitsmechanismen = { ...daten };
       if (typeof kontext.speichern === 'function') {
         kontext.speichern();
       }

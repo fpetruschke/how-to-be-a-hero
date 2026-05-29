@@ -74,6 +74,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
   },
   components: {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
+    ZufallstabellenReihenfolgeSplit: window.HTBAH_KOMPONENTEN.ZufallstabellenReihenfolgeSplit,
     ZufallstabellenZeileModal: window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal,
     NpcWizardModal: window.HTBAH_KOMPONENTEN.NpcWizardModal,
     BestienWizardModal: window.HTBAH_KOMPONENTEN.BestienWizardModal,
@@ -227,118 +228,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (!this.detailAnsicht) {
         return [];
       }
-      const z = this.detailAnsicht.zeile;
-      const typ = this.detailAnsicht.typ;
-      const plain = (label, val) => ({
-        label,
-        text: val != null ? String(val) : '',
-        html: null,
-      });
-      const rich = (label, html) => ({
-        label,
-        text: '',
-        html: typeof html === 'string' ? html : '',
-      });
-      if (typ === 'ort') {
-        return [
-          plain('Name', z.name),
-          plain('Größe', z.groesse),
-          plain('Lage', z.lage),
-          plain('Zustand', z.zustand),
-          rich('Beschreibung / Notizen', z.notizenHtml),
-        ];
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (!E || typeof E.detailFelderFuerZeile !== 'function') {
+        return [];
       }
-      if (typ === 'fraktion') {
-        return [
-          plain('Art', z.art),
-          plain('Name', z.name),
-          plain('Orte', this.fraktionOrteText(z)),
-          plain('Ziel', z.ziel),
-          plain('Gesinnung / Verhalten', z.gesinnungVerhalten),
-          rich('Beschreibung', this.bereinigeFraktionBeschreibungHtml(z.beschreibungHtml)),
-        ];
-      }
-      if (typ === 'npc') {
-        return [
-          plain('Name', z.name),
-          plain('Spitzname', z.spitzname),
-          plain('Geschlecht', z.geschlecht),
-          plain('Alter', z.alter),
-          plain('Familienstand', z.familienstand),
-          plain('Statur', z.statur),
-          plain('Lebenspunkte', z.lebenspunkte),
-          plain('Gesinnung', z.gesinnung),
-          plain('Handeln (Begabungswert)', z.handeln),
-          plain('Wissen (Begabungswert)', z.wissen),
-          plain('Soziales (Begabungswert)', z.soziales),
-          plain('Glaube', z.glaube),
-          plain('Beruf', z.beruf),
-          plain('Fraktion', z.fraktion),
-          plain('Aufenthaltsort', z.aufenthaltsort),
-          plain('Ziel', z.ziel),
-          plain('Stimme', z.stimme),
-          plain('Waffen (Inventar)', this.entitaetInventarWaffenAnzeigeText(z, { waffenloser: true })),
-          plain('Waffenloser Kampf (Fäuste, Tritte)', z.waffenloserKampf),
-          plain('Initiative', z.initiative),
-          rich('Notizen', this.bereinigeNpcNotizenHtml(z.notizenHtml)),
-        ];
-      }
-      if (typ === 'gegenstand') {
-        const waffenText = this.gegenstandWaffenWerteText(z);
-        const istWaffe = z && z.istWaffe ? 'Ja' : 'Nein';
-        return [
-          plain('Name', z.name),
-          plain('Aufenthaltsort', z.aufenthaltsort),
-          plain('Ist Waffe / Kampfgegenstand', istWaffe),
-          plain('Kampfwerte', waffenText),
-          plain('Initiative', z.initiative),
-          rich('Beschreibung', z.beschreibungHtml),
-        ];
-      }
-      if (typ === 'pantheon') {
-        return [
-          plain('Name', z.name),
-          plain('Geschlecht / Darstellung', z.geschlecht),
-          plain('Domäne', z.domaene),
-          plain('Charakter', z.charakter),
-          plain('Stärken', z.staerke),
-          plain('Schwächen', z.schwaeche),
-          plain('Schutzpatronat', z.schutzpatronat),
-          plain('Verlangen / Opfer / Gebote', z.verlangen),
-          plain('Mythos: Gaben (Erzähltes)', z.mythosGaben),
-          rich('Notizen & Mythos (formatiert)', z.notizenHtml),
-        ];
-      }
-      if (typ === 'raetsel') {
-        return [
-          plain('Art', z.art),
-          plain('Titel / Stichwort', z.titel),
-          plain('Aufenthaltsort', z.aufenthaltsort),
-          plain('Gelöst', z.geloest ? 'Ja' : 'Nein'),
-          plain('Wie könnte die Aufgabenstellung lauten?', z.aufgabenstellung),
-          plain('Ergebnis', z.ergebnis),
-          plain('Schwierigkeit', z.schwierigkeit),
-          rich('Notizen', this.bereinigeRaetselNotizenHtml(z.notizenHtml)),
-        ];
-      }
-      if (typ === 'bestie') {
-        return [
-          plain('Kategorie', this.bestieKategorieLabel(z.kategorie)),
-          plain('Name', z.name),
-          plain('Waffen (Inventar)', this.entitaetInventarWaffenAnzeigeText(z)),
-          plain('Lebenspunkte', z.lebenspunkte),
-          plain('Handeln (Begabungswert)', z.handeln),
-          plain('Wissen (Begabungswert)', z.wissen),
-          plain('Soziales (Begabungswert)', z.soziales),
-          plain('Aufenthaltsort', z.aufenthaltsort),
-          plain('Initiative', z.initiative),
-          plain('Aggressivität (1–10)', this.bestieAggressivitaetText(z)),
-          plain('Stärken', z.staerke),
-          plain('Schwächen', z.schwaeche),
-          rich('Lebensraum, Lebensweise und Legende', z.beschreibungHtml),
-        ];
-      }
-      return [];
+      const paket = E.detailFelderFuerZeile(this.detailAnsicht.typ, this.detailAnsicht.zeile);
+      return Array.isArray(paket.felder) ? paket.felder : [];
     },
     /** Fraktionen mit auswählbarem Namen (NPC-Dropdown) */
     fraktionenMitNamen() {
@@ -1129,28 +1024,25 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       return htbahHtmlText(inhalt) ? inhalt : '';
     },
     bereinigeFraktionBeschreibungHtml(html) {
-      const inhalt = typeof html === 'string' ? html : '';
-      return inhalt.replace(/<p><strong>Art:<\/strong>[\s\S]*?<\/p>/gi, '').trim();
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (E && typeof E.bereinigeFraktionBeschreibungHtml === 'function') {
+        return E.bereinigeFraktionBeschreibungHtml(html);
+      }
+      return typeof html === 'string' ? html : '';
     },
     bereinigeNpcNotizenHtml(html) {
-      const inhalt = typeof html === 'string' ? html : '';
-      return inhalt
-        .replace(/<p><strong>Geheimnis:<\/strong>[\s\S]*?<\/p>/gi, '')
-        .replace(/<p><strong>Lebenspunkte:<\/strong>[\s\S]*?<\/p>/gi, '')
-        .replace(/<p><strong>Waffe:<\/strong>[\s\S]*?<\/p>/gi, '')
-        .replace(
-          /<p><strong>Waffenloser Nahkampf \(Fäuste, Tritte\):<\/strong>[\s\S]*?<\/p>/gi,
-          '',
-        )
-        .trim();
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (E && typeof E.bereinigeNpcNotizenHtml === 'function') {
+        return E.bereinigeNpcNotizenHtml(html);
+      }
+      return typeof html === 'string' ? html : '';
     },
     bereinigeRaetselNotizenHtml(html) {
-      const inhalt = typeof html === 'string' ? html : '';
-      return inhalt
-        .replace(/<p><strong>Schwierigkeit:<\/strong>[\s\S]*?Epoche-Stimmung:[\s\S]*?<\/p>/gi, '')
-        .replace(/<p><strong>Was könnte die Aufgabe sein\?<\/strong>[\s\S]*?<\/p>/gi, '')
-        .replace(/<p><strong>Wie könnte die Aufgabenstellung lauten\?<\/strong>[\s\S]*?<\/p>/gi, '')
-        .trim();
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (E && typeof E.bereinigeRaetselNotizenHtml === 'function') {
+        return E.bereinigeRaetselNotizenHtml(html);
+      }
+      return typeof html === 'string' ? html : '';
     },
     normSucheText(wert) {
       return String(wert || '')
@@ -1263,6 +1155,53 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     },
     indexNachId(liste, id) {
       return (liste || []).findIndex((row) => row.id === id);
+    },
+    listeFuerEntitaetTyp(typ) {
+      const key =
+        typ === 'npc'
+          ? 'npcs'
+          : typ === 'ort'
+            ? 'orte'
+            : typ === 'fraktion'
+              ? 'fraktionen'
+              : typ === 'pantheon'
+                ? 'pantheon'
+                : typ === 'raetsel'
+                  ? 'raetsel'
+                  : typ === 'bestie'
+                    ? 'bestien'
+                    : typ === 'gegenstand'
+                      ? 'gegenstaende'
+                      : '';
+      if (!key || !this.zustand) {
+        return [];
+      }
+      return Array.isArray(this.zustand[key]) ? this.zustand[key] : [];
+    },
+    zeileListenIndex(typ, id) {
+      return this.listeFuerEntitaetTyp(typ).findIndex((row) => row && row.id === id);
+    },
+    kannZeileNachOben(typ, id) {
+      return this.zeileListenIndex(typ, id) > 0;
+    },
+    kannZeileNachUnten(typ, id) {
+      const liste = this.listeFuerEntitaetTyp(typ);
+      const idx = this.zeileListenIndex(typ, id);
+      return idx >= 0 && idx < liste.length - 1;
+    },
+    zeileReihenfolgeAendern(typ, id, richtung) {
+      const liste = this.listeFuerEntitaetTyp(typ);
+      const idx = this.zeileListenIndex(typ, id);
+      if (idx < 0) {
+        return;
+      }
+      const ziel = richtung === 'oben' ? idx - 1 : idx + 1;
+      if (ziel < 0 || ziel >= liste.length) {
+        return;
+      }
+      const [eintrag] = liste.splice(idx, 1);
+      liste.splice(ziel, 0, eintrag);
+      this.persist();
     },
     medienAusZeile(row) {
       return row && Array.isArray(row.medien) ? row.medien : [];
@@ -1665,24 +1604,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       return this.entitaetInventarWaffenAnzeigeText(row, { waffenloser: true });
     },
     bestieKategorieLabel(kategorie) {
-      if (kategorie === 'fantasy_tier') {
-        return 'Magisch / Fantasy';
-      }
-      if (kategorie === 'mutiert') {
-        return 'Mutiert';
-      }
-      if (kategorie === 'monster') {
-        return 'Monster';
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (E && typeof E.bestieKategorieLabel === 'function') {
+        return E.bestieKategorieLabel(kategorie);
       }
       return 'Normales Tier';
     },
     bestieAggressivitaetText(row) {
-      const n = row && Number(row.aggressivitaetSkala);
-      if (!Number.isFinite(n)) {
-        return '—';
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (E && typeof E.bestieAggressivitaetText === 'function') {
+        return E.bestieAggressivitaetText(row);
       }
-      const k = Math.min(10, Math.max(1, Math.round(n)));
-      return `${k} / 10`;
+      return '—';
     },
     begabungswerteKurzText(row) {
       if (!row || typeof row !== 'object') {
@@ -1705,9 +1638,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       });
     },
     entitaetInventarWaffenAnzeigeText(zeile, opts) {
-      const M = window.HTBAH_CHARAKTER_MODEL;
-      if (M && typeof M.entitaetInventarWaffenAnzeigeText === 'function') {
-        return M.entitaetInventarWaffenAnzeigeText(zeile, opts);
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (E && typeof E.entitaetInventarWaffenAnzeigeText === 'function') {
+        return E.entitaetInventarWaffenAnzeigeText(zeile, opts);
       }
       return '—';
     },
@@ -1728,36 +1661,25 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       });
     },
     gegenstandWaffenWerteText(row) {
-      if (!row || !row.istWaffe) {
-        return '—';
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (E && typeof E.gegenstandWaffenWerteText === 'function') {
+        return E.gegenstandWaffenWerteText(row);
       }
-      const schadenswertNahkampf = String(row.schadenswertNahkampf || '').trim();
-      const schadenswertFernkampf = String(row.schadenswertFernkampf || '').trim();
-      const teile = [];
-      if (schadenswertNahkampf) {
-        teile.push(`Nahkampf ${schadenswertNahkampf}`);
-      }
-      if (schadenswertFernkampf) {
-        teile.push(`Fernkampf ${schadenswertFernkampf}`);
-      }
-      return teile.length ? teile.join(' · ') : '—';
+      return '—';
     },
     fraktionOrteListe(row) {
-      if (!row || typeof row !== 'object') {
-        return [];
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (E && typeof E.fraktionOrteListe === 'function') {
+        return E.fraktionOrteListe(row);
       }
-      const orte = Array.isArray(row.orte)
-        ? row.orte.map((ort) => (typeof ort === 'string' ? ort.trim() : '')).filter(Boolean)
-        : [];
-      if (orte.length) {
-        return orte;
-      }
-      const legacy = typeof row.aufenthaltsort === 'string' ? row.aufenthaltsort.trim() : '';
-      return legacy ? [legacy] : [];
+      return [];
     },
     fraktionOrteText(row) {
-      const orte = this.fraktionOrteListe(row);
-      return orte.length ? orte.join(', ') : '';
+      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
+      if (E && typeof E.fraktionOrteText === 'function') {
+        return E.fraktionOrteText(row);
+      }
+      return '';
     },
     npcLeer() {
       return {
@@ -2992,6 +2914,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                         ⚙️
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
+                        <li class="px-2 py-2">
+                          <zufallstabellen-reihenfolge-split
+                            :kann-nach-oben="kannZeileNachOben('ort', row.id)"
+                            :kann-nach-unten="kannZeileNachUnten('ort', row.id)"
+                            @nach-oben="zeileReihenfolgeAendern('ort', row.id, 'oben')"
+                            @nach-unten="zeileReihenfolgeAendern('ort', row.id, 'unten')" />
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                         <li><button type="button" class="dropdown-item" @click="ortBearbeiten(row, indexNachId(zustand.orte, row.id))">Bearbeiten</button></li>
                         <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('ort', row.id)">Löschen</button></li>
@@ -3051,6 +2981,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     ⚙️
                   </button>
                   <ul class="dropdown-menu w-100">
+                    <li class="px-2 py-2">
+                      <zufallstabellen-reihenfolge-split
+                        :kann-nach-oben="kannZeileNachOben('ort', row.id)"
+                        :kann-nach-unten="kannZeileNachUnten('ort', row.id)"
+                        @nach-oben="zeileReihenfolgeAendern('ort', row.id, 'oben')"
+                        @nach-unten="zeileReihenfolgeAendern('ort', row.id, 'unten')" />
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                     <li><button type="button" class="dropdown-item" @click="ortBearbeiten(row, indexNachId(zustand.orte, row.id))">Bearbeiten</button></li>
                     <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('ort', row.id)">Löschen</button></li>
@@ -3141,6 +3079,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                         ⚙️
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
+                        <li class="px-2 py-2">
+                          <zufallstabellen-reihenfolge-split
+                            :kann-nach-oben="kannZeileNachOben('fraktion', row.id)"
+                            :kann-nach-unten="kannZeileNachUnten('fraktion', row.id)"
+                            @nach-oben="zeileReihenfolgeAendern('fraktion', row.id, 'oben')"
+                            @nach-unten="zeileReihenfolgeAendern('fraktion', row.id, 'unten')" />
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                         <li><button type="button" class="dropdown-item" @click="fraktionBearbeiten(row, indexNachId(zustand.fraktionen, row.id))">Bearbeiten</button></li>
                         <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('fraktion', row.id)">Löschen</button></li>
@@ -3198,6 +3144,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     ⚙️
                   </button>
                   <ul class="dropdown-menu w-100">
+                    <li class="px-2 py-2">
+                      <zufallstabellen-reihenfolge-split
+                        :kann-nach-oben="kannZeileNachOben('fraktion', row.id)"
+                        :kann-nach-unten="kannZeileNachUnten('fraktion', row.id)"
+                        @nach-oben="zeileReihenfolgeAendern('fraktion', row.id, 'oben')"
+                        @nach-unten="zeileReihenfolgeAendern('fraktion', row.id, 'unten')" />
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                     <li><button type="button" class="dropdown-item" @click="fraktionBearbeiten(row, indexNachId(zustand.fraktionen, row.id))">Bearbeiten</button></li>
                     <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('fraktion', row.id)">Löschen</button></li>
@@ -3327,6 +3281,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                         ⚙️
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
+                        <li class="px-2 py-2">
+                          <zufallstabellen-reihenfolge-split
+                            :kann-nach-oben="kannZeileNachOben('npc', row.id)"
+                            :kann-nach-unten="kannZeileNachUnten('npc', row.id)"
+                            @nach-oben="zeileReihenfolgeAendern('npc', row.id, 'oben')"
+                            @nach-unten="zeileReihenfolgeAendern('npc', row.id, 'unten')" />
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'npc')">Schaden</button></li>
                         <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'npc')">Parieren</button></li>
                         <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
@@ -3394,6 +3356,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     ⚙️
                   </button>
                   <ul class="dropdown-menu w-100">
+                    <li class="px-2 py-2">
+                      <zufallstabellen-reihenfolge-split
+                        :kann-nach-oben="kannZeileNachOben('npc', row.id)"
+                        :kann-nach-unten="kannZeileNachUnten('npc', row.id)"
+                        @nach-oben="zeileReihenfolgeAendern('npc', row.id, 'oben')"
+                        @nach-unten="zeileReihenfolgeAendern('npc', row.id, 'unten')" />
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
                     <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'npc')">Schaden</button></li>
                     <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'npc')">Parieren</button></li>
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
@@ -3485,6 +3455,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                         ⚙️
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
+                        <li class="px-2 py-2">
+                          <zufallstabellen-reihenfolge-split
+                            :kann-nach-oben="kannZeileNachOben('gegenstand', row.id)"
+                            :kann-nach-unten="kannZeileNachUnten('gegenstand', row.id)"
+                            @nach-oben="zeileReihenfolgeAendern('gegenstand', row.id, 'oben')"
+                            @nach-unten="zeileReihenfolgeAendern('gegenstand', row.id, 'unten')" />
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                         <li><button type="button" class="dropdown-item" @click="gegenstandBearbeiten(row, indexNachId(zustand.gegenstaende, row.id))">Bearbeiten</button></li>
                         <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">Löschen</button></li>
@@ -3539,6 +3517,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     ⚙️
                   </button>
                   <ul class="dropdown-menu w-100">
+                    <li class="px-2 py-2">
+                      <zufallstabellen-reihenfolge-split
+                        :kann-nach-oben="kannZeileNachOben('gegenstand', row.id)"
+                        :kann-nach-unten="kannZeileNachUnten('gegenstand', row.id)"
+                        @nach-oben="zeileReihenfolgeAendern('gegenstand', row.id, 'oben')"
+                        @nach-unten="zeileReihenfolgeAendern('gegenstand', row.id, 'unten')" />
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                     <li><button type="button" class="dropdown-item" @click="gegenstandBearbeiten(row, indexNachId(zustand.gegenstaende, row.id))">Bearbeiten</button></li>
                     <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('gegenstand', row.id)">Löschen</button></li>
@@ -3638,6 +3624,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                         ⚙️
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
+                        <li class="px-2 py-2">
+                          <zufallstabellen-reihenfolge-split
+                            :kann-nach-oben="kannZeileNachOben('pantheon', row.id)"
+                            :kann-nach-unten="kannZeileNachUnten('pantheon', row.id)"
+                            @nach-oben="zeileReihenfolgeAendern('pantheon', row.id, 'oben')"
+                            @nach-unten="zeileReihenfolgeAendern('pantheon', row.id, 'unten')" />
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                         <li><button type="button" class="dropdown-item" @click="pantheonBearbeiten(row, indexNachId(zustand.pantheon, row.id))">Bearbeiten</button></li>
                         <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('pantheon', row.id)">Löschen</button></li>
@@ -3694,6 +3688,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     ⚙️
                   </button>
                   <ul class="dropdown-menu w-100">
+                    <li class="px-2 py-2">
+                      <zufallstabellen-reihenfolge-split
+                        :kann-nach-oben="kannZeileNachOben('pantheon', row.id)"
+                        :kann-nach-unten="kannZeileNachUnten('pantheon', row.id)"
+                        @nach-oben="zeileReihenfolgeAendern('pantheon', row.id, 'oben')"
+                        @nach-unten="zeileReihenfolgeAendern('pantheon', row.id, 'unten')" />
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                     <li><button type="button" class="dropdown-item" @click="pantheonBearbeiten(row, indexNachId(zustand.pantheon, row.id))">Bearbeiten</button></li>
                     <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('pantheon', row.id)">Löschen</button></li>
@@ -3793,6 +3795,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                         ⚙️
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
+                        <li class="px-2 py-2">
+                          <zufallstabellen-reihenfolge-split
+                            :kann-nach-oben="kannZeileNachOben('raetsel', row.id)"
+                            :kann-nach-unten="kannZeileNachUnten('raetsel', row.id)"
+                            @nach-oben="zeileReihenfolgeAendern('raetsel', row.id, 'oben')"
+                            @nach-unten="zeileReihenfolgeAendern('raetsel', row.id, 'unten')" />
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                         <li><button type="button" class="dropdown-item" @click="raetselBearbeiten(row, indexNachId(zustand.raetsel, row.id))">Bearbeiten</button></li>
                         <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('raetsel', row.id)">Löschen</button></li>
@@ -3858,6 +3868,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     ⚙️
                   </button>
                   <ul class="dropdown-menu w-100">
+                    <li class="px-2 py-2">
+                      <zufallstabellen-reihenfolge-split
+                        :kann-nach-oben="kannZeileNachOben('raetsel', row.id)"
+                        :kann-nach-unten="kannZeileNachUnten('raetsel', row.id)"
+                        @nach-oben="zeileReihenfolgeAendern('raetsel', row.id, 'oben')"
+                        @nach-unten="zeileReihenfolgeAendern('raetsel', row.id, 'unten')" />
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                     <li><button type="button" class="dropdown-item" @click="raetselBearbeiten(row, indexNachId(zustand.raetsel, row.id))">Bearbeiten</button></li>
                     <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('raetsel', row.id)">Löschen</button></li>
@@ -3976,6 +3994,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                         ⚙️
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
+                        <li class="px-2 py-2">
+                          <zufallstabellen-reihenfolge-split
+                            :kann-nach-oben="kannZeileNachOben('bestie', row.id)"
+                            :kann-nach-unten="kannZeileNachUnten('bestie', row.id)"
+                            @nach-oben="zeileReihenfolgeAendern('bestie', row.id, 'oben')"
+                            @nach-unten="zeileReihenfolgeAendern('bestie', row.id, 'unten')" />
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">Schaden</button></li>
                         <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">Parieren</button></li>
                         <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
@@ -4054,6 +4080,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     ⚙️
                   </button>
                   <ul class="dropdown-menu w-100">
+                    <li class="px-2 py-2">
+                      <zufallstabellen-reihenfolge-split
+                        :kann-nach-oben="kannZeileNachOben('bestie', row.id)"
+                        :kann-nach-unten="kannZeileNachUnten('bestie', row.id)"
+                        @nach-oben="zeileReihenfolgeAendern('bestie', row.id, 'oben')"
+                        @nach-unten="zeileReihenfolgeAendern('bestie', row.id, 'unten')" />
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
                     <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">Schaden</button></li>
                     <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">Parieren</button></li>
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>

@@ -148,9 +148,6 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       }
       window.HTBAH.speichereSpielleiterZustand(this.zustand);
     },
-    labelsGeaendert() {
-      this.zustand = window.HTBAH.ladeSpielleiterZustand();
-    },
     nachMitgliedImportAktualisieren(mitgliedId = '') {
       const g = this.aktiveKampagne;
       if (!g) {
@@ -628,12 +625,6 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       </nav>
 
       <template v-if="aktiveKampagne">
-      <div class="card p-3 mb-3">
-        <span class="fw-semibold d-block mb-2">Kampagne: {{ aktiveKampagne.name }}</span>
-        <kampagnen-labels-editor
-          :kampagne-id="kampagneId"
-          @geaendert="labelsGeaendert" />
-      </div>
       <div class="card p-3 mb-3">
         <span class="fw-semibold d-block mb-2">
           Charakter-Auswahl

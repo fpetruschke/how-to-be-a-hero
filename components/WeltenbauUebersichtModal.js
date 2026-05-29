@@ -197,6 +197,7 @@ var HTBAH_REFACTOR_UTILS =
           index: -1,
         },
         medienUploadLaeuft: false,
+        weltBildExportLaedt: false,
         medienImportWarteschlange: [],
         medienGalerieModalOffen: false,
         speicherStatusHinweis: '',
@@ -1738,6 +1739,48 @@ var HTBAH_REFACTOR_UTILS =
           };
         });
       },
+      async interaktiveWeltAlsBildExportieren() {
+        const kid = typeof this.gruppeId === 'string' ? this.gruppeId.trim() : '';
+        const fn =
+          window.HTBAH && typeof window.HTBAH.erzeugeInteraktiveWeltPng === 'function'
+            ? window.HTBAH.erzeugeInteraktiveWeltPng
+            : null;
+        if (!kid || !fn || this.weltBildExportLaedt) {
+          if (!fn) {
+            window.HTBAH.ui.notify({
+              text: 'Bildexport nicht geladen. Seite neu laden.',
+              typ: 'danger',
+            });
+          }
+          return;
+        }
+        this.weltBildExportLaedt = true;
+        try {
+          const stageEl = this.$el && this.$el.querySelector
+            ? this.$el.querySelector('.htbah-weltenbau-map-stage')
+            : null;
+          const { blob, dateiname } = await fn(kid, {
+            mapStageElement: stageEl || undefined,
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = dateiname;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+          window.HTBAH.ui.notify({ text: 'Interaktive Welt als PNG gespeichert.', typ: 'success' });
+        } catch (e) {
+          console.error(e);
+          await window.HTBAH.ui.alert({
+            titel: 'Bildexport fehlgeschlagen',
+            beschreibung: e && e.message ? e.message : 'PNG konnte nicht erzeugt werden.',
+          });
+        } finally {
+          this.weltBildExportLaedt = false;
+        }
+      },
       mapEinstellungenZuruecksetzen() {
         const defaults = MAP_STANDARD_EINSTELLUNGEN;
         this.map.scale = defaults.zoomScale;
@@ -2063,6 +2106,20 @@ var HTBAH_REFACTOR_UTILS =
         });
       },
       baueGraph() {
+        const IW = window.HTBAH_SHARED && window.HTBAH_SHARED.InteraktiveWeltGraph;
+        if (IW && typeof IW.baueGraph === 'function') {
+          const gruppeKey = this.gruppeId || 'default';
+          const layoutAlle = this.ladeLayouts();
+          const layout = layoutAlle[gruppeKey] || {};
+          const ergebnis = IW.baueGraph({
+            zustand: this.zustand,
+            layout,
+            gruppeId: gruppeKey,
+            aktiveGruppe: this.aktiveGruppe,
+            sichtbarkeitsFilter: this.sichtbarkeitsFilter,
+          });
+          return { ...ergebnis, layoutAlle, gruppeKey };
+        }
         const gruppeKey = this.gruppeId || 'default';
         const layoutAlle = this.ladeLayouts();
         const layout = layoutAlle[gruppeKey] || {};
@@ -7006,6 +7063,14 @@ var HTBAH_REFACTOR_UTILS =
                       </button>
                     </div>
                   </div>
+                  <hr class="my-2" />
+                  <button
+                    type="button"
+                    class="dropdown-item"
+                    :disabled="weltBildExportLaedt"
+                    @click.stop="interaktiveWeltAlsBildExportieren">
+                    {{ weltBildExportLaedt ? 'Exportiert …' : 'Als Bild exportieren (PNG)' }}
+                  </button>
                   <hr class="my-2" />
                   <div class="form-check form-switch mb-2">
                     <input

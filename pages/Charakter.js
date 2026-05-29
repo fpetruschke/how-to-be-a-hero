@@ -1404,7 +1404,7 @@ window.HTBAH_SEITEN.Charakter = {
       <div v-if="!spielleiterMitglied && istNeuModus" class="card p-3 mb-2">
         <h6 class="mb-2">Blanko-PDF-Export</h6>
         <p class="small text-body-secondary mb-2">
-          Exportiert ein leeres Charakterblatt (inkl. Seite 2), damit Werte handschriftlich eingetragen werden können.
+          Exportiert ein leeres Charakterblatt (inkl. Notizen- und Sicherheitsseite), damit Werte handschriftlich eingetragen werden können.
         </p>
         <div class="htbah-pdf-export-gruppe mb-0">
           <icon-text-button

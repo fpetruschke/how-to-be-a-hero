@@ -771,6 +771,26 @@ input::placeholder {
   cursor: grabbing;
 }
 
+/* Export der interaktiven Welt (PNG/PDF) — nur auf Klon/Off-DOM-Host, nicht im Live-Modal */
+.htbah-iw-export-host {
+  --text-color: #212529;
+  --card-bg: #ffffff;
+  --border-color: #dee2e6;
+}
+
+.htbah-iw-export-capture .htbah-map-element-lock-button,
+.htbah-iw-export-capture .htbah-map-element-delete-button,
+.htbah-iw-export-capture .htbah-map-element-color-picker,
+.htbah-iw-export-capture .htbah-map-pfeil-resize-handle,
+.htbah-iw-export-capture .htbah-map-pfeil-rotate-handle,
+.htbah-iw-export-capture .htbah-map-ort-bild-rotate-handle,
+.htbah-iw-export-capture .htbah-map-ort-bild-resize,
+.htbah-iw-export-capture .htbah-map-pfeil-angle-badge,
+.htbah-iw-export-capture .htbah-map-notiz-drag-handle,
+.htbah-iw-export-capture button {
+  display: none !important;
+}
+
 .htbah-weltenbau-map-stage {
   position: relative;
   width: 12000px;
@@ -2021,6 +2041,47 @@ input::placeholder {
   pointer-events: none;
 }
 
+/* Zentrierte Dialog-Modals (Kampagnen-PDF-Export, Eingabe, …) */
+.htbah-sl-pdf-export-modal-layer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.htbah-sl-pdf-export-modal-layer .htbah-sl-pdf-export-modal-window {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: min(520px, 94vw);
+  height: auto;
+  max-height: min(90vh, 90dvh);
+  min-height: 0;
+  min-width: 0;
+  resize: none;
+  overflow: hidden;
+}
+
+.htbah-sl-pdf-export-modal-layer .htbah-sl-pdf-export-modal-window .regelwerk-modal-header {
+  cursor: default;
+  touch-action: auto;
+}
+
+.htbah-sl-pdf-export-modal-body {
+  max-height: min(calc(90vh - 8.5rem), calc(90dvh - 8.5rem));
+}
+
+.htbah-sl-pdf-export-modal-footer .btn .material-symbols-outlined {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.htbah-sl-pdf-export-fortschritt {
+  scroll-margin-bottom: 0.75rem;
+}
+
 /* Würfelbeutel: schwebend ohne Backdrop, über der unteren Navigation */
 .htbah-wuerfel-beutel-layer {
   z-index: var(--htbah-z-modal-wuerfel);
@@ -2394,6 +2455,67 @@ input::placeholder {
   flex: 1;
   width: 100%;
   border: none;
+  min-height: 0;
+}
+
+.regelwerk-modal-tabs {
+  flex-shrink: 0;
+  cursor: default;
+  user-select: auto;
+  touch-action: auto;
+}
+
+.regelwerk-modal-tabs .nav-link {
+  cursor: pointer;
+}
+
+.regelwerk-modal-cheat-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--modal-bg);
+}
+
+.regelwerk-modal-cheat-sheet-inner {
+  padding: 1rem 1.25rem 1.25rem;
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+.htbah-cheat-sheet-anzeige-kopf h2 {
+  color: var(--text-color);
+}
+
+.htbah-cheat-sheet-karte .card-title {
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.htbah-cheat-sheet-karte-inhalt ul,
+.htbah-cheat-sheet-karte-inhalt ol {
+  margin-bottom: 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.htbah-cheat-sheet-karte-inhalt p:last-child,
+.htbah-cheat-sheet-karte-inhalt ul:last-child,
+.htbah-cheat-sheet-karte-inhalt ol:last-child {
+  margin-bottom: 0;
+}
+
+.htbah-cheat-sheet-zwischenkopf {
+  font-weight: 700;
+  margin: 0.35rem 0 0.25rem;
+}
+
+.htbah-cheat-sheet-hinweis {
+  font-size: 0.8125rem;
+  color: var(--text-muted, #6c757d);
+  margin-bottom: 0;
+}
+
+.htbah-cheat-sheet-tabelle {
+  font-size: 0.8125rem;
 }
 
 /* Spielleiter: Abenteuerbuch (FAB + Quill im schwebenden Fenster) */
@@ -4873,6 +4995,11 @@ body.htbah-mit-lp-banner .htbah-konflikt-fab-stack {
 .htbah-input-icon-btn.dropdown-toggle-split::after {
   margin-left: 0;
   vertical-align: middle;
+}
+
+.htbah-reihenfolge-split .btn-group > .btn {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* Wizard-Modal liegt über dem schwebenden ZufallstabellenZeileModal (z-index 2000). */
