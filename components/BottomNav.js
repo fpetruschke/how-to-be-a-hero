@@ -2577,6 +2577,14 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           @click="konfliktModalOffen = true">
           <span class="htbah-konflikt-fab-icon" aria-hidden="true">⚔️</span>
         </button>
+        <button
+          type="button"
+          class="htbah-wuerfelbeutel-fab"
+          title="Würfelbeutel (Werkzeuge)"
+          aria-label="Würfelbeutel öffnen"
+          @click="wuerfelModalOeffnen('wuerfel')">
+          <span class="htbah-wuerfelbeutel-fab-icon" aria-hidden="true">🎲</span>
+        </button>
       </div>
     </teleport>
 

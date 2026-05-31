@@ -47,6 +47,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         fokusVorModal: null,
         initiativeWurfZielRef: null,
         parteiOffen: { helden: true, gegner: true },
+        konfliktDnD: { ziehtRefKey: null, zielSeite: null },
       };
     },
     computed: {
@@ -255,6 +256,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.beendeZiehen();
         this.beendeResize();
         this.istVollbild = false;
+        this.konfliktDnD = { ziehtRefKey: null, zielSeite: null };
         this.speichernFlushen();
         this.stelleFokusWiederHer();
       },
@@ -426,6 +428,74 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         t.seite = KM.normalisiereSeite(seite);
         this.speichernKonflikt();
+      },
+      istKonfliktDnDBereit() {
+        const utils = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.utils;
+        const v =
+          utils && typeof utils.ermittleViewportGroesse === 'function'
+            ? utils.ermittleViewportGroesse()
+            : { viewportBreite: window.innerWidth || 0 };
+        return v.viewportBreite >= 992;
+      },
+      konfliktKarteDragStart(event, teilnehmer) {
+        if (!this.istKonfliktDnDBereit() || !teilnehmer || !teilnehmer.refKey) {
+          event.preventDefault();
+          return;
+        }
+        event.stopPropagation();
+        const refKey = teilnehmer.refKey;
+        this.konfliktDnD = { ziehtRefKey: refKey, zielSeite: null };
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', refKey);
+          const karte = event.target.closest('.htbah-konflikt-karte');
+          if (karte && typeof event.dataTransfer.setDragImage === 'function') {
+            event.dataTransfer.setDragImage(karte, Math.round(karte.offsetWidth / 2), 20);
+          }
+        }
+      },
+      konfliktKarteDragEnd() {
+        this.konfliktDnD = { ziehtRefKey: null, zielSeite: null };
+      },
+      konfliktSeiteDragOver(event, zielSeite) {
+        if (!this.istKonfliktDnDBereit() || !this.konfliktDnD.ziehtRefKey) {
+          return;
+        }
+        event.preventDefault();
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = 'move';
+        }
+        if (this.konfliktDnD.zielSeite !== zielSeite) {
+          this.konfliktDnD = { ...this.konfliktDnD, zielSeite };
+        }
+        const key = zielSeite === 'gegner' ? 'gegner' : 'helden';
+        if (!this.parteiOffen[key]) {
+          this.parteiOffen = { ...this.parteiOffen, [key]: true };
+        }
+      },
+      konfliktSeiteDragLeave(event, zielSeite) {
+        const zone = event.currentTarget;
+        if (zone && event.relatedTarget && zone.contains(event.relatedTarget)) {
+          return;
+        }
+        if (this.konfliktDnD.zielSeite === zielSeite) {
+          this.konfliktDnD = { ...this.konfliktDnD, zielSeite: null };
+        }
+      },
+      konfliktSeiteDrop(event, zielSeite) {
+        event.preventDefault();
+        const refKey =
+          (event.dataTransfer && event.dataTransfer.getData('text/plain')) ||
+          this.konfliktDnD.ziehtRefKey;
+        this.konfliktDnD = { ziehtRefKey: null, zielSeite: null };
+        if (!refKey || !this.istKonfliktDnDBereit()) {
+          return;
+        }
+        const teilnehmer = this.aufgeloesteTeilnehmer.find((t) => t.refKey === refKey);
+        if (!teilnehmer || teilnehmer.seite === zielSeite) {
+          return;
+        }
+        this.setzeSeite(teilnehmer, zielSeite);
       },
       sortiereNachInitiative(liste) {
         return liste.slice().sort((a, b) => {
@@ -1002,9 +1072,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               </div>
 
               <div v-show="konflikt.aktiverTab === 'kampf'">
+                <p class="small text-body-secondary mb-2 d-none d-lg-block">
+                  Teilnehmer per Griff oben an der Karte zwischen {{ konflikt.heldenLabel }} und
+                  {{ konflikt.gegnerLabel }} verschieben.
+                </p>
                 <div class="row g-3 htbah-konflikt-kampf-spalten">
                   <div class="col-12 col-lg-6">
-                    <div class="card htbah-konflikt-partei-card shadow-sm h-100">
+                    <div
+                      class="card htbah-konflikt-partei-card shadow-sm h-100"
+                      :class="{ 'htbah-konflikt-partei-card--drop-aktiv': konfliktDnD.zielSeite === 'helden' }"
+                      @dragover="konfliktSeiteDragOver($event, 'helden')"
+                      @dragleave="konfliktSeiteDragLeave($event, 'helden')"
+                      @drop="konfliktSeiteDrop($event, 'helden')">
                       <button
                         type="button"
                         class="card-header htbah-konflikt-partei-kopf-btn d-flex align-items-center justify-content-between gap-2"
@@ -1031,7 +1110,19 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                             v-for="t in heldenTeilnehmer"
                             :key="'h-' + t.refKey"
                             class="htbah-konflikt-karte card shadow-sm mb-0"
-                            :class="karteStatusKlasse(t.kampfZustand)">
+                            :class="[
+                              karteStatusKlasse(t.kampfZustand),
+                              { 'htbah-konflikt-karte--zieht': konfliktDnD.ziehtRefKey === t.refKey },
+                            ]">
+                            <div
+                              class="htbah-konflikt-karte-griff d-none d-lg-flex"
+                              draggable="true"
+                              title="Zwischen Seiten verschieben"
+                              aria-label="Zwischen Seiten verschieben"
+                              @dragstart="konfliktKarteDragStart($event, t)"
+                              @dragend="konfliktKarteDragEnd">
+                              <span class="material-symbols-outlined" aria-hidden="true">drag_indicator</span>
+                            </div>
                             <konflikt-teilnehmer-karte-inhalt
                               :teilnehmer="t"
                               :konflikt="konflikt"
@@ -1052,7 +1143,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     </div>
                   </div>
                   <div class="col-12 col-lg-6">
-                    <div class="card htbah-konflikt-partei-card shadow-sm htbah-konflikt-partei-card--gegner h-100">
+                    <div
+                      class="card htbah-konflikt-partei-card shadow-sm htbah-konflikt-partei-card--gegner h-100"
+                      :class="{ 'htbah-konflikt-partei-card--drop-aktiv': konfliktDnD.zielSeite === 'gegner' }"
+                      @dragover="konfliktSeiteDragOver($event, 'gegner')"
+                      @dragleave="konfliktSeiteDragLeave($event, 'gegner')"
+                      @drop="konfliktSeiteDrop($event, 'gegner')">
                       <button
                         type="button"
                         class="card-header htbah-konflikt-partei-kopf-btn d-flex align-items-center justify-content-between gap-2"
@@ -1079,7 +1175,19 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                             v-for="t in gegnerTeilnehmer"
                             :key="'g-' + t.refKey"
                             class="htbah-konflikt-karte card shadow-sm mb-0"
-                            :class="karteStatusKlasse(t.kampfZustand)">
+                            :class="[
+                              karteStatusKlasse(t.kampfZustand),
+                              { 'htbah-konflikt-karte--zieht': konfliktDnD.ziehtRefKey === t.refKey },
+                            ]">
+                            <div
+                              class="htbah-konflikt-karte-griff d-none d-lg-flex"
+                              draggable="true"
+                              title="Zwischen Seiten verschieben"
+                              aria-label="Zwischen Seiten verschieben"
+                              @dragstart="konfliktKarteDragStart($event, t)"
+                              @dragend="konfliktKarteDragEnd">
+                              <span class="material-symbols-outlined" aria-hidden="true">drag_indicator</span>
+                            </div>
                             <konflikt-teilnehmer-karte-inhalt
                               :teilnehmer="t"
                               :konflikt="konflikt"
