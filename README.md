@@ -66,7 +66,7 @@ HOST=0.0.0.0 PORT=8080 ./bin/serve
 
 ## Beispiel-Kampagnen (Assets)
 
-Unter **Spielleiter → Kampagnen** können Nutzerinnen und Nutzer vorgefertigte Kampagnen aus dem Ordner `assets/beispiel-kampagnen/` additiv laden. Jede Datei ist ein JSON-Paket im gleichen Format wie der **Daten-Export** unter Einstellungen (`typ: "lokaler-speicher"` mit Array `daten`).
+Unter **Spielleitung → Kampagnen** können Nutzerinnen und Nutzer vorgefertigte Kampagnen aus dem Ordner `assets/beispiel-kampagnen/` additiv laden. Jede Datei ist ein JSON-Paket im gleichen Format wie der **Daten-Export** unter Einstellungen (`typ: "lokaler-speicher"` mit Array `daten`).
 
 ### Export als Beispiel-Kampagne nutzen
 
@@ -75,7 +75,7 @@ Du kannst eine Kampagne (oder einen vollständigen Backup-Export) in der App exp
 Unterstützt werden:
 
 - **Neuer Export** mit `htbah_export_ls:*`-Einträgen (z. B. Abenteuerbuch, Wetter, Zufallstabellen je Kategorie, Weltenbau je Bereich, Komplett-Bundle)
-- **Legacy-Sammel-Export** mit `htbah_spielleiter_kampagnen`, `htbah_zufallstabellen` und `htbah_weltenbau` (wie bei älteren Beispielen z. B. „Das schwarze Wasser“)
+- **Legacy-Sammel-Export** mit `htbah_spielleitung_kampagnen`, `htbah_zufallstabellen` und `htbah_weltenbau` (wie bei älteren Beispielen z. B. „Das schwarze Wasser“)
 
 Beim Laden wird die Kampagne **additiv** eingespielt: vorhandene Kampagnen bleiben erhalten, Einträge mit gleicher ID werden übersprungen.
 
@@ -111,7 +111,7 @@ Neue oder geänderte `.json`-Dateien (außer `index.json`) eintragen:
 
 Beim Commit/Push übernimmt das der Git-Hook automatisch (siehe [Einmaliges Setup](#einmaliges-setup)), sofern `./bin/setup-hooks` ausgeführt wurde.
 
-Das Skript prüft, ob im Paket eine Spielleiter-Kampagne erkennbar ist (Legacy `htbah_spielleiter_kampagnen` oder `htbah_export_ls:*` mit Kampagnen-ID). Dateien ohne erkennbare Kampagne werden übersprungen und als Hinweis ausgegeben.
+Das Skript prüft, ob im Paket eine Spielleitung-Kampagne erkennbar ist (Legacy `htbah_spielleitung_kampagnen` oder `htbah_export_ls:*` mit Kampagnen-ID). Dateien ohne erkennbare Kampagne werden übersprungen und als Hinweis ausgegeben.
 
 ## Charaktervorlagen (Epochen)
 

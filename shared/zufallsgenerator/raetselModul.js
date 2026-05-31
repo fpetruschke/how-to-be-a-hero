@@ -184,7 +184,7 @@ window.HTBAH = window.HTBAH || {};
     const aufgabenstellung = `„${beispiel} Ihr könnt in Ruhe kombinieren — oder ich starte eine Uhr. Was macht ihr als Erstes?“`;
     const html = [
       `<p><strong>Aufgabe:</strong> ${U.htmlEsc(beispiel)}</p>`,
-      `<p><strong>Spielleitung:</strong> Notiere dir eine gültige Endkonfiguration; Spieler dürfen probieren, zähle Versuche oder setze eine Belastungs-Uhr.</p>`,
+      `<p><strong>Spielleitung:</strong> Notiere dir eine gültige Endkonfiguration; Spielende dürfen probieren, zähle Versuche oder setze eine Belastungs-Uhr.</p>`,
     ].join('');
     return { html, aufgabenstellung };
   }

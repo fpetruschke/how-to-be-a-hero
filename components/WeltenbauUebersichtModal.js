@@ -223,7 +223,7 @@ var HTBAH_REFACTOR_UTILS =
           prevLpSnapshot: 0,
           fenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
         },
-        spielleiterTick: 0,
+        spielleitungTick: 0,
         interaktiveWeltStatsAnzeigen:
           window.HTBAH && typeof window.HTBAH.ladeInteraktiveWeltStatsAnzeigen === 'function'
             ? window.HTBAH.ladeInteraktiveWeltStatsAnzeigen()
@@ -295,8 +295,8 @@ var HTBAH_REFACTOR_UTILS =
       },
       gruppen() {
         // Recompute when local game-master state was persisted from this modal.
-        void this.spielleiterTick;
-        return (window.HTBAH.ladeSpielleiterZustand().gruppen || []).filter(Boolean);
+        void this.spielleitungTick;
+        return (window.HTBAH.ladeSpielleitungZustand().gruppen || []).filter(Boolean);
       },
       aktiveGruppe() {
         return this.gruppen.find((g) => g.id === this.gruppeId) || null;
@@ -3055,7 +3055,7 @@ var HTBAH_REFACTOR_UTILS =
         if (!mitgliedId || !this.gruppeId || typeof updater !== 'function') {
           return false;
         }
-        const zustand = window.HTBAH.ladeSpielleiterZustand();
+        const zustand = window.HTBAH.ladeSpielleitungZustand();
         const gruppe = (zustand.gruppen || []).find((g) => g && g.id === this.gruppeId);
         if (!gruppe || !Array.isArray(gruppe.mitglieder)) {
           return false;
@@ -3071,8 +3071,8 @@ var HTBAH_REFACTOR_UTILS =
           ...mitglied,
           charakter: nextCharakter || charakter,
         };
-        window.HTBAH.speichereSpielleiterZustand(zustand);
-        this.spielleiterTick += 1;
+        window.HTBAH.speichereSpielleitungZustand(zustand);
+        this.spielleitungTick += 1;
         return true;
       },
       wendeDropVerknuepfungAn(sourceNode, targetNode) {
@@ -3663,7 +3663,7 @@ var HTBAH_REFACTOR_UTILS =
         if (!mitgliedId || !this.gruppeId) {
           return;
         }
-        const sl = window.HTBAH.ladeSpielleiterZustand();
+        const sl = window.HTBAH.ladeSpielleitungZustand();
         const gruppe = (sl.gruppen || []).find((g) => g && g.id === this.gruppeId);
         if (!gruppe || !Array.isArray(gruppe.mitglieder)) {
           return;
@@ -3717,20 +3717,20 @@ var HTBAH_REFACTOR_UTILS =
         if (!(await this.bestaetigeVerlassenMitUngespeichert())) {
           return;
         }
-        const zustand = window.HTBAH.ladeSpielleiterZustand();
+        const zustand = window.HTBAH.ladeSpielleitungZustand();
         zustand.aktiveKampagneId = this.gruppeId;
         zustand.mitgliedWahlProKampagne = {
           ...(zustand.mitgliedWahlProKampagne || {}),
           [this.gruppeId]: mitgliedId,
         };
-        window.HTBAH.speichereSpielleiterZustand(zustand);
+        window.HTBAH.speichereSpielleitungZustand(zustand);
         this.schliesseAlleBearbeitungsModalsOhnePruefung();
         this.$emit('schliessen');
         if (this.$router && typeof this.$router.push === 'function') {
           const ziel =
             window.HTBAH && typeof window.HTBAH.kampagnenPfad === 'function'
               ? window.HTBAH.kampagnenPfad('gruppe', this.gruppeId)
-              : '/spielleiter';
+              : '/kampagnen';
           const nav = this.$router.push(ziel);
           if (nav && typeof nav.catch === 'function') {
             nav.catch(() => {});
@@ -4024,11 +4024,11 @@ var HTBAH_REFACTOR_UTILS =
       },
       onKampagneDatenExternGeaendert(ev) {
         const d = ev && ev.detail ? ev.detail : {};
-        if (d.art === 'spielleiter') {
+        if (d.art === 'spielleitung') {
           if (d.kampagneId && this.gruppeId && d.kampagneId !== this.gruppeId) {
             return;
           }
-          this.spielleiterTick += 1;
+          this.spielleitungTick += 1;
           if (!this.offen) {
             return;
           }
@@ -4327,7 +4327,7 @@ var HTBAH_REFACTOR_UTILS =
         if (!this.charakterModal.charakter || !this.charakterModal.mitgliedId || !this.gruppeId) {
           return false;
         }
-        const z = window.HTBAH.ladeSpielleiterZustand();
+        const z = window.HTBAH.ladeSpielleitungZustand();
         const g = (z.gruppen || []).find((gr) => gr && gr.id === this.gruppeId);
         if (!g || !Array.isArray(g.mitglieder)) {
           return false;
@@ -4371,8 +4371,8 @@ var HTBAH_REFACTOR_UTILS =
           ...g.mitglieder[idx],
           charakter,
         };
-        window.HTBAH.speichereSpielleiterZustand(z);
-        this.spielleiterTick += 1;
+        window.HTBAH.speichereSpielleitungZustand(z);
+        this.spielleitungTick += 1;
         this.setzeCharakterModalSnapshot();
         this.refreshGraph();
         if (schliessenNachSpeichern) {

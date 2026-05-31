@@ -1,5 +1,5 @@
 /**
- * Felddefinitionen für Entitäts-Detailansichten (Zufallstabellen + Spielleiter-PDF).
+ * Felddefinitionen für Entitäts-Detailansichten (Zufallstabellen + Spielleitung-PDF).
  */
 window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 

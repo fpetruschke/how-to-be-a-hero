@@ -186,23 +186,23 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const p = this.$route.path || '';
       return p === '/';
     },
-    spielleiterKampagnenAktiv() {
+    spielleitungKampagnenAktiv() {
       const p = this.$route.path || '';
-      return p === '/spielleiter' || p.startsWith('/spielleiter/kampagne/');
+      return p === '/kampagnen' || p.startsWith('/kampagnen/');
     },
     aktiveKampagneId() {
       void this.$route.fullPath;
-      const z = window.HTBAH.ladeSpielleiterZustand();
+      const z = window.HTBAH.ladeSpielleitungZustand();
       return typeof z.aktiveKampagneId === 'string' && z.aktiveKampagneId ? z.aktiveKampagneId : '';
     },
     istInKampagneRoute() {
       const p = this.$route.path || '';
-      return /^\/spielleiter\/kampagne\/[^/]+/.test(p) || /^\/kampagne\/[^/]+/.test(p);
+      return /^\/kampagnen\/[^/]+/.test(p);
     },
     hatAktiveKampagne() {
       return this.istInKampagneRoute && !!this.aktiveKampagneId;
     },
-    hatSpielleiterKampagneGewaehlt() {
+    hatSpielleitungKampagneGewaehlt() {
       return !!this.aktiveKampagneId;
     },
     presetVerwaltungAktiv() {
@@ -409,10 +409,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     aktiveKampagne() {
       const id = typeof this.aktiveKampagneId === 'string' ? this.aktiveKampagneId.trim() : '';
-      if (!id || !window.HTBAH || typeof window.HTBAH.ladeSpielleiterZustand !== 'function') {
+      if (!id || !window.HTBAH || typeof window.HTBAH.ladeSpielleitungZustand !== 'function') {
         return null;
       }
-      const sl = window.HTBAH.ladeSpielleiterZustand();
+      const sl = window.HTBAH.ladeSpielleitungZustand();
       const liste = Array.isArray(sl.kampagnen) ? sl.kampagnen : [];
       return liste.find((k) => k && k.id === id) || null;
     },
@@ -1968,11 +1968,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         schleierHtml: typeof neueWerte?.schleierHtml === 'string' ? neueWerte.schleierHtml : '',
       };
       if (this.rolle === 'spielleitung' && this.aktiveKampagneId) {
-        const sl = window.HTBAH.ladeSpielleiterZustand();
+        const sl = window.HTBAH.ladeSpielleitungZustand();
         const kampagne = (sl.kampagnen || []).find((k) => k && k.id === this.aktiveKampagneId);
         if (kampagne) {
           kampagne.sicherheitsmechanismen = { ...daten };
-          window.HTBAH.speichereSpielleiterZustand(sl);
+          window.HTBAH.speichereSpielleitungZustand(sl);
         }
         return;
       }
@@ -2411,10 +2411,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </template>
             <template v-else-if="rolle === 'spielleitung'">
               <router-link
-                to="/spielleiter"
+                to="/kampagnen"
                 title="Kampagnen"
                 class="htbah-nav-item"
-                :class="{ 'router-link-active': spielleiterKampagnenAktiv }">
+                :class="{ 'router-link-active': spielleitungKampagnenAktiv }">
                 <span class="htbah-nav-item-emoji" aria-hidden="true">🗂️</span>
                 <span class="htbah-nav-item-label">Kampagnen</span>
               </router-link>
@@ -2502,9 +2502,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               🏠
             </router-link>
             <router-link
-              to="/spielleiter"
+              to="/kampagnen"
               title="Kampagnen"
-              :class="{ 'router-link-active': spielleiterKampagnenAktiv }">
+              :class="{ 'router-link-active': spielleitungKampagnenAktiv }">
               🗂️
             </router-link>
             <router-link

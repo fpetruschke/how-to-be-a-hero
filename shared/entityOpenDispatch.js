@@ -14,7 +14,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   function kampagnenTabAusRoute(route) {
     const path = route && typeof route.path === 'string' ? route.path : '';
     const parts = path.split('/').filter(Boolean);
-    if (parts.length >= 3 && parts[0] === 'kampagne') {
+    if (parts.length >= 3 && parts[0] === 'kampagnen') {
       return parts[2];
     }
     return '';

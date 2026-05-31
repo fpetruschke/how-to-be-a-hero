@@ -57,8 +57,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
   function ermittleVerfuegbarkeit(kampagneId) {
     const fn =
-      window.HTBAH && typeof window.HTBAH.ermittleSpielleiterPdfVerfuegbarkeit === 'function'
-        ? window.HTBAH.ermittleSpielleiterPdfVerfuegbarkeit
+      window.HTBAH && typeof window.HTBAH.ermittleSpielleitungPdfVerfuegbarkeit === 'function'
+        ? window.HTBAH.ermittleSpielleitungPdfVerfuegbarkeit
         : null;
     if (!fn || !kampagneId) {
       return { ...LEER_VERFUEGBAR };
@@ -76,7 +76,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     return auswahl;
   }
 
-  window.HTBAH_KOMPONENTEN.SpielleiterPdfExportModal = {
+  window.HTBAH_KOMPONENTEN.SpielleitungPdfExportModal = {
     components: {
       CharakterPdfModal: window.HTBAH_KOMPONENTEN.CharakterPdfModal,
     },
@@ -105,6 +105,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         progressProzent: 0,
         progressSchritt: 0,
         progressSchritteGesamt: 0,
+        progressAktivitaet: '',
+        progressLog: '',
+        fortschrittTooltipText: '',
+        fortschrittTooltipStyle: null,
+        fortschrittTooltipTimer: null,
+        consoleHooks: null,
       };
     },
     computed: {
@@ -183,6 +189,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     },
     beforeUnmount() {
       this.revokeBlobUrl();
+      this.entferneConsoleHooks();
     },
     methods: {
       revokeBlobUrl() {
@@ -202,6 +209,119 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.progressProzent = 0;
         this.progressSchritt = 0;
         this.progressSchritteGesamt = 0;
+        this.progressAktivitaet = '';
+        this.progressLog = '';
+        this.fortschrittTooltipSchliessen();
+      },
+      setzeProgressLog(text) {
+        this.progressLog = typeof text === 'string' ? text : String(text);
+      },
+      formatiereConsoleArgs(args) {
+        if (!args || !args.length) {
+          return '';
+        }
+        return args
+          .map((arg) => {
+            if (typeof arg === 'string') {
+              return arg;
+            }
+            if (arg instanceof Error) {
+              return arg.message || String(arg);
+            }
+            try {
+              return JSON.stringify(arg);
+            } catch {
+              return String(arg);
+            }
+          })
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      },
+      fortschrittTooltipSchliessen() {
+        if (this.fortschrittTooltipTimer) {
+          clearTimeout(this.fortschrittTooltipTimer);
+          this.fortschrittTooltipTimer = null;
+        }
+        this.fortschrittTooltipText = '';
+        this.fortschrittTooltipStyle = null;
+      },
+      fortschrittTooltipVerzoegertSchliessen() {
+        if (this.fortschrittTooltipTimer) {
+          clearTimeout(this.fortschrittTooltipTimer);
+        }
+        this.fortschrittTooltipTimer = window.setTimeout(() => {
+          this.fortschrittTooltipSchliessen();
+        }, 250);
+      },
+      fortschrittTooltipPositionieren(text, evt, autoHideMs) {
+        const roh = typeof text === 'string' ? text.trim() : '';
+        if (!roh || roh === '\u00a0') {
+          this.fortschrittTooltipSchliessen();
+          return;
+        }
+        const ziel = evt && evt.currentTarget instanceof HTMLElement ? evt.currentTarget : null;
+        if (!ziel) {
+          return;
+        }
+        if (this.fortschrittTooltipTimer) {
+          clearTimeout(this.fortschrittTooltipTimer);
+          this.fortschrittTooltipTimer = null;
+        }
+        const rect = ziel.getBoundingClientRect();
+        const maxBreite = Math.min(window.innerWidth - 16, Math.max(rect.width, 280));
+        this.fortschrittTooltipText = roh;
+        this.fortschrittTooltipStyle = {
+          left: `${Math.max(8, Math.min(rect.left, window.innerWidth - maxBreite - 8))}px`,
+          top: `${Math.max(8, rect.top - 6)}px`,
+          maxWidth: `${maxBreite}px`,
+          transform: 'translateY(-100%)',
+        };
+        const hideMs = typeof autoHideMs === 'number' && autoHideMs > 0 ? autoHideMs : 0;
+        if (hideMs) {
+          this.fortschrittTooltipTimer = window.setTimeout(() => {
+            this.fortschrittTooltipSchliessen();
+          }, hideMs);
+        }
+      },
+      fortschrittZeileTooltip(text, evt) {
+        const autoHide = evt && evt.type === 'touchstart' ? 5000 : 0;
+        this.fortschrittTooltipPositionieren(text, evt, autoHide);
+      },
+      installiereConsoleHooks() {
+        this.entferneConsoleHooks();
+        const origDebug = console.debug;
+        const origLog = console.log;
+        const origInfo = console.info;
+        const origWarn = console.warn;
+        const origError = console.error;
+        const hook =
+          (fn) =>
+          (...args) => {
+            fn.apply(console, args);
+            const msg = this.formatiereConsoleArgs(args);
+            if (msg) {
+              this.setzeProgressLog(msg);
+            }
+          };
+        console.debug = hook(origDebug);
+        console.log = hook(origLog);
+        console.info = hook(origInfo);
+        console.warn = hook(origWarn);
+        console.error = hook(origError);
+        this.consoleHooks = { origDebug, origLog, origInfo, origWarn, origError };
+      },
+      entferneConsoleHooks() {
+        if (!this.consoleHooks) {
+          return;
+        }
+        console.debug = this.consoleHooks.origDebug;
+        console.log = this.consoleHooks.origLog;
+        console.info = this.consoleHooks.origInfo;
+        console.warn = this.consoleHooks.origWarn;
+        console.error = this.consoleHooks.origError;
+        this.consoleHooks = null;
+        this.fortschrittTooltipSchliessen();
       },
       oeffnen() {
         this.verfuegbar = ermittleVerfuegbarkeit(this.kampagneId);
@@ -220,6 +340,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.progressProzent = 0;
         this.progressSchritt = 0;
         this.progressSchritteGesamt = 0;
+        this.progressAktivitaet = '';
+        this.progressLog = '';
         this.offen = true;
         this.$nextTick(() => this.aktualisiereAlleCheckboxIndeterminate());
       },
@@ -247,15 +369,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       setzeProgress(info) {
         if (info && typeof info === 'object') {
-          this.statusText = typeof info.text === 'string' ? info.text : '';
+          if (typeof info.text === 'string' && info.text) {
+            this.progressAktivitaet = info.text;
+          }
           this.progressProzent =
             typeof info.percent === 'number' ? Math.min(100, Math.max(0, info.percent)) : 0;
           this.progressSchritt = typeof info.current === 'number' ? info.current : 0;
           this.progressSchritteGesamt = typeof info.total === 'number' ? info.total : 0;
           return;
         }
-        if (typeof info === 'string') {
-          this.statusText = info;
+        if (typeof info === 'string' && info) {
+          this.progressAktivitaet = info;
         }
       },
       schliessen() {
@@ -278,19 +402,22 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       async exportStarten() {
         const fn =
-          window.HTBAH && typeof window.HTBAH.erzeugeSpielleiterPdfBlob === 'function'
-            ? window.HTBAH.erzeugeSpielleiterPdfBlob
+          window.HTBAH && typeof window.HTBAH.erzeugeSpielleitungPdfBlob === 'function'
+            ? window.HTBAH.erzeugeSpielleitungPdfBlob
             : null;
         if (!fn || !this.kannExportieren) {
           return;
         }
         this.laedt = true;
-        this.statusText = 'PDF wird erstellt …';
+        this.statusText = '';
         this.progressProzent = 0;
         this.progressSchritt = 0;
         this.progressSchritteGesamt = 0;
+        this.progressAktivitaet = 'PDF wird erstellt …';
+        this.progressLog = '';
         this.pdfVorschauOffen = false;
         this.revokeBlobUrl();
+        this.installiereConsoleHooks();
         this.scrollZuFortschritt();
         try {
           const { blob, dateiname } = await fn(this.kampagneId, {
@@ -304,13 +431,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             sicherheitsmechanismen: this.sicherheitsmechanismen,
             onProgress: (info) => {
               this.setzeProgress(info);
-              this.scrollZuFortschritt();
             },
           });
           this.pdfBlobUrl = URL.createObjectURL(blob);
           this.pdfDateiname = dateiname;
           this.progressProzent = 100;
-          this.statusText = 'Fertig — Vorschau, Download oder Modal schließen.';
+          this.progressAktivitaet = 'Fertig.';
+          this.progressLog = '';
           this.scrollZuFortschritt();
           this.$emit('fertig', { dateiname });
         } catch (e) {
@@ -319,11 +446,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.progressProzent = 0;
           this.progressSchritt = 0;
           this.progressSchritteGesamt = 0;
+          this.progressAktivitaet = '';
+          this.progressLog = '';
           await window.HTBAH.ui.alert({
             titel: 'PDF-Export fehlgeschlagen',
             beschreibung: e && e.message ? e.message : 'Das PDF konnte nicht erzeugt werden.',
           });
         } finally {
+          this.entferneConsoleHooks();
           this.laedt = false;
         }
       },
@@ -339,7 +469,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         const a = document.createElement('a');
         a.href = this.pdfBlobUrl;
-        a.download = this.pdfDateiname || 'htbah-spielleiter.pdf';
+        a.download = this.pdfDateiname || 'htbah-spielleitung.pdf';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -530,14 +660,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             </template>
 
             <div
-              v-if="laedt || statusText"
+              v-if="laedt || progressAktivitaet"
               ref="fortschrittAnker"
               class="htbah-sl-pdf-export-fortschritt border-top pt-3 mt-2">
               <div v-if="laedt" class="d-flex justify-content-between align-items-center small mb-1">
-                <span class="text-body-secondary">{{ statusText || 'PDF wird erstellt …' }}</span>
+                <span class="text-body-secondary">PDF wird erstellt …</span>
                 <span class="fw-semibold tabular-nums">{{ progressProzent }}%</span>
               </div>
-              <p v-else-if="statusText" class="small text-body-secondary mb-2">{{ statusText }}</p>
               <div
                 v-if="laedt"
                 class="progress mb-0"
@@ -551,9 +680,25 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   class="progress-bar progress-bar-striped progress-bar-animated"
                   :style="{ width: progressProzent + '%' }"></div>
               </div>
-              <p v-if="laedt && progressSchritteGesamt > 0" class="small text-body-secondary mb-0 mt-1">
-                Schritt {{ progressSchritt }} von {{ progressSchritteGesamt }}
-              </p>
+              <p
+                class="htbah-sl-pdf-export-fortschritt-zeile small text-body-secondary mb-0 mt-2"
+                aria-live="polite"
+                aria-atomic="true"
+                :title="progressAktivitaet || ''"
+                @mouseenter="fortschrittZeileTooltip(progressAktivitaet, $event)"
+                @mouseleave="fortschrittTooltipVerzoegertSchliessen"
+                @touchstart.passive="fortschrittZeileTooltip(progressAktivitaet, $event)">{{ progressAktivitaet || '\u00a0' }}</p>
+              <p
+                class="htbah-sl-pdf-export-fortschritt-log small text-body-secondary mb-0 mt-1"
+                :title="progressLog || ''"
+                @mouseenter="fortschrittZeileTooltip(progressLog, $event)"
+                @mouseleave="fortschrittTooltipVerzoegertSchliessen"
+                @touchstart.passive="fortschrittZeileTooltip(progressLog, $event)">{{ progressLog || '\u00a0' }}</p>
+              <div
+                v-if="fortschrittTooltipText"
+                class="htbah-sl-pdf-export-fortschritt-tooltip"
+                :style="fortschrittTooltipStyle"
+                role="tooltip">{{ fortschrittTooltipText }}</div>
             </div>
           </div>
           <div class="card-footer htbah-sl-pdf-export-modal-footer py-2">
@@ -566,13 +711,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   <span class="material-symbols-outlined" aria-hidden="true" style="font-size:1.15rem;line-height:1;">visibility</span>
                   Vorschau
                 </button>
-                <button
+                <icon-text-button
                   type="button"
-                  class="btn btn-success d-inline-flex align-items-center gap-1"
+                  class="btn btn-outline-primary"
+                  icon="download"
                   @click="downloadPdf">
-                  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:1.15rem;line-height:1;">download</span>
                   Herunterladen
-                </button>
+                </icon-text-button>
               </template>
               <button
                 v-else

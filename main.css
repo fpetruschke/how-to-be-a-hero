@@ -2082,6 +2082,42 @@ input::placeholder {
   scroll-margin-bottom: 0.75rem;
 }
 
+.htbah-sl-pdf-export-fortschritt-zeile,
+.htbah-sl-pdf-export-fortschritt-log {
+  min-height: 1.25rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+  touch-action: manipulation;
+}
+
+.htbah-sl-pdf-export-fortschritt-log {
+  opacity: 0.85;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+.htbah-sl-pdf-export-fortschritt-tooltip {
+  position: fixed;
+  z-index: calc(var(--htbah-z-modal-base, 1050) + 20);
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.375rem;
+  background: var(--card-bg, var(--bs-body-bg));
+  color: var(--bs-body-color);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-all;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
 /* Würfelbeutel: schwebend ohne Backdrop, über der unteren Navigation */
 .htbah-wuerfel-beutel-layer {
   z-index: var(--htbah-z-modal-wuerfel);
@@ -2518,7 +2554,7 @@ input::placeholder {
   font-size: 0.8125rem;
 }
 
-/* Spielleiter: Abenteuerbuch (FAB + Quill im schwebenden Fenster) */
+/* Spielleitung: Abenteuerbuch (FAB + Quill im schwebenden Fenster) */
 .abenteuerbuch-modal-window.card {
   padding: 0;
 }
@@ -4115,7 +4151,7 @@ input::placeholder {
   height: 1rem;
 }
 
-/* Spielleiter-Gruppe: Statusfarbgebung für Charakter-Pills */
+/* Spielleitung-Gruppe: Statusfarbgebung für Charakter-Pills */
 .htbah-weltenbau-pill-tab.htbah-sl-pill-status-bewusstlos {
   border-color: rgba(245, 158, 11, 0.5);
   background: rgba(245, 158, 11, 0.14);

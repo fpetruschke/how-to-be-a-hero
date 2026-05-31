@@ -19,9 +19,9 @@ window.HTBAH_SEITEN.Charakter = {
     CharakterVorlageModal: window.HTBAH_KOMPONENTEN.CharakterVorlageModal,
   },
   props: {
-    spielleiterMitglied: { type: Object, default: null },
+    spielleitungMitglied: { type: Object, default: null },
     aktiveKampagneId: { type: String, default: '' },
-    onSpielleiterPersist: { type: Function, default: null },
+    onSpielleitungPersist: { type: Function, default: null },
   },
   data() {
     return {
@@ -98,7 +98,7 @@ window.HTBAH_SEITEN.Charakter = {
       return HTBAH_CHARAKTER_UTILS ? HTBAH_CHARAKTER_UTILS.GEISTESBLITZ_INFO_ZEILEN : [];
     },
     charakter() {
-      return this.spielleiterMitglied ? this.spielleiterMitglied.charakter : this.charakterLokal;
+      return this.spielleitungMitglied ? this.spielleitungMitglied.charakter : this.charakterLokal;
     },
     /** Namen aus der Pantheon-Tabelle (Zufallstabellen) für das Glaube-Feld */
     pantheonGlaubeNamen() {
@@ -113,8 +113,8 @@ window.HTBAH_SEITEN.Charakter = {
       }
     },
     charakterBild() {
-      return this.spielleiterMitglied
-        ? this.spielleiterMitglied.charakterBild
+      return this.spielleitungMitglied
+        ? this.spielleitungMitglied.charakterBild
         : this.charakterBildLokal;
     },
     charakterBildFehlt() {
@@ -127,10 +127,10 @@ window.HTBAH_SEITEN.Charakter = {
       return Math.max(0, this.punkte - 400);
     },
     istNeuModus() {
-      return !this.spielleiterMitglied && this.charakterId === null;
+      return !this.spielleitungMitglied && this.charakterId === null;
     },
     istEditModus() {
-      return !this.spielleiterMitglied && this.charakterId !== null;
+      return !this.spielleitungMitglied && this.charakterId !== null;
     },
     speicherButtonText() {
       return this.istEditModus ? 'Änderungen speichern' : 'Charakter speichern';
@@ -193,17 +193,17 @@ window.HTBAH_SEITEN.Charakter = {
     },
     zeigeAktuellePositionButton() {
       const pfad = this.$route && typeof this.$route.path === 'string' ? this.$route.path : '';
-      return !!(this.spielleiterMitglied && this.aktiveKampagneId && pfad.startsWith('/kampagne/'));
+      return !!(this.spielleitungMitglied && this.aktiveKampagneId && pfad.startsWith('/kampagnen/'));
     },
     /** Begabung Handeln (0–40) für Initiative-Obergrenze wie im Weltenbau */
-    spielleiterInitiativeBegabungHandelnGekappt() {
+    spielleitungInitiativeBegabungHandelnGekappt() {
       return Math.min(40, Math.max(0, Math.round(this.summen.handeln / 10)));
     },
-    spielleiterInitiativeMax() {
-      return Math.max(1, 10 + this.spielleiterInitiativeBegabungHandelnGekappt);
+    spielleitungInitiativeMax() {
+      return Math.max(1, 10 + this.spielleitungInitiativeBegabungHandelnGekappt);
     },
     zeigtKampfZustandToggle() {
-      return !!this.spielleiterMitglied;
+      return !!this.spielleitungMitglied;
     },
     kampfZustandOptionen() {
       return [
@@ -243,7 +243,7 @@ window.HTBAH_SEITEN.Charakter = {
   },
   watch: {
     '$route.fullPath'() {
-      if (!this.spielleiterMitglied) {
+      if (!this.spielleitungMitglied) {
         this.initialisiereCharakterAusRoute();
         if (
           this.istNeuModus &&
@@ -255,7 +255,7 @@ window.HTBAH_SEITEN.Charakter = {
         }
         this.aktualisiereAktivesSpielBegonnenAusRoute();
       }
-      this.zeigePresetAktionen = !this.spielleiterMitglied && this.istSetupTabAktiv;
+      this.zeigePresetAktionen = !this.spielleitungMitglied && this.istSetupTabAktiv;
     },
     charakter: {
       deep: true,
@@ -269,10 +269,10 @@ window.HTBAH_SEITEN.Charakter = {
             this._prevLpSnapshot = this.normalisiereLp(this.charakter.lebenspunkte);
           }
         }
-        if (this.spielleiterMitglied) {
-          this.onSpielleiterPersist?.();
+        if (this.spielleitungMitglied) {
+          this.onSpielleitungPersist?.();
         }
-        if (!this.spielleiterMitglied && this.istEditModus) {
+        if (!this.spielleitungMitglied && this.istEditModus) {
           this.autosaveEinplanen();
         }
         if (!this._lpEingabeAktiv) {
@@ -300,14 +300,14 @@ window.HTBAH_SEITEN.Charakter = {
       },
     },
     charakterId() {
-      if (!this.spielleiterMitglied) {
+      if (!this.spielleitungMitglied) {
         this.aktualisiereAktivenCharakterKontext();
       }
     },
   },
   methods: {
     merkeAktivesSpielBegonnen() {
-      if (this.spielleiterMitglied || this.charakter.aktivesSpielBegonnen) {
+      if (this.spielleitungMitglied || this.charakter.aktivesSpielBegonnen) {
         return;
       }
       this.charakter.aktivesSpielBegonnen = true;
@@ -322,7 +322,7 @@ window.HTBAH_SEITEN.Charakter = {
       }
     },
     initialisiereCharakterAusRoute() {
-      if (this.spielleiterMitglied) {
+      if (this.spielleitungMitglied) {
         return;
       }
       this._autosaveTemporarAussetzen = true;
@@ -407,7 +407,7 @@ window.HTBAH_SEITEN.Charakter = {
     },
     autosaveEinplanen() {
       if (
-        this.spielleiterMitglied ||
+        this.spielleitungMitglied ||
         !this.istEditModus ||
         !this.charakterId ||
         this._autosaveTemporarAussetzen
@@ -427,7 +427,7 @@ window.HTBAH_SEITEN.Charakter = {
     autosaveAusfuehren() {
       this.autosaveTimeoutId = null;
       if (
-        this.spielleiterMitglied ||
+        this.spielleitungMitglied ||
         !this.istEditModus ||
         !this.charakterId ||
         this._autosaveTemporarAussetzen
@@ -452,11 +452,11 @@ window.HTBAH_SEITEN.Charakter = {
       this.autosaveHinweis = `Automatisch gespeichert (${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })})`;
     },
     aktualisiereAktivenCharakterKontext() {
-      if (this.spielleiterMitglied) {
+      if (this.spielleitungMitglied) {
         window.HTBAH._aktiverCharakterKontext = {
-          typ: 'spielleiter',
+          typ: 'spielleitung',
           getCharakter: () => this.charakter,
-          speichern: () => this.onSpielleiterPersist?.(),
+          speichern: () => this.onSpielleitungPersist?.(),
         };
         window.HTBAH._aktiverCharakterKontextQuelle = this;
         return;
@@ -478,8 +478,8 @@ window.HTBAH_SEITEN.Charakter = {
       window.HTBAH._aktiverCharakterKontextQuelle = this;
     },
     speichereCharakterFormular() {
-      if (this.spielleiterMitglied) {
-        this.onSpielleiterPersist?.();
+      if (this.spielleitungMitglied) {
+        this.onSpielleitungPersist?.();
         return;
       }
       const warEditModus = this.istEditModus;
@@ -682,20 +682,20 @@ window.HTBAH_SEITEN.Charakter = {
       const max = Math.max(1, 10 + this.normalisiereBegabungswertFuerInitiative(begabungswertHandeln));
       return String(Math.max(1, Math.min(max, parsed)));
     },
-    spielleiterInitiativeWuerfeln() {
-      if (!this.spielleiterMitglied || !this.charakter) {
+    spielleitungInitiativeWuerfeln() {
+      if (!this.spielleitungMitglied || !this.charakter) {
         return;
       }
       const handelnSumme = this.summen.handeln;
       const handelnBegabungswert = Math.max(0, Math.round(handelnSumme / 10));
-      this.$refs.spielleiterInitiativeWuerfelbecher?.wuerfeln('1W10').then((werte) => {
+      this.$refs.spielleitungInitiativeWuerfelbecher?.wuerfeln('1W10').then((werte) => {
         const wurf = Array.isArray(werte) && werte.length ? Number(werte[0]) || 1 : 1;
         const gesamt = wurf + handelnBegabungswert;
         this.charakter.initiative = this.normalisiereInitiativeWert(gesamt, handelnBegabungswert);
       });
     },
-    async spielleiterInitiativeZuruecksetzen() {
-      if (!this.spielleiterMitglied || !this.charakter) {
+    async spielleitungInitiativeZuruecksetzen() {
+      if (!this.spielleitungMitglied || !this.charakter) {
         return;
       }
       const bestaetigt = await window.HTBAH.ui.confirm({
@@ -1155,12 +1155,12 @@ window.HTBAH_SEITEN.Charakter = {
     },
     setzeCharakterBild(url) {
       const dataUrl = typeof url === 'string' ? url : '';
-      if (this.spielleiterMitglied) {
-        this.spielleiterMitglied.charakterBild = dataUrl;
+      if (this.spielleitungMitglied) {
+        this.spielleitungMitglied.charakterBild = dataUrl;
       } else {
         this.charakterBildLokal = dataUrl;
       }
-      this.onSpielleiterPersist?.();
+      this.onSpielleitungPersist?.();
     },
     charakterJsonExportieren() {
       const paket = window.HTBAH.erstelleCharakterExportPaket(this.charakter, this.charakterBild);
@@ -1286,7 +1286,7 @@ window.HTBAH_SEITEN.Charakter = {
         modus: 'begabung',
         basiswert: zielwert,
         zielwert,
-        zeigtModifikator: !!this.spielleiterMitglied,
+        zeigtModifikator: !!this.spielleitungMitglied,
         basisLabel: 'Begabung ' + this.kategorieAnzeige(kategorie),
         titel: 'Probe: Begabung ' + this.kategorieAnzeige(kategorie),
         untertitel:
@@ -1315,7 +1315,7 @@ window.HTBAH_SEITEN.Charakter = {
         modus: 'faehigkeit',
         basiswert: z,
         zielwert: z,
-        zeigtModifikator: !!this.spielleiterMitglied,
+        zeigtModifikator: !!this.spielleitungMitglied,
         basisLabel: 'Effektivwert ' + faehigkeit.name,
         titel: 'Probe: ' + faehigkeit.name,
         untertitel,
@@ -1340,7 +1340,7 @@ window.HTBAH_SEITEN.Charakter = {
         });
         return;
       }
-      const istKampagnenModus = !!(this.spielleiterMitglied && this.aktiveKampagneId);
+      const istKampagnenModus = !!(this.spielleitungMitglied && this.aktiveKampagneId);
       if (!istKampagnenModus) {
         await window.HTBAH.ui.alert({
           titel: 'Keine Kampagne aktiv',
@@ -1353,7 +1353,7 @@ window.HTBAH_SEITEN.Charakter = {
         typeof this.aktiveKampagneId === 'string' ? this.aktiveKampagneId.trim() : '';
       oeffneEntitaet({
         entityType: 'charakter',
-        entityId: this.spielleiterMitglied.id,
+        entityId: this.spielleitungMitglied.id,
         openMode: 'focus',
         kampagneId,
       });
@@ -1371,16 +1371,16 @@ window.HTBAH_SEITEN.Charakter = {
     },
   },
   template: `
-    <div :class="spielleiterMitglied ? 'content py-3' : 'container content py-3'">
-      <h4 v-if="!spielleiterMitglied" class="text-center mb-3 htbah-page-title">
+    <div :class="spielleitungMitglied ? 'content py-3' : 'container content py-3'">
+      <h4 v-if="!spielleitungMitglied" class="text-center mb-3 htbah-page-title">
         <span class="htbah-page-title-emoji" aria-hidden="true">🧙</span>
         <span>{{ istEditModus ? 'Charakter bearbeiten' : 'Neuen Charakter erstellen' }}</span>
       </h4>
-      <p v-if="!spielleiterMitglied && istEditModus" class="small text-body-secondary text-center mt-n2 mb-2">
+      <p v-if="!spielleitungMitglied && istEditModus" class="small text-body-secondary text-center mt-n2 mb-2">
         Session Zero, aktives Spiel und Daten in einem durchgehenden Flow.
       </p>
       <div
-        v-if="spielleiterMitglied && (charakterLebenspunkteStatus.tot || charakterLebenspunkteStatus.bewusstlos)"
+        v-if="spielleitungMitglied && (charakterLebenspunkteStatus.tot || charakterLebenspunkteStatus.bewusstlos)"
         class="htbah-sl-charakter-lp-status-sticky mb-3"
         :class="charakterLebenspunkteStatus.tot ? 'htbah-lp-status-tot' : 'htbah-lp-status-bewusstlos'"
         role="status"
@@ -1401,7 +1401,7 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div v-if="!spielleiterMitglied && istNeuModus" class="card p-3 mb-2">
+      <div v-if="!spielleitungMitglied && istNeuModus" class="card p-3 mb-2">
         <h6 class="mb-2">Blanko-PDF-Export</h6>
         <p class="small text-body-secondary mb-2">
           Exportiert ein leeres Charakterblatt (inkl. Notizen- und Sicherheitsseite), damit Werte handschriftlich eingetragen werden können.
@@ -1432,7 +1432,7 @@ window.HTBAH_SEITEN.Charakter = {
       </div>
 
       <div
-        v-if="!spielleiterMitglied && istNeuModus"
+        v-if="!spielleitungMitglied && istNeuModus"
         class="card p-3 mb-2">
         <h6 class="mb-2">Bestehenden Charakter importieren</h6>
         <p class="small text-body-secondary mb-2">
@@ -1458,12 +1458,12 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div v-if="importHinweis && !spielleiterMitglied && istNeuModus" class="alert alert-secondary py-2 mb-2">
+      <div v-if="importHinweis && !spielleitungMitglied && istNeuModus" class="alert alert-secondary py-2 mb-2">
         {{ importHinweis }}
       </div>
 
       <div
-        v-if="!spielleiterMitglied && istNeuModus"
+        v-if="!spielleitungMitglied && istNeuModus"
         class="alert alert-info mb-2"
         role="note">
         <p class="small mb-0">
@@ -1472,7 +1472,7 @@ window.HTBAH_SEITEN.Charakter = {
       </div>
 
       <ul
-        v-if="!spielleiterMitglied && istEditModus"
+        v-if="!spielleitungMitglied && istEditModus"
         class="nav htbah-weltenbau-pill-tabs mb-2"
         role="tablist"
         aria-label="Charakter Bereiche">
@@ -1507,7 +1507,7 @@ window.HTBAH_SEITEN.Charakter = {
           </button>
         </li>
       </ul>
-      <div v-if="!spielleiterMitglied && istEditModus" class="alert alert-info py-2 px-3 small mb-2" role="note">
+      <div v-if="!spielleitungMitglied && istEditModus" class="alert alert-info py-2 px-3 small mb-2" role="note">
         <span v-if="aktiveCharakterTab === 'setup'">
           Session Zero: Stammdaten, Sicherheitsmechanismen sowie Vor- und Nachteile pflegen.
         </span>
@@ -1519,7 +1519,7 @@ window.HTBAH_SEITEN.Charakter = {
         </span>
       </div>
       <div
-        v-if="!spielleiterMitglied && istEditModus && istSpielTabAktiv"
+        v-if="!spielleitungMitglied && istEditModus && istSpielTabAktiv"
         class="card p-3 mb-2"
         role="region"
         aria-label="Charakter-Übersicht für aktives Spiel">
@@ -1606,7 +1606,7 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div v-if="!spielleiterMitglied && istSetupTabAktiv && !istNeuModus" class="card p-3 mb-2">
+      <div v-if="!spielleitungMitglied && istSetupTabAktiv && !istNeuModus" class="card p-3 mb-2">
         <h5 class="mb-2">Sicherheitsmechanismen</h5>
         <p class="small text-body-secondary mb-2">
           Legt gemeinsam mit der Spielleitung in der Session Zero Grenzen, Schleier und die Nutzung der X-Karte fest.
@@ -1624,7 +1624,7 @@ window.HTBAH_SEITEN.Charakter = {
         </label>
       </div>
 
-      <div v-if="spielleiterMitglied || istNeuModus || istSetupTabAktiv" class="card p-3 mb-2">
+      <div v-if="spielleitungMitglied || istNeuModus || istSetupTabAktiv" class="card p-3 mb-2">
         <div class="row g-3 htbah-charakter-stammdaten-row">
           <div class="col-12 col-lg order-lg-2">
             <div class="mb-3">
@@ -1714,7 +1714,7 @@ window.HTBAH_SEITEN.Charakter = {
                 <datalist v-if="pantheonGlaubeNamen.length" id="ce-char-glaube-datalist">
                   <option v-for="n in pantheonGlaubeNamen" :key="'pgl-' + n" :value="n"></option>
                 </datalist>
-                <div v-if="!spielleiterMitglied" class="d-flex justify-content-end mt-2">
+                <div v-if="!spielleitungMitglied" class="d-flex justify-content-end mt-2">
                   <input
                     ref="pantheonImportInput"
                     type="file"
@@ -1806,7 +1806,7 @@ window.HTBAH_SEITEN.Charakter = {
       </div>
 
       <div
-        v-if="!spielleiterMitglied && istSetupTabAktiv && !istNeuModus"
+        v-if="!spielleitungMitglied && istSetupTabAktiv && !istNeuModus"
         class="card p-3 mb-2">
         <h6 class="mb-2">Charaktervorlage (Epoche)</h6>
         <p class="small text-body-secondary mb-2">
@@ -1822,7 +1822,7 @@ window.HTBAH_SEITEN.Charakter = {
         </icon-text-button>
       </div>
 
-      <div v-if="(spielleiterMitglied || istSetupTabAktiv) && !istNeuModus" class="card p-3 mb-2">
+      <div v-if="(spielleitungMitglied || istSetupTabAktiv) && !istNeuModus" class="card p-3 mb-2">
         <h5 class="mb-2">Vor- &amp; Nachteile</h5>
         <p class="small text-body-secondary mb-3 mb-md-2">
           Jedes Paar besteht aus einem Vorteil (kostet Fähigkeitspunkte) und einem Nachteil
@@ -1868,12 +1868,12 @@ window.HTBAH_SEITEN.Charakter = {
         </p>
       </div>
 
-      <div v-if="spielleiterMitglied || (!istNeuModus && (istSpielTabAktiv || istSetupTabAktiv))" class="card p-2 mb-2">
+      <div v-if="spielleitungMitglied || (!istNeuModus && (istSpielTabAktiv || istSetupTabAktiv))" class="card p-2 mb-2">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <h5 class="mb-0">Fähigkeiten</h5>
           <div class="d-flex align-items-center gap-2">
             <button
-              v-if="!spielleiterMitglied"
+              v-if="!spielleitungMitglied"
               type="button"
               class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
               @click="presetAktionenUmschalten"
@@ -1896,7 +1896,7 @@ window.HTBAH_SEITEN.Charakter = {
           </div>
         </div>
 
-        <div v-if="zeigePresetAktionen && !spielleiterMitglied" id="ce-preset-karte" class="card p-2 mb-2">
+        <div v-if="zeigePresetAktionen && !spielleitungMitglied" id="ce-preset-karte" class="card p-2 mb-2">
           <h6 class="mb-1">Fähigkeiten-Presets importieren</h6>
           <p class="small text-body-secondary mb-2">
             Die Spielleitung kann Dir ein Fähigkeiten-Preset als .json-Datei zukommen lassen.
@@ -1932,14 +1932,14 @@ window.HTBAH_SEITEN.Charakter = {
               ({{ faehigkeitspunkteUeberLimit }} über dem Maximum). Bitte Punkte reduzieren.
             </div>
             <p
-              v-if="punkte < 400 || !( !spielleiterMitglied && istEditModus && istSpielTabAktiv )"
+              v-if="punkte < 400 || !( !spielleitungMitglied && istEditModus && istSpielTabAktiv )"
               class="mb-2">
               Punkte: <strong>{{punkte}}</strong> / 400
               <span class="text-warning">({{400 - punkte}} übrig)</span>
             </p>
 
             <div
-              v-if="punkte < 400 || !( !spielleiterMitglied && istEditModus && istSpielTabAktiv )"
+              v-if="punkte < 400 || !( !spielleitungMitglied && istEditModus && istSpielTabAktiv )"
               class="progress"
               style="height:10px;">
               <div class="progress-bar" :style="{width: (punkte/400*100) + '%'}"></div>
@@ -1947,7 +1947,7 @@ window.HTBAH_SEITEN.Charakter = {
           </div>
 
           <div
-            v-if="!( !spielleiterMitglied && istEditModus && istSetupTabAktiv )"
+            v-if="!( !spielleitungMitglied && istEditModus && istSetupTabAktiv )"
             class="mb-2">
             <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
               <button
@@ -2125,16 +2125,16 @@ window.HTBAH_SEITEN.Charakter = {
           </div>
         </div>
 
-        <div v-if="!( !spielleiterMitglied && istEditModus && istSpielTabAktiv )" class="card p-2">
+        <div v-if="!( !spielleitungMitglied && istEditModus && istSpielTabAktiv )" class="card p-2">
           <h5>Neue Fähigkeit</h5>
           <faehigkeit-formular v-model="neueFaehigkeit" id-prefix="ce-neu" />
           <button class="btn btn-primary w-100 mt-2" @click="faehigkeitHinzufuegen">Hinzufügen</button>
         </div>
       </div>
 
-      <div v-if="spielleiterMitglied || istSpielTabAktiv || istNeuModus" class="card p-3 mb-2">
+      <div v-if="spielleitungMitglied || istSpielTabAktiv || istNeuModus" class="card p-3 mb-2">
         <div class="row g-2">
-          <div v-if="spielleiterMitglied || istSpielTabAktiv" class="col-12">
+          <div v-if="spielleitungMitglied || istSpielTabAktiv" class="col-12">
             <div v-if="zeigtKampfZustandToggle" class="mb-2">
               <label class="form-label small text-secondary mb-1">Zustand</label>
               <div class="btn-group w-100 htbah-kampf-zustand-toggle" role="group" aria-label="Kampfzustand">
@@ -2157,7 +2157,7 @@ window.HTBAH_SEITEN.Charakter = {
             <div class="row g-2">
               <div class="col-12 col-md-4">
                 <icon-text-button
-                  v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
+                  v-if="spielleitungMitglied || (istSpielTabAktiv && !istNeuModus)"
                   type="button"
                   class="btn btn-outline-primary btn-lg w-100"
                   symbol="🎲"
@@ -2167,7 +2167,7 @@ window.HTBAH_SEITEN.Charakter = {
               </div>
               <div class="col-12 col-md-4">
                 <icon-text-button
-                  v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
+                  v-if="spielleitungMitglied || (istSpielTabAktiv && !istNeuModus)"
                   type="button"
                   class="btn btn-outline-primary btn-lg w-100"
                   symbol="💥"
@@ -2177,7 +2177,7 @@ window.HTBAH_SEITEN.Charakter = {
               </div>
               <div class="col-12 col-md-4">
                 <icon-text-button
-                  v-if="spielleiterMitglied || (istSpielTabAktiv && !istNeuModus)"
+                  v-if="spielleitungMitglied || (istSpielTabAktiv && !istNeuModus)"
                   type="button"
                   class="btn btn-outline-primary btn-lg w-100"
                   symbol="🛡️"
@@ -2187,14 +2187,14 @@ window.HTBAH_SEITEN.Charakter = {
               </div>
             </div>
           </div>
-          <div v-if="spielleiterMitglied" class="col-12">
+          <div v-if="spielleitungMitglied" class="col-12">
             <label class="form-label small text-secondary mb-1">Initiative</label>
             <div class="input-group">
               <input
                 class="form-control"
                 type="number"
                 min="1"
-                :max="spielleiterInitiativeMax"
+                :max="spielleitungInitiativeMax"
                 v-model="charakter.initiative"
                 placeholder="z. B. 12"
                 inputmode="numeric"
@@ -2203,7 +2203,7 @@ window.HTBAH_SEITEN.Charakter = {
                 type="button"
                 class="btn btn-outline-primary"
                 title="1W10 + Begabung Handeln"
-                @click="spielleiterInitiativeWuerfeln">
+                @click="spielleitungInitiativeWuerfeln">
                 🎲
               </button>
               <button
@@ -2212,12 +2212,12 @@ window.HTBAH_SEITEN.Charakter = {
                 title="Initiative leeren"
                 aria-label="Initiative leeren"
                 :disabled="!String(charakter.initiative || '').trim()"
-                @click="spielleiterInitiativeZuruecksetzen">
+                @click="spielleitungInitiativeZuruecksetzen">
                 <span class="material-symbols-outlined" aria-hidden="true">close</span>
               </button>
             </div>
             <div class="form-text">
-              Gültig: 1 bis {{ spielleiterInitiativeMax }} (1W10 + Begabung Handeln).
+              Gültig: 1 bis {{ spielleitungInitiativeMax }} (1W10 + Begabung Handeln).
             </div>
           </div>
           <div class="col-12 col-md-6">
@@ -2241,7 +2241,7 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div v-if="!spielleiterMitglied && istNeuModus" class="card p-3 mb-2">
+      <div v-if="!spielleitungMitglied && istNeuModus" class="card p-3 mb-2">
         <p class="small text-body-secondary mb-3 mb-md-0">
           Speichere hier Deinen Charakter als Vorbereitung auf die Session Zero. In dieser wirst Du Deinen Charakter
           weiter ausbauen und dann für Dich und die Spielleitung exportieren können. Beachte, dass die Daten nur in
@@ -2259,21 +2259,21 @@ window.HTBAH_SEITEN.Charakter = {
 
       <div v-if="istEditModus && istVerwaltungTabAktiv" class="card p-3 mb-2">
         <h5 class="mb-2">Verwaltung</h5>
-        <p v-if="!spielleiterMitglied && istEditModus" class="small text-body-secondary mb-2">
+        <p v-if="!spielleitungMitglied && istEditModus" class="small text-body-secondary mb-2">
           Im Bearbeiten-Modus speichert das Formular automatisch nach Änderungen.
         </p>
         <p v-else class="small text-body-secondary mb-3 mb-md-2">
           PDF: kompletter Charakterbogen auf einer DIN-A4-Seite (bei viel Text wird der Inhalt
           zum Ausdrucken verkleinert).
         </p>
-        <p v-if="!spielleiterMitglied && istEditModus && autosaveHinweis" class="small text-success mb-2">
+        <p v-if="!spielleitungMitglied && istEditModus && autosaveHinweis" class="small text-success mb-2">
           {{ autosaveHinweis }}
         </p>
-        <hr v-if="spielleiterMitglied || istEditModus" class="border-secondary border-opacity-25 my-2" />
-        <h6 v-if="!spielleiterMitglied && istEditModus" class="small text-uppercase text-body-secondary mb-2">
+        <hr v-if="spielleitungMitglied || istEditModus" class="border-secondary border-opacity-25 my-2" />
+        <h6 v-if="!spielleitungMitglied && istEditModus" class="small text-uppercase text-body-secondary mb-2">
           Exporte
         </h6>
-        <div v-if="spielleiterMitglied || istEditModus" class="htbah-pdf-export-gruppe mb-2">
+        <div v-if="spielleitungMitglied || istEditModus" class="htbah-pdf-export-gruppe mb-2">
           <icon-text-button
             type="button"
             class="btn btn-outline-primary htbah-pdf-export-gruppe-btn"
@@ -2298,7 +2298,7 @@ window.HTBAH_SEITEN.Charakter = {
           </div>
         </div>
         <hr
-          v-if="(spielleiterMitglied || istEditModus) && !istEditModus"
+          v-if="(spielleitungMitglied || istEditModus) && !istEditModus"
           class="border-secondary border-opacity-25 my-2" />
         <icon-text-button
           v-if="istEditModus"
@@ -2381,7 +2381,7 @@ window.HTBAH_SEITEN.Charakter = {
                 aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
-              <p v-if="!spielleiterMitglied && istEditModus && istSpielTabAktiv">
+              <p v-if="!spielleitungMitglied && istEditModus && istSpielTabAktiv">
                 <strong>Du hast in der Session Zero 400 Punkte auf die Fähigkeiten verteilt.</strong>
               </p>
               <p v-else><strong>Du hast 400 Punkte.</strong> Diese verteilst du auf Fähigkeiten.</p>
@@ -2459,8 +2459,8 @@ window.HTBAH_SEITEN.Charakter = {
         @change="charakterbildDateiAusgewaehlt" />
       <vor-nachteile-modal ref="vorNachteileModal" :charakter="charakter" />
       <initiative-modal ref="initiativeModal" :charakter="charakter" />
-      <div v-if="spielleiterMitglied" class="d-none" aria-hidden="true">
-        <wuerfelbecher-wurf ref="spielleiterInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
+      <div v-if="spielleitungMitglied" class="d-none" aria-hidden="true">
+        <wuerfelbecher-wurf ref="spielleitungInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
       </div>
       <schaden-modal ref="schadenModal" :charakter="charakter" />
       <parade-modal ref="paradeModal" />

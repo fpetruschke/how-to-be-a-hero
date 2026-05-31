@@ -40,7 +40,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
         konflikt: KM ? KM.leererKonfliktZustand() : { teilnehmer: [], aktiverTab: 'auswahl' },
         zufallstabellenTick: 0,
-        spielleiterTick: 0,
+        spielleitungTick: 0,
         suchText: '',
         filterTyp: 'alle',
         speichernTimer: null,
@@ -61,7 +61,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (!id) {
           return '';
         }
-        const sl = window.HTBAH.ladeSpielleiterZustand();
+        const sl = window.HTBAH.ladeSpielleitungZustand();
         const k = (sl.kampagnen || []).find((x) => x && x.id === id);
         return k ? String(k.name || '') : '';
       },
@@ -75,8 +75,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         return window.HTBAH.ladeZufallstabellenZustand(this.kampagneIdEffektiv);
       },
       kampagneGruppe() {
-        void this.spielleiterTick;
-        const sl = window.HTBAH.ladeSpielleiterZustand();
+        void this.spielleitungTick;
+        const sl = window.HTBAH.ladeSpielleitungZustand();
         return (sl.kampagnen || []).find((g) => g && g.id === this.kampagneIdEffektiv) || null;
       },
       katalog() {
@@ -350,11 +350,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         if (d.art === 'zufallstabellen') {
           this.zufallstabellenTick += 1;
-        } else if (d.art === 'spielleiter' || d.art === 'konflikt') {
+        } else if (d.art === 'spielleitung' || d.art === 'konflikt') {
           if (d.art === 'konflikt' && this.offen) {
             this.ladeKonflikt();
           }
-          this.spielleiterTick += 1;
+          this.spielleitungTick += 1;
         }
       },
       setzeTab(tab) {
@@ -451,7 +451,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return;
         }
         if (teilnehmer.typ === 'charakter') {
-          const sl = window.HTBAH.ladeSpielleiterZustand();
+          const sl = window.HTBAH.ladeSpielleitungZustand();
           const g = (sl.kampagnen || []).find((gr) => gr && gr.id === this.kampagneIdEffektiv);
           if (!g || !Array.isArray(g.mitglieder)) {
             return;
@@ -465,8 +465,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             window.HTBAH.setzeCharakterKampfZustand(char, patch.kampfZustand);
           }
           g.mitglieder[idx] = { ...g.mitglieder[idx], charakter: char };
-          window.HTBAH.speichereSpielleiterZustand(sl);
-          this.spielleiterTick += 1;
+          window.HTBAH.speichereSpielleitungZustand(sl);
+          this.spielleitungTick += 1;
           return;
         }
         const z = window.HTBAH.ladeZufallstabellenZustand(this.kampagneIdEffektiv);
@@ -543,7 +543,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       onLpInput(teilnehmer, wert) {
         this.persistEntityPatch(teilnehmer, { lebenspunkte: String(wert == null ? '' : wert) });
         if (teilnehmer.typ === 'charakter' && typeof window.HTBAH.aktualisiereCharakterKampfZustandAusLp === 'function') {
-          const sl = window.HTBAH.ladeSpielleiterZustand();
+          const sl = window.HTBAH.ladeSpielleitungZustand();
           const g = (sl.kampagnen || []).find((gr) => gr && gr.id === this.kampagneIdEffektiv);
           const m =
             g && Array.isArray(g.mitglieder)
@@ -859,7 +859,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             <div class="flex-grow-1 min-h-0 overflow-auto px-3 py-3">
               <div v-show="konflikt.aktiverTab === 'auswahl'">
                 <p class="small text-body-secondary mb-2">
-                  Wähle alle am Konflikt beteiligten Figuren. Spielercharaktere starten bei „{{ konflikt.heldenLabel }}“,
+                  Wähle alle am Konflikt beteiligten Figuren. Charaktere starten bei „{{ konflikt.heldenLabel }}“,
                   NPCs und Bestien bei „{{ konflikt.gegnerLabel }}“ — die Zuordnung lässt sich später ändern.
                 </p>
                 <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">

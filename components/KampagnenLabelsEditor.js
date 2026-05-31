@@ -21,10 +21,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       kampagne() {
         void this.refreshTick;
         const kid = typeof this.kampagneId === 'string' ? this.kampagneId.trim() : '';
-        if (!kid || !window.HTBAH || typeof window.HTBAH.ladeSpielleiterZustand !== 'function') {
+        if (!kid || !window.HTBAH || typeof window.HTBAH.ladeSpielleitungZustand !== 'function') {
           return null;
         }
-        const z = window.HTBAH.ladeSpielleiterZustand();
+        const z = window.HTBAH.ladeSpielleitungZustand();
         const liste = Array.isArray(z && z.kampagnen) ? z.kampagnen : [];
         return liste.find((k) => k && k.id === kid) || null;
       },

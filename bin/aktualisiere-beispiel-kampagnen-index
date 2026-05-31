@@ -64,7 +64,9 @@ function parseLsKampagneIdAusKey(key) {
   if (
     typ === 'kampagne_komplett:' ||
     typ === 'kampagne_komplett_ohne_gruppe:' ||
+    typ === 'spielleitung_teil:' ||
     typ === 'spielleiter_teil:' ||
+    typ === 'spielleitung_ohne_gruppe:' ||
     typ === 'spielleiter_ohne_gruppe:' ||
     typ === 'sl_abenteuerbuch:' ||
     typ === 'sl_atmosphaere:' ||
@@ -86,7 +88,7 @@ function paketHatErkennbareKampagne(paket) {
   const daten = Array.isArray(paket.daten) ? paket.daten : [];
   if (
     daten.some(
-      (d) => d && d.key === 'htbah_spielleiter_kampagnen' && d.vorhanden && typeof d.wert === 'string',
+      (d) => d && (d.key === 'htbah_spielleitung_kampagnen' || d.key === 'htbah_spielleiter_kampagnen') && d.vorhanden && typeof d.wert === 'string',
     )
   ) {
     return true;
@@ -109,7 +111,7 @@ function eintragAusKampagne(dateiname, paket) {
     return {
       ok: false,
       fehler:
-        'Keine Spielleiter-Kampagne erkennbar (Legacy `htbah_spielleiter_kampagnen` oder `htbah_export_ls:*` mit Kampagnen-ID).',
+        'Keine Spielleitung-Kampagne erkennbar (Legacy `htbah_spielleitung_kampagnen` / `htbah_spielleiter_kampagnen` oder `htbah_export_ls:*` mit Kampagnen-ID).',
     };
   }
   const m = paket.beispiel && typeof paket.beispiel === 'object' ? paket.beispiel : {};

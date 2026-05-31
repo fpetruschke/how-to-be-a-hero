@@ -67,7 +67,7 @@ window.HTBAH_SEITEN.NichtGefunden = {
     },
     primaerAktionPfad() {
       if (this.rolle === 'spielleitung') {
-        return '/spielleiter';
+        return '/kampagnen';
       }
       if (this.rolle === 'charakter') {
         const id = window.HTBAH.ladeAktivenCharakterId();

@@ -1,5 +1,5 @@
 /**
- * Gemeinsames Charakterdatenmodell (Import/Export, Spielleiter, Spieler).
+ * Gemeinsames Charakterdatenmodell (Import/Export, Spielleitung, Charaktere).
  * Wird vor den Seiten-Skripten geladen.
  */
 window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};

@@ -1,6 +1,6 @@
 window.HTBAH_SEITEN = window.HTBAH_SEITEN || {};
 
-window.HTBAH_SEITEN.SpielleiterGruppe = {
+window.HTBAH_SEITEN.KampagneAnsicht = {
   props: {
     eingebettet: { type: Boolean, default: false },
     kampagneId: { type: String, default: '' },
@@ -10,7 +10,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
   },
   data() {
     return {
-      zustand: window.HTBAH.ladeSpielleiterZustand(),
+      zustand: window.HTBAH.ladeSpielleitungZustand(),
       lokaleCharaktere: [],
       ausgewaehlterLokalerCharakterId: '',
       aktivesMitgliedId: null,
@@ -93,7 +93,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       immediate: true,
       handler(neu, alt) {
         if (neu && neu !== alt) {
-          this.zustand = window.HTBAH.ladeSpielleiterZustand();
+          this.zustand = window.HTBAH.ladeSpielleitungZustand();
         }
         this.syncAusRoute();
       },
@@ -106,8 +106,8 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
     },
   },
   mounted() {
-    window.HTBAH._spielleiterAnsichtAktiv = true;
-    window.HTBAH._spielleiterPersistFn = () => this.persist();
+    window.HTBAH._spielleitungAnsichtAktiv = true;
+    window.HTBAH._spielleitungPersistFn = () => this.persist();
     this.lokaleCharaktereNeuLaden();
     if (!this.aktivesMitglied) {
       window.HTBAH.syncLebenspunkteStatusFromCharakter(null);
@@ -118,16 +118,16 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       this.verschiebeModalInstanz.hide();
       this.verschiebeModalInstanz = null;
     }
-    window.HTBAH._spielleiterAnsichtAktiv = false;
-    window.HTBAH._spielleiterPersistFn = null;
+    window.HTBAH._spielleitungAnsichtAktiv = false;
+    window.HTBAH._spielleitungPersistFn = null;
     window.HTBAH.syncLebenspunkteStatusFromCharakter(window.HTBAH.ladeCharakter());
   },
   methods: {
     syncAusRoute() {
-      const z = window.HTBAH.ladeSpielleiterZustand();
+      const z = window.HTBAH.ladeSpielleitungZustand();
       const gid = this.kampagneIdEffektiv;
       if (!gid || !z.kampagnen.some((g) => g.id === gid)) {
-        this.$router.replace('/spielleiter');
+        this.$router.replace('/kampagnen');
         return;
       }
       z.aktiveKampagneId = gid;
@@ -146,7 +146,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       if (kid) {
         this.zustand.aktiveKampagneId = kid;
       }
-      window.HTBAH.speichereSpielleiterZustand(this.zustand);
+      window.HTBAH.speichereSpielleitungZustand(this.zustand);
     },
     nachMitgliedImportAktualisieren(mitgliedId = '') {
       const g = this.aktiveKampagne;
@@ -164,7 +164,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         this.zustand.mitgliedWahlProKampagne[g.id] = mid;
       }
       this.persist();
-      this.zustand = window.HTBAH.ladeSpielleiterZustand();
+      this.zustand = window.HTBAH.ladeSpielleitungZustand();
       if (mid) {
         const ag = this.aktiveKampagne;
         this.aktivesMitgliedId =
@@ -185,7 +185,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       const modal = window.HTBAH && window.HTBAH._weltenbauUebersichtModalInstanz;
       if (modal && typeof modal.onKampagneDatenExternGeaendert === 'function') {
         modal.onKampagneDatenExternGeaendert({
-          detail: { art: 'spielleiter', kampagneId: kid },
+          detail: { art: 'spielleitung', kampagneId: kid },
         });
       }
     },
@@ -360,7 +360,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       delete this.zustand.mitgliedWahlProKampagne[g.id];
       this.persist();
       this.zeigeStatus('Letztes Mitglied entfernt und Kampagne gelöscht.');
-      this.$router.replace('/spielleiter');
+      this.$router.replace('/kampagnen');
     },
     oeffneVerschiebenModal() {
       if (!this.aktivesMitglied || this.andereKampagnen.length === 0 || !window.bootstrap) {
@@ -458,11 +458,11 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       }
       if (
         !window.HTBAH ||
-        typeof window.HTBAH.importiereSpielleiterMitgliedPaket !== 'function'
+        typeof window.HTBAH.importiereSpielleitungMitgliedPaket !== 'function'
       ) {
         return { ok: false, fehler: 'Import nicht verfügbar.' };
       }
-      return window.HTBAH.importiereSpielleiterMitgliedPaket(kid, json);
+      return window.HTBAH.importiereSpielleitungMitgliedPaket(kid, json);
     },
     importiereKandidatAlsMitglied(kandidat) {
       if (!kandidat || !kandidat.charakter) {
@@ -470,7 +470,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
       }
       const storageId = this.charakterAusImportInLokalenSpeicher(kandidat);
       const mitgliedId =
-        kandidat.quelle === 'spielleiter-kampagne' && typeof kandidat.id === 'string'
+        kandidat.quelle === 'spielleitung-kampagne' && typeof kandidat.id === 'string'
           ? kandidat.id
           : '';
       return (
@@ -524,7 +524,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         if (
           json &&
           json.htbahExportVersion === 1 &&
-          json.typ === 'htbah-spielleiter-mitglied' &&
+          (json.typ === 'htbah-spielleitung-mitglied' || json.typ === 'htbah-spielleiter-mitglied') &&
           json.mitglied
         ) {
           const ergebnis = this.importiereMitgliedPaketAusJson(json);
@@ -542,13 +542,13 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
           if (mid) {
             zuletztImportiertesMitgliedId = mid;
           }
-          this.zustand = window.HTBAH.ladeSpielleiterZustand();
+          this.zustand = window.HTBAH.ladeSpielleitungZustand();
           importiert += 1;
           continue;
         }
         if (
           json &&
-          json.typ === 'spielleiter_kampagne' &&
+          (json.typ === 'spielleitung_kampagne' || json.typ === 'spielleiter_kampagne') &&
           Array.isArray(json.mitglieder)
         ) {
           for (let k = 0; k < json.mitglieder.length; k++) {
@@ -558,7 +558,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
             }
             const ergebnis = this.importiereMitgliedPaketAusJson({
               htbahExportVersion: 1,
-              typ: 'htbah-spielleiter-mitglied',
+              typ: 'htbah-spielleitung-mitglied',
               mitglied: raw,
             });
             if (!ergebnis || !ergebnis.ok) {
@@ -569,7 +569,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
             }
             importiert += 1;
           }
-          this.zustand = window.HTBAH.ladeSpielleiterZustand();
+          this.zustand = window.HTBAH.ladeSpielleitungZustand();
           continue;
         }
         const stuecke = Array.isArray(json) ? json : [json];
@@ -618,7 +618,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
   template: `
     <div :class="eingebettet ? 'py-3' : 'container content py-3'">
       <nav v-if="!eingebettet" class="mb-2" aria-label="Brotkrumen">
-        <router-link to="/spielleiter" class="htbah-back-link">
+        <router-link to="/kampagnen" class="htbah-back-link">
           <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
           <span>Zurück zur Übersicht</span>
         </router-link>
@@ -713,7 +713,7 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         </ul>
 
         <p v-else class="small text-body-secondary mb-0">
-          Noch keine Charaktere — nutze „Charakterblätter importieren“ (vom Spieler exportierte Datei).
+          Noch keine Charaktere — nutze „Charakterblätter importieren“ (von Spielenden exportierte Datei).
         </p>
 
         <div class="d-flex flex-wrap gap-2">
@@ -735,9 +735,9 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         <div v-if="aktivesMitglied" class="mt-3 pt-3 border-top border-secondary border-opacity-25">
           <charakter
             :key="aktivesMitglied.id"
-            :spielleiter-mitglied="aktivesMitglied"
+            :spielleitung-mitglied="aktivesMitglied"
             :aktive-kampagne-id="kampagneId"
-            :on-spielleiter-persist="persist"
+            :on-spielleitung-persist="persist"
           />
         </div>
       </div>
@@ -750,14 +750,14 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
         <div
           ref="verschiebeModalElement"
           class="modal fade"
-          id="spielleiterVerschiebenModal"
+          id="spielleitungVerschiebenModal"
           tabindex="-1"
-          aria-labelledby="spielleiterVerschiebenModalLabel"
+          aria-labelledby="spielleitungVerschiebenModalLabel"
           aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow">
               <div class="modal-header">
-                <h5 class="modal-title" id="spielleiterVerschiebenModalLabel">
+                <h5 class="modal-title" id="spielleitungVerschiebenModalLabel">
                   In andere Kampagne verschieben
                 </h5>
                 <button
@@ -767,11 +767,11 @@ window.HTBAH_SEITEN.SpielleiterGruppe = {
                   aria-label="Schließen"></button>
               </div>
               <div class="modal-body">
-                <label for="spielleiter-ziel-kampagne" class="form-label">
+                <label for="spielleitung-ziel-kampagne" class="form-label">
                   Zielkampagne auswählen
                 </label>
                 <select
-                  id="spielleiter-ziel-kampagne"
+                  id="spielleitung-ziel-kampagne"
                   class="form-select"
                   v-model="zielKampagneId">
                   <option v-for="g in andereKampagnen" :key="g.id" :value="g.id">

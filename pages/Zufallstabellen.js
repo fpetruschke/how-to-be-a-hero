@@ -155,7 +155,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (typeof this.kampagneId === 'string' && this.kampagneId.trim()) {
         return this.kampagneId.trim();
       }
-      const sl = window.HTBAH.ladeSpielleiterZustand();
+      const sl = window.HTBAH.ladeSpielleitungZustand();
       return typeof sl.aktiveKampagneId === 'string' && sl.aktiveKampagneId.trim()
         ? sl.aktiveKampagneId.trim()
         : '';
@@ -196,8 +196,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     zufallsgeneratorBereit() {
       return !!(window.HTBAH && window.HTBAH.Zufallsgenerator);
     },
-    spielleiterKampagnenFuerDuplikat() {
-      const sl = window.HTBAH.ladeSpielleiterZustand();
+    spielleitungKampagnenFuerDuplikat() {
+      const sl = window.HTBAH.ladeSpielleitungZustand();
       return Array.isArray(sl.kampagnen) ? sl.kampagnen.filter((k) => k && k.id) : [];
     },
     entitaetenAuswahlSchluesselListe() {
@@ -919,7 +919,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     },
     duplizierenNeueKampagneAnlegen() {
       const nameRoh = (this.duplizierenNeueKampagneName || '').trim();
-      const api = window.HTBAH && window.HTBAH.erstelleSpielleiterKampagne;
+      const api = window.HTBAH && window.HTBAH.erstelleSpielleitungKampagne;
       if (typeof api !== 'function') {
         return;
       }
@@ -2440,8 +2440,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return '';
       }
       const zustand =
-        window.HTBAH && typeof window.HTBAH.ladeSpielleiterZustand === 'function'
-          ? window.HTBAH.ladeSpielleiterZustand()
+        window.HTBAH && typeof window.HTBAH.ladeSpielleitungZustand === 'function'
+          ? window.HTBAH.ladeSpielleitungZustand()
           : null;
       const kampagnen = zustand && Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
       const slugAusName =
@@ -2773,7 +2773,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-model="duplizierenZielKampagneId"
                   class="form-select form-select-sm"
                   aria-label="Ziel-Kampagne für Duplikate">
-                  <option v-for="k in spielleiterKampagnenFuerDuplikat" :key="'zst-dup-k-' + k.id" :value="k.id">
+                  <option v-for="k in spielleitungKampagnenFuerDuplikat" :key="'zst-dup-k-' + k.id" :value="k.id">
                     {{ k.name }}
                   </option>
                 </select>

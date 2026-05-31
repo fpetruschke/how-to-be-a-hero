@@ -32,7 +32,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
       return this.istVollbild ? 'Vollbild beenden' : 'Vollbild';
     },
     cheatSheetAnzeigeHtml() {
-      const CS = window.HTBAH_SHARED && window.HTBAH_SHARED.SpielleiterPdfCheatSheet;
+      const CS = window.HTBAH_SHARED && window.HTBAH_SHARED.SpielleitungPdfCheatSheet;
       if (!CS || typeof CS.baueCheatSheetAnzeigeHtml !== 'function') {
         return '';
       }

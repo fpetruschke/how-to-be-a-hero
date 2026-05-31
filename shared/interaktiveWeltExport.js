@@ -16,7 +16,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     if (!kid) {
       throw new Error('Keine Kampagne angegeben.');
     }
-    const sl = window.HTBAH.ladeSpielleiterZustand();
+    const sl = window.HTBAH.ladeSpielleitungZustand();
     const kampagne = (sl.kampagnen || []).find((k) => k && k.id === kid) || null;
     if (!kampagne) {
       throw new Error('Kampagne nicht gefunden.');
@@ -714,7 +714,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const opts = optionen && typeof optionen === 'object' ? optionen : {};
     const { canvas } = await erzeugeInteraktiveWeltCanvas(kampagneId, opts);
     const blob = await canvasZuPngBlob(canvas);
-    const sl = window.HTBAH.ladeSpielleiterZustand();
+    const sl = window.HTBAH.ladeSpielleitungZustand();
     const kampagne = (sl.kampagnen || []).find((k) => k && k.id === kampagneId);
     const name = U().sichererDateinameTeil(kampagne && kampagne.name, 'kampagne');
     const zeit = U().dateinameZeitstempel();

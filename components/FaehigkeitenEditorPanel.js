@@ -7,8 +7,8 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
   },
   props: {
     entitaet: { type: Object, required: true },
-    /** 'spieler' | 'sl' */
-    modus: { type: String, default: 'spieler' },
+    /** 'charakter' | 'sl' */
+    modus: { type: String, default: 'charakter' },
     presetId: { type: String, default: '' },
     zeigeNeuFormular: { type: Boolean, default: true },
     idPrefix: { type: String, default: 'faeh-panel' },

@@ -11,14 +11,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
   window.HTBAH_KOMPONENTEN.KampagneEinstellungen = {
     components: {
-      SpielleiterPdfExportModal: window.HTBAH_KOMPONENTEN.SpielleiterPdfExportModal,
+      SpielleitungPdfExportModal: window.HTBAH_KOMPONENTEN.SpielleitungPdfExportModal,
     },
     props: {
       kampagneId: { type: String, default: '' },
     },
     data() {
       return {
-        zustand: window.HTBAH.ladeSpielleiterZustand(),
+        zustand: window.HTBAH.ladeSpielleitungZustand(),
         nameEntwurf: '',
         nameSpeichernAktiv: false,
       };
@@ -52,7 +52,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         },
       },
       kampagneId() {
-        this.zustand = window.HTBAH.ladeSpielleiterZustand();
+        this.zustand = window.HTBAH.ladeSpielleitungZustand();
       },
     },
     methods: {
@@ -72,13 +72,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         });
       },
       persist() {
-        window.HTBAH.speichereSpielleiterZustand(this.zustand);
+        window.HTBAH.speichereSpielleitungZustand(this.zustand);
       },
       zeigeStatus(text, typ = 'success') {
         window.HTBAH.ui.notify({ text, typ });
       },
       labelsGeaendert() {
-        this.zustand = window.HTBAH.ladeSpielleiterZustand();
+        this.zustand = window.HTBAH.ladeSpielleitungZustand();
         this.$emit('geaendert');
       },
       async nameSpeichern() {
@@ -126,10 +126,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
       },
       pdfExportModalOeffnen() {
-        if (!this.kampagneId || !this.$refs.spielleiterPdfExportModal) {
+        if (!this.kampagneId || !this.$refs.spielleitungPdfExportModal) {
           return;
         }
-        this.$refs.spielleiterPdfExportModal.oeffnen();
+        this.$refs.spielleitungPdfExportModal.oeffnen();
       },
     },
     template: `
@@ -199,8 +199,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           </button>
         </div>
 
-        <spielleiter-pdf-export-modal
-          ref="spielleiterPdfExportModal"
+        <spielleitung-pdf-export-modal
+          ref="spielleitungPdfExportModal"
           :kampagne-id="kampagneId"
           :kampagne-name="kampagne ? kampagne.name : ''" />
       </div>

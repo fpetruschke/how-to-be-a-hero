@@ -215,8 +215,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     (z.bestien || []).forEach((row) => pushEntity(result, query, 'bestie', row, 'name'));
     (z.gegenstaende || []).forEach((row) => pushEntity(result, query, 'gegenstand', row, 'name'));
 
-    const sl = window.HTBAH && typeof window.HTBAH.ladeSpielleiterZustand === 'function'
-      ? window.HTBAH.ladeSpielleiterZustand()
+    const sl = window.HTBAH && typeof window.HTBAH.ladeSpielleitungZustand === 'function'
+      ? window.HTBAH.ladeSpielleitungZustand()
       : {};
     const onlyGruppeId = typeof options.gruppeId === 'string' ? options.gruppeId : '';
     (sl.kampagnen || []).forEach((kampagne) => {

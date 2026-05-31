@@ -140,7 +140,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       this.quillTextChangeHandler = null;
     },
     aktualisiereAktiveKampagne() {
-      const zustand = window.HTBAH.ladeSpielleiterZustand();
+      const zustand = window.HTBAH.ladeSpielleitungZustand();
       const id = typeof zustand.aktiveKampagneId === 'string' ? zustand.aktiveKampagneId : '';
       const kampagne = id
         ? (Array.isArray(zustand.kampagnen) ? zustand.kampagnen : []).find((k) => k && k.id === id)

@@ -1,12 +1,12 @@
 /**
- * Spielleiter-Kampagnen-PDF (alle Inhalte, wählbar).
- * await window.HTBAH.erzeugeSpielleiterPdfBlob(kampagneId, optionen)
+ * Spielleitung-Kampagnen-PDF (alle Inhalte, wählbar).
+ * await window.HTBAH.erzeugeSpielleitungPdfBlob(kampagneId, optionen)
  */
 (function () {
   const U = () => window.HTBAH_SHARED.PdfRenderUtils;
   const E = () => window.HTBAH_SHARED.EntitaetDetailFelder;
   const IW = () => window.HTBAH_SHARED.InteraktiveWeltExport;
-  const CS = () => window.HTBAH_SHARED.SpielleiterPdfCheatSheet;
+  const CS = () => window.HTBAH_SHARED.SpielleitungPdfCheatSheet;
 
   const STANDARD_AUSWAHL = {
     gruppe: true,
@@ -105,7 +105,7 @@
     }
   }
 
-  function ermittleSpielleiterPdfVerfuegbarkeit(kampagneId) {
+  function ermittleSpielleitungPdfVerfuegbarkeit(kampagneId) {
     const kid = typeof kampagneId === 'string' ? kampagneId.trim() : '';
     const leer = {
       gruppe: false,
@@ -123,7 +123,7 @@
     if (!kid) {
       return leer;
     }
-    const sl = window.HTBAH.ladeSpielleiterZustand();
+    const sl = window.HTBAH.ladeSpielleitungZustand();
     const kampagne = (sl.kampagnen || []).find((k) => k && k.id === kid);
     if (!kampagne) {
       return leer;
@@ -571,32 +571,34 @@
     </div>`;
   }
 
-  function maxPdfBlockHoehePx() {
-    return U().berechneA4SliceHoeheCanvasPx(2) - 16;
+  function maxPdfBlockHoehePx(scale) {
+    const sc = typeof scale === 'number' && scale > 0 ? scale : U().ermittlePdfRenderScale();
+    return U().berechneA4SliceHoeheCanvasPx(sc) - 16;
   }
 
-  async function messPdfBlockHoehePx(innerHtml, stil) {
+  function messPdfBlockHoehePx(innerHtml, stil, htmlOpts) {
     const html = `${pdfWurzelStart(stil)}${innerHtml}${pdfWurzelEnde()}`;
-    const canvas = await U().renderHtmlZuCanvas(html);
-    return canvas.height;
+    return U().messeHtmlBlockHoeheCanvasPx(html, htmlOpts);
   }
 
-  async function renderHtmlInFlow(pdf, innerHtml, stil, flow) {
+  async function renderHtmlInFlow(pdf, innerHtml, stil, flow, htmlOpts) {
     const html = `${pdfWurzelStart(stil)}${innerHtml}${pdfWurzelEnde()}`;
-    const canvas = await U().renderHtmlZuCanvas(html);
+    const canvas = await U().renderHtmlZuCanvas(html, htmlOpts);
     U().sicherePdfNeueSeiteWennZuKlein(pdf, flow, canvas.height);
     U().fuegeCanvasInPdfFlow(pdf, canvas, flow, { seite1BreitePrioritaet: true });
+    await U().yieldToMain();
   }
 
-  async function ermittleSektionsStartBlock(titelHtml, zeilen, stil) {
-    const titelH = await messPdfBlockHoehePx(titelHtml, stil);
+  async function ermittleSektionsStartBlock(titelHtml, zeilen, stil, htmlOpts) {
+    const titelH = messPdfBlockHoehePx(titelHtml, stil, htmlOpts);
     let kartenHtml = '';
     let idx = 0;
     let kartenH = 0;
+    const maxH = maxPdfBlockHoehePx(htmlOpts && htmlOpts.scale);
     while (idx < zeilen.length) {
       const probe = wrapKartenZeilenBlock(kartenHtml + zeilen[idx]);
-      const probeH = await messPdfBlockHoehePx(probe, stil);
-      if (!kartenHtml || titelH + kartenH + probeH <= maxPdfBlockHoehePx()) {
+      const probeH = messPdfBlockHoehePx(probe, stil, htmlOpts);
+      if (!kartenHtml || titelH + kartenH + probeH <= maxH) {
         kartenHtml += zeilen[idx];
         kartenH = probeH;
         idx += 1;
@@ -617,7 +619,7 @@
     flow.hatInhaltAufSeite = false;
   }
 
-  async function renderKartenSektion(pdf, titel, kartenEintraege, stil, sektionOpts, flow) {
+  async function renderKartenSektion(pdf, titel, kartenEintraege, stil, sektionOpts, flow, htmlOpts) {
     const karten = Array.isArray(kartenEintraege) ? kartenEintraege : [];
     const zeilen = baueKartenZeilenHtml(karten);
     if (!zeilen.length) {
@@ -625,18 +627,19 @@
     }
     erzwingeKapitelSeitenumbruch(pdf, flow, sektionOpts && sektionOpts.kapitelSeitenumbruch);
     const titelHtml = baueSektionTitelHtml(titel, stil, sektionOpts);
-    const start = await ermittleSektionsStartBlock(titelHtml, zeilen, stil);
+    const start = await ermittleSektionsStartBlock(titelHtml, zeilen, stil, htmlOpts);
     U().sicherePdfNeueSeiteWennZuKlein(pdf, flow, start.noetigPx);
-    await renderHtmlInFlow(pdf, start.html, stil, flow);
+    await renderHtmlInFlow(pdf, start.html, stil, flow, htmlOpts);
     let i = start.idx;
+    const maxH = maxPdfBlockHoehePx(htmlOpts && htmlOpts.scale);
     while (i < zeilen.length) {
       let blockHtml = '';
       let blockH = 0;
-      const budget = Math.min(U().flowVerfuegbareHoeheCanvasPx(pdf, flow), maxPdfBlockHoehePx());
+      const budget = Math.min(U().flowVerfuegbareHoeheCanvasPx(pdf, flow), maxH);
       while (i < zeilen.length) {
         const probe = wrapKartenZeilenBlock(blockHtml + zeilen[i]);
         const probeMitTrenner = kartenBlockTrennerHtml() + probe;
-        const probeH = await messPdfBlockHoehePx(probeMitTrenner, stil);
+        const probeH = messPdfBlockHoehePx(probeMitTrenner, stil, htmlOpts);
         if (blockHtml && blockH + probeH > budget) {
           break;
         }
@@ -646,9 +649,10 @@
       }
       if (!blockHtml && i < zeilen.length) {
         blockHtml = zeilen[i];
-        blockH = await messPdfBlockHoehePx(
+        blockH = messPdfBlockHoehePx(
           kartenBlockTrennerHtml() + wrapKartenZeilenBlock(blockHtml),
           stil,
+          htmlOpts,
         );
         i += 1;
       }
@@ -658,6 +662,7 @@
           kartenBlockTrennerHtml() + wrapKartenZeilenBlock(blockHtml),
           stil,
           flow,
+          htmlOpts,
         );
       }
     }
@@ -763,25 +768,31 @@
     return html;
   }
 
-  async function renderDeckblattSeite(pdf, innerHtml, stil) {
+  async function renderDeckblattSeite(pdf, innerHtml, stil, htmlOpts) {
     const html = `${pdfWurzelStart(stil)}${innerHtml}${pdfWurzelEnde()}`;
-    const canvas = await U().renderHtmlZuCanvas(html);
+    const canvas = await U().renderHtmlZuCanvas(html, htmlOpts);
     U().fuegeCanvasAlsA4SeiteHinzu(pdf, canvas, true);
     pdf.addPage();
+    await U().yieldToMain();
   }
 
-  async function htmlZuPdfSeiten(pdf, html, flow) {
-    const canvas = await U().renderHtmlZuCanvas(html);
+  async function htmlZuPdfSeiten(pdf, html, flow, htmlOpts) {
+    const canvas = await U().renderHtmlZuCanvas(html, htmlOpts);
     U().fuegeCanvasInPdfFlow(pdf, canvas, flow, { seite1BreitePrioritaet: true });
+    await U().yieldToMain();
   }
 
-  function meldeExportProgress(opts, text, aktuell, gesamt) {
+  function meldeExportProgress(opts, text, aktuell, gesamt, extra) {
     if (typeof opts.onProgress !== 'function') {
       return;
     }
     const total = Math.max(1, gesamt);
     const current = Math.max(0, Math.min(aktuell, total));
-    const percent = Math.min(100, Math.round((current / total) * 100));
+    let percent = Math.min(100, Math.round((current / total) * 100));
+    const meta = extra && typeof extra === 'object' ? extra : {};
+    if (typeof meta.percent === 'number') {
+      percent = Math.min(100, Math.max(0, Math.round(meta.percent)));
+    }
     opts.onProgress({ text: text || '', current, total, percent });
   }
 
@@ -847,7 +858,7 @@
     for (let i = 0; i < mitglieder.length; i += 1) {
       const m = mitglieder[i];
       if (typeof tick === 'function') {
-        tick(`Charakterbogen ${i + 1}/${mitglieder.length} …`);
+        await tick(`Charakterbogen ${i + 1}/${mitglieder.length} …`);
       }
       const canvases = await fn(m.charakter, m.charakterBild, {
         stil: optionen.pdfStil || 'fantasy-mittelalter',
@@ -878,7 +889,7 @@
     return SEKTION_AUSWAHL_KEYS.some((key) => auswahl && auswahl[key]);
   }
 
-  async function erzeugeSpielleiterPdfBlob(kampagneId, optionen) {
+  async function erzeugeSpielleitungPdfBlob(kampagneId, optionen) {
     const opts = optionen && typeof optionen === 'object' ? optionen : {};
     const charakterModus =
       opts.charakterDarstellung === 'voller_bogen' ? 'voller_bogen' : 'kompakt';
@@ -905,7 +916,7 @@
       throw new Error('Keine Kampagne angegeben.');
     }
 
-    const verfuegbar = ermittleSpielleiterPdfVerfuegbarkeit(kid);
+    const verfuegbar = ermittleSpielleitungPdfVerfuegbarkeit(kid);
     const auswahl = normalisiereAuswahl(opts.auswahl, verfuegbar);
     const cheatSheet = opts.cheatSheet === true;
     const sicherheitsmechanismen =
@@ -915,7 +926,7 @@
       throw new Error('Keine exportierbaren Inhalte ausgewählt.');
     }
 
-    const sl = window.HTBAH.ladeSpielleiterZustand();
+    const sl = window.HTBAH.ladeSpielleitungZustand();
     const kampagne = (sl.kampagnen || []).find((k) => k && k.id === kid);
     if (!kampagne) {
       throw new Error('Kampagne nicht gefunden.');
@@ -934,6 +945,8 @@
 
     const pdf = U().neuesA4Pdf();
     const pdfFlow = U().erstellePdfFlowState();
+    const pdfScale = U().ermittlePdfRenderScale();
+    const htmlOpts = { scale: pdfScale, breitePx: U().PDF_BREITE_PX };
     const schritteGesamt = zaehleExportSchritte(
       auswahl,
       kampagne,
@@ -945,26 +958,39 @@
       { cheatSheet, sicherheitsmechanismen },
     );
     let schritt = 0;
-    const tick = (text) => {
+    const exportLog = (msg) => {
+      const text = typeof msg === 'string' ? msg : String(msg);
+      console.log('[PDF-Export]', text);
+    };
+    const tick = async (text) => {
       schritt += 1;
+      exportLog(text);
       meldeExportProgress(opts, text, schritt, schritteGesamt);
+      await U().yieldToMain();
     };
 
     const renderHtmlBlock = async (html) => {
-      await htmlZuPdfSeiten(pdf, html, pdfFlow);
+      await htmlZuPdfSeiten(pdf, html, pdfFlow, htmlOpts);
     };
 
-    tick('Titelseite …');
-    await renderDeckblattSeite(pdf, baueTitelseiteHtml(kampagne, labels, stil), stil);
+    exportLog(`Start — Render-Scale ${pdfScale}×`);
+    await tick('Titelseite …');
+    await renderDeckblattSeite(pdf, baueTitelseiteHtml(kampagne, labels, stil), stil, htmlOpts);
 
     if (cheatSheet && CS() && typeof CS().baueCheatSheetHtml === 'function') {
-      tick('Cheat-Sheet …');
-      await renderHtmlInFlow(pdf, CS().baueCheatSheetHtml(stil), stil, pdfFlow);
+      await tick('Cheat-Sheet …');
+      await renderHtmlInFlow(pdf, CS().baueCheatSheetHtml(stil), stil, pdfFlow, htmlOpts);
     }
 
     if (sicherheitsmechanismen && CS() && typeof CS().baueSicherheitsmechanismenPdfHtml === 'function') {
-      tick('Sicherheitsmechanismen …');
-      await renderHtmlInFlow(pdf, CS().baueSicherheitsmechanismenPdfHtml(kampagne, stil), stil, pdfFlow);
+      await tick('Sicherheitsmechanismen …');
+      await renderHtmlInFlow(
+        pdf,
+        CS().baueSicherheitsmechanismenPdfHtml(kampagne, stil),
+        stil,
+        pdfFlow,
+        htmlOpts,
+      );
     }
 
     const mitglieder = Array.isArray(kampagne.mitglieder) ? kampagne.mitglieder : [];
@@ -981,7 +1007,7 @@
       const karten = sammleGruppeKartenHtml(kampagne, auswahl, stil);
       if (karten.length) {
         if (!hatInhaltsRender) {
-          tick('Inhalte …');
+          await tick('Inhalte …');
           hatInhaltsRender = true;
         }
         await renderKartenSektion(
@@ -991,6 +1017,7 @@
           stil,
           { ersteSektion: ersteInhaltsSektion, kapitelSeitenumbruch },
           pdfFlow,
+          htmlOpts,
         );
         ersteInhaltsSektion = false;
       }
@@ -1018,7 +1045,7 @@
         continue;
       }
       if (!hatInhaltsRender) {
-        tick('Inhalte …');
+        await tick('Inhalte …');
         hatInhaltsRender = true;
       }
       await renderKartenSektion(
@@ -1028,6 +1055,7 @@
         stil,
         { ersteSektion: ersteInhaltsSektion, kapitelSeitenumbruch },
         pdfFlow,
+        htmlOpts,
       );
       ersteInhaltsSektion = false;
     }
@@ -1053,7 +1081,7 @@
 
     if (restInhalt) {
       if (!hatInhaltsRender) {
-        tick('Inhalte …');
+        await tick('Inhalte …');
         hatInhaltsRender = true;
       }
       erzwingeKapitelSeitenumbruch(pdf, pdfFlow, kapitelSeitenumbruch);
@@ -1061,7 +1089,7 @@
     }
 
     if (auswahl.interaktiveWelt && IW() && hatInteraktiveWeltInhalt(kid)) {
-      tick('Interaktive Welt …');
+      await tick('Interaktive Welt …');
       U().pdfFlowNachSeitenReset(pdfFlow);
       const mapStage =
         opts.mapStageElement instanceof HTMLElement
@@ -1079,21 +1107,27 @@
           orientation: weltOrientation,
         });
       });
+      await U().yieldToMain();
     }
 
-    meldeExportProgress(opts, 'PDF wird fertiggestellt …', schritteGesamt, schritteGesamt);
+    exportLog('PDF-Datei wird serialisiert …');
+    meldeExportProgress(opts, 'PDF wird fertiggestellt …', schritteGesamt, schritteGesamt, {
+      percent: 95,
+    });
+    await U().yieldToMain();
 
-    const blob = U().pdfBlobAusInstanz(pdf);
+    const blob = await U().pdfBlobAusInstanz(pdf);
+    exportLog(`Fertig — ${Math.round(blob.size / 1024)} KB`);
     const name = U().sichererDateinameTeil(kampagne.name, 'kampagne');
     const zeit = U().dateinameZeitstempel();
     return {
       blob,
-      dateiname: `htbah-spielleiter-${name}-${zeit}.pdf`,
+      dateiname: `htbah-spielleitung-${name}-${zeit}.pdf`,
     };
   }
 
   window.HTBAH = window.HTBAH || {};
-  window.HTBAH.erzeugeSpielleiterPdfBlob = erzeugeSpielleiterPdfBlob;
-  window.HTBAH.ermittleSpielleiterPdfVerfuegbarkeit = ermittleSpielleiterPdfVerfuegbarkeit;
+  window.HTBAH.erzeugeSpielleitungPdfBlob = erzeugeSpielleitungPdfBlob;
+  window.HTBAH.ermittleSpielleitungPdfVerfuegbarkeit = ermittleSpielleitungPdfVerfuegbarkeit;
   window.HTBAH.SPIELLEITER_PDF_STANDARD_AUSWAHL = STANDARD_AUSWAHL;
 })();

@@ -3,7 +3,7 @@
  */
 window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 
-(function registerSpielleiterPdfCheatSheet() {
+(function registerSpielleitungPdfCheatSheet() {
   const U = () => window.HTBAH_SHARED.PdfRenderUtils;
 
   const CHEAT_SHEET_META = Object.freeze({
@@ -406,7 +406,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     </div>`;
   }
 
-  window.HTBAH_SHARED.SpielleiterPdfCheatSheet = {
+  window.HTBAH_SHARED.SpielleitungPdfCheatSheet = {
     CHEAT_SHEET_META,
     ladeCheatSheetKarten,
     baueCheatSheetHtml,

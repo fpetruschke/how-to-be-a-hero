@@ -35,10 +35,10 @@ function normalisiereBeispielManifestEintrag(roh) {
   return eintrag;
 }
 
-window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
+window.HTBAH_SEITEN.KampagnenUebersicht = {
   data() {
     return {
-      zustand: window.HTBAH.ladeSpielleiterZustand(),
+      zustand: window.HTBAH.ladeSpielleitungZustand(),
       neueKampagneNameEntwurf: '',
       beispielManifest: [],
       beispielManifestLaedt: false,
@@ -81,7 +81,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       if (!ziel) {
         return false;
       }
-      const roh = window.HTBAH.ladeSpielleiterZustand();
+      const roh = window.HTBAH.ladeSpielleitungZustand();
       const kampagnen = Array.isArray(roh && roh.kampagnen)
         ? roh.kampagnen
         : Array.isArray(roh && roh.gruppen)
@@ -96,7 +96,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       });
     },
     persist() {
-      window.HTBAH.speichereSpielleiterZustand(this.zustand);
+      window.HTBAH.speichereSpielleitungZustand(this.zustand);
     },
     zeigeStatus(text) {
       window.HTBAH.ui.notify({ text, typ: 'success' });
@@ -173,7 +173,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         return;
       }
       const gid = g.id;
-      const ergebnis = window.HTBAH.loescheSpielleiterKampagneKomplett(gid);
+      const ergebnis = window.HTBAH.loescheSpielleitungKampagneKomplett(gid);
       if (!ergebnis || !ergebnis.ok) {
         window.HTBAH.ui.notify({
           text: 'Die Kampagne konnte nicht gelöscht werden.',
@@ -181,7 +181,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
         });
         return;
       }
-      this.zustand = window.HTBAH.ladeSpielleiterZustand();
+      this.zustand = window.HTBAH.ladeSpielleitungZustand();
       this.zeigeStatus('Kampagne gelöscht.');
     },
     mitgliedName(mitglied) {
@@ -392,7 +392,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
     },
     beispielPaketAdditivAnwenden(paket) {
       const ergebnis = window.HTBAH.wendeBeispielLokalerSpeicherPaketAdditivAn(paket);
-      this.zustand = window.HTBAH.ladeSpielleiterZustand();
+      this.zustand = window.HTBAH.ladeSpielleitungZustand();
       return ergebnis;
     },
   },
@@ -566,13 +566,13 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
       <div v-if="beispielManifest.length" class="card p-3 mb-0 text-start htbah-beispiel-kampagnen-card">
         <button
             type="button"
-            class="btn w-100 d-flex align-items-center justify-content-between gap-2 mb-2 p-0 border-0 bg-transparent text-start text-body cursor-pointer"
+            class="w-100 d-flex align-items-center justify-content-between gap-2 p-0 border-0 bg-transparent text-start text-body cursor-pointer lh-1"
             :aria-expanded="beispielKampagnenInhaltOffen ? 'true' : 'false'"
             aria-controls="sl-uebersicht-beispiel-inhalt"
             :aria-label="beispielKampagnenInhaltOffen ? 'Beispiel-Kampagne-Bereich einklappen' : 'Beispiel-Kampagne-Bereich ausklappen'"
             @click="beispielKampagnenInhaltOffen = !beispielKampagnenInhaltOffen">
-          <h5 class="mb-0 d-flex align-items-center gap-2">
-            <span aria-hidden="true">📖</span>
+          <h5 class="mb-0 d-flex align-items-center gap-2 lh-1">
+            <span class="htbah-page-title-emoji" aria-hidden="true">📖</span>
             <span>Beispiel-Kampagne laden</span>
           </h5>
           <span class="material-symbols-outlined flex-shrink-0" aria-hidden="true">
@@ -583,7 +583,7 @@ window.HTBAH_SEITEN.SpielleiterGruppenUebersicht = {
             v-show="beispielKampagnenInhaltOffen"
             id="sl-uebersicht-beispiel-inhalt">
         <div
-            class="alert alert-danger border-danger mb-3"
+            class="alert alert-danger border-danger mt-2 mb-3"
             role="alert">
           <strong>Nur für Spielleitung — nicht zum Testen als Spielende!</strong>
           <p class="mb-0 mt-2 small">

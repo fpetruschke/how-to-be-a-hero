@@ -1,11 +1,43 @@
 /**
- * Gemeinsame Hilfen für html2canvas → jsPDF (Charakter- und Spielleiter-PDF).
+ * Gemeinsame Hilfen für html2canvas → jsPDF (Charakter- und Spielleitung-PDF).
  */
 window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 
 (function registerPdfRenderUtils() {
   const PDF_BREITE_PX = 794;
   const PDF_SEITEN_RAND_MM = 5;
+  const PDF_JPEG_QUALITAET_DESKTOP = 0.92;
+  const PDF_JPEG_QUALITAET_MOBIL = 0.85;
+
+  function yieldToMain() {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, 0);
+    });
+  }
+
+  /** Geringerer html2canvas-Scale auf mobilen / speicherarmen Geräten. */
+  function ermittlePdfRenderScale() {
+    try {
+      const mem = navigator.deviceMemory;
+      if (typeof mem === 'number' && mem <= 4) {
+        return 1;
+      }
+    } catch {
+      /* deviceMemory optional */
+    }
+    const ua = navigator.userAgent || '';
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) {
+      return 1;
+    }
+    if (navigator.maxTouchPoints > 1 && window.innerWidth < 900) {
+      return 1;
+    }
+    return 2;
+  }
+
+  function pdfJpegQualitaetFuerScale(scale) {
+    return scale <= 1 ? PDF_JPEG_QUALITAET_MOBIL : PDF_JPEG_QUALITAET_DESKTOP;
+  }
 
   function escapeHtml(s) {
     if (s == null || s === '') {
@@ -146,6 +178,38 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return Math.max(1, Math.floor((verfuegbarMm / maxH) * maxSlicePxFull));
   }
 
+  /** Layout-Höhe in Canvas-Pixeln (ohne html2canvas — nur DOM-Messung). */
+  function messeHtmlBlockHoeheCanvasPx(html, optionen) {
+    const opts =
+      typeof optionen === 'number'
+        ? { breitePx: optionen }
+        : optionen && typeof optionen === 'object'
+          ? optionen
+          : {};
+    const breite =
+      typeof opts.breitePx === 'number' && opts.breitePx > 0 ? opts.breitePx : PDF_BREITE_PX;
+    const scale =
+      typeof opts.scale === 'number' && opts.scale > 0 ? opts.scale : ermittlePdfRenderScale();
+    const host = document.createElement('div');
+    host.setAttribute('aria-hidden', 'true');
+    host.style.cssText =
+      'position:fixed;left:-9999px;top:0;width:' +
+      breite +
+      'px;max-width:' +
+      breite +
+      'px;z-index:-1;pointer-events:none;overflow:visible;visibility:hidden;';
+    host.innerHTML = html;
+    document.body.appendChild(host);
+    const el = host.querySelector('.htbah-pdf-wurzel') || host.firstElementChild;
+    if (!el) {
+      document.body.removeChild(host);
+      return 0;
+    }
+    const h = Math.max(el.scrollHeight, el.offsetHeight, 1);
+    document.body.removeChild(host);
+    return Math.ceil(h * scale);
+  }
+
   async function renderHtmlZuCanvas(html, optionen) {
     const opts =
       typeof optionen === 'number'
@@ -178,8 +242,10 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const canvasHoehe = hoehe || Math.max(el.scrollHeight, el.offsetHeight, 1);
     const iwExport =
       opts.interaktiveWeltExport === true || !!el.querySelector('.htbah-iw-export-host');
+    const scale =
+      typeof opts.scale === 'number' && opts.scale > 0 ? opts.scale : ermittlePdfRenderScale();
     let h2cOpts = {
-      scale: typeof opts.scale === 'number' && opts.scale > 0 ? opts.scale : 2,
+      scale,
       useCORS: true,
       allowTaint: true,
       backgroundColor:
@@ -210,7 +276,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const rand = PDF_SEITEN_RAND_MM;
     const maxW = pageW - 2 * rand;
     const maxH = pageH - 2 * rand;
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const jpegQ = pdfJpegQualitaetFuerScale(canvas.width / PDF_BREITE_PX);
+    const imgData = canvas.toDataURL('image/jpeg', jpegQ);
     const cw = canvas.width;
     const ch = canvas.height;
     let finalW = maxW;
@@ -376,7 +443,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         startY = rand;
         verfuegbarMm = pageH - 2 * rand;
       }
-      const imgData = sliceCanvas.toDataURL('image/jpeg', 0.92);
+      const jpegQ = pdfJpegQualitaetFuerScale(cw / PDF_BREITE_PX);
+      const imgData = sliceCanvas.toDataURL('image/jpeg', jpegQ);
       pdf.addImage(imgData, 'JPEG', rand + platz.xRel, startY, platz.finalW, platz.finalH);
       flow.currentY = startY + platz.finalH;
       flow.hatInhaltAufSeite = true;
@@ -436,7 +504,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const rand = PDF_SEITEN_RAND_MM;
     const maxW = pageW - 2 * rand;
     const maxH = pageH - 2 * rand;
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const jpegQ = pdfJpegQualitaetFuerScale(canvas.width / PDF_BREITE_PX);
+    const imgData = canvas.toDataURL('image/jpeg', jpegQ);
     const cw = canvas.width;
     const ch = canvas.height;
     let finalW = maxW;
@@ -483,8 +552,10 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     });
   }
 
-  function pdfBlobAusInstanz(pdf) {
+  async function pdfBlobAusInstanz(pdf) {
+    await yieldToMain();
     const ab = pdf.output('arraybuffer');
+    await yieldToMain();
     return new Blob([ab], { type: 'application/pdf' });
   }
 
@@ -504,6 +575,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     PDF_SEITEN_RAND_MM,
     escapeHtml,
     quillHtmlBasisStyles,
+    yieldToMain,
+    ermittlePdfRenderScale,
+    messeHtmlBlockHoeheCanvasPx,
     renderHtmlZuCanvas,
     fuegeCanvasAlsA4SeiteHinzu,
     fuegeCanvasAlsA4SeitenGestapelt,

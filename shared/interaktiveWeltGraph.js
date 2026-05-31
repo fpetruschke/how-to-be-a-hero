@@ -231,7 +231,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
    * @param {object} kontext.zustand - Zufallstabellen-Zustand
    * @param {object} kontext.layout - Layout-Map für gruppeKey
    * @param {string} kontext.gruppeId
-   * @param {object|null} kontext.aktiveGruppe - Spielleiter-Kampagne mit mitglieder
+   * @param {object|null} kontext.aktiveGruppe - Spielleitung-Kampagne mit mitglieder
    * @param {object} kontext.sichtbarkeitsFilter
    */
   function baueGraph(kontext) {

@@ -68,7 +68,7 @@ const SPEICHER_BEREICHE = {
     ],
     titel: 'Würfelbeutel-Layout löschen?',
     beschreibung:
-      '3D-Würfel (Aktivierung und Farbe) sowie gespeicherte Größe und Position des Würfelbeutel-Fensters werden entfernt. Wetter/Tageszeit ist Teil der jeweiligen Kampagne und bleibt unter „Spielleiter-Kampagnen“ gespeichert.',
+      '3D-Würfel (Aktivierung und Farbe) sowie gespeicherte Größe und Position des Würfelbeutel-Fensters werden entfernt. Wetter/Tageszeit ist Teil der jeweiligen Kampagne und bleibt unter „Spielleitung-Kampagnen“ gespeichert.',
     erfolg: 'Würfelbeutel-Layout wurde gelöscht.',
     buttonSymbol: '🎲',
     buttonLabel: 'Würfelbecher-Einstellungen löschen',
@@ -90,14 +90,14 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '🏷️',
     buttonLabel: 'Kampagnen-Label-Katalog löschen',
   },
-  spielleiter: {
-    key: 'htbah_spielleiter_kampagnen',
-    titel: 'Spielleiter-Kampagnen löschen?',
+  spielleitung: {
+    key: 'htbah_spielleitung_kampagnen',
+    titel: 'Spielleitung-Kampagnen löschen?',
     beschreibung:
-      'Alle gespeicherten Kampagnen und Charaktere in der Spielleiter-Ansicht werden entfernt — inklusive Label-Kopien, Abenteuerbücher, Wetter/Tageszeit-Daten und Badge-Positionen.',
-    erfolg: 'Spielleiter-Kampagnen wurden gelöscht.',
+      'Alle gespeicherten Kampagnen und Charaktere in der Spielleitung-Ansicht werden entfernt — inklusive Label-Kopien, Abenteuerbücher, Wetter/Tageszeit-Daten und Badge-Positionen.',
+    erfolg: 'Spielleitung-Kampagnen wurden gelöscht.',
     buttonSymbol: '👥',
-    buttonLabel: 'Spielleiter-Kampagnen löschen',
+    buttonLabel: 'Spielleitung-Kampagnen löschen',
   },
   alles: {
     keys: [
@@ -108,7 +108,7 @@ const SPEICHER_BEREICHE = {
       'htbah_character_image',
       'htbah_presets',
       'htbah_theme',
-      'htbah_spielleiter_kampagnen',
+      'htbah_spielleitung_kampagnen',
       'htbah_kampagnen_labels_katalog',
       'htbah_zufallstabellen',
       'htbah_weltenbau',
@@ -125,7 +125,7 @@ const SPEICHER_BEREICHE = {
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleiter-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen und Weltenbau-Daten je Kampagne, deine Theme-Auswahl, die Würfel- und Zeitmessungs-Einstellungen, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleitung-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen und Weltenbau-Daten je Kampagne, deine Theme-Auswahl, die Würfel- und Zeitmessungs-Einstellungen, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
@@ -227,10 +227,10 @@ function kampagneNameAusLsPaket(pak) {
   }
   const k =
     (pak.kampagne && typeof pak.kampagne.name === 'string' && pak.kampagne.name) ||
-    (pak.spielleiterTeil &&
-      pak.spielleiterTeil.kampagne &&
-      typeof pak.spielleiterTeil.kampagne.name === 'string' &&
-      pak.spielleiterTeil.kampagne.name) ||
+    ((pak.spielleitungTeil || pak.spielleiterTeil) &&
+      (pak.spielleitungTeil || pak.spielleiterTeil).kampagne &&
+      typeof (pak.spielleitungTeil || pak.spielleiterTeil).kampagne.name === 'string' &&
+      (pak.spielleitungTeil || pak.spielleiterTeil).kampagne.name) ||
     '';
   return typeof k === 'string' ? k.trim() : '';
 }
@@ -241,7 +241,7 @@ function kampagneNamenAusImportEintraegen(eintraege) {
     if (!e || typeof e !== 'object') {
       return;
     }
-    if (e.key === 'htbah_spielleiter_kampagnen' && e.vorhanden && typeof e.wert === 'string') {
+    if ((e.key === 'htbah_spielleitung_kampagnen' || e.key === 'htbah_spielleiter_kampagnen') && e.vorhanden && typeof e.wert === 'string') {
       try {
         const p = JSON.parse(e.wert);
         (Array.isArray(p.kampagnen) ? p.kampagnen : []).forEach((k) => {
@@ -445,7 +445,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       return {
         appRolle: this.appRolle,
         charakterEintraege: this.charakterEintraege,
-        spielleiterKampagnen: this.spielleiterKampagnen,
+        spielleitungKampagnen: this.spielleitungKampagnen,
         charakterNameFn: (e) => this.charakterName(e),
         kampagneNameFn: (k) => this.kampagneAnzeigeName(k),
         mitgliedNameFn: (m) => this.mitgliedName(m),
@@ -496,9 +496,9 @@ window.HTBAH_SEITEN.Einstellungen = {
     charakterEintraege() {
       return window.HTBAH.listeCharaktere();
     },
-    spielleiterKampagnen() {
+    spielleitungKampagnen() {
       void this.kampagnenCacheTick;
-      const z = window.HTBAH.ladeSpielleiterZustand();
+      const z = window.HTBAH.ladeSpielleitungZustand();
       return Array.isArray(z.kampagnen) ? z.kampagnen.filter((k) => k && k.id) : [];
     },
     ztfKampagneKategorien() {
@@ -709,7 +709,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       let ok = true;
       switch (p.typ) {
         case 'kampagne_komplett': {
-          const r = window.HTBAH.loescheSpielleiterKampagneKomplett(p.kampagneId);
+          const r = window.HTBAH.loescheSpielleitungKampagneKomplett(p.kampagneId);
           if (!r || !r.ok) {
             ok = false;
             this.statusAnzeigen('Die Kampagne konnte nicht gelöscht werden.', 'danger');
@@ -1001,7 +1001,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       if (this.browserSpeicherInitialErmittelt) {
         this.speicherSchaetzungLaden();
       }
-      if (this.zuLoeschenderBereich === 'spielleiter' || this.zuLoeschenderBereich === 'alles') {
+      if (this.zuLoeschenderBereich === 'spielleitung' || this.zuLoeschenderBereich === 'alles') {
         this.kampagnenCacheTick += 1;
       }
     },
@@ -1044,18 +1044,18 @@ window.HTBAH_SEITEN.Einstellungen = {
             pak = window.HTBAH.erstelleKampagneKomplettBackupBundle(kid);
           } else if (bereich.lsTyp === 'kampagne_komplett_ohne_gruppe') {
             pak = window.HTBAH.erstelleKampagneKomplettOhneGruppeBackupBundle(kid);
-          } else if (bereich.lsTyp === 'spielleiter_teil') {
-            pak = window.HTBAH.erstelleSpielleiterKampagneTeilExportPaket(kid);
-          } else if (bereich.lsTyp === 'spielleiter_ohne_gruppe') {
-            pak = window.HTBAH.erstelleSpielleiterKampagneTeilOhneMitgliederExportPaket(kid);
+          } else if (bereich.lsTyp === 'spielleitung_teil') {
+            pak = window.HTBAH.erstelleSpielleitungKampagneTeilExportPaket(kid);
+          } else if (bereich.lsTyp === 'spielleitung_ohne_gruppe') {
+            pak = window.HTBAH.erstelleSpielleitungKampagneTeilOhneMitgliederExportPaket(kid);
           } else if (bereich.lsTyp === 'sl_mitglied') {
-            pak = window.HTBAH.erstelleSpielleiterMitgliedExportPaket(kid, bereich.mitgliedId);
+            pak = window.HTBAH.erstelleSpielleitungMitgliedExportPaket(kid, bereich.mitgliedId);
           } else if (bereich.lsTyp === 'sl_abenteuerbuch') {
-            pak = window.HTBAH.erstelleSpielleiterAbenteuerbuchExportPaket(kid);
+            pak = window.HTBAH.erstelleSpielleitungAbenteuerbuchExportPaket(kid);
           } else if (bereich.lsTyp === 'sl_atmosphaere') {
-            pak = window.HTBAH.erstelleSpielleiterAtmosphaereExportPaket(kid);
+            pak = window.HTBAH.erstelleSpielleitungAtmosphaereExportPaket(kid);
           } else if (bereich.lsTyp === 'sl_zeitmessung') {
-            pak = window.HTBAH.erstelleSpielleiterZeitmessungExportPaket(kid);
+            pak = window.HTBAH.erstelleSpielleitungZeitmessungExportPaket(kid);
           } else if (bereich.lsTyp === 'ztf_kampagne') {
             pak = window.HTBAH.erstelleZufallstabellenKampagneExportPaket(kid);
           } else if (bereich.lsTyp === 'ztf_pantheon') {
@@ -1135,7 +1135,7 @@ window.HTBAH_SEITEN.Einstellungen = {
           };
         }
         if (bereich.id === 'zufallstabellen') {
-          const sl = window.HTBAH.ladeSpielleiterZustand();
+          const sl = window.HTBAH.ladeSpielleitungZustand();
           const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen : [];
           const proKampagne = {};
           kampagnen.forEach((k) => {
@@ -1160,7 +1160,7 @@ window.HTBAH_SEITEN.Einstellungen = {
           };
         }
         if (bereich.id === 'weltenbau') {
-          const sl = window.HTBAH.ladeSpielleiterZustand();
+          const sl = window.HTBAH.ladeSpielleitungZustand();
           const kampagnen = Array.isArray(sl.kampagnen) ? sl.kampagnen : [];
           const proKampagne = {};
           kampagnen.forEach((k) => {
@@ -1397,24 +1397,30 @@ window.HTBAH_SEITEN.Einstellungen = {
             r = window.HTBAH.importiereKampagneKomplettBackupBundle(kid, p);
           } else if (tail.startsWith('spielleiter_ohne_gruppe:')) {
             const kid = tail.slice('spielleiter_ohne_gruppe:'.length);
-            r = window.HTBAH.importiereSpielleiterKampagneTeilPaket(kid, p);
+            r = window.HTBAH.importiereSpielleitungKampagneTeilPaket(kid, p);
+          } else if (tail.startsWith('spielleitung_ohne_gruppe:')) {
+            const kid = tail.slice('spielleitung_ohne_gruppe:'.length);
+            r = window.HTBAH.importiereSpielleitungKampagneTeilPaket(kid, p);
           } else if (tail.startsWith('spielleiter_teil:')) {
             const kid = tail.slice('spielleiter_teil:'.length);
-            r = window.HTBAH.importiereSpielleiterKampagneTeilPaket(kid, p);
+            r = window.HTBAH.importiereSpielleitungKampagneTeilPaket(kid, p);
+          } else if (tail.startsWith('spielleitung_teil:')) {
+            const kid = tail.slice('spielleitung_teil:'.length);
+            r = window.HTBAH.importiereSpielleitungKampagneTeilPaket(kid, p);
           } else if (tail.startsWith('sl_mitglied:')) {
             const rest = tail.slice('sl_mitglied:'.length);
             const li = rest.lastIndexOf(':');
             const kid = li > 0 ? rest.slice(0, li) : rest;
-            r = kid ? window.HTBAH.importiereSpielleiterMitgliedPaket(kid, p) : { ok: false, fehler: 'Keine Kampagne.' };
+            r = kid ? window.HTBAH.importiereSpielleitungMitgliedPaket(kid, p) : { ok: false, fehler: 'Keine Kampagne.' };
           } else if (tail.startsWith('sl_abenteuerbuch:')) {
             const kid = tail.slice('sl_abenteuerbuch:'.length);
-            r = window.HTBAH.importiereSpielleiterAbenteuerbuchPaket(kid, p);
+            r = window.HTBAH.importiereSpielleitungAbenteuerbuchExportPaket(kid, p);
           } else if (tail.startsWith('sl_atmosphaere:')) {
             const kid = tail.slice('sl_atmosphaere:'.length);
-            r = window.HTBAH.importiereSpielleiterAtmosphaerePaket(kid, p);
+            r = window.HTBAH.importiereSpielleitungAtmosphaereExportPaket(kid, p);
           } else if (tail.startsWith('sl_zeitmessung:')) {
             const kid = tail.slice('sl_zeitmessung:'.length);
-            r = window.HTBAH.importiereSpielleiterZeitmessungPaket(kid, p);
+            r = window.HTBAH.importiereSpielleitungZeitmessungExportPaket(kid, p);
           } else if (tail.startsWith('ztf_kampagne:')) {
             const kid = tail.slice('ztf_kampagne:'.length);
             r = window.HTBAH.importiereZufallstabellenKampagnePaket(kid, p);
@@ -1505,7 +1511,7 @@ window.HTBAH_SEITEN.Einstellungen = {
         ausgewaehlteBereiche.some(
           (b) =>
             b.key.startsWith('htbah_export_ls:') ||
-            b.key === 'htbah_spielleiter_kampagnen' ||
+            b.key === 'htbah_spielleitung_kampagnen' || b.key === 'htbah_spielleiter_kampagnen' ||
             b.key === 'htbah_zufallstabellen' ||
             b.key === 'htbah_weltenbau' ||
             b.lsTyp === 'sl_mitglied' ||
@@ -2008,12 +2014,12 @@ window.HTBAH_SEITEN.Einstellungen = {
         <template v-else-if="appRolle === 'spielleitung'">
           <div class="mb-3">
             <h6 class="mb-2">Nach Kampagne</h6>
-            <p v-if="!spielleiterKampagnen.length" class="small text-body-secondary mb-0">
-              Keine Kampagnen vorhanden — lege zuerst unter „Spielleiter“ eine Kampagne an.
+            <p v-if="!spielleitungKampagnen.length" class="small text-body-secondary mb-0">
+              Keine Kampagnen vorhanden — lege zuerst unter „Spielleitung“ eine Kampagne an.
             </p>
             <div v-else class="d-flex flex-column gap-3">
               <div
-                v-for="k in spielleiterKampagnen"
+                v-for="k in spielleitungKampagnen"
                 :key="'del-kamp-' + k.id"
                 class="rounded border border-secondary border-opacity-25 p-2 ps-3 text-start">
                 <div class="fw-semibold mb-2">{{ kampagneAnzeigeName(k) }}</div>
@@ -2139,9 +2145,9 @@ window.HTBAH_SEITEN.Einstellungen = {
                   <icon-text-button
                     class="btn btn-outline-danger btn-sm w-100 text-start"
                     type="button"
-                    :symbol="speicherBereiche.spielleiter.buttonSymbol"
-                    @click="oeffneLoeschDialog('spielleiter')">
-                    {{ speicherBereiche.spielleiter.buttonLabel }}
+                    :symbol="speicherBereiche.spielleitung.buttonSymbol"
+                    @click="oeffneLoeschDialog('spielleitung')">
+                    {{ speicherBereiche.spielleitung.buttonLabel }}
                   </icon-text-button>
                   <icon-text-button
                     class="btn btn-outline-danger btn-sm w-100 text-start"

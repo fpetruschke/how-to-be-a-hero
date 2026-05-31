@@ -165,11 +165,12 @@ window.HTBAH_SEITEN.Weltenbau = {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
     WeltenbauUebersichtModal: window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal,
     ZufallstabellenSeite: window.HTBAH_SEITEN.Zufallstabellen,
-    SpielleiterGruppe: window.HTBAH_SEITEN.SpielleiterGruppe,
+    KampagnenUebersicht: window.HTBAH_SEITEN.KampagnenUebersicht,
+    KampagneAnsicht: window.HTBAH_SEITEN.KampagneAnsicht,
     KampagneEinstellungen: window.HTBAH_KOMPONENTEN.KampagneEinstellungen,
   },
   data() {
-    const slInit = window.HTBAH.ladeSpielleiterZustand();
+    const slInit = window.HTBAH.ladeSpielleitungZustand();
     const startKampagneId =
       (typeof slInit.aktiveKampagneId === 'string' && slInit.aktiveKampagneId) ||
       ((slInit.kampagnen || [])[0] && slInit.kampagnen[0].id) ||
@@ -207,18 +208,18 @@ window.HTBAH_SEITEN.Weltenbau = {
     };
   },
   computed: {
-    spielleiterKampagnen() {
-      const sl = window.HTBAH.ladeSpielleiterZustand();
+    spielleitungKampagnen() {
+      const sl = window.HTBAH.ladeSpielleitungZustand();
       return Array.isArray(sl && sl.kampagnen) ? sl.kampagnen : [];
     },
     aktiveKampagne() {
-      return this.spielleiterKampagnen.find((k) => k && k.id === this.ausgewaehlteKampagneId) || null;
+      return this.spielleitungKampagnen.find((k) => k && k.id === this.ausgewaehlteKampagneId) || null;
     },
     seitenTitel() {
       return (this.aktiveKampagne && this.aktiveKampagne.name) || 'Kampagne';
     },
     kampagnenAuswahlDeaktiviert() {
-      return this.spielleiterKampagnen.length <= 1;
+      return this.spielleitungKampagnen.length <= 1;
     },
     maxRohDateiHuman() {
       return this.formatBytes(WELTENBAU_MAX_ROH_DATEI_BYTES);
@@ -274,10 +275,10 @@ window.HTBAH_SEITEN.Weltenbau = {
       if (!neu) {
         return;
       }
-      const z = window.HTBAH.ladeSpielleiterZustand();
+      const z = window.HTBAH.ladeSpielleitungZustand();
       if (z.aktiveKampagneId !== neu) {
         z.aktiveKampagneId = neu;
-        window.HTBAH.speichereSpielleiterZustand(z);
+        window.HTBAH.speichereSpielleitungZustand(z);
       }
       if (neu !== alt) {
         this.zustand = weltenbauKomponentenZustandAusSpeicher(neu);
@@ -319,7 +320,7 @@ window.HTBAH_SEITEN.Weltenbau = {
     syncKampagneAusRoute() {
       const slugRaw = this.$route?.params?.kampagneSlug;
       const slug = typeof slugRaw === 'string' ? decodeURIComponent(slugRaw) : '';
-      const kampagnen = this.spielleiterKampagnen;
+      const kampagnen = this.spielleitungKampagnen;
       if (!kampagnen.length) {
         this.ausgewaehlteKampagneId = '';
         return;
@@ -1165,7 +1166,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         <div class="alert alert-info py-2 px-3 small mb-2" role="note">
           Hier bearbeitest du die aktuell gewählte Kampagne und ihre Charaktere.
         </div>
-        <spielleiter-gruppe eingebettet :kampagne-id="ausgewaehlteKampagneId" />
+        <kampagne-ansicht eingebettet :kampagne-id="ausgewaehlteKampagneId" />
       </template>
 
       <div class="abstandshalter" aria-hidden="true"></div>

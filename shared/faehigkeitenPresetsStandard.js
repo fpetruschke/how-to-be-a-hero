@@ -1,6 +1,6 @@
 /**
  * Vorgegebene Fähigkeiten-Presets (How to be a Hero: Fähigkeitsnamen je Begabung).
- * Werte sind bewusst leer — Spieler verteilen die 400 Punkte selbst.
+ * Werte sind bewusst leer — Spielende verteilen die 400 Punkte selbst.
  * Charaktervorlagen und Demo-Archetypen nutzen ausschließlich Namen aus diesen Listen.
  * @see https://howtobeahero.de/index.php/Fähigkeiten
  */

@@ -58,13 +58,13 @@ const LEGACY_SLOT_META = [
     label: 'Komplett ohne Gruppe (Legacy)',
   },
   {
-    lsTyp: 'spielleiter_teil',
-    prefix: 'spielleiter_teil:',
+    lsTyp: 'spielleitung_teil',
+    prefix: 'spielleitung_teil:',
     label: 'Gruppe, Abenteuerbuch, Wetter (Legacy)',
   },
   {
-    lsTyp: 'spielleiter_ohne_gruppe',
-    prefix: 'spielleiter_ohne_gruppe:',
+    lsTyp: 'spielleitung_ohne_gruppe',
+    prefix: 'spielleitung_ohne_gruppe:',
     label: 'Abenteuerbuch und Wetter ohne Gruppe (Legacy)',
   },
   {
@@ -85,7 +85,7 @@ const LEGACY_SLOT_META = [
 ];
 
 const LEGACY_GLOBAL = [
-  { id: 'kampagnen', key: 'htbah_spielleiter_kampagnen', label: 'Alle Spielleiter-Kampagnen (Legacy)' },
+  { id: 'kampagnen', key: 'htbah_spielleitung_kampagnen', label: 'Alle Spielleitung-Kampagnen (Legacy, inkl. htbah_spielleiter_kampagnen)' },
   { id: 'zufallstabellen', key: 'htbah_zufallstabellen', label: 'Zufallstabellen aller Kampagnen (Legacy)' },
   { id: 'weltenbau', key: 'htbah_weltenbau', label: 'Weltenbau aller Kampagnen (Legacy)' },
 ];
@@ -157,8 +157,10 @@ function parseLsExportKeyMeta(key) {
   const typen = [
     ['kampagne_komplett_ohne_gruppe:', 'kampagne_komplett_ohne_gruppe'],
     ['kampagne_komplett:', 'kampagne_komplett'],
-    ['spielleiter_ohne_gruppe:', 'spielleiter_ohne_gruppe'],
-    ['spielleiter_teil:', 'spielleiter_teil'],
+    ['spielleitung_ohne_gruppe:', 'spielleitung_ohne_gruppe'],
+    ['spielleiter_ohne_gruppe:', 'spielleitung_ohne_gruppe'],
+    ['spielleitung_teil:', 'spielleitung_teil'],
+    ['spielleiter_teil:', 'spielleitung_teil'],
     ['sl_mitglied:', 'sl_mitglied'],
     ['sl_abenteuerbuch:', 'sl_abenteuerbuch'],
     ['sl_atmosphaere:', 'sl_atmosphaere'],
@@ -250,9 +252,9 @@ function baueKampagneKnoten(kampagne, opts) {
   const kinder = [];
   kinder.push(
     blattKnoten(`ex:sl:teil:${kid}`, 'Kampagne (Name & Labels)', {
-      key: `htbah_export_ls:spielleiter_teil:${kid}`,
+      key: `htbah_export_ls:spielleitung_teil:${kid}`,
       label: 'Kampagne (Name & Labels)',
-      lsTyp: 'spielleiter_teil',
+      lsTyp: 'spielleitung_teil',
       kampagneId: kid,
     }),
   );
@@ -353,7 +355,7 @@ function baueExportBaumWurzel(opts) {
     );
   });
   if (opts.appRolle === 'spielleitung') {
-    (opts.spielleiterKampagnen || [])
+    (opts.spielleitungKampagnen || [])
       .filter((k) => k && k.id)
       .forEach((k) => {
         wurzel.push(baueKampagneKnoten(k, opts));

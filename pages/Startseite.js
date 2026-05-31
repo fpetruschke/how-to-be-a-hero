@@ -108,7 +108,7 @@ window.HTBAH_SEITEN.Startseite = {
     },
     rolleSpielleitungWaehlen() {
       window.HTBAH.speichereAppRolle('spielleitung');
-      this.$router.push('/spielleiter');
+      this.$router.push('/kampagnen');
     },
     penPaperInfoOeffnen() {
       this.penPaperModalOffen = true;
