@@ -19,11 +19,14 @@ const SPEICHER_KEY_DICE_COLORS = 'htbah_dice_colors';
 const SPEICHER_KEY_WUERFEL_BEUTEL_FENSTER = 'htbah_wuerfel_beutel_fenster';
 const SPEICHER_KEY_ZEITMESSUNG = 'htbah_zeitmessung_einstellungen';
 const SPEICHER_KEY_ZEITMESSUNG_BADGE_POS = 'htbah_zeitmessung_badge_pos';
+const SPEICHER_KEY_ABENTEUERBUCH_EINSTELLUNGEN = 'htbah_abenteuerbuch_einstellungen';
 const SPEICHER_KEY_ZEICHEN_MODAL = 'htbah_zeichen_brett';
 const SPEICHER_KEY_MENTION_NAV_TARGET = 'htbah_mention_nav_target';
 const SPEICHER_KEY_ORIENTATION_MODE = 'htbah_orientation_mode';
 const SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN = 'htbah_interaktive_welt_stats_anzeigen';
 const SPEICHER_KEY_KONFLIKT_FENSTER = 'htbah_konflikt_fenster';
+const SPEICHER_KEY_OFFENE_MODALS = 'htbah_offene_modals';
+const SPEICHER_KEY_FLOATING_FAB_POS = 'htbah_floating_fab_pos';
 
 function erstelleLocalStorageBackend() {
   return {
@@ -1220,7 +1223,18 @@ function loescheSpielleitungKampagneKomplett(kampagneId) {
     zustand.aktiveKampagneId = zustand.kampagnen[0] ? zustand.kampagnen[0].id : null;
   }
   speichereSpielleitungZustand(zustand);
+  const fabSpeicher = window.HTBAH_FLOATING_FAB_SPEICHER;
+  if (fabSpeicher && typeof fabSpeicher.entferneKampagne === 'function') {
+    fabSpeicher.entferneKampagne(gid);
+  }
   return { ok: true };
+}
+
+function loescheFloatingFabSpeicherKomplett() {
+  const fabSpeicher = window.HTBAH_FLOATING_FAB_SPEICHER;
+  if (fabSpeicher && typeof fabSpeicher.loescheAlle === 'function') {
+    fabSpeicher.loescheAlle();
+  }
 }
 
 function ladeZufallstabellenZustand(kampagneId) {
@@ -4257,6 +4271,38 @@ function setzeZeitmessungProfil(teil) {
   return neu;
 }
 
+function ladeAbenteuerbuchEinstellungen() {
+  const AE = window.HTBAH_SHARED && window.HTBAH_SHARED.normalisiereAbenteuerbuchEinstellungen;
+  const defaults = AE ? AE(null) : { reiterLeisteUmbruch: false };
+  try {
+    const roh = htbahSpeicher.leseText(SPEICHER_KEY_ABENTEUERBUCH_EINSTELLUNGEN, null);
+    if (roh && String(roh).trim().startsWith('{')) {
+      const o = JSON.parse(roh);
+      return AE ? AE(o) : defaults;
+    }
+  } catch {
+    /* defektes JSON */
+  }
+  return defaults;
+}
+
+/**
+ * @param {{ reiterLeisteUmbruch?: boolean }} teil
+ */
+function setzeAbenteuerbuchEinstellungen(teil) {
+  const AE = window.HTBAH_SHARED && window.HTBAH_SHARED.normalisiereAbenteuerbuchEinstellungen;
+  const aktuell = ladeAbenteuerbuchEinstellungen();
+  const zusammengefuegt = {
+    reiterLeisteUmbruch:
+      teil.reiterLeisteUmbruch !== undefined
+        ? Boolean(teil.reiterLeisteUmbruch)
+        : aktuell.reiterLeisteUmbruch,
+  };
+  const neu = AE ? AE(zusammengefuegt) : zusammengefuegt;
+  htbahSpeicher.schreibeText(SPEICHER_KEY_ABENTEUERBUCH_EINSTELLUNGEN, JSON.stringify(neu));
+  return neu;
+}
+
 function spieleZeitmessungKlick(lautstaerkeOverride) {
   const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
   if (ZU && typeof ZU.spieleKlick === 'function') {
@@ -4520,6 +4566,8 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   mentionNavigationTarget: SPEICHER_KEY_MENTION_NAV_TARGET,
   interaktiveWeltStatsAnzeigen: SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN,
   konfliktFenster: SPEICHER_KEY_KONFLIKT_FENSTER,
+  offeneModals: SPEICHER_KEY_OFFENE_MODALS,
+  floatingFabPos: SPEICHER_KEY_FLOATING_FAB_POS,
 });
 
 window.HTBAH = {
@@ -4552,6 +4600,8 @@ window.HTBAH = {
   spieleWuerfelSounds,
   ladeZeitmessungProfil,
   setzeZeitmessungProfil,
+  ladeAbenteuerbuchEinstellungen,
+  setzeAbenteuerbuchEinstellungen,
   spieleZeitmessungKlick,
   spieleZeitmessungAbgelaufen,
   ladeZeitmessungBadgePosition,
@@ -4654,6 +4704,19 @@ window.HTBAH = {
   speichereInteraktiveWeltStatsAnzeigen,
   speicher: htbahSpeicher,
   speicherKeys: HTBAH_SPEICHER_KEYS,
+  loescheFloatingFabSpeicherKomplett,
+  loescheOffeneModalsSpeicher() {
+    const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+    if (S && typeof S.loescheAlle === 'function') {
+      S.loescheAlle();
+    }
+    uiZustand.regelwerkOffen = false;
+    uiZustand.abenteuerbuchOffen = false;
+    uiZustand.zeichenModalOffen = false;
+    uiZustand.weltenbauUebersichtModalOffen = false;
+    uiZustand.weltenbauUebersichtModalGruppeId = '';
+    window.dispatchEvent(new CustomEvent('htbah:offene-modals-speicher-geleert'));
+  },
 };
 
 const uiApi = {
@@ -4826,6 +4889,19 @@ const routes = [
 const router = VueRouter.createRouter({
   history: VueRouter.createWebHashHistory(),
   routes,
+  scrollBehavior(_to, _from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition;
+    }
+    if (window.matchMedia('(min-width: 992px)').matches) {
+      const app = document.getElementById('app');
+      if (app) {
+        app.scrollTo({ top: 0, left: 0 });
+      }
+      return false;
+    }
+    return { top: 0, left: 0 };
+  },
 });
 
 function istNurCharakterRoute(pfad) {
@@ -4928,6 +5004,28 @@ const uiZustand = Vue.reactive({
   weltenbauUebersichtModalOffen: false,
   weltenbauUebersichtModalGruppeId: '',
 });
+
+(function stelleUiZustandOffeneModalsWiederHer() {
+  const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+  if (!S) {
+    return;
+  }
+  const I = S.MODAL_IDS;
+  if (S.istOffenGespeichert(I.regelwerk)) {
+    uiZustand.regelwerkOffen = true;
+  }
+  if (S.istOffenGespeichert(I.abenteuerbuch)) {
+    uiZustand.abenteuerbuchOffen = true;
+  }
+  if (S.istOffenGespeichert(I.zeichen)) {
+    uiZustand.zeichenModalOffen = true;
+  }
+  const wb = S.lade(I.weltenbau);
+  if (wb && wb.offen && wb.gruppeId) {
+    uiZustand.weltenbauUebersichtModalGruppeId = wb.gruppeId;
+    uiZustand.weltenbauUebersichtModalOffen = true;
+  }
+})();
 
 const lebenspunkteStatus = Vue.reactive({
   tot: false,
@@ -5178,6 +5276,7 @@ const app = Vue.createApp({
     <zeichen-modal :ui-zustand="uiZustand"></zeichen-modal>
     <bildbetrachter-host />
     <bottom-nav :ui-zustand="uiZustand"></bottom-nav>
+    <modal-minimize-dock />
   `,
 });
 
@@ -5214,6 +5313,7 @@ app.component(
   window.HTBAH_KOMPONENTEN.EntwicklungshinweisModal,
 );
 app.component('bottom-nav', window.HTBAH_KOMPONENTEN.BottomNav);
+app.component('modal-minimize-dock', window.HTBAH_KOMPONENTEN.ModalMinimizeDock);
 app.component('bestaetigen-modal', window.HTBAH_KOMPONENTEN.BestaetigenModal);
 app.component('hinweis-modal', window.HTBAH_KOMPONENTEN.HinweisModal);
 app.component('eingabe-modal', window.HTBAH_KOMPONENTEN.EingabeModal);

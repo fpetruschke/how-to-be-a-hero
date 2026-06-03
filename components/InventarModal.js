@@ -61,15 +61,50 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
       this.beendeZiehen();
       this.beendeResize();
       this.istVollbild = false;
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      if (S) {
+        S.beimModalSchliessen(this, 'inventar');
+      } else {
+        this.bereinigeMinimiertZustand('inventar');
+      }
       this.offen = false;
       this.stelleFokusWiederHer();
+    },
+    modalMinimieren() {
+      this.minimieren({
+        id: 'inventar',
+        titel: 'Inventar',
+        emoji: '🎒',
+        onWiederherstellen: () => {
+          this.$nextTick(() => {
+            this.stelleSichtbaresFensterSicher();
+            this.fokussiereFenster();
+          });
+        },
+      });
     },
     oeffnen() {
       this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.offen = true;
       this.$nextTick(() => {
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (S) {
+          S.beimModalOeffnen('inventar', this, {
+            fensterOpts: { minBreite: 480, minHoehe: 320 },
+            onWiederherstellen: () => {
+              this.$nextTick(() => {
+                this.stelleSichtbaresFensterSicher();
+                this.fokussiereFenster();
+              });
+            },
+          });
+        } else {
+          this.bindModalSpeicher('inventar');
+        }
         this.initialisierePosition();
-        this.fokussiereFenster();
+        if (!this.minimiert) {
+          this.fokussiereFenster();
+        }
       });
     },
     onFensterEscape() {
@@ -79,6 +114,7 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
   template: `
     <div v-if="offen" class="regelwerk-modal-layer">
       <div
+        v-show="!minimiert"
         ref="fensterElement"
         class="regelwerk-modal-window card shadow htbah-inventar-modal-window"
         :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
@@ -100,6 +136,14 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
               :aria-label="vollbildLabel"
               @click="vollbildUmschalten">
               <span class="material-symbols-outlined">{{ vollbildIcon }}</span>
+            </button>
+            <button
+              type="button"
+              class="regelwerk-icon-button"
+              title="Minimieren"
+              aria-label="Minimieren"
+              @click="modalMinimieren">
+              <span class="material-symbols-outlined">minimize</span>
             </button>
             <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>

@@ -54,22 +54,28 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
       if (istOffen) {
         this.regelwerkTab = 'cheat-sheet';
         this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        this.$nextTick(() => {
-          this.initialisierePosition();
-          this.fokussiereFenster();
-        });
+        this.$nextTick(() => this.wiederherstelleRegelwerkAusSpeicher());
         return;
       }
 
       this.beendeZiehen();
       this.beendeResize();
-      this.istVollbild = false;
       this.entsorgeViewerIframe();
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      if (S) {
+        S.beimModalSchliessen(this, 'regelwerk');
+      } else {
+        this.bereinigeMinimiertZustand('regelwerk');
+      }
       this.stelleFokusWiederHer();
     },
   },
   mounted() {
     window.addEventListener('resize', this.beiFensterGroesseGeaendert);
+    if (this.uiZustand.regelwerkOffen) {
+      this.regelwerkTab = 'cheat-sheet';
+      this.$nextTick(() => this.wiederherstelleRegelwerkAusSpeicher());
+    }
   },
   beforeUnmount() {
     this.beendeZiehen();
@@ -91,11 +97,54 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
       }
       this.fokusVorModal = null;
     },
+    wiederherstelleRegelwerkAusSpeicher() {
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      if (S) {
+        S.beimModalOeffnen('regelwerk', this, {
+          onWiederherstellen: () => {
+            this.$nextTick(() => {
+              if (!this.istVollbild) {
+                this.stelleSichtbaresFensterSicher();
+              }
+              this.fokussiereFenster();
+            });
+          },
+        });
+        S.nachGeoeffnetAusSpeicher(this, this, {
+          initialisierePosition: this.initialisierePosition,
+          fokussiere: this.fokussiereFenster,
+        });
+      } else {
+        this.bindModalSpeicher('regelwerk');
+        this.initialisierePosition();
+        if (!this.minimiert) {
+          this.fokussiereFenster();
+        }
+      }
+    },
     schliessen() {
       this.beendeZiehen();
       this.beendeResize();
-      this.istVollbild = false;
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      if (S) {
+        S.beimModalSchliessen(this, 'regelwerk');
+      } else {
+        this.bereinigeMinimiertZustand('regelwerk');
+      }
       this.uiZustand.regelwerkOffen = false;
+    },
+    modalMinimieren() {
+      this.minimieren({
+        id: 'regelwerk',
+        titel: 'Regelwerk',
+        emoji: '📜',
+        onWiederherstellen: () => {
+          this.$nextTick(() => {
+            this.stelleSichtbaresFensterSicher();
+            this.fokussiereFenster();
+          });
+        },
+      });
     },
     onFensterEscape() {
       this.schliessen();
@@ -139,6 +188,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
   template: `
     <div v-if="uiZustand.regelwerkOffen" class="regelwerk-modal-layer">
       <div
+        v-show="!minimiert"
         ref="fensterElement"
         class="regelwerk-modal-window card shadow"
         :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
@@ -170,6 +220,14 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
               :aria-label="vollbildLabel"
               @click="vollbildUmschalten">
               <span class="material-symbols-outlined">{{ vollbildIcon }}</span>
+            </button>
+            <button
+              type="button"
+              class="regelwerk-icon-button"
+              title="Minimieren"
+              aria-label="Minimieren"
+              @click="modalMinimieren">
+              <span class="material-symbols-outlined">minimize</span>
             </button>
             <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>

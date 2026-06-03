@@ -40,6 +40,11 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       }
       if (typeof roh.aktiverReiterId === 'string' && roh.aktiverReiterId.trim()) {
         aktiverReiterId = roh.aktiverReiterId.trim();
+      } else if (
+        typeof roh.zuletztGeoeffneterReiterId === 'string' &&
+        roh.zuletztGeoeffneterReiterId.trim()
+      ) {
+        aktiverReiterId = roh.zuletztGeoeffneterReiterId.trim();
       }
     }
 
@@ -60,7 +65,11 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       aktiverReiterId = reiter[0].id;
     }
 
-    return { reiter, aktiverReiterId };
+    return {
+      reiter,
+      aktiverReiterId,
+      zuletztGeoeffneterReiterId: aktiverReiterId,
+    };
   }
 
   function erstelleLeeresAbenteuerbuch() {
@@ -68,6 +77,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return {
       reiter: [{ id, name: DEFAULT_REITER_NAME, html: '' }],
       aktiverReiterId: id,
+      zuletztGeoeffneterReiterId: id,
     };
   }
 

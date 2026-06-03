@@ -1402,6 +1402,74 @@ var HTBAH_REFACTOR_UTILS =
       },
       vollbildUmschalten() {
         this.modal.istVollbild = !this.modal.istVollbild;
+        if (!this.modal.istVollbild) {
+          this.$nextTick(() => {
+            this.stelleSichtbaresFensterSicher();
+            this.initialisierePosition();
+          });
+        }
+        window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebunden.call(this.modal);
+      },
+      wiederherstelleWeltenbauAusSpeicher() {
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        const fokussiere = () => {
+          const fenster = this.$refs.fensterElement;
+          if (fenster && typeof fenster.focus === 'function') {
+            fenster.focus();
+          }
+        };
+        if (S) {
+          S.beimModalOeffnen('weltenbau', this.modal, {
+            extrasLieferant: () => ({ gruppeId: this.gruppeId }),
+            onWiederherstellen: () => {
+              this.$nextTick(() => {
+                if (!this.modal.istVollbild) {
+                  this.stelleSichtbaresFensterSicher();
+                }
+                fokussiere();
+              });
+            },
+          });
+          S.nachGeoeffnetAusSpeicher(this.modal, this, {
+            initialisierePosition: this.initialisierePosition,
+            fokussiere,
+          });
+        } else {
+          window.HTBAH_MODAL_FENSTER.methoden.bindModalSpeicher.call(this.modal, 'weltenbau', () => ({
+            gruppeId: this.gruppeId,
+          }));
+          if (!this.modal.istVollbild) {
+            this.initialisierePosition();
+          }
+        }
+        this.refreshGraph();
+        if (this.initialisiereFehlendeOrtBildLayoutsAusGraph()) {
+          this.refreshGraph();
+        }
+        this.uebernehmeMapEinstellungen();
+        this.verlaufZuruecksetzen();
+        this.$nextTick(() => {
+          this.$nextTick(() => {
+            this.wendeCharakterErstfokusWennNoetig();
+            this.verarbeiteMentionNavigationTarget();
+          });
+        });
+      },
+      weltenbauModalMinimieren() {
+        window.HTBAH_MODAL_FENSTER.methoden.minimieren.call(this.modal, {
+          id: 'weltenbau',
+          titel: 'Interaktive Welt',
+          emoji: '🗺️',
+          onWiederherstellen: () => {
+            this.$nextTick(() => {
+              this.stelleSichtbaresFensterSicher();
+              const fenster = this.$refs.fensterElement;
+              if (fenster && typeof fenster.focus === 'function') {
+                fenster.focus();
+              }
+            });
+          },
+        });
       },
       async schliessen() {
         await this.schliesseMitPruefung();
@@ -6724,21 +6792,7 @@ var HTBAH_REFACTOR_UTILS =
           this.mapFreieElementeTick += 1;
           this.aktualisiereZustand();
           this.uebernehmeBildLayouts();
-          this.$nextTick(() => {
-            this.initialisierePosition();
-            this.refreshGraph();
-            if (this.initialisiereFehlendeOrtBildLayoutsAusGraph()) {
-              this.refreshGraph();
-            }
-            this.uebernehmeMapEinstellungen();
-            this.verlaufZuruecksetzen();
-            this.$nextTick(() => {
-              this.$nextTick(() => {
-                this.wendeCharakterErstfokusWennNoetig();
-                this.verarbeiteMentionNavigationTarget();
-              });
-            });
-          });
+          this.$nextTick(() => this.wiederherstelleWeltenbauAusSpeicher());
         } else {
           this.flushOrtBildLayoutsPersistieren();
           this.persistiereElementLocks();
@@ -6763,6 +6817,12 @@ var HTBAH_REFACTOR_UTILS =
           this.ausgewaehlteElemente = {};
           this.setzeDragHoverZiel('');
           this.verlaufZuruecksetzen();
+          const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+          if (S) {
+            S.beimModalSchliessen(this.modal, 'weltenbau');
+          } else {
+            window.HTBAH_MODAL_FENSTER.methoden.bereinigeMinimiertZustand.call(this.modal, 'weltenbau');
+          }
         }
       },
       gruppeId() {
@@ -6859,6 +6919,12 @@ var HTBAH_REFACTOR_UTILS =
       window.addEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
       window.addEventListener('htbah:interaktive-welt-stats-anzeigen-geaendert', this.synceInteraktiveWeltStatsFlag);
       window.addEventListener('htbah:kampagne-daten-geaendert', this.onKampagneDatenExternGeaendert);
+      if (this.offen) {
+        this.synceInteraktiveWeltStatsFlag();
+        this.aktualisiereZustand();
+        this.uebernehmeBildLayouts();
+        this.$nextTick(() => this.wiederherstelleWeltenbauAusSpeicher());
+      }
     },
     beforeUnmount() {
       if (window.HTBAH._weltenbauUebersichtModalInstanz === this) {
@@ -6904,6 +6970,7 @@ var HTBAH_REFACTOR_UTILS =
     template: `
       <div v-if="offen" class="regelwerk-modal-layer htbah-weltenbau-map-layer">
         <div
+          v-show="!modal.minimiert"
           ref="fensterElement"
           class="regelwerk-modal-window card shadow htbah-weltenbau-map-window"
           :class="{ 'regelwerk-modal-window-fullscreen': modal.istVollbild }"
@@ -6919,6 +6986,14 @@ var HTBAH_REFACTOR_UTILS =
                 :title="modal.istVollbild ? 'Vollbild beenden' : 'Vollbild'"
                 @click="vollbildUmschalten">
                 <span class="material-symbols-outlined">{{ modal.istVollbild ? 'close_fullscreen' : 'open_in_full' }}</span>
+              </button>
+              <button
+                type="button"
+                class="regelwerk-icon-button"
+                title="Minimieren"
+                aria-label="Minimieren"
+                @click="weltenbauModalMinimieren">
+                <span class="material-symbols-outlined">minimize</span>
               </button>
               <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
               </div>

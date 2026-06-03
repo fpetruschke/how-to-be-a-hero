@@ -200,13 +200,47 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       if (offen && !this.eingebettet) {
         this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         this.$nextTick(() => {
-          this.initialisierePosition();
-          this.fokussiereFenster();
+          const dockId = this.zeileModalDockId();
+          const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+          if (S) {
+            S.beimModalOeffnen(dockId, this.modal, {
+              fensterOpts: { minBreite: 360, minHoehe: 300 },
+              extrasLieferant: () => ({
+                dockTitel: this.zeileModalTitel || 'Eintrag bearbeiten',
+                dockEmoji: '✏️',
+              }),
+              onWiederherstellen: () => {
+                this.$nextTick(() => {
+                  this.stelleSichtbaresFensterSicher();
+                  this.fokussiereFenster();
+                });
+              },
+            });
+          }
+          const S2 = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+          if (S2) {
+            S2.nachGeoeffnetAusSpeicher(this.modal, this, {
+              initialisierePosition: this.initialisierePosition,
+              fokussiere: this.fokussiereFenster,
+            });
+          } else if (!this.modal.istVollbild) {
+            this.initialisierePosition();
+          }
+          if (!this.modal.minimiert) {
+            this.fokussiereFenster();
+          }
         });
       } else if (!offen) {
         this.beendeZiehen();
         this.beendeResize();
         this.modal.istVollbild = false;
+        const dockId = this.zeileModalDockId();
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (S) {
+          S.beimModalSchliessen(this.modal, dockId);
+        } else {
+          window.HTBAH_MODAL_FENSTER.methoden.bereinigeMinimiertZustand.call(this.modal, dockId);
+        }
         this.stelleFokusWiederHer();
       }
       this.fraktionOrtEingabe = '';
@@ -380,9 +414,37 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         komponente.schliessenUndZuruecksetzen();
       });
     },
+    zeileModalDockId() {
+      const typ = this.anlage && this.anlage.typ ? String(this.anlage.typ) : 'eintrag';
+      const id =
+        this.anlage && this.anlage.zeile && this.anlage.zeile.id
+          ? String(this.anlage.zeile.id)
+          : 'neu';
+      return `zufallstabellen-zeile-${typ}-${id}`;
+    },
     schliessen() {
       this.kampfWuerfelModalsSchliessenUndZuruecksetzen();
+      const dockId = this.zeileModalDockId();
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      if (S) {
+        S.beimModalSchliessen(this.modal, dockId);
+      } else {
+        window.HTBAH_MODAL_FENSTER.methoden.bereinigeMinimiertZustand.call(this.modal, dockId);
+      }
       this.$emit('close');
+    },
+    zeileModalMinimieren() {
+      window.HTBAH_MODAL_FENSTER.methoden.minimieren.call(this.modal, {
+        id: this.zeileModalDockId(),
+        titel: this.zeileModalTitel || 'Eintrag bearbeiten',
+        emoji: '✏️',
+        onWiederherstellen: () => {
+          this.$nextTick(() => {
+            this.stelleSichtbaresFensterSicher();
+            this.fokussiereFenster();
+          });
+        },
+      });
     },
     onResize() {
       this.$nextTick(() => this.stelleSichtbaresFensterSicher());
@@ -735,6 +797,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
   template: `
     <div v-if="anlage.offen && anlage.zeile" class="regelwerk-modal-layer">
       <div
+        v-show="!modal.minimiert"
         ref="fensterElement"
         class="regelwerk-modal-window card shadow"
         :class="{ 'regelwerk-modal-window-fullscreen': modal.istVollbild }"
@@ -801,6 +864,14 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
               :title="modal.istVollbild ? 'Vollbild beenden' : 'Vollbild'"
               @click="vollbildUmschalten">
               <span class="material-symbols-outlined">{{ vollbildIcon }}</span>
+            </button>
+            <button
+              type="button"
+              class="regelwerk-icon-button"
+              title="Minimieren"
+              aria-label="Minimieren"
+              @click="zeileModalMinimieren">
+              <span class="material-symbols-outlined">minimize</span>
             </button>
             <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>

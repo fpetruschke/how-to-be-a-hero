@@ -695,12 +695,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       'uiZustand.zeichenModalOffen'(istOffen) {
         if (istOffen) {
           this.fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-          this.ladeAusSpeicher();
-          this.$nextTick(() => {
-            this.initialisierePosition();
-            this.bindCanvas();
-            this.fokussiereFenster();
-          });
+          this.$nextTick(() => this.wiederherstelleZeichenAusSpeicher());
           window.addEventListener('keydown', this.onTastatur);
           return;
         }
@@ -708,6 +703,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.werkzeugMenuOffen = false;
         this.beendeZiehen();
         this.beendeResize();
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (S) {
+          S.beimModalSchliessen(this, 'zeichen');
+        } else {
+          this.bereinigeMinimiertZustand('zeichen');
+        }
         this.stiftVorschauPos = null;
         this._formEntwurf = null;
         this.unbindCanvas();
@@ -765,6 +766,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       window.addEventListener('resize', this.beiFensterGroesseGeaendert);
       window.addEventListener('pagehide', this.flushSpeichern);
       window.addEventListener('pointerdown', this.beiGlobalemPointerdown, true);
+      if (this.uiZustand.zeichenModalOffen) {
+        this.$nextTick(() => this.wiederherstelleZeichenAusSpeicher());
+      }
     },
     beforeUnmount() {
       window.removeEventListener('resize', this.beiFensterGroesseGeaendert);
@@ -778,12 +782,60 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     },
     methods: {
       ...window.HTBAH_MODAL_FENSTER.methoden,
+      wiederherstelleZeichenAusSpeicher() {
+        this.ladeAusSpeicher();
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (S) {
+          S.beimModalOeffnen('zeichen', this, {
+            onWiederherstellen: () => {
+              this.$nextTick(() => {
+                if (!this.istVollbild) {
+                  this.stelleSichtbaresFensterSicher();
+                }
+                this.fokussiereFenster();
+              });
+            },
+          });
+          S.nachGeoeffnetAusSpeicher(this, this, {
+            initialisierePosition: this.initialisierePosition,
+            fokussiere: this.fokussiereFenster,
+          });
+        } else {
+          this.bindModalSpeicher('zeichen');
+          if (!this.istVollbild) {
+            this.initialisierePosition();
+          }
+        }
+        this.bindCanvas();
+        if (!this.minimiert) {
+          this.fokussiereFenster();
+        }
+      },
       schliessen() {
         this.werkzeugMenuOffen = false;
         this.flushSpeichern();
         this.beendeZiehen();
         this.beendeResize();
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (S) {
+          S.beimModalSchliessen(this, 'zeichen');
+        } else {
+          this.bereinigeMinimiertZustand('zeichen');
+        }
         this.uiZustand.zeichenModalOffen = false;
+      },
+      modalMinimieren() {
+        this.minimieren({
+          id: 'zeichen',
+          titel: 'Zeichnen',
+          emoji: '✏️',
+          onWiederherstellen: () => {
+            this.$nextTick(() => {
+              this.stelleSichtbaresFensterSicher();
+              this.fokussiereFenster();
+            });
+          },
+        });
       },
       onFensterEscape() {
         if (this.werkzeugMenuOffen) {
@@ -2199,6 +2251,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     template: `
       <div v-if="uiZustand.zeichenModalOffen" class="regelwerk-modal-layer htbah-zeichen-modal-layer">
         <div
+          v-show="!minimiert"
           ref="fensterElement"
           class="regelwerk-modal-window card shadow htbah-zeichen-modal-window"
           :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
@@ -2223,6 +2276,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 :aria-label="vollbildLabel"
                 @click="vollbildUmschalten">
                 <span class="material-symbols-outlined">{{ vollbildIcon }}</span>
+              </button>
+              <button
+                type="button"
+                class="regelwerk-icon-button"
+                title="Minimieren"
+                aria-label="Minimieren"
+                @click="modalMinimieren">
+                <span class="material-symbols-outlined">minimize</span>
               </button>
               <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
             </div>

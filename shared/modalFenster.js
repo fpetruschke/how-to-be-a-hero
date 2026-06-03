@@ -1,6 +1,58 @@
+const HTBAH_MODAL_MINIMIZE_DOCK_EINTRAGE =
+  typeof Vue !== 'undefined' && Vue.reactive ? Vue.reactive([]) : [];
+
 window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
   minBreite: 320,
   minHoehe: 280,
+  minimiertIcon: 'minimize',
+  minimiertLabel: 'Minimieren',
+  wiederherstellenLabel: 'Fenster wiederherstellen',
+  dock: {
+    get eintraege() {
+      return HTBAH_MODAL_MINIMIZE_DOCK_EINTRAGE;
+    },
+    registriere(eintrag) {
+      if (!eintrag || !eintrag.id) {
+        return;
+      }
+      const idx = HTBAH_MODAL_MINIMIZE_DOCK_EINTRAGE.findIndex((e) => e.id === eintrag.id);
+      const payload = {
+        id: eintrag.id,
+        titel: eintrag.titel || 'Fenster',
+        emoji: eintrag.emoji || '',
+        wiederherstellen:
+          typeof eintrag.wiederherstellen === 'function' ? eintrag.wiederherstellen : () => {},
+      };
+      if (idx >= 0) {
+        HTBAH_MODAL_MINIMIZE_DOCK_EINTRAGE[idx] = payload;
+        return;
+      }
+      HTBAH_MODAL_MINIMIZE_DOCK_EINTRAGE.push(payload);
+    },
+    entferne(id) {
+      if (!id) {
+        return;
+      }
+      const idx = HTBAH_MODAL_MINIMIZE_DOCK_EINTRAGE.findIndex((e) => e.id === id);
+      if (idx >= 0) {
+        HTBAH_MODAL_MINIMIZE_DOCK_EINTRAGE.splice(idx, 1);
+      }
+    },
+    verschiebe(vonIndex, nachIndex) {
+      const arr = HTBAH_MODAL_MINIMIZE_DOCK_EINTRAGE;
+      if (
+        vonIndex < 0 ||
+        nachIndex < 0 ||
+        vonIndex >= arr.length ||
+        nachIndex >= arr.length ||
+        vonIndex === nachIndex
+      ) {
+        return;
+      }
+      const [eintrag] = arr.splice(vonIndex, 1);
+      arr.splice(nachIndex, 0, eintrag);
+    },
+  },
   utils: {
     ermittleViewportGroesse() {
       const viewportBreite =
@@ -34,6 +86,8 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
   },
   erstelleBasisDaten() {
     return {
+      minimiert: false,
+      _dockId: null,
       istVollbild: false,
       positionX: null,
       positionY: null,
@@ -141,6 +195,7 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
       window.removeEventListener('pointermove', this.beimZiehen);
       window.removeEventListener('pointerup', this.beendeZiehen);
       window.removeEventListener('pointercancel', this.beendeZiehen);
+      window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(this);
     },
     starteResize(event) {
       if (this.istVollbild) {
@@ -179,14 +234,22 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
       window.removeEventListener('pointermove', this.beimResize);
       window.removeEventListener('pointerup', this.beendeResize);
       window.removeEventListener('pointercancel', this.beendeResize);
+      window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(this);
     },
     vollbildUmschalten() {
+      const MF = window.HTBAH_MODAL_FENSTER;
+      const M = MF && MF.methoden;
       this.istVollbild = !this.istVollbild;
       if (!this.istVollbild) {
         this.$nextTick(() => {
           this.stelleSichtbaresFensterSicher();
           this.zentriereFenster();
+          if (M) {
+            M.persistiereModalWennGebunden.call(this);
+          }
         });
+      } else if (M) {
+        M.persistiereModalWennGebunden.call(this);
       }
     },
     stelleSichtbaresFensterSicher() {
@@ -211,6 +274,99 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
     },
     beiFensterGroesseGeaendert() {
       this.$nextTick(this.stelleSichtbaresFensterSicher);
+      window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(this);
+    },
+    bindModalSpeicher(modalId, extrasLieferant) {
+      this._htbahModalSpeicherId = modalId || null;
+      this._htbahModalSpeicherExtras =
+        typeof extrasLieferant === 'function' ? extrasLieferant : extrasLieferant || null;
+    },
+    entferneModalSpeicher() {
+      const id = this._htbahModalSpeicherId;
+      this._htbahModalSpeicherId = null;
+      this._htbahModalSpeicherExtras = null;
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      if (id && S) {
+        S.entferne(id);
+      }
+    },
+    modalSpeicherExtras() {
+      return window.HTBAH_MODAL_FENSTER.methoden.leseModalSpeicherExtras.call(this);
+    },
+    leseModalSpeicherExtras() {
+      if (typeof this._htbahModalSpeicherExtras === 'function') {
+        return this._htbahModalSpeicherExtras() || {};
+      }
+      return this._htbahModalSpeicherExtras || {};
+    },
+    persistiereModalWennGebunden() {
+      const id = this._htbahModalSpeicherId;
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      if (id && S) {
+        S.persistiere(id, this, window.HTBAH_MODAL_FENSTER.methoden.leseModalSpeicherExtras.call(this));
+      }
+    },
+    persistiereModalWennGebundenDebounced() {
+      const id = this._htbahModalSpeicherId;
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      if (id && S) {
+        S.persistiereDebounced(
+          id,
+          this,
+          window.HTBAH_MODAL_FENSTER.methoden.leseModalSpeicherExtras.call(this),
+        );
+      }
+    },
+    minimieren(meta) {
+      const MF = window.HTBAH_MODAL_FENSTER;
+      if (!meta || !meta.id) {
+        return;
+      }
+      if (typeof this.beendeZiehen === 'function') {
+        this.beendeZiehen();
+      }
+      if (typeof this.beendeResize === 'function') {
+        this.beendeResize();
+      }
+      if (this.istVollbild) {
+        this.istVollbild = false;
+      }
+      this.minimiert = true;
+      this._dockId = meta.id;
+      const fenster = this;
+      MF.dock.registriere({
+        id: meta.id,
+        titel: meta.titel || 'Fenster',
+        emoji: meta.emoji || '',
+        wiederherstellen() {
+          MF.methoden.wiederherstellen.call(fenster);
+          MF.methoden.persistiereModalWennGebunden.call(fenster);
+          if (typeof meta.onWiederherstellen === 'function') {
+            meta.onWiederherstellen();
+          }
+        },
+      });
+      MF.methoden.persistiereModalWennGebunden.call(this);
+    },
+    wiederherstellen() {
+      if (!this.minimiert) {
+        return;
+      }
+      this.minimiert = false;
+      const id = this._dockId;
+      this._dockId = null;
+      if (id) {
+        window.HTBAH_MODAL_FENSTER.dock.entferne(id);
+      }
+      window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebunden.call(this);
+    },
+    bereinigeMinimiertZustand(dockId) {
+      const id = dockId || this._dockId;
+      if (id) {
+        window.HTBAH_MODAL_FENSTER.dock.entferne(id);
+      }
+      this.minimiert = false;
+      this._dockId = null;
     },
   },
 };

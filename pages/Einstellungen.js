@@ -65,10 +65,13 @@ const SPEICHER_BEREICHE = {
     keys: [
       'htbah_dice_colors',
       'htbah_wuerfel_beutel_fenster',
+      'htbah_konflikt_fenster',
+      'htbah_offene_modals',
+      'htbah_floating_fab_pos',
     ],
     titel: 'Würfelbeutel-Layout löschen?',
     beschreibung:
-      '3D-Würfel (Aktivierung und Farbe) sowie gespeicherte Größe und Position des Würfelbeutel-Fensters werden entfernt. Wetter/Tageszeit ist Teil der jeweiligen Kampagne und bleibt unter „Spielleitung-Kampagnen“ gespeichert.',
+      '3D-Würfel (Aktivierung und Farbe) sowie gespeicherte Größe, Position und offene Zustände der schwebenden Fenster (Würfelbeutel, Musik, Konflikt usw.) und der Positionen der Floating Buttons werden entfernt. Wetter/Tageszeit ist Teil der jeweiligen Kampagne und bleibt unter „Spielleitung-Kampagnen“ gespeichert.',
     erfolg: 'Würfelbeutel-Layout wurde gelöscht.',
     buttonSymbol: '🎲',
     buttonLabel: 'Würfelbecher-Einstellungen löschen',
@@ -116,8 +119,12 @@ const SPEICHER_BEREICHE = {
       'htbah_wuerfel_sound',
       'htbah_zeitmessung_einstellungen',
       'htbah_zeitmessung_badge_pos',
+      'htbah_abenteuerbuch_einstellungen',
       'htbah_dice_colors',
       'htbah_wuerfel_beutel_fenster',
+      'htbah_konflikt_fenster',
+      'htbah_offene_modals',
+      'htbah_floating_fab_pos',
       'htbah_wuerfelbecher_bundle',
       'htbah_orientation_mode',
       'htbah_orientation_anchor_angle',
@@ -125,7 +132,7 @@ const SPEICHER_BEREICHE = {
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleitung-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen und Weltenbau-Daten je Kampagne, deine Theme-Auswahl, die Würfel- und Zeitmessungs-Einstellungen, 3D-Würfel-Farben sowie Größe und Position des Würfelbeutel-Fensters entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleitung-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen und Weltenbau-Daten je Kampagne, deine Theme-Auswahl, die Würfel- und Zeitmessungs-Einstellungen, 3D-Würfel-Farben sowie offene Fenster inkl. Größe, Position und Minimieren-Zustand entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
@@ -152,7 +159,14 @@ const WUERFELBECHER_KEYS = [
   'htbah_zeitmessung_badge_pos',
 ];
 
-const IMPORT_IGNORIERE_KEYS = new Set(['htbah_app_rolle', 'htbah_active_character_id']);
+const IMPORT_IGNORIERE_KEYS = new Set([
+  'htbah_app_rolle',
+  'htbah_active_character_id',
+  'htbah_offene_modals',
+  'htbah_floating_fab_pos',
+  'htbah_wuerfel_beutel_fenster',
+  'htbah_konflikt_fenster',
+]);
 
 function htbahNormalisiereLokalerSpeicherImportDaten(rohDaten) {
   if (!Array.isArray(rohDaten)) {
@@ -303,6 +317,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       zeitmessungKlickLautstaerke: 0.65,
       zeitmessungStoppuhrMitKlick: false,
       zeitmessungCountdownAbSekunde: 10,
+      abenteuerbuchReiterLeisteUmbruch: false,
       orientierungModus: 'frei',
       /** Erzwingt Neu-Laden der Kampagnenliste aus dem Speicher (nicht reaktiv). */
       kampagnenCacheTick: 0,
@@ -832,6 +847,19 @@ window.HTBAH_SEITEN.Einstellungen = {
         this.zeitmessungStoppuhrMitKlick = zeit.stoppuhrMitKlick;
         this.zeitmessungCountdownAbSekunde = zeit.countdownAbSekunde;
       }
+      if (window.HTBAH && typeof window.HTBAH.ladeAbenteuerbuchEinstellungen === 'function') {
+        const ab = window.HTBAH.ladeAbenteuerbuchEinstellungen();
+        this.abenteuerbuchReiterLeisteUmbruch = Boolean(ab.reiterLeisteUmbruch);
+      }
+    },
+    speichereAbenteuerbuchEinstellungen() {
+      if (!window.HTBAH || typeof window.HTBAH.setzeAbenteuerbuchEinstellungen !== 'function') {
+        return;
+      }
+      window.HTBAH.setzeAbenteuerbuchEinstellungen({
+        reiterLeisteUmbruch: this.abenteuerbuchReiterLeisteUmbruch,
+      });
+      window.dispatchEvent(new CustomEvent('htbah:abenteuerbuch-einstellungen-geaendert'));
     },
     speichereWuerfelAnzeigeEinstellungen() {
       window.HTBAH.setzeWuerfelAnzeigeProfil({
@@ -965,6 +993,14 @@ window.HTBAH_SEITEN.Einstellungen = {
         window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
       } else if (Array.isArray(bereich.keys)) {
         window.HTBAH.speicher.loescheKeys(bereich.keys);
+        if (
+          this.zuLoeschenderBereich === 'wuerfelbeutelLayout' ||
+          this.zuLoeschenderBereich === 'alles'
+        ) {
+          if (typeof window.HTBAH.loescheOffeneModalsSpeicher === 'function') {
+            window.HTBAH.loescheOffeneModalsSpeicher();
+          }
+        }
         if (this.zuLoeschenderBereich === 'alles') {
           window.HTBAH.speicher.loescheKeysMitPraefix(
             window.HTBAH.speicherKeys.zufallstabellenProKampagnePraefix,
@@ -1002,7 +1038,15 @@ window.HTBAH_SEITEN.Einstellungen = {
         this.speicherSchaetzungLaden();
       }
       if (this.zuLoeschenderBereich === 'spielleitung' || this.zuLoeschenderBereich === 'alles') {
+        if (typeof window.HTBAH.loescheFloatingFabSpeicherKomplett === 'function') {
+          window.HTBAH.loescheFloatingFabSpeicherKomplett();
+        }
         this.kampagnenCacheTick += 1;
+      }
+      if (this.zuLoeschenderBereich === 'wuerfelbeutelLayout') {
+        if (typeof window.HTBAH.loescheFloatingFabSpeicherKomplett === 'function') {
+          window.HTBAH.loescheFloatingFabSpeicherKomplett();
+        }
       }
     },
     statusAnzeigen(text, typ = 'success') {
@@ -1682,6 +1726,25 @@ window.HTBAH_SEITEN.Einstellungen = {
         <h5 class="text-start mb-2">Labels</h5>
         <div class="card p-3 mb-3 text-start">
           <kampagnen-labels-verwaltung />
+        </div>
+
+        <h5 class="text-start mb-2">Abenteuerbuch</h5>
+        <div class="card p-3 mb-3 text-start">
+          <div class="form-check form-switch mb-0">
+            <input
+              id="settings-abenteuerbuch-reiter-umbruch"
+              class="form-check-input"
+              type="checkbox"
+              role="switch"
+              v-model="abenteuerbuchReiterLeisteUmbruch"
+              @change="speichereAbenteuerbuchEinstellungen" />
+            <label class="form-check-label" for="settings-abenteuerbuch-reiter-umbruch">
+              Reiter bei Platzmangel umbrechen
+            </label>
+          </div>
+          <div class="form-text mt-2 mb-0">
+            Aus: eine Zeile, horizontal scrollbar. An: mehrere Zeilen — alle Reiter bleiben sichtbar.
+          </div>
         </div>
       </template>
 

@@ -16,6 +16,12 @@ const HTBAH_DICE_INIT_TIMEOUT_MS = 7000;
 /** Sound nach Start des 3D-Wurfs — sonst ertönt er vor sichtbarer Würfelbewegung. */
 const HTBAH_WUERFEL_SOUND_VERZOEGERUNG_3D_MS = 750;
 const HTBAH_APP_ORIGIN = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
+/** Gedrückt halten, dann FAB-Stack frei verschieben (auch Touch). */
+const HTBAH_FAB_LONG_PRESS_MS = 450;
+const HTBAH_FAB_HOLD_BEWEGUNG_ABBRUCH_PX = 12;
+
+/** Abstand zwischen zwei übereinander gestapelten FABs (3rem + gap). */
+const HTBAH_FAB_STACK_OFFSET_PX = 55;
 
 window.HTBAH_KOMPONENTEN.BottomNav = {
   components: {
@@ -82,13 +88,28 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       musikboardAusloeserElement: null,
       sicherheitsmechanismenModalOffen: false,
       konfliktModalOffen: false,
+      fabPos: {
+        sicherheits: null,
+        konflikt: null,
+        wuerfelbeutel: null,
+      },
+      fabZiehtId: null,
+      fabKlickGesperrt: false,
+      /** Erzwingt Neuberechnung der viewport-begrenzten FAB-Anzeigeposition. */
+      fabViewportTick: 0,
+      _fabHold: null,
+      _fabDrag: null,
+      _fabHoldMoveHandler: null,
+      _fabHoldUpHandler: null,
+      _fabLongPressTimer: null,
+      _kampagnenModalNurUiVerstecken: false,
       _badgeDragMoveHandler: null,
       _badgeDragUpHandler: null,
     };
   },
   created() {
     this.synchronisiereKampagnenbasierteDaten();
-    this.ladeWuerfelBeutelFenster();
+    this.stelleOffeneBottomNavModalsAusSpeicherWiederHer();
   },
   computed: {
     ergebnisSumme() {
@@ -280,7 +301,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       );
     },
     zeitmessungOverlaySichtbar() {
-      return this.zeitmessungLaeuft || this.zeitmessungPausiert || this.zeitmessungAbgelaufen;
+      return (
+        this.hatAktiveKampagne &&
+        (this.zeitmessungLaeuft || this.zeitmessungPausiert || this.zeitmessungAbgelaufen)
+      );
     },
     zeitmessungCountdownProfil() {
       return window.HTBAH && typeof window.HTBAH.ladeZeitmessungProfil === 'function'
@@ -473,9 +497,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       if (this.sicherheitsmechanismenModalOffen) {
         this.sicherheitsmechanismenModalOffen = false;
       }
-      if (this.konfliktModalOffen) {
-        this.konfliktModalOffen = false;
-      }
     },
     aktiveKampagneId(neu, alt) {
       const altId = typeof alt === 'string' && alt.trim() ? alt.trim() : '';
@@ -487,8 +508,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     hatAktiveKampagne(neu) {
       if (neu) {
         this.synchronisiereKampagnenbasierteDaten();
+        this.stelleOffeneBottomNavModalsAusSpeicherWiederHer();
         return;
       }
+      this.versteckeKampagnenModale();
       if (this.wuerfelModalTab === 'atmosphaere' || this.wuerfelModalTab === 'begegnung') {
         this.wuerfelModalTab = 'wuerfel';
       }
@@ -510,6 +533,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     wuerfelModalTab(neu) {
       if (neu === 'zeitmessung') {
         this.zeitmessungTimerEingabeGeaendert();
+      }
+      if (this.wuerfelBeutelOffen && this.wuerfelBeutelFenster._htbahModalSpeicherId) {
+        window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(
+          this.wuerfelBeutelFenster,
+        );
       }
       if (neu === 'wuerfel' && this.dice3dAktiv) {
         this.$nextTick(() => {
@@ -547,9 +575,16 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         window.addEventListener('resize', this.wuerfelBeutelBeiViewportResize);
         window.addEventListener('keydown', this.onWuerfelBeutelKeydown);
         this.$nextTick(() => {
-          const fenster = this.$refs.wuerfelBeutelFensterRef;
-          if (fenster && typeof fenster.focus === 'function') {
-            fenster.focus();
+          this.wuerfelBeutelInitialisierePosition();
+          this.bottomNavModalNachOeffnen('wuerfelBeutelFenster', 'wuerfel-beutel', {
+            minBreite: 300,
+            minHoehe: 260,
+          });
+          if (!this.wuerfelBeutelFenster.minimiert) {
+            const fenster = this.$refs.wuerfelBeutelFensterRef;
+            if (fenster && typeof fenster.focus === 'function') {
+              fenster.focus();
+            }
           }
         });
       } else {
@@ -557,6 +592,17 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         window.removeEventListener('keydown', this.onWuerfelBeutelKeydown);
         this.wuerfelBeutelBeendeZiehen();
         this.wuerfelBeutelBeendeResize();
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (!this._kampagnenModalNurUiVerstecken) {
+          if (S) {
+            S.beimModalSchliessen(this.wuerfelBeutelFenster, 'wuerfel-beutel');
+          } else {
+            window.HTBAH_MODAL_FENSTER.methoden.bereinigeMinimiertZustand.call(
+              this.wuerfelBeutelFenster,
+              'wuerfel-beutel',
+            );
+          }
+        }
         if (this.wuerfelBeutelAusloeserElement && this.wuerfelBeutelAusloeserElement.isConnected) {
           this.wuerfelBeutelAusloeserElement.focus();
         }
@@ -568,9 +614,16 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         window.addEventListener('resize', this.musikboardBeiViewportResize);
         window.addEventListener('keydown', this.onMusikboardKeydown);
         this.$nextTick(() => {
-          const fenster = this.$refs.musikboardFensterRef;
-          if (fenster && typeof fenster.focus === 'function') {
-            fenster.focus();
+          this.musikboardInitialisierePosition();
+          this.bottomNavModalNachOeffnen('musikboardFenster', 'musikboard', {
+            minBreite: 360,
+            minHoehe: 280,
+          });
+          if (!this.musikboardFenster.minimiert) {
+            const fenster = this.$refs.musikboardFensterRef;
+            if (fenster && typeof fenster.focus === 'function') {
+              fenster.focus();
+            }
           }
         });
       } else {
@@ -578,6 +631,17 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         window.removeEventListener('keydown', this.onMusikboardKeydown);
         this.musikboardBeendeZiehen();
         this.musikboardBeendeResize();
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (!this._kampagnenModalNurUiVerstecken) {
+          if (S) {
+            S.beimModalSchliessen(this.musikboardFenster, 'musikboard');
+          } else {
+            window.HTBAH_MODAL_FENSTER.methoden.bereinigeMinimiertZustand.call(
+              this.musikboardFenster,
+              'musikboard',
+            );
+          }
+        }
         if (this.musikboardAusloeserElement && this.musikboardAusloeserElement.isConnected) {
           this.musikboardAusloeserElement.focus();
         }
@@ -586,9 +650,32 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
   },
   mounted() {
+    this._onOffeneModalsSpeicherGeleert = () => this.onOffeneModalsSpeicherGeleert();
+    window.addEventListener('htbah:offene-modals-speicher-geleert', this._onOffeneModalsSpeicherGeleert);
     this._navReserveObserver = null;
-    this.$nextTick(() => this.bindNavReserveObserver());
+    this.$nextTick(() => {
+      this.bindNavReserveObserver();
+      if (this.hatAktiveKampagne && this.wuerfelBeutelOffen) {
+        this.wuerfelBeutelInitialisierePosition();
+        this.bottomNavModalNachOeffnen('wuerfelBeutelFenster', 'wuerfel-beutel', {
+          minBreite: 300,
+          minHoehe: 260,
+        });
+      }
+      if (this.hatAktiveKampagne && this.musikboardOffen) {
+        this.musikboardInitialisierePosition();
+        this.bottomNavModalNachOeffnen('musikboardFenster', 'musikboard', {
+          minBreite: 360,
+          minHoehe: 280,
+        });
+      }
+    });
     this.ladeDiceFarbwahl();
+    this._fabViewportHandler = () => {
+      this.fabViewportTick += 1;
+    };
+    window.addEventListener('resize', this._fabViewportHandler, { passive: true });
+    window.addEventListener('orientationchange', this._fabViewportHandler, { passive: true });
     window.addEventListener('htbah:wuerfel-einstellungen-geaendert', this.onWuerfelEinstellungenGlobalGeaendert);
     window.addEventListener('htbah:kampagne-daten-geaendert', this.onHtbahKampagneZufallstabellenGeaendert);
   },
@@ -611,6 +698,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.diceInitPromiseEiner = null;
     this.diceModulLadenPromise = null;
     this.abbrecheAnstehenden3dWuerfelSound();
+    this.fabHoldAbbrechen();
+    if (this._fabViewportHandler) {
+      window.removeEventListener('resize', this._fabViewportHandler);
+      window.removeEventListener('orientationchange', this._fabViewportHandler);
+      this._fabViewportHandler = null;
+    }
     this.zeitmessungStoppeTicker();
     this.zeitmessungPersistiereAktuelleKampagne();
     this.zeitmessungAbbrecheSpeichernTimer();
@@ -627,7 +720,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     window.removeEventListener('htbah:kampagne-daten-geaendert', this.onHtbahKampagneZufallstabellenGeaendert);
     window.removeEventListener('resize', this.musikboardBeiViewportResize);
     window.removeEventListener('keydown', this.onMusikboardKeydown);
-    this.speichereWuerfelBeutelFenster();
+    if (this._onOffeneModalsSpeicherGeleert) {
+      window.removeEventListener(
+        'htbah:offene-modals-speicher-geleert',
+        this._onOffeneModalsSpeicherGeleert,
+      );
+    }
     this.wuerfelBeutelBeendeZiehen();
     this.wuerfelBeutelBeendeResize();
     this.musikboardBeendeZiehen();
@@ -636,6 +734,19 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.zeitmessungBadgeZiehenCleanup();
   },
   methods: {
+    onOffeneModalsSpeicherGeleert() {
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      const M = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.methoden;
+      if (M) {
+        M.bereinigeMinimiertZustand.call(this.wuerfelBeutelFenster, 'wuerfel-beutel');
+        M.bereinigeMinimiertZustand.call(this.musikboardFenster, 'musikboard');
+        this.wuerfelBeutelFenster._htbahModalSpeicherId = null;
+        this.musikboardFenster._htbahModalSpeicherId = null;
+      }
+      this.wuerfelBeutelOffen = false;
+      this.musikboardOffen = false;
+      this.konfliktModalOffen = false;
+    },
     entsorgeDiceBoxInstanz(rawBox) {
       if (!rawBox || typeof rawBox !== 'object') {
         return;
@@ -988,6 +1099,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.zeitmessungPersistiereAktuelleKampagne();
         this.atmosphaere = {};
         this.badgePos = null;
+        this.fabPos = { sicherheits: null, konflikt: null, wuerfelbeutel: null };
         this.zeitmessungSetzeAufStandardZustand();
         return;
       }
@@ -999,6 +1111,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       }
       this.atmosphaere = window.HTBAH.ladeKampagnenAtmosphaereZustand(id);
       this.badgePos = window.HTBAH.ladeKampagnenAtmosphaereBadgePosition(id);
+      this.fabLadePositionen(id);
       this.zeitmessungLadeAusKampagne(id);
     },
     speichereAtmosphaere() {
@@ -1143,53 +1256,143 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     atmosphaereToggleFormular() {
       this.atmosphaereFormularOffen = !this.atmosphaereFormularOffen;
     },
-    ladeWuerfelBeutelFenster() {
+    wuerfelBeutelSpeicherExtras() {
+      const id = this.aktiveKampagneId;
+      return {
+        wuerfelModalTab: this.wuerfelModalTab,
+        ...(id ? { kampagneId: id } : {}),
+      };
+    },
+    modalSpeicherPasstZurAktivenKampagne(eintrag) {
+      if (!eintrag || !eintrag.kampagneId) {
+        return true;
+      }
+      return eintrag.kampagneId === this.aktiveKampagneId;
+    },
+    versteckeKampagnenModale() {
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      this._kampagnenModalNurUiVerstecken = true;
       try {
-        const key = window.HTBAH?.speicherKeys?.wuerfelBeutelFenster || 'htbah_wuerfel_beutel_fenster';
-        const o = window.HTBAH?.speicher?.leseJson(key, null);
-        if (!o || typeof o !== 'object') {
-          return;
+        if (this.wuerfelBeutelOffen) {
+          if (S) {
+            S.beimModalUiAusblenden(
+              'wuerfel-beutel',
+              this.wuerfelBeutelFenster,
+              () => this.wuerfelBeutelSpeicherExtras(),
+            );
+          } else {
+            window.HTBAH_MODAL_FENSTER.methoden.bereinigeMinimiertZustand.call(
+              this.wuerfelBeutelFenster,
+              'wuerfel-beutel',
+            );
+          }
+          this.wuerfelBeutelOffen = false;
         }
-        const f = this.wuerfelBeutelFenster;
-        const br = Number(o.breite);
-        const ho = Number(o.hoehe);
-        if (Number.isFinite(br) && Number.isFinite(ho) && br > 0 && ho > 0) {
-          const g = window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(br, ho, 300, 260);
-          f.breite = g.breite;
-          f.hoehe = g.hoehe;
+        if (this.musikboardOffen) {
+          if (S) {
+            S.beimModalUiAusblenden('musikboard', this.musikboardFenster, () => ({
+              kampagneId: this.aktiveKampagneId || undefined,
+            }));
+          } else {
+            window.HTBAH_MODAL_FENSTER.methoden.bereinigeMinimiertZustand.call(
+              this.musikboardFenster,
+              'musikboard',
+            );
+          }
+          this.musikboardOffen = false;
         }
-        const px = Number(o.positionX);
-        const py = Number(o.positionY);
-        if (Number.isFinite(px) && Number.isFinite(py) && f.breite != null && f.hoehe != null) {
-          const p = window.HTBAH_MODAL_FENSTER.utils.begrenzePosition(px, py, f.breite, f.hoehe);
-          f.positionX = p.x;
-          f.positionY = p.y;
+        if (this.konfliktModalOffen) {
+          this.konfliktModalOffen = false;
         }
-      } catch {
-        /* Optional: defekter LocalStorage-Eintrag */
+      } finally {
+        this._kampagnenModalNurUiVerstecken = false;
       }
     },
-    speichereWuerfelBeutelFenster() {
-      try {
-        const f = this.wuerfelBeutelFenster;
-        if (
-          f.breite == null ||
-          f.hoehe == null ||
-          f.positionX == null ||
-          f.positionY == null
-        ) {
-          return;
-        }
-        const key = window.HTBAH?.speicherKeys?.wuerfelBeutelFenster || 'htbah_wuerfel_beutel_fenster';
-        window.HTBAH?.speicher?.schreibeJson(key, {
-          breite: Math.round(f.breite),
-          hoehe: Math.round(f.hoehe),
-          positionX: Math.round(f.positionX),
-          positionY: Math.round(f.positionY),
-        });
-      } catch {
-        /* Optional: Speicher gesperrt */
+    stelleOffeneBottomNavModalsAusSpeicherWiederHer() {
+      if (!this.hatAktiveKampagne) {
+        return;
       }
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      const M = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.methoden;
+      if (!S || !M) {
+        return;
+      }
+      const I = S.MODAL_IDS;
+      const w = S.lade(I.wuerfelBeutel);
+      if (w && w.offen && this.modalSpeicherPasstZurAktivenKampagne(w)) {
+        S.migriereLegacyEinmalig(I.wuerfelBeutel, this.wuerfelBeutelFenster, {
+          minBreite: 300,
+          minHoehe: 260,
+        });
+        const wEintrag = S.lade(I.wuerfelBeutel);
+        if (wEintrag) {
+          S.wendeAufFenster(this.wuerfelBeutelFenster, wEintrag, {
+            minBreite: 300,
+            minHoehe: 260,
+          });
+        }
+        if (w.wuerfelModalTab) {
+          this.wuerfelModalTab = w.wuerfelModalTab;
+        }
+        this.wuerfelBeutelOffen = true;
+      }
+      const m = S.lade(I.musikboard);
+      if (m && m.offen && this.modalSpeicherPasstZurAktivenKampagne(m)) {
+        S.migriereLegacyEinmalig(I.musikboard, this.musikboardFenster, {
+          minBreite: 360,
+          minHoehe: 280,
+        });
+        const mEintrag = S.lade(I.musikboard);
+        if (mEintrag) {
+          S.wendeAufFenster(this.musikboardFenster, mEintrag, {
+            minBreite: 360,
+            minHoehe: 280,
+          });
+        }
+        this.musikboardOffen = true;
+      }
+      const k = S.lade(I.konflikt);
+      if (k && k.offen && k.kampagneId && k.kampagneId === this.aktiveKampagneId) {
+        this.konfliktModalOffen = true;
+      }
+    },
+    bottomNavModalNachOeffnen(fensterKey, modalId, fensterOpts) {
+      const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+      const fenster = this[fensterKey];
+      if (!S || !fenster) {
+        return;
+      }
+      const extras =
+        modalId === 'wuerfel-beutel'
+          ? () => this.wuerfelBeutelSpeicherExtras()
+          : modalId === 'konflikt'
+            ? () => ({ kampagneId: this.aktiveKampagneId })
+            : modalId === 'musikboard'
+              ? () => ({
+                  kampagneId: this.aktiveKampagneId || undefined,
+                })
+              : null;
+      S.beimModalOeffnen(modalId, fenster, {
+        fensterOpts: fensterOpts || undefined,
+        extrasLieferant: extras,
+        onWiederherstellen: () => {
+          this.$nextTick(() => {
+            if (modalId === 'wuerfel-beutel') {
+              this.wuerfelBeutelStelleSichtbar();
+              const el = this.$refs.wuerfelBeutelFensterRef;
+              if (el && typeof el.focus === 'function') {
+                el.focus();
+              }
+            } else if (modalId === 'musikboard') {
+              this.musikboardStelleSichtbar();
+              const el = this.$refs.musikboardFensterRef;
+              if (el && typeof el.focus === 'function') {
+                el.focus();
+              }
+            }
+          });
+        },
+      });
     },
     zeitmessungAbbrecheSpeichernTimer() {
       if (this._zeitmessungSpeichernTimer != null) {
@@ -1531,8 +1734,23 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       });
     },
     wuerfelBeutelSchliessen() {
-      this.speichereWuerfelBeutelFenster();
       this.wuerfelBeutelOffen = false;
+    },
+    wuerfelBeutelMinimieren() {
+      window.HTBAH_MODAL_FENSTER.methoden.minimieren.call(this.wuerfelBeutelFenster, {
+        id: 'wuerfel-beutel',
+        titel: 'Würfelbeutel',
+        emoji: '🎲',
+        onWiederherstellen: () => {
+          this.$nextTick(() => {
+            this.wuerfelBeutelStelleSichtbar();
+            const fenster = this.$refs.wuerfelBeutelFensterRef;
+            if (fenster && typeof fenster.focus === 'function') {
+              fenster.focus();
+            }
+          });
+        },
+      });
     },
     onWuerfelBeutelKeydown(event) {
       if (!this.wuerfelBeutelOffen || !event || event.key !== 'Escape') {
@@ -1608,7 +1826,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     wuerfelBeutelBeiViewportResize() {
       this.wuerfelBeutelStelleSichtbar();
       if (this.wuerfelBeutelOffen) {
-        this.speichereWuerfelBeutelFenster();
+        window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(
+          this.wuerfelBeutelFenster,
+        );
       }
     },
     musikboardOeffnen() {
@@ -1618,6 +1838,22 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     musikboardSchliessen() {
       this.musikboardOffen = false;
+    },
+    musikboardMinimieren() {
+      window.HTBAH_MODAL_FENSTER.methoden.minimieren.call(this.musikboardFenster, {
+        id: 'musikboard',
+        titel: 'Musik',
+        emoji: '🎵',
+        onWiederherstellen: () => {
+          this.$nextTick(() => {
+            this.musikboardStelleSichtbar();
+            const fenster = this.$refs.musikboardFensterRef;
+            if (fenster && typeof fenster.focus === 'function') {
+              fenster.focus();
+            }
+          });
+        },
+      });
     },
     onMusikboardKeydown(event) {
       if (!this.musikboardOffen || !event || event.key !== 'Escape') {
@@ -1737,6 +1973,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       window.removeEventListener('pointermove', this.musikboardBeimZiehen);
       window.removeEventListener('pointerup', this.musikboardBeendeZiehen);
       window.removeEventListener('pointercancel', this.musikboardBeendeZiehen);
+      if (this.musikboardOffen) {
+        window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(
+          this.musikboardFenster,
+        );
+      }
     },
     musikboardStarteResize(event) {
       if (this.musikboardFenster.istVollbild) {
@@ -1778,6 +2019,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       window.removeEventListener('pointermove', this.musikboardBeimResize);
       window.removeEventListener('pointerup', this.musikboardBeendeResize);
       window.removeEventListener('pointercancel', this.musikboardBeendeResize);
+      if (this.musikboardOffen) {
+        window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(
+          this.musikboardFenster,
+        );
+      }
     },
     wuerfelBeutelStarteZiehen(event) {
       if (this.wuerfelBeutelFenster.istVollbild || event.target.closest('button, a, input, textarea, select')) {
@@ -1824,7 +2070,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       window.removeEventListener('pointerup', this.wuerfelBeutelBeendeZiehen);
       window.removeEventListener('pointercancel', this.wuerfelBeutelBeendeZiehen);
       if (this.wuerfelBeutelOffen) {
-        this.speichereWuerfelBeutelFenster();
+        window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(
+          this.wuerfelBeutelFenster,
+        );
       }
     },
     wuerfelBeutelStarteResize(event) {
@@ -1868,7 +2116,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       window.removeEventListener('pointerup', this.wuerfelBeutelBeendeResize);
       window.removeEventListener('pointercancel', this.wuerfelBeutelBeendeResize);
       if (this.wuerfelBeutelOffen) {
-        this.speichereWuerfelBeutelFenster();
+        window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(
+          this.wuerfelBeutelFenster,
+        );
       }
     },
     atmosphaereBadgeOeffnen() {
@@ -1957,6 +2207,213 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         window.HTBAH.speichereKampagnenZeitmessungBadgePosition(id, this.zeitmessungBadgePos);
       } else if (window.HTBAH && typeof window.HTBAH.speichereZeitmessungBadgePosition === 'function') {
         window.HTBAH.speichereZeitmessungBadgePosition(this.zeitmessungBadgePos);
+      }
+    },
+    fabStackInlineStyle(fabId) {
+      void this.fabViewportTick;
+      const pos = this.fabPos[fabId];
+      if (!pos || pos.mode !== 'fixed') {
+        return {};
+      }
+      const angezeigt = this.fabBegrenzePosition(fabId, pos) || pos;
+      return {
+        left: `${angezeigt.left}px`,
+        top: `${angezeigt.top}px`,
+        right: 'auto',
+        bottom: 'auto',
+      };
+    },
+    fabStackRef(fabId) {
+      const refs = {
+        sicherheits: 'fabStackSicherheits',
+        konflikt: 'fabStackKonflikt',
+        wuerfelbeutel: 'fabStackWuerfelbeutel',
+      };
+      return this.$refs[refs[fabId]];
+    },
+    fabBegrenzePosition(fabId, pos) {
+      const FS = window.HTBAH_FLOATING_FAB_SPEICHER;
+      if (!FS || typeof FS.begrenzePosition !== 'function' || !pos) {
+        return pos;
+      }
+      const el = this.fabStackRef(fabId);
+      return FS.begrenzePosition(pos, {
+        width: el && el.offsetWidth ? el.offsetWidth : 48,
+        height: el && el.offsetHeight ? el.offsetHeight : 48,
+      });
+    },
+    fabLadePositionen(kampagneId) {
+      const FS = window.HTBAH_FLOATING_FAB_SPEICHER;
+      const leer = { sicherheits: null, konflikt: null, wuerfelbeutel: null };
+      if (!FS || typeof FS.lade !== 'function') {
+        this.fabPos = leer;
+        return;
+      }
+      const sicherheits = FS.lade(kampagneId, 'sicherheits');
+      const konflikt = FS.lade(kampagneId, 'konflikt');
+      let wuerfelbeutel = FS.lade(kampagneId, 'wuerfelbeutel');
+      if (
+        !wuerfelbeutel &&
+        konflikt &&
+        konflikt.mode === 'fixed' &&
+        typeof konflikt.left === 'number' &&
+        typeof konflikt.top === 'number'
+      ) {
+        wuerfelbeutel = {
+          mode: 'fixed',
+          left: konflikt.left,
+          top: konflikt.top + HTBAH_FAB_STACK_OFFSET_PX,
+        };
+      }
+      this.fabPos = { sicherheits, konflikt, wuerfelbeutel };
+    },
+    fabSetPosition(fabId, pos) {
+      this.fabPos = { ...this.fabPos, [fabId]: pos };
+    },
+    fabPersistierePosition(fabId) {
+      const id = this.aktiveKampagneId;
+      const FS = window.HTBAH_FLOATING_FAB_SPEICHER;
+      if (!id || !FS || typeof FS.speichere !== 'function') {
+        return;
+      }
+      FS.speichere(id, fabId, this.fabPos[fabId]);
+    },
+    fabEntferneHoldListener() {
+      if (this._fabHoldMoveHandler) {
+        document.removeEventListener('pointermove', this._fabHoldMoveHandler);
+        this._fabHoldMoveHandler = null;
+      }
+      if (this._fabHoldUpHandler) {
+        document.removeEventListener('pointerup', this._fabHoldUpHandler);
+        document.removeEventListener('pointercancel', this._fabHoldUpHandler);
+        this._fabHoldUpHandler = null;
+      }
+    },
+    fabHoldAbbrechen() {
+      if (this._fabLongPressTimer != null) {
+        window.clearTimeout(this._fabLongPressTimer);
+        this._fabLongPressTimer = null;
+      }
+      this.fabEntferneHoldListener();
+      this._fabHold = null;
+      this._fabDrag = null;
+      this.fabZiehtId = null;
+    },
+    fabHoldStart(e, fabId) {
+      if (this.fabZiehtId || (e.button != null && e.button !== 0)) {
+        return;
+      }
+      const stackEl = this.fabStackRef(fabId);
+      if (!stackEl) {
+        return;
+      }
+      this.fabHoldAbbrechen();
+      this._fabHold = {
+        fabId,
+        startX: e.clientX,
+        startY: e.clientY,
+        stackEl,
+        pointerId: e.pointerId,
+        captureEl: e.currentTarget,
+        longPressAktiv: false,
+      };
+      this._fabHoldMoveHandler = (ev) => this.fabHoldMove(ev);
+      this._fabHoldUpHandler = () => this.fabHoldEnd();
+      document.addEventListener('pointermove', this._fabHoldMoveHandler, { passive: false });
+      document.addEventListener('pointerup', this._fabHoldUpHandler);
+      document.addEventListener('pointercancel', this._fabHoldUpHandler);
+      this._fabLongPressTimer = window.setTimeout(() => {
+        this._fabLongPressTimer = null;
+        this.fabLongPressStart();
+      }, HTBAH_FAB_LONG_PRESS_MS);
+    },
+    fabHoldMove(e) {
+      const hold = this._fabHold;
+      if (!hold) {
+        return;
+      }
+      if (hold.longPressAktiv) {
+        this.fabZiehenMove(e);
+        return;
+      }
+      const dx = e.clientX - hold.startX;
+      const dy = e.clientY - hold.startY;
+      if (Math.hypot(dx, dy) > HTBAH_FAB_HOLD_BEWEGUNG_ABBRUCH_PX) {
+        this.fabHoldAbbrechen();
+      }
+    },
+    fabLongPressStart() {
+      const hold = this._fabHold;
+      if (!hold || !hold.stackEl) {
+        return;
+      }
+      hold.longPressAktiv = true;
+      this.fabZiehtId = hold.fabId;
+      const r = hold.stackEl.getBoundingClientRect();
+      this._fabDrag = {
+        fabId: hold.fabId,
+        pointerId: hold.pointerId,
+        startX: hold.startX,
+        startY: hold.startY,
+        baseLeft: r.left,
+        baseTop: r.top,
+        captureEl: hold.captureEl,
+        hatBewegt: false,
+      };
+      try {
+        hold.captureEl.setPointerCapture(hold.pointerId);
+      } catch {
+        /* optional */
+      }
+    },
+    fabZiehenMove(e) {
+      const d = this._fabDrag;
+      if (!d) {
+        return;
+      }
+      e.preventDefault();
+      d.hatBewegt = true;
+      let left = d.baseLeft + (e.clientX - d.startX);
+      let top = d.baseTop + (e.clientY - d.startY);
+      const begrenzt = this.fabBegrenzePosition(d.fabId, { mode: 'fixed', left, top });
+      if (begrenzt) {
+        left = begrenzt.left;
+        top = begrenzt.top;
+      }
+      this.fabSetPosition(d.fabId, { mode: 'fixed', left, top });
+    },
+    fabHoldEnd() {
+      const d = this._fabDrag;
+      const hold = this._fabHold;
+      const hatGezogen = !!(d && d.hatBewegt);
+      const hatLongPress = !!(hold && hold.longPressAktiv);
+      const fabId = (d && d.fabId) || (hold && hold.fabId);
+      if (d && d.captureEl && d.pointerId != null) {
+        try {
+          d.captureEl.releasePointerCapture(d.pointerId);
+        } catch {
+          /* optional */
+        }
+      }
+      if (hatGezogen && fabId) {
+        this.fabPersistierePosition(fabId);
+      }
+      if (hatLongPress || hatGezogen) {
+        this.fabKlickGesperrt = true;
+        window.setTimeout(() => {
+          this.fabKlickGesperrt = false;
+        }, 400);
+      }
+      this.fabHoldAbbrechen();
+    },
+    fabButtonKlick(event, handler) {
+      if (this.fabKlickGesperrt) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (typeof handler === 'function') {
+        handler();
       }
     },
     sicherheitsmechanismenOeffnen() {
@@ -2555,34 +3012,66 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     </teleport>
 
     <teleport to="body">
-      <div v-if="sicherheitsButtonAnzeigen" class="htbah-sicherheits-fab-stack">
+      <div
+        v-if="sicherheitsButtonAnzeigen"
+        ref="fabStackSicherheits"
+        class="htbah-sicherheits-fab-stack"
+        :class="{
+          'htbah-fab-stack--custom-pos': fabPos.sicherheits && fabPos.sicherheits.mode === 'fixed',
+          'htbah-fab-stack--ziehen': fabZiehtId === 'sicherheits',
+        }"
+        :style="fabStackInlineStyle('sicherheits')"
+        @pointerdown="fabHoldStart($event, 'sicherheits')">
         <button
           type="button"
           class="htbah-sicherheits-fab"
-          title="Sicherheitsmechanismen (Session Zero)"
+          title="Sicherheitsmechanismen (Session Zero). Gedrückt halten zum Verschieben."
           aria-label="Sicherheitsmechanismen öffnen"
-          @click="sicherheitsmechanismenOeffnen">
+          @click="fabButtonKlick($event, sicherheitsmechanismenOeffnen)">
           🚩
         </button>
       </div>
     </teleport>
 
     <teleport to="body">
-      <div v-if="konfliktFabAnzeigen" class="htbah-konflikt-fab-stack">
+      <div
+        v-if="konfliktFabAnzeigen"
+        ref="fabStackKonflikt"
+        class="htbah-konflikt-fab-stack"
+        :class="{
+          'htbah-fab-stack--custom-pos': fabPos.konflikt && fabPos.konflikt.mode === 'fixed',
+          'htbah-fab-stack--ziehen': fabZiehtId === 'konflikt',
+        }"
+        :style="fabStackInlineStyle('konflikt')"
+        @pointerdown="fabHoldStart($event, 'konflikt')">
         <button
           type="button"
           class="htbah-konflikt-fab"
-          title="Konflikt (Teilnehmer, Initiative, Übersicht)"
+          title="Konflikt (Teilnehmer, Initiative, Übersicht). Gedrückt halten zum Verschieben."
           aria-label="Konflikt-Modal öffnen"
-          @click="konfliktModalOffen = true">
+          @click="fabButtonKlick($event, () => { konfliktModalOffen = true })">
           <span class="htbah-konflikt-fab-icon" aria-hidden="true">⚔️</span>
         </button>
+      </div>
+    </teleport>
+
+    <teleport to="body">
+      <div
+        v-if="konfliktFabAnzeigen"
+        ref="fabStackWuerfelbeutel"
+        class="htbah-wuerfelbeutel-fab-stack"
+        :class="{
+          'htbah-fab-stack--custom-pos': fabPos.wuerfelbeutel && fabPos.wuerfelbeutel.mode === 'fixed',
+          'htbah-fab-stack--ziehen': fabZiehtId === 'wuerfelbeutel',
+        }"
+        :style="fabStackInlineStyle('wuerfelbeutel')"
+        @pointerdown="fabHoldStart($event, 'wuerfelbeutel')">
         <button
           type="button"
           class="htbah-wuerfelbeutel-fab"
-          title="Würfelbeutel (Werkzeuge)"
+          title="Würfelbeutel (Werkzeuge). Gedrückt halten zum Verschieben."
           aria-label="Würfelbeutel öffnen"
-          @click="wuerfelModalOeffnen('wuerfel')">
+          @click="fabButtonKlick($event, () => wuerfelModalOeffnen('wuerfel'))">
           <span class="htbah-wuerfelbeutel-fab-icon" aria-hidden="true">🎲</span>
         </button>
       </div>
@@ -2591,6 +3080,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     <konflikt-modal
       :offen="konfliktModalOffen"
       :kampagne-id="aktiveKampagneId"
+      :entferne-speicher-bei-schliessen="hatAktiveKampagne"
       @update:offen="konfliktModalOffen = $event" />
 
     <teleport to="body">
@@ -2704,10 +3194,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
     <teleport to="body">
       <div
-        v-if="musikboardOffen"
+        v-if="musikboardOffen && hatAktiveKampagne"
         class="regelwerk-modal-layer htbah-wuerfel-beutel-layer"
         role="presentation">
         <div
+          v-show="!musikboardFenster.minimiert"
           ref="musikboardFensterRef"
           class="regelwerk-modal-window card shadow htbah-musik-modal-window"
           :style="musikboardFensterStil"
@@ -2722,11 +3213,21 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               <span aria-hidden="true">🎵</span>
               Musik
             </h5>
-            <button
-              type="button"
-              class="btn-close"
-              aria-label="Schließen"
-              @click="musikboardSchliessen"></button>
+            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+              <button
+                type="button"
+                class="regelwerk-icon-button"
+                title="Minimieren"
+                aria-label="Minimieren"
+                @click="musikboardMinimieren">
+                <span class="material-symbols-outlined">minimize</span>
+              </button>
+              <button
+                type="button"
+                class="btn-close"
+                aria-label="Schließen"
+                @click="musikboardSchliessen"></button>
+            </div>
           </div>
           <div class="px-3 pt-2 pb-0">
             <div class="alert alert-info mb-2 py-2" role="note">
@@ -2755,10 +3256,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
     <teleport to="body">
       <div
-        v-if="wuerfelBeutelOffen"
+        v-if="wuerfelBeutelOffen && hatAktiveKampagne"
         class="regelwerk-modal-layer htbah-wuerfel-beutel-layer"
         role="presentation">
         <div
+          v-show="!wuerfelBeutelFenster.minimiert"
           ref="wuerfelBeutelFensterRef"
           class="regelwerk-modal-window card shadow htbah-wuerfel-beutel-window"
           :style="wuerfelBeutelFensterStil"
@@ -2773,11 +3275,21 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               <span aria-hidden="true">🎲</span>
               Würfelbeutel
             </h5>
-            <button
-              type="button"
-              class="btn-close"
-              aria-label="Schließen"
-              @click="wuerfelBeutelSchliessen"></button>
+            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+              <button
+                type="button"
+                class="regelwerk-icon-button"
+                title="Minimieren"
+                aria-label="Minimieren"
+                @click="wuerfelBeutelMinimieren">
+                <span class="material-symbols-outlined">minimize</span>
+              </button>
+              <button
+                type="button"
+                class="btn-close"
+                aria-label="Schließen"
+                @click="wuerfelBeutelSchliessen"></button>
+            </div>
           </div>
           <div class="flex-grow-1 min-h-0 overflow-auto px-3 py-2">
               <ul class="nav nav-tabs mb-3" role="tablist">

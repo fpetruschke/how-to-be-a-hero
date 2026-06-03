@@ -33,6 +33,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     props: {
       offen: { type: Boolean, default: false },
       kampagneId: { type: String, default: '' },
+      /** false = nur UI zu (Kampagne verlassen), Fensterzustand bleibt gespeichert */
+      entferneSpeicherBeiSchliessen: { type: Boolean, default: true },
     },
     emits: ['update:offen', 'schliessen'],
     data() {
@@ -247,15 +249,23 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.ladeKonflikt();
           this.fokusVorModal =
             document.activeElement instanceof HTMLElement ? document.activeElement : null;
-          this.$nextTick(() => {
-            this.initialisierePosition();
-            this.fokussiereFenster();
-          });
+          this.$nextTick(() => this.wiederherstelleKonfliktAusSpeicher());
           return;
         }
         this.beendeZiehen();
         this.beendeResize();
-        this.istVollbild = false;
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (S) {
+          if (this.entferneSpeicherBeiSchliessen) {
+            S.beimModalSchliessen(this, 'konflikt');
+          } else {
+            S.beimModalUiAusblenden('konflikt', this, () => ({
+              kampagneId: this.kampagneIdEffektiv,
+            }));
+          }
+        } else {
+          this.bereinigeMinimiertZustand('konflikt');
+        }
         this.konfliktDnD = { ziehtRefKey: null, zielSeite: null };
         this.speichernFlushen();
         this.stelleFokusWiederHer();
@@ -270,6 +280,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       window.addEventListener('resize', this.beiFensterGroesseGeaendert);
       window.addEventListener('pagehide', this.beichernFlushen);
       window.addEventListener('htbah:kampagne-daten-geaendert', this.onKampagneDatenGeaendert);
+      if (this.offen) {
+        this.ladeKonflikt();
+        this.$nextTick(() => this.wiederherstelleKonfliktAusSpeicher());
+      }
     },
     beforeUnmount() {
       this.beichernFlushen();
@@ -303,10 +317,58 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         this.fokusVorModal = null;
       },
+      wiederherstelleKonfliktAusSpeicher() {
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (S) {
+          S.beimModalOeffnen('konflikt', this, {
+            fensterOpts: { minBreite: 360, minHoehe: 320 },
+            extrasLieferant: () => ({ kampagneId: this.kampagneIdEffektiv }),
+            onWiederherstellen: () => {
+              this.$nextTick(() => {
+                if (!this.istVollbild) {
+                  this.stelleSichtbaresFensterSicher();
+                }
+                this.fokussiereFenster();
+              });
+            },
+          });
+          S.nachGeoeffnetAusSpeicher(this, this, {
+            initialisierePosition: this.initialisierePosition,
+            fokussiere: this.fokussiereFenster,
+          });
+        } else {
+          this.bindModalSpeicher('konflikt', () => ({ kampagneId: this.kampagneIdEffektiv }));
+          if (!this.istVollbild) {
+            this.initialisierePosition();
+          }
+          if (!this.minimiert) {
+            this.fokussiereFenster();
+          }
+        }
+      },
       schliessen() {
         this.speichernFlushen();
+        const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
+        if (S) {
+          S.beimModalSchliessen(this, 'konflikt');
+        } else {
+          this.bereinigeMinimiertZustand('konflikt');
+        }
         this.$emit('update:offen', false);
         this.$emit('schliessen');
+      },
+      modalMinimieren() {
+        this.minimieren({
+          id: 'konflikt',
+          titel: this.modalTitel,
+          emoji: '⚔️',
+          onWiederherstellen: () => {
+            this.$nextTick(() => {
+              this.stelleSichtbaresFensterSicher();
+              this.fokussiereFenster();
+            });
+          },
+        });
       },
       onFensterEscape() {
         this.schliessen();
@@ -775,48 +837,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           waffenlosParade: !ruestungen.length,
         });
       },
-      ladeFensterAusSpeicher() {
-        try {
-          const key =
-            window.HTBAH?.speicherKeys?.konfliktFenster || 'htbah_konflikt_fenster';
-          const o = window.HTBAH?.speicher?.leseJson(key, null);
-          if (!o || typeof o !== 'object') {
-            return;
-          }
-          const br = Number(o.breite);
-          const ho = Number(o.hoehe);
-          if (Number.isFinite(br) && Number.isFinite(ho) && br > 0 && ho > 0) {
-            const g = window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(br, ho, 360, 320);
-            this.breite = g.breite;
-            this.hoehe = g.hoehe;
-          }
-          const px = Number(o.positionX);
-          const py = Number(o.positionY);
-          if (Number.isFinite(px) && Number.isFinite(py)) {
-            this.positionX = px;
-            this.positionY = py;
-          }
-        } catch {
-          /* ignorieren */
-        }
-      },
-      speichereFensterInSpeicher() {
-        try {
-          const key =
-            window.HTBAH?.speicherKeys?.konfliktFenster || 'htbah_konflikt_fenster';
-          window.HTBAH?.speicher?.schreibeJson(key, {
-            breite: this.breite,
-            hoehe: this.hoehe,
-            positionX: this.positionX,
-            positionY: this.positionY,
-          });
-        } catch {
-          /* ignorieren */
-        }
-      },
     },
     created() {
-      this.ladeFensterAusSpeicher();
       if (this.breite == null) {
         this.breite = 920;
         this.hoehe = 640;
@@ -829,6 +851,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           class="regelwerk-modal-layer htbah-konflikt-modal-layer"
           role="presentation">
           <div
+            v-show="!minimiert"
             ref="fensterElement"
             class="regelwerk-modal-window card shadow htbah-konflikt-modal-window"
             :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
@@ -854,6 +877,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   :title="istVollbild ? 'Vollbild beenden' : 'Vollbild'"
                   @click="vollbildUmschalten">
                   <span class="material-symbols-outlined">{{ vollbildIcon }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="regelwerk-icon-button"
+                  title="Minimieren"
+                  aria-label="Minimieren"
+                  @click="modalMinimieren">
+                  <span class="material-symbols-outlined">minimize</span>
                 </button>
                 <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
               </div>

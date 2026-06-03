@@ -143,12 +143,6 @@ body {
   border-bottom: 1px solid rgba(15, 23, 42, 0.2);
 }
 
-@media (min-width: 992px) {
-  .htbah-lp-status-banner {
-    top: var(--htbah-top-nav-reserve, 0px);
-  }
-}
-
 .htbah-lp-status-banner-inner {
   max-width: 1140px;
   margin: 0 auto;
@@ -203,11 +197,6 @@ body {
   flex: 1 1 12rem;
 }
 
-@media (min-width: 992px) {
-  .htbah-sl-charakter-lp-status-sticky {
-    top: var(--htbah-top-nav-reserve, 0px);
-  }
-}
 
 .htbah-lp-status-banner-btn {
   flex-shrink: 0;
@@ -2005,24 +1994,54 @@ input::placeholder {
 }
 
 @media (min-width: 992px) {
+  html {
+    overflow: hidden;
+    height: 100dvh;
+  }
+
+  body {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Teleport-Ziele: Nav + LP-Banner bleiben oben, Scrollbalken nur im App-Inhalt */
   .navbar-fixed {
-    top: 0;
+    position: relative;
+    top: auto;
     bottom: auto;
+    flex: 0 0 auto;
+    order: -100;
     border-top: none;
     border-bottom: 1px solid var(--border-color);
   }
 
+  .htbah-lp-status-banner {
+    position: relative;
+    top: auto;
+    flex: 0 0 auto;
+    order: -99;
+  }
+
   #app {
-    padding-top: calc(var(--htbah-top-nav-reserve) + 0.75rem);
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-top: 0.75rem;
+  }
+
+  body.htbah-mit-lp-banner #app {
+    padding-top: 0.75rem;
   }
 
   .content {
     padding-top: 0;
     padding-bottom: var(--htbah-content-ende-luft);
-  }
-
-  body.htbah-mit-lp-banner #app {
-    padding-top: calc(var(--htbah-top-nav-reserve) + 4.1rem);
   }
 }
 
@@ -2038,6 +2057,114 @@ input::placeholder {
   position: fixed;
   inset: 0;
   z-index: var(--htbah-z-modal-base);
+  pointer-events: none;
+}
+
+/* Minimierte Fenster: alle Leisten sichtbar, links unten gestapelt, per Griff sortierbar */
+.htbah-modal-minimize-dock {
+  position: fixed;
+  z-index: calc(var(--htbah-z-modal-wuerfel, 2060) + 5);
+  left: max(0.65rem, env(safe-area-inset-left, 0px));
+  bottom: calc(
+    var(--htbah-bottom-nav-reserve, 3.5rem) + 0.35rem + env(safe-area-inset-bottom, 0px)
+  );
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: min(22rem, calc(100vw - 1.25rem));
+  max-height: min(50vh, calc(100dvh - var(--htbah-bottom-nav-reserve, 3.5rem) - 2.5rem));
+  overflow-x: visible;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.htbah-modal-minimize-eintrag {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: min(22rem, calc(100vw - 1.25rem));
+  pointer-events: auto;
+}
+
+.htbah-modal-minimize-eintrag--zieht .htbah-modal-minimize-leiste {
+  opacity: 0.55;
+}
+
+.htbah-modal-minimize-eintrag--drop-ziel .htbah-modal-minimize-leiste {
+  outline: 2px dashed var(--bs-primary);
+  outline-offset: 2px;
+}
+
+.htbah-modal-minimize-leiste {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.65rem 0.35rem 0.4rem;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  border-radius: 0.5rem;
+  background: var(--card-bg, var(--bs-body-bg));
+  color: var(--bs-body-color);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+  font-size: 0.875rem;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.htbah-modal-minimize-leiste:hover {
+  filter: brightness(0.97);
+}
+
+.htbah-modal-minimize-leiste:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+.htbah-modal-minimize-leiste__griff {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  min-height: 1.5rem;
+  border-radius: 0.25rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+}
+
+.htbah-modal-minimize-leiste__griff:active {
+  cursor: grabbing;
+}
+
+.htbah-modal-minimize-leiste__emoji {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.htbah-modal-minimize-leiste__titel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.htbah-modal-minimize-leiste__symbol {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+  opacity: 0.72;
   pointer-events: none;
 }
 
@@ -2622,6 +2749,13 @@ input::placeholder {
   scrollbar-width: thin;
 }
 
+.abenteuerbuch-reiter-leiste--umbruch {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  overflow-x: visible;
+  overflow-y: visible;
+}
+
 .abenteuerbuch-reiter {
   display: inline-flex;
   align-items: center;
@@ -2635,6 +2769,42 @@ input::placeholder {
 .abenteuerbuch-reiter--aktiv {
   border-color: color-mix(in srgb, var(--primary-color) 55%, transparent);
   background: color-mix(in srgb, var(--primary-color) 16%, var(--card-bg));
+}
+
+.abenteuerbuch-reiter--zieht {
+  opacity: 0.55;
+}
+
+.abenteuerbuch-reiter--drop-ziel {
+  outline: 2px dashed var(--bs-primary);
+  outline-offset: 2px;
+}
+
+.abenteuerbuch-reiter-griff {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  min-height: 1.5rem;
+  margin-left: 0.15rem;
+  border-radius: 0.25rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.abenteuerbuch-reiter-griff:active {
+  cursor: grabbing;
+}
+
+.abenteuerbuch-reiter-griff:hover,
+.abenteuerbuch-reiter-griff:focus-visible {
+  color: var(--heading-color);
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
 }
 
 .abenteuerbuch-reiter-tap {
@@ -4269,6 +4439,21 @@ input::placeholder {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  touch-action: manipulation;
+}
+
+.htbah-fab-stack--custom-pos {
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+}
+
+.htbah-fab-stack--ziehen {
+  touch-action: none;
+  cursor: grabbing;
+  z-index: calc(var(--htbah-z-fab-ueber-welt-modal) + 2);
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.22));
 }
 
 body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
@@ -4306,28 +4491,59 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   filter: brightness(1.06);
 }
 
-/* Konflikt-FAB (rechts oben, orange) */
-.htbah-konflikt-fab-stack {
+/* Konflikt- & Würfelbeutel-FAB: gemeinsame Basis */
+.htbah-konflikt-fab-stack,
+.htbah-wuerfelbeutel-fab-stack {
   position: fixed;
-  top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 0.6rem);
-  right: max(0.6rem, env(safe-area-inset-right, 0px));
   z-index: var(--htbah-z-fab-ueber-welt-modal);
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
+  touch-action: manipulation;
 }
 
-body.htbah-mit-lp-banner .htbah-konflikt-fab-stack {
-  top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 4.2rem);
-}
-
-@media (max-width: 767.98px) {
-  .htbah-konflikt-fab-stack {
-    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 3.75rem);
+/* Desktop: rechts oben unter Top-Nav */
+@media (min-width: 992px) {
+  .htbah-konflikt-fab-stack:not(.htbah-fab-stack--custom-pos) {
+    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 0.6rem);
+    right: max(0.6rem, env(safe-area-inset-right, 0px));
+    left: auto;
+    bottom: auto;
   }
 
-  body.htbah-mit-lp-banner .htbah-konflikt-fab-stack {
-    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 7.1rem);
+  .htbah-wuerfelbeutel-fab-stack:not(.htbah-fab-stack--custom-pos) {
+    top: calc(
+      var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 0.6rem + 3rem + 0.45rem
+    );
+    right: max(0.6rem, env(safe-area-inset-right, 0px));
+    left: auto;
+    bottom: auto;
+  }
+
+  body.htbah-mit-lp-banner .htbah-konflikt-fab-stack:not(.htbah-fab-stack--custom-pos) {
+    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 4.2rem);
+  }
+
+  body.htbah-mit-lp-banner .htbah-wuerfelbeutel-fab-stack:not(.htbah-fab-stack--custom-pos) {
+    top: calc(
+      var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 4.2rem + 3rem + 0.45rem
+    );
+  }
+}
+
+/* Mobil/Tablet: rechts unten über Bottom-Nav (Nav ist unten fixiert, nicht oben) */
+@media (max-width: 991.98px) {
+  .htbah-konflikt-fab-stack:not(.htbah-fab-stack--custom-pos) {
+    top: auto;
+    left: auto;
+    right: max(0.6rem, env(safe-area-inset-right, 0px));
+    bottom: calc(
+      var(--htbah-bottom-nav-reserve, 3.5rem) + env(safe-area-inset-bottom, 0px) + 3rem + 0.45rem
+    );
+  }
+
+  .htbah-wuerfelbeutel-fab-stack:not(.htbah-fab-stack--custom-pos) {
+    top: auto;
+    left: auto;
+    right: max(0.6rem, env(safe-area-inset-right, 0px));
+    bottom: calc(var(--htbah-bottom-nav-reserve, 3.5rem) + env(safe-area-inset-bottom, 0px) + 0.35rem);
   }
 }
 

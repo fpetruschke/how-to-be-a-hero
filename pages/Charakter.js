@@ -497,7 +497,12 @@ window.HTBAH_SEITEN.Charakter = {
         if (!warEditModus) {
           this.$nextTick(() => {
             window.requestAnimationFrame(() => {
-              window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+              const app = document.getElementById('app');
+              if (window.matchMedia('(min-width: 992px)').matches && app) {
+                app.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+              } else {
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+              }
             });
           });
         }
