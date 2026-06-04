@@ -144,6 +144,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
       if (S) {
         S.beimModalOeffnen('abenteuerbuch', this, {
+          onSchliessen: () => this.schliessen(),
           onWiederherstellen: () => {
             this.$nextTick(() => {
               if (!this.istVollbild) {
@@ -188,6 +189,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
         id: 'abenteuerbuch',
         titel,
         emoji: '📔',
+        onSchliessen: () => this.schliessen(),
         onWiederherstellen: () => {
           this.$nextTick(() => {
             this.stelleSichtbaresFensterSicher();

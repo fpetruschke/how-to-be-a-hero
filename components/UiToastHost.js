@@ -20,12 +20,47 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
         text: inhalt,
         typ: typ === 'danger' || typ === 'warning' ? typ : 'success',
         timer: null,
+        mehrzeilig: false,
+        layoutBeobachter: null,
       };
       this.eintraege.push(eintrag);
       if (dauerMs > 0) {
         eintrag.timer = window.setTimeout(() => this.dismiss(id), dauerMs);
       }
       return id;
+    },
+    toastLayoutBeobachterFreigeben(eintrag) {
+      if (!eintrag || !eintrag.layoutBeobachter) {
+        return;
+      }
+      eintrag.layoutBeobachter.disconnect();
+      eintrag.layoutBeobachter = null;
+    },
+    aktualisiereToastLayout(el, eintrag) {
+      if (!el || !eintrag) {
+        return;
+      }
+      const textEl = el.querySelector('.htbah-erfolgs-toast-text');
+      if (!textEl) {
+        return;
+      }
+      const zeilenHoehe = parseFloat(window.getComputedStyle(textEl).lineHeight);
+      if (!Number.isFinite(zeilenHoehe) || zeilenHoehe <= 0) {
+        return;
+      }
+      eintrag.mehrzeilig = textEl.scrollHeight > zeilenHoehe + 1;
+    },
+    setToastRef(el, eintrag) {
+      this.toastLayoutBeobachterFreigeben(eintrag);
+      if (!el || !eintrag) {
+        return;
+      }
+      const messen = () => this.aktualisiereToastLayout(el, eintrag);
+      this.$nextTick(messen);
+      if (typeof ResizeObserver !== 'undefined') {
+        eintrag.layoutBeobachter = new ResizeObserver(messen);
+        eintrag.layoutBeobachter.observe(el);
+      }
     },
     dismiss(id) {
       const idx = this.eintraege.findIndex((e) => e.id === id);
@@ -36,6 +71,7 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
       if (eintrag && eintrag.timer) {
         window.clearTimeout(eintrag.timer);
       }
+      this.toastLayoutBeobachterFreigeben(eintrag);
       this.eintraege.splice(idx, 1);
     },
     alertClass(typ) {
@@ -53,6 +89,7 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
       if (eintrag && eintrag.timer) {
         window.clearTimeout(eintrag.timer);
       }
+      this.toastLayoutBeobachterFreigeben(eintrag);
     });
     this.eintraege = [];
   },
@@ -61,10 +98,11 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
       <div
         v-for="eintrag in eintraege"
         :key="eintrag.id"
+        :ref="(el) => setToastRef(el, eintrag)"
         class="htbah-erfolgs-toast alert alert-dismissible py-2 mb-0 text-center shadow"
-        :class="alertClass(eintrag.typ)"
+        :class="[alertClass(eintrag.typ), { 'htbah-erfolgs-toast--mehrzeilig': eintrag.mehrzeilig }]"
         role="status">
-        {{ eintrag.text }}
+        <span class="htbah-erfolgs-toast-text">{{ eintrag.text }}</span>
         <button
           type="button"
           class="btn-close"

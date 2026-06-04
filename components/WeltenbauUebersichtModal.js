@@ -1421,6 +1421,7 @@ var HTBAH_REFACTOR_UTILS =
         if (S) {
           S.beimModalOeffnen('weltenbau', this.modal, {
             extrasLieferant: () => ({ gruppeId: this.gruppeId }),
+            onSchliessen: () => this.schliesseMitPruefung(),
             onWiederherstellen: () => {
               this.$nextTick(() => {
                 if (!this.modal.istVollbild) {
@@ -1460,6 +1461,7 @@ var HTBAH_REFACTOR_UTILS =
           id: 'weltenbau',
           titel: 'Interaktive Welt',
           emoji: '🗺️',
+          onSchliessen: () => this.schliesseMitPruefung(),
           onWiederherstellen: () => {
             this.$nextTick(() => {
               this.stelleSichtbaresFensterSicher();

@@ -267,6 +267,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     wuerfelNavAktiv() {
       return this.wuerfelBeutelOffen;
     },
+    wuerfelBeutelNavLabel() {
+      return this.istSpielleitung ? 'Werkzeuge' : 'Würfelbeutel';
+    },
     zeitmessungAnzeigeText() {
       const format =
         HTBAH_ZEITMESSUNG && typeof HTBAH_ZEITMESSUNG.formatHhMmSs === 'function'
@@ -520,11 +523,8 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.$nextTick(() => this.bindNavReserveObserver());
     },
     rolle(neu) {
-      if (
-        neu !== 'spielleitung' &&
-        (this.wuerfelModalTab === 'atmosphaere' || this.wuerfelModalTab === 'begegnung')
-      ) {
-        this.wuerfelModalTab = 'wuerfel';
+      if (neu !== 'spielleitung') {
+        this.wuerfelModalTab = this.wuerfelBeutelTabNormalisieren(this.wuerfelModalTab);
       }
       if (neu !== 'spielleitung' && this.musikboardOffen) {
         this.musikboardSchliessen();
@@ -652,6 +652,8 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
   mounted() {
     this._onOffeneModalsSpeicherGeleert = () => this.onOffeneModalsSpeicherGeleert();
     window.addEventListener('htbah:offene-modals-speicher-geleert', this._onOffeneModalsSpeicherGeleert);
+    this._onFloatingFabSpeicherGeleert = () => this.onFloatingFabSpeicherGeleert();
+    window.addEventListener('htbah:floating-fab-speicher-geleert', this._onFloatingFabSpeicherGeleert);
     this._navReserveObserver = null;
     this.$nextTick(() => {
       this.bindNavReserveObserver();
@@ -726,6 +728,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this._onOffeneModalsSpeicherGeleert,
       );
     }
+    if (this._onFloatingFabSpeicherGeleert) {
+      window.removeEventListener(
+        'htbah:floating-fab-speicher-geleert',
+        this._onFloatingFabSpeicherGeleert,
+      );
+    }
     this.wuerfelBeutelBeendeZiehen();
     this.wuerfelBeutelBeendeResize();
     this.musikboardBeendeZiehen();
@@ -746,6 +754,15 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.wuerfelBeutelOffen = false;
       this.musikboardOffen = false;
       this.konfliktModalOffen = false;
+    },
+    onFloatingFabSpeicherGeleert() {
+      const id = this.aktiveKampagneId;
+      if (id) {
+        this.fabLadePositionen(id);
+      } else {
+        this.fabPos = { sicherheits: null, konflikt: null, wuerfelbeutel: null };
+      }
+      this.fabViewportTick += 1;
     },
     entsorgeDiceBoxInstanz(rawBox) {
       if (!rawBox || typeof rawBox !== 'object') {
@@ -1332,7 +1349,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           });
         }
         if (w.wuerfelModalTab) {
-          this.wuerfelModalTab = w.wuerfelModalTab;
+          this.wuerfelModalTab = this.wuerfelBeutelTabNormalisieren(w.wuerfelModalTab);
         }
         this.wuerfelBeutelOffen = true;
       }
@@ -1372,9 +1389,16 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                   kampagneId: this.aktiveKampagneId || undefined,
                 })
               : null;
+      const onSchliessen =
+        modalId === 'wuerfel-beutel'
+          ? () => this.wuerfelBeutelSchliessen()
+          : modalId === 'musikboard'
+            ? () => this.musikboardSchliessen()
+            : null;
       S.beimModalOeffnen(modalId, fenster, {
         fensterOpts: fensterOpts || undefined,
         extrasLieferant: extras,
+        onSchliessen: onSchliessen || undefined,
         onWiederherstellen: () => {
           this.$nextTick(() => {
             if (modalId === 'wuerfel-beutel') {
@@ -1711,24 +1735,28 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.zeitmessungZielMs = ms;
       this.zeitmessungPersistiereDebounced();
     },
-    wuerfelModalOeffnen(tab) {
-      const erlaubteTabs = ['wuerfel', 'zeitmessung', 'atmosphaere', 'begegnung'];
+    wuerfelBeutelTabNormalisieren(tab) {
+      if (!this.istSpielleitung) {
+        return 'wuerfel';
+      }
+      const erlaubteTabs = ['wuerfel', 'zeitmessung'];
+      if (this.hatAktiveKampagne) {
+        erlaubteTabs.push('atmosphaere', 'begegnung');
+      }
       const zielTab = erlaubteTabs.includes(tab) ? tab : 'wuerfel';
-      const gmTab = zielTab === 'atmosphaere' || zielTab === 'begegnung';
-      const atmosphaereVerbieten = zielTab === 'atmosphaere' && !this.hatAktiveKampagne;
-      const begegnungVerbieten = zielTab === 'begegnung' && !this.begegnungReiterMoeglich;
-      this.wuerfelModalTab =
-        (!this.istSpielleitung && gmTab) || atmosphaereVerbieten || begegnungVerbieten
-          ? zielTab === 'zeitmessung'
-            ? 'zeitmessung'
-            : 'wuerfel'
-          : zielTab;
+      if (zielTab === 'begegnung' && !this.begegnungReiterMoeglich) {
+        return 'wuerfel';
+      }
+      return zielTab;
+    },
+    wuerfelModalOeffnen(tab) {
+      this.wuerfelModalTab = this.wuerfelBeutelTabNormalisieren(tab);
       this.wuerfelBeutelAusloeserElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.ladeDiceFarbwahl();
       this.wuerfelBeutelOffen = true;
       this.$nextTick(() => {
         this.wuerfelBeutelInitialisierePosition();
-        if (this.wuerfelModalTab === 'wuerfel') {
+        if (!this.istSpielleitung || this.wuerfelModalTab === 'wuerfel') {
           this.stelleDiceBoxBereit();
         }
       });
@@ -1741,6 +1769,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         id: 'wuerfel-beutel',
         titel: 'Würfelbeutel',
         emoji: '🎲',
+        onSchliessen: () => this.wuerfelBeutelSchliessen(),
         onWiederherstellen: () => {
           this.$nextTick(() => {
             this.wuerfelBeutelStelleSichtbar();
@@ -1844,6 +1873,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         id: 'musikboard',
         titel: 'Musik',
         emoji: '🎵',
+        onSchliessen: () => this.musikboardSchliessen(),
         onWiederherstellen: () => {
           this.$nextTick(() => {
             this.musikboardStelleSichtbar();
@@ -2908,12 +2938,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </button>
             <button
               type="button"
-              title="Werkzeuge"
+              :title="wuerfelBeutelNavLabel"
               class="htbah-nav-item"
               :class="{ 'htbah-nav-button-active': wuerfelNavAktiv }"
               @click="wuerfelModalOeffnen('wuerfel')">
               <span class="htbah-nav-item-emoji" aria-hidden="true">🎲</span>
-              <span class="htbah-nav-item-label">Werkzeuge</span>
+              <span class="htbah-nav-item-label">{{ wuerfelBeutelNavLabel }}</span>
             </button>
             <button
               v-if="istSpielleitung"
@@ -2988,7 +3018,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           </button>
           <button
             type="button"
-            title="Werkzeuge"
+            :title="wuerfelBeutelNavLabel"
             :class="{ 'htbah-nav-button-active': wuerfelNavAktiv }"
             @click="wuerfelModalOeffnen('wuerfel')">
             🎲
@@ -3125,7 +3155,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
     <teleport to="body">
       <div
-        v-if="zeigeNav && zeitmessungOverlaySichtbar"
+        v-if="zeigeNav && istSpielleitung && zeitmessungOverlaySichtbar"
         ref="zeitmessungBadgeEl"
         class="htbah-zeitmessung-badge"
         :class="{ 'htbah-zeitmessung-badge--custom-pos': zeitmessungBadgePos && zeitmessungBadgePos.mode === 'fixed' }"
@@ -3194,7 +3224,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
     <teleport to="body">
       <div
-        v-if="musikboardOffen && hatAktiveKampagne"
+        v-if="musikboardOffen"
         class="regelwerk-modal-layer htbah-wuerfel-beutel-layer"
         role="presentation">
         <div
@@ -3256,7 +3286,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
     <teleport to="body">
       <div
-        v-if="wuerfelBeutelOffen && hatAktiveKampagne"
+        v-if="wuerfelBeutelOffen"
         class="regelwerk-modal-layer htbah-wuerfel-beutel-layer"
         role="presentation">
         <div
@@ -3292,7 +3322,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
             </div>
           </div>
           <div class="flex-grow-1 min-h-0 overflow-auto px-3 py-2">
-              <ul class="nav nav-tabs mb-3" role="tablist">
+              <ul v-if="istSpielleitung" class="nav nav-tabs mb-3" role="tablist">
                 <li class="nav-item" role="presentation">
                   <button
                     type="button"
@@ -3311,7 +3341,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     Zeitmessung
                   </button>
                 </li>
-                <li v-if="istSpielleitung && hatAktiveKampagne" class="nav-item" role="presentation">
+                <li v-if="hatAktiveKampagne" class="nav-item" role="presentation">
                   <button
                     type="button"
                     class="nav-link"
@@ -3320,7 +3350,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     Wetter &amp; Tageszeit
                   </button>
                 </li>
-                <li v-if="istSpielleitung && hatAktiveKampagne" class="nav-item" role="presentation">
+                <li v-if="hatAktiveKampagne" class="nav-item" role="presentation">
                   <button
                     type="button"
                     class="nav-link"
@@ -3331,7 +3361,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 </li>
               </ul>
 
-              <div v-show="wuerfelModalTab === 'wuerfel'">
+              <div v-if="!istSpielleitung || wuerfelModalTab === 'wuerfel'">
                 <div class="btn-group w-100 mb-3" role="group" aria-label="Würfelmodus">
                   <button
                     type="button"
@@ -3383,7 +3413,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 />
               </div>
 
-              <div v-show="wuerfelModalTab === 'zeitmessung'" class="htbah-zeitmessung-tab">
+              <div
+                v-if="istSpielleitung"
+                v-show="wuerfelModalTab === 'zeitmessung'"
+                class="htbah-zeitmessung-tab">
                 <div class="btn-group w-100 mb-3" role="group" aria-label="Zeitmessungsmodus">
                   <button
                     type="button"

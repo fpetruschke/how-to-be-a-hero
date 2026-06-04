@@ -62,19 +62,35 @@ const SPEICHER_BEREICHE = {
     buttonLabel: 'Weltenbau-Bilder löschen',
   },
   wuerfelbeutelLayout: {
-    keys: [
-      'htbah_dice_colors',
-      'htbah_wuerfel_beutel_fenster',
-      'htbah_konflikt_fenster',
-      'htbah_offene_modals',
-      'htbah_floating_fab_pos',
-    ],
+    keys: ['htbah_dice_colors'],
     titel: 'Würfelbeutel-Layout löschen?',
     beschreibung:
-      '3D-Würfel (Aktivierung und Farbe) sowie gespeicherte Größe, Position und offene Zustände der schwebenden Fenster (Würfelbeutel, Musik, Konflikt usw.) und der Positionen der Floating Buttons werden entfernt. Wetter/Tageszeit ist Teil der jeweiligen Kampagne und bleibt unter „Spielleitung-Kampagnen“ gespeichert.',
+      '3D-Würfel (Aktivierung und Farbe) werden entfernt. Wetter/Tageszeit ist Teil der jeweiligen Kampagne und bleibt unter „Spielleitung-Kampagnen“ gespeichert. Offene Fenster betreffen „Modale zurücksetzen“, Button-Positionen „Floating Buttons zurücksetzen“.',
     erfolg: 'Würfelbeutel-Layout wurde gelöscht.',
     buttonSymbol: '🎲',
     buttonLabel: 'Würfelbecher-Einstellungen löschen',
+  },
+  modaleZustand: {
+    keys: [
+      'htbah_offene_modals',
+      'htbah_wuerfel_beutel_fenster',
+      'htbah_konflikt_fenster',
+    ],
+    titel: 'Modale zurücksetzen?',
+    beschreibung:
+      'Größe, Position, Vollbild- und Minimieren-Zustand sowie welche schwebenden Fenster geöffnet waren (Regelwerk, Abenteuerbuch, Zeichnen, Weltenbau, Würfelbeutel, Musik, Konflikt, Inventar usw.) werden zurückgesetzt. Inhaltliche Daten (z. B. Konflikt-Teilnehmer) bleiben erhalten.',
+    erfolg: 'Modal-Einstellungen wurden zurückgesetzt.',
+    buttonSymbol: '🪟',
+    buttonLabel: 'Modale zurücksetzen',
+  },
+  floatingFabZustand: {
+    keys: ['htbah_floating_fab_pos'],
+    titel: 'Floating Buttons zurücksetzen?',
+    beschreibung:
+      'Gespeicherte Positionen der schwebenden Buttons werden pro Kampagne zurückgesetzt: Sicherheitsmechanismen (🚩, Spielleitung und Spielende), bei Spielleitung zusätzlich Konflikt (⚔️) und Würfelbeutel (🎲). Die Buttons erscheinen wieder an ihrer Standardposition.',
+    erfolg: 'Floating-Button-Positionen wurden zurückgesetzt.',
+    buttonSymbol: '📍',
+    buttonLabel: 'Floating Buttons zurücksetzen',
   },
   sicherheitsmechanismen: {
     titel: 'Sicherheitsmechanismen löschen?',
@@ -994,7 +1010,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       } else if (Array.isArray(bereich.keys)) {
         window.HTBAH.speicher.loescheKeys(bereich.keys);
         if (
-          this.zuLoeschenderBereich === 'wuerfelbeutelLayout' ||
+          this.zuLoeschenderBereich === 'modaleZustand' ||
           this.zuLoeschenderBereich === 'alles'
         ) {
           if (typeof window.HTBAH.loescheOffeneModalsSpeicher === 'function') {
@@ -1037,16 +1053,17 @@ window.HTBAH_SEITEN.Einstellungen = {
       if (this.browserSpeicherInitialErmittelt) {
         this.speicherSchaetzungLaden();
       }
-      if (this.zuLoeschenderBereich === 'spielleitung' || this.zuLoeschenderBereich === 'alles') {
+      if (
+        this.zuLoeschenderBereich === 'floatingFabZustand' ||
+        this.zuLoeschenderBereich === 'spielleitung' ||
+        this.zuLoeschenderBereich === 'alles'
+      ) {
         if (typeof window.HTBAH.loescheFloatingFabSpeicherKomplett === 'function') {
           window.HTBAH.loescheFloatingFabSpeicherKomplett();
         }
-        this.kampagnenCacheTick += 1;
       }
-      if (this.zuLoeschenderBereich === 'wuerfelbeutelLayout') {
-        if (typeof window.HTBAH.loescheFloatingFabSpeicherKomplett === 'function') {
-          window.HTBAH.loescheFloatingFabSpeicherKomplett();
-        }
+      if (this.zuLoeschenderBereich === 'spielleitung' || this.zuLoeschenderBereich === 'alles') {
+        this.kampagnenCacheTick += 1;
       }
     },
     statusAnzeigen(text, typ = 'success') {
@@ -1659,8 +1676,7 @@ window.HTBAH_SEITEN.Einstellungen = {
         <span>Einstellungen</span>
       </h4>
 
-      <h5 class="text-start mb-2">Theme</h5>
-      <div class="card p-3 mb-3 text-start">
+      <einstellungen-sektion titel="Theme" section-id="theme" emoji="🎨">
         <div class="d-flex align-items-center justify-content-between">
           <label class="form-check-label d-flex align-items-center gap-2 mb-0" for="themeToggle">
             <span class="material-symbols-outlined" aria-hidden="true">
@@ -1678,10 +1694,9 @@ window.HTBAH_SEITEN.Einstellungen = {
               @change="themeUmschalten" />
           </div>
         </div>
-      </div>
+      </einstellungen-sektion>
 
-      <h5 class="text-start mb-2">Ausrichtung</h5>
-      <div class="card p-3 mb-3 text-start">
+      <einstellungen-sektion titel="Ausrichtung" section-id="ausrichtung" emoji="📱">
         <p class="small text-body-secondary mb-2">
           Lege fest, ob die Ansicht frei drehbar bleibt oder in der aktuellen Lage (Quer- bzw. Hochformat) fixiert wird – auch bei Drehen oder Wenden des Geräts.
         </p>
@@ -1720,16 +1735,14 @@ window.HTBAH_SEITEN.Einstellungen = {
             <span>Portrait</span>
           </button>
         </div>
-      </div>
+      </einstellungen-sektion>
 
       <template v-if="appRolle === 'spielleitung'">
-        <h5 class="text-start mb-2">Labels</h5>
-        <div class="card p-3 mb-3 text-start">
+        <einstellungen-sektion titel="Labels" section-id="labels" emoji="🏷️">
           <kampagnen-labels-verwaltung />
-        </div>
+        </einstellungen-sektion>
 
-        <h5 class="text-start mb-2">Abenteuerbuch</h5>
-        <div class="card p-3 mb-3 text-start">
+        <einstellungen-sektion titel="Abenteuerbuch" section-id="abenteuerbuch" emoji="📖">
           <div class="form-check form-switch mb-0">
             <input
               id="settings-abenteuerbuch-reiter-umbruch"
@@ -1745,11 +1758,10 @@ window.HTBAH_SEITEN.Einstellungen = {
           <div class="form-text mt-2 mb-0">
             Aus: eine Zeile, horizontal scrollbar. An: mehrere Zeilen — alle Reiter bleiben sichtbar.
           </div>
-        </div>
+        </einstellungen-sektion>
       </template>
 
-      <h5 class="text-start mb-2">Würfel</h5>
-      <div class="card p-3 mb-3 text-start">
+      <einstellungen-sektion titel="Würfel" section-id="wuerfel" emoji="🎲">
         <div class="form-check form-switch mb-3">
           <input
             id="settings-wuerfel-3d"
@@ -1821,10 +1833,13 @@ window.HTBAH_SEITEN.Einstellungen = {
             </span>
           </button>
         </div>
-      </div>
+      </einstellungen-sektion>
 
-      <h5 class="text-start mb-2">Zeitmessung (Würfelbeutel)</h5>
-      <div class="card p-3 mb-3 text-start">
+      <einstellungen-sektion
+        v-if="appRolle === 'spielleitung'"
+        titel="Zeitmessung (Würfelbeutel)"
+        section-id="zeitmessung"
+        emoji="⏱️">
         <p class="small text-body-secondary mb-3">
           Klick-Töne für Timer und Stoppuhr im Würfelbeutel. Der Ton wird per Web Audio erzeugt — kein
           zusätzliches Audio-Asset nötig.
@@ -1901,10 +1916,9 @@ window.HTBAH_SEITEN.Einstellungen = {
             (Ende-Test).
           </div>
         </div>
-      </div>
+      </einstellungen-sektion>
 
-      <h5 class="text-start mb-2">Speicherstatus</h5>
-      <div class="card p-3 mb-3 text-start">
+      <einstellungen-sektion titel="Speicherstatus" section-id="speicherstatus" emoji="💾">
         <p class="small text-body-secondary mb-2">
           <strong>localStorage</strong> wird beim Ermitteln direkt anhand aller Schlüssel summiert (Keys und Werte als UTF-16, ohne Browser-interne Zusatzstrukturen).
           <strong>Browser gesamt</strong> ist eine grobe Schätzung über das Kontingent dieser Website (u. a. localStorage, IndexedDB, Service-Worker-Caches); sie kann von der localStorage-Summe abweichen.
@@ -1976,10 +1990,9 @@ window.HTBAH_SEITEN.Einstellungen = {
           @click="speicherSchaetzungLaden">
           {{ browserSpeicherInitialErmittelt ? 'Aktualisieren' : 'Speicherbedarf ermitteln' }}
         </icon-text-button>
-      </div>
+      </einstellungen-sektion>
 
-      <h5 class="text-start mb-2">Daten</h5>
-      <div class="card p-3 mb-3 text-start">
+      <einstellungen-sektion titel="Daten" section-id="daten" emoji="📁" :default-offen="true">
         <p class="small text-body-secondary mb-2">
           Exportiere und importiere Deine lokalen Daten als JSON-Datei, um Backups zu erstellen
           oder Daten über Deine eigene Cloud zwischen Geräten zu synchronisieren.
@@ -2006,38 +2019,52 @@ window.HTBAH_SEITEN.Einstellungen = {
           type="file"
           accept=".json,application/json"
           @change="importDateiAusgewaehlt" />
-      </div>
+      </einstellungen-sektion>
 
-      <h5 class="text-start mb-2">Daten löschen</h5>
-      <div class="card p-3">
-        <div class="mb-3">
-          <h6 class="mb-2">Einzelne Charaktere</h6>
-          <p v-if="!charakterEintraege.length" class="small text-body-secondary mb-2">
-            Keine gespeicherten Charaktere vorhanden.
-          </p>
-          <div v-else class="d-flex flex-column gap-2">
-            <button
-              v-for="eintrag in charakterEintraege"
-              :key="'del-char-' + eintrag.id"
-              type="button"
-              class="btn btn-outline-danger btn-sm btn-labeled w-100 text-start"
-              :aria-label="charakterName(eintrag) + ' löschen'"
-              @click="loescheEinzelCharakter(eintrag)">
-              <span class="btn-label">
-                <img
-                  v-if="charakterBild(eintrag)"
-                  :src="charakterBild(eintrag)"
-                  alt=""
-                  class="htbah-btn-labeled-avatar"
-                  aria-hidden="true" />
-                <span v-else class="btn-labeled-emoji" aria-hidden="true">🧙</span>
-              </span>
-              <span class="btn-labeled-text">{{ charakterName(eintrag) }} löschen</span>
-            </button>
-          </div>
-        </div>
-        <hr class="border-secondary border-opacity-25 my-3" />
-        <template v-if="appRolle === 'charakter'">
+      <einstellungen-sektion
+        titel="Daten löschen / zurücksetzen"
+        section-id="daten-loeschen-zuruecksetzen"
+        emoji="🗑️"
+        gefahr>
+        <div class="d-flex flex-column gap-2">
+          <einstellungen-sektion
+            titel="Einzelne Charaktere"
+            section-id="loeschen-einzelne-charaktere"
+            emoji="🧙"
+            klein
+            eingebettet>
+            <p v-if="!charakterEintraege.length" class="small text-body-secondary mb-0">
+              Keine gespeicherten Charaktere vorhanden.
+            </p>
+            <div v-else class="d-flex flex-column gap-2">
+              <button
+                v-for="eintrag in charakterEintraege"
+                :key="'del-char-' + eintrag.id"
+                type="button"
+                class="btn btn-outline-danger btn-sm btn-labeled w-100 text-start"
+                :aria-label="charakterName(eintrag) + ' löschen'"
+                @click="loescheEinzelCharakter(eintrag)">
+                <span class="btn-label">
+                  <img
+                    v-if="charakterBild(eintrag)"
+                    :src="charakterBild(eintrag)"
+                    alt=""
+                    class="htbah-btn-labeled-avatar"
+                    aria-hidden="true" />
+                  <span v-else class="btn-labeled-emoji" aria-hidden="true">🧙</span>
+                </span>
+                <span class="btn-labeled-text">{{ charakterName(eintrag) }} löschen</span>
+              </button>
+            </div>
+          </einstellungen-sektion>
+
+          <template v-if="appRolle === 'charakter'">
+            <einstellungen-sektion
+              titel="Weitere Löschoptionen"
+              section-id="loeschen-bereiche-charakter"
+              emoji="🗑️"
+              klein
+              eingebettet>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
             type="button"
@@ -2051,6 +2078,20 @@ window.HTBAH_SEITEN.Einstellungen = {
             :symbol="speicherBereiche.wuerfelbeutelLayout.buttonSymbol"
             @click="oeffneLoeschDialog('wuerfelbeutelLayout')">
             {{ speicherBereiche.wuerfelbeutelLayout.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.modaleZustand.buttonSymbol"
+            @click="oeffneLoeschDialog('modaleZustand')">
+            {{ speicherBereiche.modaleZustand.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
+            :symbol="speicherBereiche.floatingFabZustand.buttonSymbol"
+            @click="oeffneLoeschDialog('floatingFabZustand')">
+            {{ speicherBereiche.floatingFabZustand.buttonLabel }}
           </icon-text-button>
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
@@ -2073,10 +2114,16 @@ window.HTBAH_SEITEN.Einstellungen = {
             @click="oeffneLoeschDialog('alles')">
             {{ speicherBereiche.alles.buttonLabel }}
           </icon-text-button>
-        </template>
-        <template v-else-if="appRolle === 'spielleitung'">
-          <div class="mb-3">
-            <h6 class="mb-2">Nach Kampagne</h6>
+            </einstellungen-sektion>
+          </template>
+
+          <template v-else-if="appRolle === 'spielleitung'">
+            <einstellungen-sektion
+              titel="Nach Kampagne"
+              section-id="loeschen-nach-kampagne"
+              emoji="🗂️"
+              klein
+              eingebettet>
             <p v-if="!spielleitungKampagnen.length" class="small text-body-secondary mb-0">
               Keine Kampagnen vorhanden — lege zuerst unter „Spielleitung“ eine Kampagne an.
             </p>
@@ -2162,10 +2209,14 @@ window.HTBAH_SEITEN.Einstellungen = {
                 </div>
               </div>
             </div>
-          </div>
-          <hr class="border-secondary border-opacity-25 my-3" />
-          <div class="rounded border border-secondary border-opacity-25 p-2 ps-3 text-start">
-            <div class="fw-semibold mb-2">Alle Kampagnen / global</div>
+            </einstellungen-sektion>
+
+            <einstellungen-sektion
+              titel="Alle Kampagnen / global"
+              section-id="loeschen-global"
+              emoji="🌐"
+              klein
+              eingebettet>
             <div class="d-flex flex-column gap-2 ps-2 border-start border-secondary border-opacity-50 ms-1">
               <icon-text-button
                 class="btn btn-danger btn-sm w-100 text-start"
@@ -2236,6 +2287,20 @@ window.HTBAH_SEITEN.Einstellungen = {
                   <icon-text-button
                     class="btn btn-outline-danger btn-sm w-100 text-start"
                     type="button"
+                    :symbol="speicherBereiche.modaleZustand.buttonSymbol"
+                    @click="oeffneLoeschDialog('modaleZustand')">
+                    {{ speicherBereiche.modaleZustand.buttonLabel }}
+                  </icon-text-button>
+                  <icon-text-button
+                    class="btn btn-outline-danger btn-sm w-100 text-start"
+                    type="button"
+                    :symbol="speicherBereiche.floatingFabZustand.buttonSymbol"
+                    @click="oeffneLoeschDialog('floatingFabZustand')">
+                    {{ speicherBereiche.floatingFabZustand.buttonLabel }}
+                  </icon-text-button>
+                  <icon-text-button
+                    class="btn btn-outline-danger btn-sm w-100 text-start"
+                    type="button"
                     :symbol="speicherBereiche.sicherheitsmechanismen.buttonSymbol"
                     @click="oeffneLoeschDialog('sicherheitsmechanismen')">
                     {{ speicherBereiche.sicherheitsmechanismen.buttonLabel }}
@@ -2250,9 +2315,10 @@ window.HTBAH_SEITEN.Einstellungen = {
                 </div>
               </div>
             </div>
-          </div>
-        </template>
-      </div>
+            </einstellungen-sektion>
+          </template>
+        </div>
+      </einstellungen-sektion>
 
       <div class="abstandshalter" aria-hidden="true"></div>
 

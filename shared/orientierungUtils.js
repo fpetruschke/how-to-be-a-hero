@@ -35,6 +35,8 @@ const ORIENT_DREH_KLASSEN = [
 
 let orientierungSpeicher = null;
 let orientierungAktualisierungRaf = 0;
+/** Letzter per API ermittelter Winkel – Fallback nur für 90°/270°, nicht 0° vs. 180°. */
+let orientierungLetzterApiWinkel = 0;
 
 function orientierungSetzeSpeicher(speicher) {
   orientierungSpeicher = speicher;
@@ -73,32 +75,100 @@ function orientierungNormalisiereWinkel(winkel) {
   return norm;
 }
 
-function orientierungErmittleGeraeteWinkel() {
+function orientierungWinkelAusScreenTyp(typ) {
+  if (typeof typ !== 'string') {
+    return null;
+  }
+  if (typ === 'landscape-primary') {
+    return 90;
+  }
+  if (typ === 'landscape-secondary') {
+    return 270;
+  }
+  if (typ === 'portrait-secondary') {
+    return 180;
+  }
+  if (typ === 'portrait-primary') {
+    return 0;
+  }
+  return null;
+}
+
+function orientierungWinkelAusWindowOrientation(wert) {
+  if (typeof wert !== 'number' || !Number.isFinite(wert)) {
+    return null;
+  }
+  if (wert === 90) {
+    return 90;
+  }
+  if (wert === -90) {
+    return 270;
+  }
+  if (wert === 180 || wert === -180) {
+    return 180;
+  }
+  if (wert === 0) {
+    return 0;
+  }
+  return null;
+}
+
+function orientierungMerkeApiWinkel(winkel) {
+  orientierungLetzterApiWinkel = winkel;
+  return winkel;
+}
+
+function orientierungLeseGeraeteWinkelAusApi() {
   if (typeof screen !== 'undefined' && screen.orientation) {
     const apiWinkel = orientierungNormalisiereWinkel(screen.orientation.angle);
     if (apiWinkel !== null) {
       return apiWinkel;
     }
-  }
-  if (typeof window !== 'undefined' && typeof window.orientation === 'number') {
-    const o = window.orientation;
-    if (o === 90) {
-      return 90;
-    }
-    if (o === -90) {
-      return 270;
-    }
-    if (o === 180 || o === -180) {
-      return 180;
-    }
-    if (o === 0) {
-      return 0;
+    const ausTyp = orientierungWinkelAusScreenTyp(screen.orientation.type);
+    if (ausTyp !== null) {
+      return ausTyp;
     }
   }
   if (typeof window !== 'undefined') {
-    return window.innerWidth > window.innerHeight ? 90 : 0;
+    return orientierungWinkelAusWindowOrientation(window.orientation);
   }
-  return 0;
+  return null;
+}
+
+function orientierungToggleGegenpaarWinkel(gruppe) {
+  if (gruppe === 'landscape') {
+    return orientierungLetzterApiWinkel === 270 ? 90 : 270;
+  }
+  return orientierungLetzterApiWinkel === 180 ? 0 : 180;
+}
+
+function orientierungErmittleGeraeteWinkel(optionen = {}) {
+  const querformat =
+    typeof window !== 'undefined' && window.innerWidth > window.innerHeight;
+  const ausApi = orientierungLeseGeraeteWinkelAusApi();
+  if (ausApi !== null) {
+    if (
+      optionen.beiDrehungToggle &&
+      ausApi === orientierungLetzterApiWinkel &&
+      ((querformat && (ausApi === 90 || ausApi === 270)) ||
+        (!querformat && (ausApi === 0 || ausApi === 180)))
+    ) {
+      const gruppe = querformat ? 'landscape' : 'portrait';
+      return orientierungMerkeApiWinkel(orientierungToggleGegenpaarWinkel(gruppe));
+    }
+    return orientierungMerkeApiWinkel(ausApi);
+  }
+  if (optionen.beiDrehungToggle && typeof window !== 'undefined') {
+    const gruppe = querformat ? 'landscape' : 'portrait';
+    return orientierungMerkeApiWinkel(orientierungToggleGegenpaarWinkel(gruppe));
+  }
+  if (typeof window !== 'undefined') {
+    if (querformat) {
+      return orientierungLetzterApiWinkel === 270 ? 270 : 90;
+    }
+    return orientierungLetzterApiWinkel === 180 ? 180 : 0;
+  }
+  return orientierungLetzterApiWinkel;
 }
 
 function orientierungErmittleTypAusWinkel(winkel) {
@@ -254,18 +324,32 @@ function orientierungWendeModusAn(modus, optionen = {}) {
   }
 }
 
-function orientierungPlaneCssAktualisierung() {
+function orientierungWendeCssNachGeraetedrehungAn(optionen = {}) {
+  if (optionen.beiDrehungToggle) {
+    orientierungErmittleGeraeteWinkel({ beiDrehungToggle: true });
+  }
+  orientierungWendeCssKompensationAn(orientierungLadeModus());
+}
+
+function orientierungPlaneCssAktualisierung(optionen = {}) {
   if (typeof window === 'undefined' || typeof requestAnimationFrame !== 'function') {
-    orientierungWendeCssKompensationAn(orientierungLadeModus());
+    orientierungWendeCssNachGeraetedrehungAn(optionen);
     return;
   }
   if (orientierungAktualisierungRaf) {
     cancelAnimationFrame(orientierungAktualisierungRaf);
   }
+  /* Zwei Frames: screen.orientation.angle ist bei orientationchange oft noch veraltet. */
   orientierungAktualisierungRaf = requestAnimationFrame(() => {
-    orientierungAktualisierungRaf = 0;
-    orientierungWendeCssKompensationAn(orientierungLadeModus());
+    orientierungAktualisierungRaf = requestAnimationFrame(() => {
+      orientierungAktualisierungRaf = 0;
+      orientierungWendeCssNachGeraetedrehungAn(optionen);
+    });
   });
+}
+
+function orientierungBeiDrehungsEvent() {
+  orientierungPlaneCssAktualisierung({ beiDrehungToggle: true });
 }
 
 function orientierungSpeichereModus(modus) {
@@ -308,14 +392,14 @@ function orientierungInitialisiereListener() {
   if (typeof window === 'undefined') {
     return;
   }
-  window.addEventListener('orientationchange', orientierungPlaneCssAktualisierung);
+  window.addEventListener('orientationchange', orientierungBeiDrehungsEvent);
   window.addEventListener('resize', orientierungPlaneCssAktualisierung);
   if (
     typeof screen !== 'undefined' &&
     screen.orientation &&
     typeof screen.orientation.addEventListener === 'function'
   ) {
-    screen.orientation.addEventListener('change', orientierungPlaneCssAktualisierung);
+    screen.orientation.addEventListener('change', orientierungBeiDrehungsEvent);
   }
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {

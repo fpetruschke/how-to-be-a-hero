@@ -34,6 +34,23 @@ window.HTBAH_KOMPONENTEN.ModalMinimizeDock = {
       event.preventDefault();
       this.leisteAktivieren(eintrag);
     },
+    leisteSchliessen(eintrag, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (this.ziehenAktiv || !eintrag || typeof eintrag.schliessen !== 'function') {
+        return;
+      }
+      eintrag.schliessen();
+    },
+    leisteSchliessenTastatur(event, eintrag) {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+      event.preventDefault();
+      this.leisteSchliessen(eintrag, event);
+    },
     dragStart(event, index) {
       this.ziehtIndex = index;
       this.ziehenAktiv = false;
@@ -174,14 +191,7 @@ window.HTBAH_KOMPONENTEN.ModalMinimizeDock = {
           @dragover="dragOver($event, index)"
           @dragleave="dragLeave(index)"
           @drop="drop($event, index)">
-          <div
-            class="htbah-modal-minimize-leiste"
-            role="button"
-            tabindex="0"
-            :aria-label="(eintrag.titel || 'Fenster') + ' wiederherstellen'"
-            :title="(eintrag.titel || 'Fenster') + ' wiederherstellen'"
-            @click="leisteAktivieren(eintrag)"
-            @keydown="leisteTastatur($event, eintrag)">
+          <div class="htbah-modal-minimize-leiste">
             <span
               class="htbah-modal-minimize-leiste__griff"
               draggable="true"
@@ -191,14 +201,36 @@ window.HTBAH_KOMPONENTEN.ModalMinimizeDock = {
               @dragend.stop="dragEnd"
               @pointerdown.stop="griffPointerDown($event, index)"
               @click.stop>⠿</span>
-            <span
-              v-if="eintrag.emoji"
-              class="htbah-modal-minimize-leiste__emoji"
-              aria-hidden="true">{{ eintrag.emoji }}</span>
-            <span class="htbah-modal-minimize-leiste__titel">{{ eintrag.titel }}</span>
-            <span
-              class="material-symbols-outlined htbah-modal-minimize-leiste__symbol"
-              aria-hidden="true">open_in_full</span>
+            <button
+              type="button"
+              class="htbah-modal-minimize-leiste__haupt"
+              :aria-label="(eintrag.titel || 'Fenster') + ' wiederherstellen'"
+              :title="(eintrag.titel || 'Fenster') + ' wiederherstellen'"
+              @click="leisteAktivieren(eintrag)"
+              @keydown="leisteTastatur($event, eintrag)">
+              <span
+                v-if="eintrag.emoji"
+                class="htbah-modal-minimize-leiste__emoji"
+                aria-hidden="true">{{ eintrag.emoji }}</span>
+              <span class="htbah-modal-minimize-leiste__titel">{{ eintrag.titel }}</span>
+            </button>
+            <button
+              type="button"
+              class="htbah-modal-minimize-leiste__aktion"
+              title="Wiederherstellen"
+              :aria-label="(eintrag.titel || 'Fenster') + ' wiederherstellen'"
+              @click.stop="leisteAktivieren(eintrag)">
+              <span class="material-symbols-outlined" aria-hidden="true">open_in_full</span>
+            </button>
+            <button
+              type="button"
+              class="htbah-modal-minimize-leiste__aktion htbah-modal-minimize-leiste__schliessen"
+              title="Schließen"
+              :aria-label="(eintrag.titel || 'Fenster') + ' schließen'"
+              @click.stop="leisteSchliessen(eintrag, $event)"
+              @keydown.stop="leisteSchliessenTastatur($event, eintrag)">
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
           </div>
         </div>
       </div>

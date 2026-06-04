@@ -1235,6 +1235,7 @@ function loescheFloatingFabSpeicherKomplett() {
   if (fabSpeicher && typeof fabSpeicher.loescheAlle === 'function') {
     fabSpeicher.loescheAlle();
   }
+  window.dispatchEvent(new CustomEvent('htbah:floating-fab-speicher-geleert'));
 }
 
 function ladeZufallstabellenZustand(kampagneId) {
@@ -5320,6 +5321,10 @@ app.component('eingabe-modal', window.HTBAH_KOMPONENTEN.EingabeModal);
 app.component('ui-toast-host', window.HTBAH_KOMPONENTEN.UiToastHost);
 app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner);
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);
+app.component(
+  'einstellungen-sektion',
+  window.HTBAH_KOMPONENTEN.EinstellungenSektion,
+);
 app.component('weltenbau-uebersicht-modal', window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal);
 app.component(
   'kampagnen-labels-editor',

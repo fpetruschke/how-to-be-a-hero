@@ -323,6 +323,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           S.beimModalOeffnen('konflikt', this, {
             fensterOpts: { minBreite: 360, minHoehe: 320 },
             extrasLieferant: () => ({ kampagneId: this.kampagneIdEffektiv }),
+            onSchliessen: () => this.schliessen(),
             onWiederherstellen: () => {
               this.$nextTick(() => {
                 if (!this.istVollbild) {
@@ -362,6 +363,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           id: 'konflikt',
           titel: this.modalTitel,
           emoji: '⚔️',
+          onSchliessen: () => this.schliessen(),
           onWiederherstellen: () => {
             this.$nextTick(() => {
               this.stelleSichtbaresFensterSicher();

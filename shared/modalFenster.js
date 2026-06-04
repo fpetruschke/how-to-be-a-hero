@@ -22,6 +22,7 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
         emoji: eintrag.emoji || '',
         wiederherstellen:
           typeof eintrag.wiederherstellen === 'function' ? eintrag.wiederherstellen : () => {},
+        schliessen: typeof eintrag.schliessen === 'function' ? eintrag.schliessen : () => {},
       };
       if (idx >= 0) {
         HTBAH_MODAL_MINIMIZE_DOCK_EINTRAGE[idx] = payload;
@@ -334,6 +335,13 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
       this.minimiert = true;
       this._dockId = meta.id;
       const fenster = this;
+      const schliessen =
+        typeof meta.onSchliessen === 'function'
+          ? meta.onSchliessen
+          : () => {
+              MF.methoden.bereinigeMinimiertZustand.call(fenster, meta.id);
+              MF.methoden.entferneModalSpeicher.call(fenster);
+            };
       MF.dock.registriere({
         id: meta.id,
         titel: meta.titel || 'Fenster',
@@ -345,6 +353,7 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
             meta.onWiederherstellen();
           }
         },
+        schliessen,
       });
       MF.methoden.persistiereModalWennGebunden.call(this);
     },

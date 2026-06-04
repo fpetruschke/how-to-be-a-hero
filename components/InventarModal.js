@@ -75,6 +75,7 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
         id: 'inventar',
         titel: 'Inventar',
         emoji: '🎒',
+        onSchliessen: () => this.schliessen(),
         onWiederherstellen: () => {
           this.$nextTick(() => {
             this.stelleSichtbaresFensterSicher();
@@ -91,6 +92,7 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
         if (S) {
           S.beimModalOeffnen('inventar', this, {
             fensterOpts: { minBreite: 480, minHoehe: 320 },
+            onSchliessen: () => this.schliessen(),
             onWiederherstellen: () => {
               this.$nextTick(() => {
                 this.stelleSichtbaresFensterSicher();

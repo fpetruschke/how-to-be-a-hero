@@ -209,6 +209,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                 dockTitel: this.zeileModalTitel || 'Eintrag bearbeiten',
                 dockEmoji: '✏️',
               }),
+              onSchliessen: () => this.schliessen(),
               onWiederherstellen: () => {
                 this.$nextTick(() => {
                   this.stelleSichtbaresFensterSicher();
@@ -438,6 +439,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         id: this.zeileModalDockId(),
         titel: this.zeileModalTitel || 'Eintrag bearbeiten',
         emoji: '✏️',
+        onSchliessen: () => this.schliessen(),
         onWiederherstellen: () => {
           this.$nextTick(() => {
             this.stelleSichtbaresFensterSicher();

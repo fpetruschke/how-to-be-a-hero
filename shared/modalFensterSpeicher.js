@@ -289,14 +289,26 @@
     };
   }
 
-  function registriereMinimiertImDock(modalId, fenster, onWiederherstellen) {
+  function registriereMinimiertImDock(modalId, fenster, onWiederherstellen, onSchliessen) {
     const MF = window.HTBAH_MODAL_FENSTER;
+    const M = MF && MF.methoden;
     if (!MF || !modalId || !fenster || !fenster.minimiert) {
       return;
     }
     const eintrag = lade(modalId);
     const meta = metaFuerModal(modalId, eintrag);
     fenster._dockId = modalId;
+    const schliessen =
+      typeof onSchliessen === 'function'
+        ? onSchliessen
+        : () => {
+            if (M) {
+              M.bereinigeMinimiertZustand.call(fenster, modalId);
+              M.entferneModalSpeicher.call(fenster);
+            } else {
+              MF.dock.entferne(modalId);
+            }
+          };
     MF.dock.registriere({
       id: modalId,
       titel: meta.titel,
@@ -308,6 +320,7 @@
           onWiederherstellen();
         }
       },
+      schliessen,
     });
   }
 
@@ -370,6 +383,7 @@
         modalId,
         fenster,
         options && options.onWiederherstellen ? options.onWiederherstellen : null,
+        options && options.onSchliessen ? options.onSchliessen : null,
       );
     }
   }
