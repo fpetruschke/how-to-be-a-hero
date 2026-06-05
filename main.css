@@ -2680,6 +2680,7 @@ input::placeholder {
 }
 
 .regelwerk-modal-window.regelwerk-modal-window-fullscreen > .flex-grow-1,
+.regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-zeichen-modal-body,
 .regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-zeichen-modal-canvas-host,
 .regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-musik-iframe-wrap,
 .regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-inventar-modal-body,
@@ -3033,7 +3034,7 @@ input::placeholder {
 }
 
 .htbah-zeichen-modal-window.regelwerk-modal-window {
-  width: min(94vw, 760px);
+  width: min(94vw, 880px);
   height: min(88vh, 620px);
   max-height: min(94dvh, 820px);
   overflow: hidden;
@@ -3175,6 +3176,265 @@ input::placeholder {
 .htbah-zeichen-modal-window .htbah-zeichen-pinsel-punkt {
   display: block;
   border-radius: 50%;
+}
+
+.htbah-zeichen-modal-window .htbah-zeichen-gitter-color {
+  width: 2rem;
+  height: 2rem;
+  padding: 0.1rem;
+}
+
+.htbah-zeichen-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.htbah-zeichen-ebenen-panel {
+  width: min(12.5rem, 36vw);
+  min-width: 10rem;
+  max-width: 14rem;
+  background: var(--card-bg);
+  border-color: var(--border-color) !important;
+}
+
+.htbah-zeichen-ebenen-hinzufuegen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0;
+  line-height: 1;
+}
+
+.htbah-zeichen-ebenen-hinzufuegen .material-symbols-outlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.htbah-zeichen-ebenen-toggle-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  width: 1.85rem;
+  padding: 0.35rem 0.15rem;
+  border: 0;
+  border-left: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.htbah-zeichen-ebenen-toggle-tab:hover,
+.htbah-zeichen-ebenen-toggle-tab:focus-visible {
+  opacity: 1;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.htbah-zeichen-ebenen-toggle-tab .material-symbols-outlined {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.htbah-zeichen-ebenen-toggle-tab-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  line-height: 1;
+  opacity: 0.75;
+}
+
+.htbah-zeichen-ebenen-kopf {
+  flex-shrink: 0;
+}
+
+.htbah-zeichen-ebenen-liste {
+  min-height: 0;
+}
+
+.htbah-zeichen-ebene-eintrag {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 2.35rem;
+  padding: 0.3rem 0.35rem;
+  border-bottom: 1px solid var(--border-color);
+  cursor: grab;
+}
+
+.htbah-zeichen-ebene-eintrag.aktiv {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.htbah-zeichen-ebene-eintrag--ausgeblendet {
+  opacity: 0.55;
+}
+
+.htbah-zeichen-ebene-eintrag--ausgeblendet.aktiv {
+  opacity: 0.72;
+}
+
+.htbah-zeichen-ebene-eintrag.drag-over {
+  outline: 2px dashed rgba(37, 99, 235, 0.45);
+  outline-offset: -2px;
+}
+
+.htbah-zeichen-ebene-eintrag.dragging {
+  opacity: 0.55;
+}
+
+.htbah-zeichen-ebene-falafel,
+.htbah-zeichen-ebene-aktionen .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.htbah-zeichen-ebene-falafel:hover,
+.htbah-zeichen-ebene-falafel:focus-visible,
+.htbah-zeichen-ebene-aktionen .btn:hover,
+.htbah-zeichen-ebene-aktionen .btn:focus-visible {
+  text-decoration: none;
+}
+
+.htbah-zeichen-ebene-falafel {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.htbah-zeichen-ebene-falafel .material-symbols-outlined,
+.htbah-zeichen-ebene-aktionen .material-symbols-outlined {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.htbah-zeichen-ebene-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.htbah-zeichen-ebene-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 8;
+  min-width: 10.5rem;
+  padding: 0.3rem;
+  background: var(--modal-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.htbah-zeichen-ebene-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.htbah-zeichen-ebene-menu-item:hover:not(:disabled),
+.htbah-zeichen-ebene-menu-item:focus-visible:not(:disabled) {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.htbah-zeichen-ebene-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.htbah-zeichen-ebene-menu-item .material-symbols-outlined {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.htbah-zeichen-ebene-menu-item--danger {
+  color: var(--bs-danger, #dc3545);
+}
+
+.htbah-zeichen-ebene-haupt {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  min-width: 0;
+  min-height: 1.5rem;
+  padding: 0.15rem 0.25rem;
+  border-radius: 0.25rem;
+  color: inherit;
+}
+
+.htbah-zeichen-ebene-haupt:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.htbah-zeichen-ebene-vorschau {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 0.15rem;
+  background: #fff;
+}
+
+.htbah-zeichen-ebene-vorschau--transparent {
+  background:
+    linear-gradient(45deg, rgba(15, 23, 42, 0.08) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(15, 23, 42, 0.08) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(15, 23, 42, 0.08) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(15, 23, 42, 0.08) 75%);
+  background-size: 6px 6px;
+  background-position: 0 0, 0 3px, 3px -3px, -3px 0;
+}
+
+.htbah-zeichen-ebene-name {
+  line-height: 1.2;
+}
+
+.htbah-zeichen-ebene-aktionen {
+  flex-shrink: 0;
+  align-self: center;
+  opacity: 0.65;
+  gap: 0;
+}
+
+.htbah-zeichen-ebene-aktionen .btn {
+  width: 1.25rem;
+  height: 1.1rem;
+  min-height: 0;
+  padding: 0;
+}
+
+.htbah-zeichen-ebene-neu-form {
+  flex-shrink: 0;
+  background: rgba(148, 163, 184, 0.08);
 }
 
 .htbah-zeichen-modal-canvas-host {

@@ -3979,31 +3979,63 @@ function beispielBaueZustandAusPaketZtfKategorien(daten, quellKid, idMaps) {
   return zustand;
 }
 
-function beispielRemapWeltenbauBereichDaten(daten, idMaps) {
+function beispielRemapWeltenbauGruppeKey(gruppeKey, altKid, neuKid) {
+  const gk = typeof gruppeKey === 'string' ? gruppeKey : '';
+  const alt = typeof altKid === 'string' && altKid.trim() ? altKid.trim() : '';
+  const neu = typeof neuKid === 'string' && neuKid.trim() ? neuKid.trim() : '';
+  if (alt && neu && gk === alt) {
+    return neu;
+  }
+  return gk;
+}
+
+function beispielRemapWeltenbauNestedGruppeRoot(root, idMaps, altKid, neuKid) {
+  if (!root || typeof root !== 'object') {
+    return {};
+  }
+  const neuRoot = {};
+  Object.keys(root).forEach((gruppeKey) => {
+    const layer = root[gruppeKey];
+    if (!layer || typeof layer !== 'object') {
+      return;
+    }
+    const neuLayer = {};
+    Object.entries(layer).forEach(([layoutKey, val]) => {
+      const nk = zstDuplizierMapLayoutKey(layoutKey, idMaps) || layoutKey;
+      neuLayer[nk] = val;
+    });
+    neuRoot[beispielRemapWeltenbauGruppeKey(gruppeKey, altKid, neuKid)] = neuLayer;
+  });
+  return neuRoot;
+}
+
+function beispielRemapWeltenbauFlatGruppeRoot(root, altKid, neuKid) {
+  if (!root || typeof root !== 'object') {
+    return {};
+  }
+  const neuRoot = {};
+  Object.entries(root).forEach(([gruppeKey, val]) => {
+    if (typeof gruppeKey !== 'string' || !gruppeKey) {
+      return;
+    }
+    neuRoot[beispielRemapWeltenbauGruppeKey(gruppeKey, altKid, neuKid)] = val;
+  });
+  return neuRoot;
+}
+
+function beispielRemapWeltenbauBereichDaten(daten, idMaps, altKid, neuKid) {
   if (!daten || typeof daten !== 'object') {
     return daten;
   }
   const out = JSON.parse(JSON.stringify(daten));
   ['mapLayouts', 'mapBildLayouts', 'mapElementLocks'].forEach((feld) => {
-    const root = out[feld];
-    if (!root || typeof root !== 'object') {
-      return;
-    }
-    const neuRoot = {};
-    Object.keys(root).forEach((gruppeKey) => {
-      const layer = root[gruppeKey];
-      if (!layer || typeof layer !== 'object') {
-        return;
-      }
-      const neuLayer = {};
-      Object.entries(layer).forEach(([layoutKey, val]) => {
-        const nk = zstDuplizierMapLayoutKey(layoutKey, idMaps) || layoutKey;
-        neuLayer[nk] = val;
-      });
-      neuRoot[gruppeKey] = neuLayer;
-    });
-    out[feld] = neuRoot;
+    out[feld] = beispielRemapWeltenbauNestedGruppeRoot(out[feld], idMaps, altKid, neuKid);
   });
+  ['mapHintergruende', 'mapEinstellungen', 'mapFreieBilder', 'mapFreieNotizen', 'mapFreiePfeile'].forEach(
+    (feld) => {
+      out[feld] = beispielRemapWeltenbauFlatGruppeRoot(out[feld], altKid, neuKid);
+    },
+  );
   return out;
 }
 
@@ -4174,10 +4206,10 @@ function wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAn(paket) {
     } else if (meta.lsTyp === 'sl_zeitmessung') {
       importiereSpielleitungZeitmessungExportPaket(neuKid, p);
     } else if (meta.lsTyp === 'wb_bereich' && p.daten) {
-      p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps);
+      p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps, altKid, neuKid);
       importiereWeltenbauBereichPaket(neuKid, p);
     } else if (meta.lsTyp === 'wb_kampagne' && p.daten) {
-      p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps);
+      p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps, altKid, neuKid);
       importiereWeltenbauKampagnePaket(neuKid, p);
     } else if (meta.lsTyp === 'ztf_kampagne' && p.daten) {
       const remapped = beispielRemapZtfZustandObjekt(p.daten, idMaps);
@@ -4199,7 +4231,7 @@ function wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAn(paket) {
       if (p.weltenbauKampagne && p.weltenbauKampagne.daten) {
         p.weltenbauKampagne = {
           ...p.weltenbauKampagne,
-          daten: beispielRemapWeltenbauBereichDaten(p.weltenbauKampagne.daten, idMaps),
+          daten: beispielRemapWeltenbauBereichDaten(p.weltenbauKampagne.daten, idMaps, altKid, neuKid),
         };
       }
       importiereKampagneKomplettBackupBundle(neuKid, p);
@@ -4232,7 +4264,12 @@ function wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAn(paket) {
       welLegacyPaket.proKampagne &&
       welLegacyPaket.proKampagne[altKid]
     ) {
-      const wbDaten = beispielRemapWeltenbauBereichDaten(welLegacyPaket.proKampagne[altKid], idMaps);
+      const wbDaten = beispielRemapWeltenbauBereichDaten(
+        welLegacyPaket.proKampagne[altKid],
+        idMaps,
+        altKid,
+        neuKid,
+      );
       if (Number(wbDaten.version) === 4) {
         speichereWeltenbauZustand(wbDaten, neuKid);
       }
@@ -4281,7 +4318,7 @@ function beispielImportBereicheFuerSchritte(daten, altKid) {
   });
 }
 
-function beispielImportierePaketBereich(neuKid, neuerName, bereich, idMaps) {
+function beispielImportierePaketBereich(neuKid, neuerName, bereich, idMaps, altKid) {
   const meta = parseLsExportKeyMetaBeispiel(bereich && bereich.key);
   if (!meta) {
     return;
@@ -4299,10 +4336,10 @@ function beispielImportierePaketBereich(neuKid, neuerName, bereich, idMaps) {
   } else if (meta.lsTyp === 'sl_zeitmessung') {
     importiereSpielleitungZeitmessungExportPaket(neuKid, p);
   } else if (meta.lsTyp === 'wb_bereich' && p.daten) {
-    p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps);
+    p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps, altKid, neuKid);
     importiereWeltenbauBereichPaket(neuKid, p);
   } else if (meta.lsTyp === 'wb_kampagne' && p.daten) {
-    p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps);
+    p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps, altKid, neuKid);
     importiereWeltenbauKampagnePaket(neuKid, p);
   } else if (meta.lsTyp === 'ztf_kampagne' && p.daten) {
     const remapped = beispielRemapZtfZustandObjekt(p.daten, idMaps);
@@ -4324,7 +4361,7 @@ function beispielImportierePaketBereich(neuKid, neuerName, bereich, idMaps) {
     if (p.weltenbauKampagne && p.weltenbauKampagne.daten) {
       p.weltenbauKampagne = {
         ...p.weltenbauKampagne,
-        daten: beispielRemapWeltenbauBereichDaten(p.weltenbauKampagne.daten, idMaps),
+        daten: beispielRemapWeltenbauBereichDaten(p.weltenbauKampagne.daten, idMaps, altKid, neuKid),
       };
     }
     importiereKampagneKomplettBackupBundle(neuKid, p);
@@ -4358,7 +4395,12 @@ function beispielImportLegacyDaten(daten, altKid, neuKid, idMaps) {
       welLegacyPaket.proKampagne &&
       welLegacyPaket.proKampagne[altKid]
     ) {
-      const wbDaten = beispielRemapWeltenbauBereichDaten(welLegacyPaket.proKampagne[altKid], idMaps);
+      const wbDaten = beispielRemapWeltenbauBereichDaten(
+        welLegacyPaket.proKampagne[altKid],
+        idMaps,
+        altKid,
+        neuKid,
+      );
       if (Number(wbDaten.version) === 4) {
         speichereWeltenbauZustand(wbDaten, neuKid);
       }
@@ -4499,7 +4541,7 @@ async function wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAsync(paket, repor
       label: `${beispielImportBereichLabel(meta)} wird importiert …`,
       fn: async () => {
         htbahMitBulkSpeicherModus(() => {
-          beispielImportierePaketBereich(neuKid, neuerName, bereich, idMaps);
+          beispielImportierePaketBereich(neuKid, neuerName, bereich, idMaps, altKid);
         });
       },
     });

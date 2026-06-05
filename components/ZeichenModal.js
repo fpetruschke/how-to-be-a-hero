@@ -15,6 +15,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   /** CSS-Referenz: 1in = 96px, 1in = 2,54cm — entspricht der Browser-Einheit „cm“ im Layout. */
   const CSS_PX_PRO_CM = 96 / 2.54;
   const KARO_KANTE_CM = 0.5;
+  const STANDARD_GITTER_FARBE = '#94a3b8';
+  const GITTER_ALPHA = 0.22;
+  const MAX_EBENEN = 50;
   const ZEICHEN_WERKZEUGE = [
     'freihand',
     'linie',
@@ -167,6 +170,113 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       return ('#' + r + r + g + g + b + b).toLowerCase();
     }
     return '#111827';
+  }
+
+  function hexZuRgbaString(hex, alpha) {
+    const [r, g, b] = hexZuRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function normalisiereHintergrund(roh) {
+    if (roh && typeof roh === 'object' && roh.typ === 'farbe') {
+      return { typ: 'farbe', farbe: normalisiereFarbe(roh.farbe) };
+    }
+    return { typ: 'transparent' };
+  }
+
+  function erstelleStandardEbene(name, hintergrund) {
+    return {
+      id: neueId(),
+      name: typeof name === 'string' && name.trim() ? name.trim() : 'Ebene',
+      sichtbar: true,
+      hintergrund: normalisiereHintergrund(hintergrund),
+      elemente: [],
+    };
+  }
+
+  function normalisiereEbene(roh) {
+    if (!roh || typeof roh !== 'object') return null;
+    const id =
+      typeof roh.id === 'string' && roh.id
+        ? roh.id
+        : typeof roh.i === 'string' && roh.i
+          ? roh.i
+          : neueId();
+    const name = typeof roh.name === 'string' && roh.name.trim() ? roh.name.trim() : 'Ebene';
+    return {
+      id,
+      name,
+      sichtbar: roh.sichtbar !== false,
+      hintergrund: normalisiereHintergrund(roh.hintergrund || roh.bg),
+      elemente: normalisiereElementListe(roh.elemente || roh.e),
+    };
+  }
+
+  function normalisiereEbenenListe(roh) {
+    if (!Array.isArray(roh)) return [];
+    return roh.map(normalisiereEbene).filter(Boolean);
+  }
+
+  function rundeEbenenFuerSpeicher(ebenen) {
+    return ebenen.map((eb) => ({
+      id: eb.id,
+      name: eb.name,
+      sichtbar: !!eb.sichtbar,
+      hintergrund:
+        eb.hintergrund && eb.hintergrund.typ === 'farbe'
+          ? { typ: 'farbe', farbe: eb.hintergrund.farbe }
+          : { typ: 'transparent' },
+      elemente: rundeElementeFuerSpeicher(eb.elemente),
+    }));
+  }
+
+  function normalisiereVerlaufSnapshot(roh) {
+    if (Array.isArray(roh)) {
+      const ebene = erstelleStandardEbene('Ebene 1');
+      ebene.elemente = normalisiereElementListe(roh);
+      return { ebenen: [ebene], aktiveEbeneId: ebene.id };
+    }
+    if (!roh || typeof roh !== 'object' || !Array.isArray(roh.ebenen)) return null;
+    const ebenen = normalisiereEbenenListe(roh.ebenen);
+    if (!ebenen.length) return null;
+    const aktiveEbeneId =
+      typeof roh.aktiveEbeneId === 'string' && ebenen.some((eb) => eb.id === roh.aktiveEbeneId)
+        ? roh.aktiveEbeneId
+        : ebenen[ebenen.length - 1].id;
+    return { ebenen, aktiveEbeneId };
+  }
+
+  function rundeVerlaufSnapshotFuerSpeicher(snap) {
+    if (!snap || !Array.isArray(snap.ebenen)) return null;
+    return {
+      ebenen: rundeEbenenFuerSpeicher(snap.ebenen),
+      aktiveEbeneId: snap.aktiveEbeneId,
+    };
+  }
+
+  function holeSichtbareElemente(ebenen) {
+    const alle = [];
+    for (const eb of ebenen) {
+      if (eb.sichtbar) alle.push(...eb.elemente);
+    }
+    return alle;
+  }
+
+  function dupliziereEbene(quelle) {
+    const nameBasis = String(quelle.name || 'Ebene').trim() || 'Ebene';
+    let name = `${nameBasis} Kopie`;
+    if (name.length > 40) name = name.slice(0, 40);
+    const elemente = normalisiereElementListe(klone(quelle.elemente)).map((el) => ({
+      ...el,
+      i: neueId(),
+    }));
+    return {
+      id: neueId(),
+      name,
+      sichtbar: quelle.sichtbar !== false,
+      hintergrund: normalisiereHintergrund(klone(quelle.hintergrund)),
+      elemente,
+    };
   }
 
   function clampDicke(d) {
@@ -767,13 +877,27 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   window.HTBAH_KOMPONENTEN.ZeichenModal = {
     props: ['uiZustand'],
     data() {
+      const initEbenen = (() => {
+        const erste = erstelleStandardEbene('Ebene 1');
+        return { ebenen: [erste], aktiveEbeneId: erste.id };
+      })();
       return {
         ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten(),
         farbe: '#111827',
         dicke: 4,
         werkzeug: 'freihand',
         werkzeugMenuOffen: false,
-        elemente: [],
+        ebenen: initEbenen.ebenen,
+        aktiveEbeneId: initEbenen.aktiveEbeneId,
+        gitterFarbe: STANDARD_GITTER_FARBE,
+        neueEbeneFormOffen: false,
+        neueEbeneName: '',
+        neueEbeneHintergrundTyp: 'transparent',
+        neueEbeneHintergrundFarbe: '#ffffff',
+        ebeneDragIndex: null,
+        ebeneDropIndex: null,
+        ebeneMenuOffenId: null,
+        ebenenSidebarOffen: true,
         auswahl: [],
         undoStack: [],
         redoStack: [],
@@ -786,6 +910,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         fokusVorModal: null,
         farbenVoreingestellt: Object.freeze([
           '#111827',
+          '#737373',
           '#ffffff',
           '#ef4444',
           '#f59e0b',
@@ -804,6 +929,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       };
     },
     created() {
+      if (!this.aktiveEbeneId && this.ebenen.length) {
+        this.aktiveEbeneId = this.ebenen[0].id;
+      }
       this._ctx = null;
       this._dpr = 1;
       this._resizeObserver = null;
@@ -876,7 +1004,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         return this.redoStack.length > 0;
       },
       kannExportieren() {
-        return this.elemente.length > 0;
+        return this.hatZeichenInhalt;
       },
       kannPasten() {
         return this.zwischenablage.length > 0;
@@ -896,6 +1024,28 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       auswahlSet() {
         return new Set(this.auswahl);
       },
+      aktiveEbene() {
+        const id = this.aktiveEbeneId;
+        if (id) {
+          const gefunden = this.ebenen.find((eb) => eb.id === id);
+          if (gefunden) return gefunden;
+        }
+        return this.ebenen.length ? this.ebenen[this.ebenen.length - 1] : null;
+      },
+      elemente() {
+        return this.aktiveEbene ? this.aktiveEbene.elemente : [];
+      },
+      ebenenUiListe() {
+        return this.ebenen
+          .map((eb, index) => ({ eb, index }))
+          .slice()
+          .reverse();
+      },
+      hatZeichenInhalt() {
+        return this.ebenen.some(
+          (eb) => eb.elemente.length > 0 || (eb.hintergrund && eb.hintergrund.typ === 'farbe'),
+        );
+      },
     },
     watch: {
       'uiZustand.zeichenModalOffen'(istOffen) {
@@ -907,6 +1057,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         window.removeEventListener('keydown', this.onTastatur);
         this.werkzeugMenuOffen = false;
+        this.ebeneMenuOffenId = null;
         this.beendeZiehen();
         this.beendeResize();
         const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
@@ -947,6 +1098,23 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       karopapierGitter() {
         if (this.zustandGeladen) this.persistDebounce();
+        this.zeichneAlles();
+      },
+      gitterFarbe() {
+        if (this.zustandGeladen) this.persistDebounce();
+        this.zeichneAlles();
+      },
+      ebenenSidebarOffen() {
+        if (this.zustandGeladen) this.persistDebounce();
+        if (!this.ebenenSidebarOffen) {
+          this.ebeneMenuOffenId = null;
+          this.neueEbeneFormOffen = false;
+        }
+        this.$nextTick(() => this.beiCanvasGroesseGeaendert());
+      },
+      aktiveEbeneId() {
+        if (this.zustandGeladen) this.persistDebounce();
+        this.auswahl = [];
         this.zeichneAlles();
       },
       istVollbild() {
@@ -1080,6 +1248,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           if (!menu || !toggle || (!menu.contains(event.target) && !toggle.contains(event.target))) {
             this.werkzeugMenuOffen = false;
           }
+        }
+        if (this.ebeneMenuOffenId && !(event.target instanceof Element && event.target.closest('.htbah-zeichen-ebene-menu-wrap'))) {
+          this.ebeneMenuOffenId = null;
         }
         if (!this.uiZustand?.zeichenModalOffen || !this._formEntwurf) return;
         if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -1230,6 +1401,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             if (typeof z.einstellungen.karopapierGitter === 'boolean') {
               this.karopapierGitter = z.einstellungen.karopapierGitter;
             }
+            if (typeof z.einstellungen.gitterFarbe === 'string') {
+              this.gitterFarbe = normalisiereFarbe(z.einstellungen.gitterFarbe);
+            }
+            if (typeof z.einstellungen.ebenenSidebarOffen === 'boolean') {
+              this.ebenenSidebarOffen = z.einstellungen.ebenenSidebarOffen;
+            }
           }
           if (z.ansicht && typeof z.ansicht === 'object') {
             const sc = Number(z.ansicht.scale);
@@ -1239,25 +1416,44 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             this.ansicht.offsetX = Number.isFinite(ox) ? ox : 0;
             this.ansicht.offsetY = Number.isFinite(oy) ? oy : 0;
           }
-          if (Array.isArray(z.elemente)) {
-            this.elemente = normalisiereElementListe(z.elemente);
+          if (Array.isArray(z.ebenen) && z.ebenen.length) {
+            this.ebenen = normalisiereEbenenListe(z.ebenen);
+            const gespeicherteAktive =
+              typeof z.aktiveEbeneId === 'string' ? z.aktiveEbeneId : null;
+            this.aktiveEbeneId =
+              gespeicherteAktive && this.ebenen.some((eb) => eb.id === gespeicherteAktive)
+                ? gespeicherteAktive
+                : this.ebenen[this.ebenen.length - 1].id;
+          } else if (Array.isArray(z.elemente)) {
+            const ebene = erstelleStandardEbene('Ebene 1');
+            ebene.elemente = normalisiereElementListe(z.elemente);
+            this.ebenen = [ebene];
+            this.aktiveEbeneId = ebene.id;
           } else if (Array.isArray(z.strokes)) {
-            this.elemente = normalisiereElementListe(
+            const ebene = erstelleStandardEbene('Ebene 1');
+            ebene.elemente = normalisiereElementListe(
               z.strokes.map((s) => ({ ...s, t: 's' })),
             );
+            this.ebenen = [ebene];
+            this.aktiveEbeneId = ebene.id;
           } else {
-            this.elemente = [];
+            const ebene = erstelleStandardEbene('Ebene 1');
+            this.ebenen = [ebene];
+            this.aktiveEbeneId = ebene.id;
           }
           this.undoStack = Array.isArray(z.undoStack)
-            ? z.undoStack.map(normalisiereElementListe).filter((l) => Array.isArray(l))
+            ? z.undoStack.map(normalisiereVerlaufSnapshot).filter(Boolean)
             : [];
           this.redoStack = Array.isArray(z.redoStack)
-            ? z.redoStack.map(normalisiereElementListe).filter((l) => Array.isArray(l))
+            ? z.redoStack.map(normalisiereVerlaufSnapshot).filter(Boolean)
             : [];
           this.zwischenablage = Array.isArray(z.zwischenablage) ? normalisiereElementListe(z.zwischenablage) : [];
         }
         if (this.breite == null) this.breite = STANDARD_BREITE;
         if (this.hoehe == null) this.hoehe = STANDARD_HOEHE;
+        if (!this.aktiveEbeneId && this.ebenen.length) {
+          this.aktiveEbeneId = this.ebenen[this.ebenen.length - 1].id;
+        }
         this.auswahl = [];
         this.zustandGeladen = true;
       },
@@ -1288,11 +1484,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             dicke: this.dicke,
             werkzeug: this.werkzeug,
             karopapierGitter: !!this.karopapierGitter,
+            gitterFarbe: this.gitterFarbe,
+            ebenenSidebarOffen: !!this.ebenenSidebarOffen,
           },
           ansicht: { ...this.ansicht },
-          elemente: rundeElementeFuerSpeicher(this.elemente),
-          undoStack: this.undoStack.map(rundeElementeFuerSpeicher),
-          redoStack: this.redoStack.map(rundeElementeFuerSpeicher),
+          ebenen: rundeEbenenFuerSpeicher(this.ebenen),
+          aktiveEbeneId: this.aktiveEbeneId,
+          undoStack: this.undoStack.map(rundeVerlaufSnapshotFuerSpeicher).filter(Boolean),
+          redoStack: this.redoStack.map(rundeVerlaufSnapshotFuerSpeicher).filter(Boolean),
           zwischenablage: rundeElementeFuerSpeicher(this.zwischenablage),
         };
         if (!speichereRoh(daten)) {
@@ -1300,28 +1499,45 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           speichereRoh(ohneHistory);
         }
       },
+      erstelleZustandSnapshot() {
+        return {
+          ebenen: klone(this.ebenen),
+          aktiveEbeneId: this.aktiveEbeneId,
+        };
+      },
+      wendeZustandSnapshot(snap) {
+        if (!snap || !Array.isArray(snap.ebenen)) return;
+        this.ebenen = klone(snap.ebenen);
+        this.aktiveEbeneId =
+          typeof snap.aktiveEbeneId === 'string' && this.ebenen.some((eb) => eb.id === snap.aktiveEbeneId)
+            ? snap.aktiveEbeneId
+            : this.ebenen[this.ebenen.length - 1]?.id || null;
+        this.auswahl = this.auswahl.filter((id) =>
+          this.elemente.some((el) => el.i === id),
+        );
+      },
       verlaufSchnappschuss() {
-        this.undoStack.push(klone(this.elemente));
+        this.undoStack.push(this.erstelleZustandSnapshot());
         while (this.undoStack.length > MAX_HISTORY) this.undoStack.shift();
         this.redoStack = [];
       },
       undo() {
         this.rasterBildCacheLeeren();
         if (!this.kannUndo) return;
-        this.redoStack.push(klone(this.elemente));
+        this.redoStack.push(this.erstelleZustandSnapshot());
         while (this.redoStack.length > MAX_HISTORY) this.redoStack.shift();
-        this.elemente = this.undoStack.pop();
-        this.auswahl = this.auswahl.filter((id) => this.elemente.some((el) => el.i === id));
+        const snap = this.undoStack.pop();
+        this.wendeZustandSnapshot(snap);
         this.zeichneAlles();
         this.persistDebounce();
       },
       redo() {
         this.rasterBildCacheLeeren();
         if (!this.kannRedo) return;
-        this.undoStack.push(klone(this.elemente));
+        this.undoStack.push(this.erstelleZustandSnapshot());
         while (this.undoStack.length > MAX_HISTORY) this.undoStack.shift();
-        this.elemente = this.redoStack.pop();
-        this.auswahl = this.auswahl.filter((id) => this.elemente.some((el) => el.i === id));
+        const snap = this.redoStack.pop();
+        this.wendeZustandSnapshot(snap);
         this.zeichneAlles();
         this.persistDebounce();
       },
@@ -1728,16 +1944,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           }
         } else if (this._dragModus === 'radier') {
           if (this.undoStack.length) {
-            this.elemente = this.undoStack.pop();
+            this.wendeZustandSnapshot(this.undoStack.pop());
             this.zeichneAlles();
           }
         } else if (this._dragModus === 'verschieben') {
           if (this._moveOriginal && this.undoStack.length) {
-            this.elemente = this.undoStack.pop();
+            this.wendeZustandSnapshot(this.undoStack.pop());
+            this.zeichneAlles();
           }
         } else if (this._dragModus === 'drehen') {
           if (this._rotateOriginal && this.undoStack.length) {
-            this.elemente = this.undoStack.pop();
+            this.wendeZustandSnapshot(this.undoStack.pop());
+            this.zeichneAlles();
           }
         }
         this._dragElement = null;
@@ -2133,6 +2351,41 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.ansicht.offsetY = mitteJetzt.y - weltY * neueSkala;
         this.zeichneAlles();
       },
+      holeSichtbareWeltFlaeche() {
+        const s = this.ansicht.scale || 1;
+        const ox = this.ansicht.offsetX;
+        const oy = this.ansicht.offsetY;
+        const bw = this.canvasBreite;
+        const bh = this.canvasHoehe;
+        if (!Number.isFinite(s) || s <= 0 || bw <= 0 || bh <= 0) {
+          return { x: 0, y: 0, w: STANDARD_BREITE, h: STANDARD_HOEHE };
+        }
+        return {
+          x: -ox / s,
+          y: -oy / s,
+          w: bw / s,
+          h: bh / s,
+        };
+      },
+      zeichneEbeneHintergrund(ctx, eb, flaeche) {
+        if (!eb || eb.hintergrund?.typ !== 'farbe') return;
+        const f = flaeche || this.holeSichtbareWeltFlaeche();
+        ctx.save();
+        ctx.fillStyle = eb.hintergrund.farbe;
+        ctx.fillRect(f.x, f.y, f.w, f.h);
+        ctx.restore();
+      },
+      zeichneEbenenInhalt(ctx, opts) {
+        const nurSichtbar = !(opts && opts.alleEbenen);
+        const flaeche = opts && opts.flaeche ? opts.flaeche : null;
+        for (const eb of this.ebenen) {
+          if (nurSichtbar && !eb.sichtbar) continue;
+          this.zeichneEbeneHintergrund(ctx, eb, flaeche);
+          for (const el of eb.elemente) {
+            this.zeichneElement(ctx, el);
+          }
+        }
+      },
       zeichneAlles() {
         const ctx = this._ctx;
         const canvas = this.$refs.canvas;
@@ -2150,14 +2403,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.ansicht.offsetX * dpr,
           this.ansicht.offsetY * dpr,
         );
+        this.zeichneEbenenInhalt(ctx);
         if (this.karopapierGitter) {
           this.zeichneKaropapierRasterWelt(ctx);
         }
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        for (const el of this.elemente) {
-          this.zeichneElement(ctx, el);
-        }
         this.zeichneFormEntwurf(ctx);
         this.zeichneStiftspitzenRahmen(ctx, canvas, dpr);
         this.zeichneAuswahlOverlay(ctx);
@@ -2261,7 +2512,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const jMax = Math.ceil(maxY / schritt) + 1;
 
         ctx.save();
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
+        ctx.strokeStyle = hexZuRgbaString(normalisiereFarbe(this.gitterFarbe), GITTER_ALPHA);
         ctx.lineWidth = 1 / s;
         ctx.lineCap = 'butt';
         ctx.lineJoin = 'miter';
@@ -2301,22 +2552,26 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       async warteRasterBilderFuerFuell() {
         const ps = [];
-        for (const el of this.elemente) {
-          if (el.t !== 'm') continue;
-          const img = this.holeRasterBild(el);
-          if (img && !img.complete) {
-            ps.push(
-              new Promise((resolve) => {
-                img.onload = resolve;
-                img.onerror = resolve;
-              }),
-            );
+        for (const eb of this.ebenen) {
+          if (!eb.sichtbar) continue;
+          for (const el of eb.elemente) {
+            if (el.t !== 'm') continue;
+            const img = this.holeRasterBild(el);
+            if (img && !img.complete) {
+              ps.push(
+                new Promise((resolve) => {
+                  img.onload = resolve;
+                  img.onerror = resolve;
+                }),
+              );
+            }
           }
         }
         await Promise.all(ps);
       },
       zeichneKompositAufCtx(ctx, dpr, opts) {
         const ohneKaro = !!(opts && opts.ohneKaro);
+        const flaeche = opts && opts.flaeche ? opts.flaeche : null;
         const canvas = ctx.canvas;
         if (!canvas) return;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2331,13 +2586,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.ansicht.offsetX * dpr,
           this.ansicht.offsetY * dpr,
         );
+        this.zeichneEbenenInhalt(ctx, { flaeche });
         if (this.karopapierGitter && !ohneKaro) {
           this.zeichneKaropapierRasterWelt(ctx);
-        }
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        for (const el of this.elemente) {
-          this.zeichneElement(ctx, el);
         }
       },
       pipetteFarbeAnCss(cssX, cssY) {
@@ -2544,7 +2795,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       ansichtZuruecksetzen() {
         this.ansicht.scale = 1;
-        const box = gesamtBoundingBox(this.elemente);
+        const box = gesamtBoundingBox(holeSichtbareElemente(this.ebenen));
         if (box && this.canvasBreite > 0 && this.canvasHoehe > 0) {
           const breiteWelt = box.w || 1;
           const hoeheWelt = box.h || 1;
@@ -2578,21 +2829,190 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       farbePreset(farbe) {
         this.farbe = normalisiereFarbe(farbe);
       },
+      ebeneAuswaehlen(id) {
+        if (!this.ebenen.some((eb) => eb.id === id)) return;
+        this.ebeneMenuOffenId = null;
+        this.aktiveEbeneId = id;
+      },
+      ebeneSichtbarkeitUmschalten(id) {
+        const eb = this.ebenen.find((e) => e.id === id);
+        if (!eb) return;
+        this.verlaufSchnappschuss();
+        eb.sichtbar = !eb.sichtbar;
+        this.zeichneAlles();
+        this.persistDebounce();
+      },
+      neueEbeneFormToggle() {
+        this.neueEbeneFormOffen = !this.neueEbeneFormOffen;
+        if (this.neueEbeneFormOffen) {
+          this.neueEbeneName = `Ebene ${this.ebenen.length + 1}`;
+          this.neueEbeneHintergrundTyp = 'transparent';
+          this.neueEbeneHintergrundFarbe = '#ffffff';
+        }
+      },
+      ebeneNeuErstellen() {
+        if (this.ebenen.length >= MAX_EBENEN) return;
+        const name = String(this.neueEbeneName || '').trim() || `Ebene ${this.ebenen.length + 1}`;
+        const hintergrund =
+          this.neueEbeneHintergrundTyp === 'farbe'
+            ? { typ: 'farbe', farbe: normalisiereFarbe(this.neueEbeneHintergrundFarbe) }
+            : { typ: 'transparent' };
+        this.verlaufSchnappschuss();
+        const ebene = erstelleStandardEbene(name, hintergrund);
+        this.ebenen.push(ebene);
+        this.aktiveEbeneId = ebene.id;
+        this.neueEbeneFormOffen = false;
+        this.auswahl = [];
+        this.zeichneAlles();
+        this.persistDebounce();
+      },
+      async ebeneLoeschen(id) {
+        if (this.ebenen.length <= 1) return;
+        const eb = this.ebenen.find((e) => e.id === id);
+        if (!eb) return;
+        const hatInhalt = eb.elemente.length > 0 || eb.hintergrund?.typ === 'farbe';
+        if (hatInhalt) {
+          const bestaetigt = await window.HTBAH.ui.confirm({
+            titel: 'Ebene löschen?',
+            beschreibung: `„${eb.name}“ und alle Inhalte dieser Ebene werden entfernt.`,
+            bestaetigenText: 'Löschen',
+            bestaetigenButtonClass: 'btn-danger',
+            warnhinweisAnzeigen: true,
+          });
+          if (!bestaetigt) return;
+        }
+        this.verlaufSchnappschuss();
+        const index = this.ebenen.findIndex((e) => e.id === id);
+        if (index < 0) return;
+        this.ebenen.splice(index, 1);
+        if (this.aktiveEbeneId === id) {
+          const neuIndex = Math.min(index, this.ebenen.length - 1);
+          this.aktiveEbeneId = this.ebenen[neuIndex]?.id || null;
+        }
+        this.auswahl = [];
+        this.rasterBildCacheLeeren();
+        this.zeichneAlles();
+        this.persistDebounce();
+      },
+      ebeneVerschieben(vonIndex, nachIndex) {
+        if (
+          vonIndex === nachIndex ||
+          vonIndex < 0 ||
+          nachIndex < 0 ||
+          vonIndex >= this.ebenen.length ||
+          nachIndex >= this.ebenen.length
+        ) {
+          return;
+        }
+        this.verlaufSchnappschuss();
+        const [eb] = this.ebenen.splice(vonIndex, 1);
+        this.ebenen.splice(nachIndex, 0, eb);
+        this.zeichneAlles();
+        this.persistDebounce();
+      },
+      ebeneNachOben(index) {
+        if (index < this.ebenen.length - 1) {
+          this.ebeneVerschieben(index, index + 1);
+        }
+      },
+      ebeneNachUnten(index) {
+        if (index > 0) {
+          this.ebeneVerschieben(index, index - 1);
+        }
+      },
+      ebeneDragStart(index) {
+        this.ebeneDragIndex = index;
+        this.ebeneDropIndex = null;
+      },
+      ebeneDragOver(index, event) {
+        if (this.ebeneDragIndex == null || this.ebeneDragIndex === index) return;
+        event.preventDefault();
+        this.ebeneDropIndex = index;
+      },
+      ebeneDrop(index) {
+        if (this.ebeneDragIndex == null || this.ebeneDragIndex === index) {
+          this.ebeneDragIndex = null;
+          this.ebeneDropIndex = null;
+          return;
+        }
+        this.ebeneVerschieben(this.ebeneDragIndex, index);
+        this.ebeneDragIndex = null;
+        this.ebeneDropIndex = null;
+      },
+      ebeneDragEnde() {
+        this.ebeneDragIndex = null;
+        this.ebeneDropIndex = null;
+      },
+      ebeneMenuToggle(id) {
+        this.ebeneMenuOffenId = this.ebeneMenuOffenId === id ? null : id;
+      },
+      async ebeneMenuAktion(aktion) {
+        this.ebeneMenuOffenId = null;
+        await aktion();
+      },
+      ebenenSidebarUmschalten() {
+        this.ebenenSidebarOffen = !this.ebenenSidebarOffen;
+      },
+      async ebeneUmbenennen(id) {
+        const eb = this.ebenen.find((e) => e.id === id);
+        if (!eb) return;
+        const eingabe = await window.HTBAH.ui.prompt({
+          titel: 'Ebene umbenennen',
+          beschreibung: 'Gib einen neuen Namen für die Ebene ein.',
+          label: 'Name',
+          startwert: eb.name,
+          bestaetigenText: 'Speichern',
+          bestaetigenButtonClass: 'btn-primary',
+          trim: true,
+        });
+        if (eingabe === null) return;
+        const name = String(eingabe).trim();
+        if (!name || name === eb.name) return;
+        this.verlaufSchnappschuss();
+        eb.name = name.slice(0, 40);
+        this.persistDebounce();
+      },
+      ebeneDuplizieren(id) {
+        if (this.ebenen.length >= MAX_EBENEN) return;
+        const index = this.ebenen.findIndex((e) => e.id === id);
+        if (index < 0) return;
+        const quelle = this.ebenen[index];
+        this.verlaufSchnappschuss();
+        const kopie = dupliziereEbene(quelle);
+        this.ebenen.splice(index + 1, 0, kopie);
+        this.aktiveEbeneId = kopie.id;
+        this.auswahl = [];
+        this.rasterBildCacheLeeren();
+        this.zeichneAlles();
+        this.persistDebounce();
+      },
+      ebeneHintergrundVorschauStil(eb) {
+        if (eb.hintergrund?.typ === 'farbe') {
+          return { background: eb.hintergrund.farbe };
+        }
+        return {};
+      },
       async leeren() {
-        if (!this.elemente.length && !this.undoStack.length && !this.redoStack.length) return;
+        if (!this.hatZeichenInhalt && !this.undoStack.length && !this.redoStack.length) return;
         const bestaetigt = await window.HTBAH.ui.confirm({
           titel: 'Zeichnung löschen?',
           beschreibung:
-            'Die aktuelle Zeichnung wird vollständig entfernt. Auch die Rückgängig-Historie wird verworfen.',
+            'Alle Ebenen, Zeicheninhalte und Einstellungen (Gitterfarbe, Historie) werden vollständig entfernt.',
           bestaetigenText: 'Löschen',
           bestaetigenButtonClass: 'btn-danger',
           warnhinweisAnzeigen: true,
         });
         if (!bestaetigt) return;
-        this.elemente = [];
+        const ebene = erstelleStandardEbene('Ebene 1');
+        this.ebenen = [ebene];
+        this.aktiveEbeneId = ebene.id;
+        this.gitterFarbe = STANDARD_GITTER_FARBE;
+        this.karopapierGitter = false;
         this.auswahl = [];
         this.undoStack = [];
         this.redoStack = [];
+        this.zwischenablage = [];
+        this.neueEbeneFormOffen = false;
         this.rasterBildCacheLeeren();
         this.zeichneAlles();
         this.flushSpeichern();
@@ -2608,14 +3028,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           .slice(0, 120);
       },
       async exportierePng() {
-        if (!this.elemente.length) {
+        if (!this.hatZeichenInhalt) {
           await window.HTBAH.ui.alert({
             titel: 'Nichts zu exportieren',
-            beschreibung: 'Auf der Zeichenfläche befinden sich noch keine Elemente.',
+            beschreibung: 'Es sind noch keine sichtbaren Ebenen mit Inhalt vorhanden.',
           });
           return;
         }
-        const box = gesamtBoundingBox(this.elemente);
+        const sichtbareElemente = holeSichtbareElemente(this.ebenen);
+        let box = gesamtBoundingBox(sichtbareElemente);
+        if (!box) {
+          box = this.holeSichtbareWeltFlaeche();
+        }
         if (!box) return;
         const zeitstempel = new Date().toISOString().replace(/[:T]/g, '-').replace(/\..+$/, '');
         const standardName = `htbah-zeichnung-${zeitstempel}`;
@@ -2644,8 +3068,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         ctx.translate(EXPORT_PADDING - box.x, EXPORT_PADDING - box.y);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        for (const el of this.elemente) {
-          this.zeichneElement(ctx, el);
+        const exportFlaeche = { x: box.x, y: box.y, w: box.w, h: box.h };
+        for (const eb of this.ebenen) {
+          if (!eb.sichtbar) continue;
+          this.zeichneEbeneHintergrund(ctx, eb, exportFlaeche);
+          for (const el of eb.elemente) {
+            this.zeichneElement(ctx, el);
+          }
         }
         exportCanvas.toBlob((blob) => {
           if (!blob) return;
@@ -2826,6 +3255,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 @click="karopapierGitterUmschalten">
                 <span class="material-symbols-outlined">{{ karopapierGitterIcon }}</span>
               </button>
+              <label class="d-flex align-items-center gap-1 mb-0" title="Gitterfarbe">
+                <span class="small text-muted d-none d-lg-inline">Gitter</span>
+                <input
+                  type="color"
+                  class="form-control form-control-color htbah-zeichen-color htbah-zeichen-gitter-color"
+                  v-model="gitterFarbe"
+                  aria-label="Gitterfarbe" />
+              </label>
             </div>
 
             <div class="htbah-zeichen-werkzeuggruppe d-flex align-items-center gap-1">
@@ -2914,7 +3351,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             </div>
           </div>
 
-          <div ref="canvasHost" class="htbah-zeichen-modal-canvas-host">
+          <div class="htbah-zeichen-modal-body d-flex flex-grow-1 min-h-0">
+            <div ref="canvasHost" class="htbah-zeichen-modal-canvas-host flex-grow-1 min-w-0">
             <canvas
               ref="canvas"
               class="htbah-zeichen-modal-canvas"
@@ -2956,6 +3394,180 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 Strg + Mausrad zum Zoomen · Shift + Mausrad horizontal verschieben · Hand-Werkzeug: ziehen und Mausrad zoomen · Pipette / Füllen im Werkzeugmenü · Mit zwei Fingern zoomen &amp; verschieben · Mittlere Maustaste oder Alt+Ziehen zum Verschieben
               </template>
             </div>
+            </div>
+
+            <button
+              v-if="!ebenenSidebarOffen"
+              type="button"
+              class="htbah-zeichen-ebenen-toggle-tab flex-shrink-0"
+              title="Ebenenleiste einblenden"
+              aria-label="Ebenenleiste einblenden"
+              @click="ebenenSidebarUmschalten">
+              <span class="material-symbols-outlined">chevron_left</span>
+              <span class="htbah-zeichen-ebenen-toggle-tab-label small">Ebenen</span>
+            </button>
+
+            <aside
+              v-if="ebenenSidebarOffen"
+              ref="ebenenPanel"
+              class="htbah-zeichen-ebenen-panel d-flex flex-column flex-shrink-0 border-start"
+              aria-label="Ebenen">
+              <div class="htbah-zeichen-ebenen-kopf d-flex align-items-center justify-content-between px-2 py-2 border-bottom">
+                <span class="small fw-semibold">Ebenen</span>
+                <div class="d-flex align-items-center gap-1">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary htbah-zeichen-ebenen-hinzufuegen"
+                    title="Neue Ebene"
+                    aria-label="Neue Ebene"
+                    :disabled="ebenen.length >= 50"
+                    @click="neueEbeneFormToggle">
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary htbah-zeichen-ebenen-hinzufuegen"
+                    title="Ebenenleiste ausblenden"
+                    aria-label="Ebenenleiste ausblenden"
+                    @click="ebenenSidebarUmschalten">
+                    <span class="material-symbols-outlined">chevron_right</span>
+                  </button>
+                </div>
+              </div>
+              <div v-if="neueEbeneFormOffen" class="htbah-zeichen-ebene-neu-form px-2 py-2 border-bottom">
+                <label class="form-label small mb-1">Name</label>
+                <input v-model="neueEbeneName" type="text" class="form-control form-control-sm mb-2" maxlength="40" />
+                <div class="small mb-1">Hintergrund</div>
+                <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="Hintergrundtyp">
+                  <button
+                    type="button"
+                    class="btn"
+                    :class="neueEbeneHintergrundTyp === 'transparent' ? 'btn-primary' : 'btn-outline-primary'"
+                    @click="neueEbeneHintergrundTyp = 'transparent'">
+                    Transparent
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    :class="neueEbeneHintergrundTyp === 'farbe' ? 'btn-primary' : 'btn-outline-primary'"
+                    @click="neueEbeneHintergrundTyp = 'farbe'">
+                    Farbe
+                  </button>
+                </div>
+                <div v-if="neueEbeneHintergrundTyp === 'farbe'" class="d-flex align-items-center gap-2 mb-2">
+                  <input
+                    type="color"
+                    class="form-control form-control-color htbah-zeichen-color"
+                    v-model="neueEbeneHintergrundFarbe"
+                    aria-label="Hintergrundfarbe der neuen Ebene" />
+                  <span class="small text-muted">Fläche einfärben</span>
+                </div>
+                <div class="d-flex gap-1">
+                  <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1" @click="neueEbeneFormOffen = false">Abbrechen</button>
+                  <button type="button" class="btn btn-sm btn-outline-success flex-grow-1" @click="ebeneNeuErstellen">Erstellen</button>
+                </div>
+              </div>
+              <ul class="htbah-zeichen-ebenen-liste list-unstyled mb-0 flex-grow-1 overflow-auto">
+                <li
+                  v-for="eintrag in ebenenUiListe"
+                  :key="eintrag.eb.id"
+                  class="htbah-zeichen-ebene-eintrag"
+                  :class="{
+                    aktiv: aktiveEbeneId === eintrag.eb.id,
+                    'htbah-zeichen-ebene-eintrag--ausgeblendet': !eintrag.eb.sichtbar,
+                    'drag-over': ebeneDropIndex === eintrag.index,
+                    dragging: ebeneDragIndex === eintrag.index,
+                  }"
+                  draggable="true"
+                  @dragstart="ebeneDragStart(eintrag.index)"
+                  @dragover="ebeneDragOver(eintrag.index, $event)"
+                  @drop.prevent="ebeneDrop(eintrag.index)"
+                  @dragend="ebeneDragEnde">
+                  <button
+                    type="button"
+                    class="htbah-zeichen-ebene-haupt flex-grow-1 d-flex align-items-center gap-1 border-0 bg-transparent text-start"
+                    @click="ebeneAuswaehlen(eintrag.eb.id)">
+                    <span
+                      class="htbah-zeichen-ebene-vorschau flex-shrink-0"
+                      :class="{ 'htbah-zeichen-ebene-vorschau--transparent': eintrag.eb.hintergrund?.typ !== 'farbe' }"
+                      :style="ebeneHintergrundVorschauStil(eintrag.eb)"
+                      aria-hidden="true"></span>
+                    <span class="htbah-zeichen-ebene-name text-truncate small">{{ eintrag.eb.name }}</span>
+                  </button>
+                  <div class="htbah-zeichen-ebene-aktionen d-flex flex-column align-items-center justify-content-center">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-link p-0"
+                      title="Nach oben"
+                      aria-label="Ebene nach oben"
+                      :disabled="eintrag.index >= ebenen.length - 1"
+                      @click.stop="ebeneNachOben(eintrag.index)">
+                      <span class="material-symbols-outlined">arrow_upward</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-link p-0"
+                      title="Nach unten"
+                      aria-label="Ebene nach unten"
+                      :disabled="eintrag.index <= 0"
+                      @click.stop="ebeneNachUnten(eintrag.index)">
+                      <span class="material-symbols-outlined">arrow_downward</span>
+                    </button>
+                  </div>
+                  <div class="htbah-zeichen-ebene-menu-wrap">
+                    <button
+                      type="button"
+                      class="htbah-zeichen-ebene-falafel btn btn-sm btn-link p-0"
+                      title="Ebenenaktionen"
+                      aria-label="Ebenenaktionen"
+                      :aria-expanded="ebeneMenuOffenId === eintrag.eb.id ? 'true' : 'false'"
+                      @click.stop="ebeneMenuToggle(eintrag.eb.id)">
+                      <span class="material-symbols-outlined">more_vert</span>
+                    </button>
+                    <div
+                      v-show="ebeneMenuOffenId === eintrag.eb.id"
+                      class="htbah-zeichen-ebene-menu"
+                      role="menu"
+                      @click.stop>
+                      <button
+                        type="button"
+                        class="htbah-zeichen-ebene-menu-item"
+                        role="menuitem"
+                        @click="ebeneMenuAktion(() => ebeneSichtbarkeitUmschalten(eintrag.eb.id))">
+                        <span class="material-symbols-outlined">{{ eintrag.eb.sichtbar ? 'visibility_off' : 'visibility' }}</span>
+                        <span>{{ eintrag.eb.sichtbar ? 'Ausblenden' : 'Einblenden' }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="htbah-zeichen-ebene-menu-item"
+                        role="menuitem"
+                        @click="ebeneMenuAktion(() => ebeneUmbenennen(eintrag.eb.id))">
+                        <span class="material-symbols-outlined">edit</span>
+                        <span>Umbenennen</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="htbah-zeichen-ebene-menu-item"
+                        role="menuitem"
+                        :disabled="ebenen.length >= 50"
+                        @click="ebeneMenuAktion(() => ebeneDuplizieren(eintrag.eb.id))">
+                        <span class="material-symbols-outlined">content_copy</span>
+                        <span>Duplizieren</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="htbah-zeichen-ebene-menu-item htbah-zeichen-ebene-menu-item--danger"
+                        role="menuitem"
+                        :disabled="ebenen.length <= 1"
+                        @click="ebeneMenuAktion(() => ebeneLoeschen(eintrag.eb.id))">
+                        <span class="material-symbols-outlined">delete</span>
+                        <span>Löschen</span>
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </aside>
           </div>
 
           <div
