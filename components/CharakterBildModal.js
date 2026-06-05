@@ -128,7 +128,7 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
         aria-labelledby="charakterBildVerwaltungLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title" id="charakterBildVerwaltungLabel">
                 Charakterbild verwalten

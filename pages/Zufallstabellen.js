@@ -4112,7 +4112,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         aria-hidden="true"
         @hidden.bs.modal="onDetailAnsichtModalHidden">
         <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-md-down modal-xl">
-          <div class="modal-content shadow border-0">
+          <div class="modal-content shadow-lg border-0">
             <div class="modal-header py-2 py-md-3 border-0 border-bottom">
               <div class="me-auto pe-2">
                 <div class="small text-secondary text-uppercase mb-0">Nur Lesen</div>
@@ -4277,7 +4277,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         aria-hidden="true"
         @hidden.bs.modal="onGalerieModalHidden">
         <div class="modal-dialog modal-dialog-scrollable modal-lg">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title" id="htbahZufallstabellenGalerieModalLabel">Medien</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>

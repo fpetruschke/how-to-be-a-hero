@@ -73,16 +73,10 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
     },
     bestaetigen() {
       this._hatBestaetigt = true;
-      if (this._onBestaetigen) {
-        this._onBestaetigen();
-      }
       this.schliessen();
     },
     sekundaerAktion() {
       this._hatSekundaerAktion = true;
-      if (this._onSekundaer) {
-        this._onSekundaer();
-      }
       this.schliessen();
     },
     schliessen() {
@@ -99,14 +93,55 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       this._hatSekundaerAktion = false;
     },
     modalGeschlossen() {
-      if (!this._hatBestaetigt && !this._hatSekundaerAktion && this._onAbbrechen) {
-        this._onAbbrechen();
-      }
-      if (this._fokusVorModal && this._fokusVorModal.isConnected) {
-        this._fokusVorModal.focus();
-      }
+      const onBestaetigen = this._onBestaetigen;
+      const onSekundaer = this._onSekundaer;
+      const onAbbrechen = this._onAbbrechen;
+      const hatBestaetigt = this._hatBestaetigt;
+      const hatSekundaer = this._hatSekundaerAktion;
+      const fokusZiel = this._fokusVorModal;
       this.zuruecksetzenCallbacks();
       this._fokusVorModal = null;
+
+      const nachBackdropBereinigung = (fn) => {
+        if (typeof fn !== 'function') {
+          return;
+        }
+        requestAnimationFrame(() => {
+          if (window.HTBAH && window.HTBAH.ui && typeof window.HTBAH.ui.bereinigeModalBackdrop === 'function') {
+            window.HTBAH.ui.bereinigeModalBackdrop();
+          }
+          requestAnimationFrame(() => fn());
+        });
+      };
+
+      const fokusWiederherstellen = () => {
+        if (fokusZiel && fokusZiel.isConnected) {
+          fokusZiel.focus();
+        }
+      };
+
+      if (hatBestaetigt) {
+        nachBackdropBereinigung(() => {
+          if (onBestaetigen) {
+            onBestaetigen();
+          }
+          fokusWiederherstellen();
+        });
+      } else if (hatSekundaer) {
+        nachBackdropBereinigung(() => {
+          if (onSekundaer) {
+            onSekundaer();
+          }
+          fokusWiederherstellen();
+        });
+      } else if (onAbbrechen) {
+        nachBackdropBereinigung(() => {
+          onAbbrechen();
+          fokusWiederherstellen();
+        });
+      } else {
+        fokusWiederherstellen();
+      }
     },
   },
   mounted() {
@@ -130,7 +165,7 @@ window.HTBAH_KOMPONENTEN.BestaetigenModal = {
       :aria-labelledby="titelLabelId"
       aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title" :id="titelLabelId">
               {{ titel }}

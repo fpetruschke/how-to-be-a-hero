@@ -335,7 +335,7 @@ window.HTBAH_KOMPONENTEN.VorNachteileModal = {
       aria-labelledby="vorNachteileEditorLabel"
       aria-hidden="true">
       <div class="modal-dialog modal-fullscreen">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title" id="vorNachteileEditorLabel">Vor- & Nachteile</h5>
             <button

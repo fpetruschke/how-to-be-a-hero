@@ -386,9 +386,23 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       window.removeEventListener('pointercancel', this.beendeResize);
     },
     vollbildUmschalten() {
+      const M = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.methoden;
+      const warVollbild = this.modal.istVollbild;
       this.modal.istVollbild = !this.modal.istVollbild;
-      if (!this.modal.istVollbild) {
-        this.$nextTick(() => this.stelleSichtbaresFensterSicher());
+      if (!this.modal.istVollbild && warVollbild) {
+        this.$nextTick(() => {
+          if (M) {
+            M.bereiteFensterNachVollbildBeenden.call(
+              this,
+              this.modal,
+              this,
+              'fensterElement',
+              (breite, hoehe) => this.begrenzeFensterGroesse(breite, hoehe),
+            );
+          } else {
+            this.stelleSichtbaresFensterSicher();
+          }
+        });
       }
     },
     fokussiereFenster() {
@@ -801,7 +815,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       <div
         v-show="!modal.minimiert"
         ref="fensterElement"
-        class="regelwerk-modal-window card shadow"
+        class="regelwerk-modal-window card shadow-lg"
         :class="{ 'regelwerk-modal-window-fullscreen': modal.istVollbild }"
         :style="fensterStil"
         role="dialog"
@@ -932,8 +946,10 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   :class="anlage.zeile.kampfZustand === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
                   :aria-pressed="anlage.zeile.kampfZustand === opt.id ? 'true' : 'false'"
                   @click="setzeKampfZustand(opt.id)">
-                  <span aria-hidden="true">{{ opt.emoji }}</span>
-                  <span class="ms-1">{{ opt.label }}</span>
+                  <span class="htbah-kampf-zustand-btn-inhalt">
+                    <span class="htbah-kampf-zustand-btn-ico" aria-hidden="true">{{ opt.emoji }}</span>
+                    <span class="htbah-kampf-zustand-btn-text">{{ opt.label }}</span>
+                  </span>
                 </button>
               </div>
               <p class="form-text mb-0 mt-1">

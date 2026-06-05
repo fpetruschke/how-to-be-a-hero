@@ -78,7 +78,7 @@ window.HTBAH_KOMPONENTEN.LokalerSpeicherHinweisModal = {
       data-bs-backdrop="static"
       data-bs-keyboard="false">
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title" id="htbahLokalerSpeicherHinweisModalLabel">
               Kurz zu Deinen Daten

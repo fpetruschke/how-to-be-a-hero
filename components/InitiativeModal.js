@@ -103,7 +103,7 @@ window.HTBAH_KOMPONENTEN.InitiativeModal = {
       aria-labelledby="initiativeModalLabel"
       aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title d-flex align-items-center gap-2" id="initiativeModalLabel">
               <span class="material-symbols-outlined" aria-hidden="true">swords</span>

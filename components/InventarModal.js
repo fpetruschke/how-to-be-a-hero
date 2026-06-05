@@ -118,7 +118,7 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
       <div
         v-show="!minimiert"
         ref="fensterElement"
-        class="regelwerk-modal-window card shadow htbah-inventar-modal-window"
+        class="regelwerk-modal-window card shadow-lg htbah-inventar-modal-window"
         :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
         :style="fensterStil"
         role="dialog"

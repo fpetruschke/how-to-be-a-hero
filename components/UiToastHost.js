@@ -21,23 +21,22 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
         typ: typ === 'danger' || typ === 'warning' ? typ : 'success',
         timer: null,
         mehrzeilig: false,
-        layoutBeobachter: null,
       };
       this.eintraege.push(eintrag);
       if (dauerMs > 0) {
         eintrag.timer = window.setTimeout(() => this.dismiss(id), dauerMs);
       }
+      this.$nextTick(() => this.toastLayoutEinmalMessung(id));
       return id;
     },
-    toastLayoutBeobachterFreigeben(eintrag) {
-      if (!eintrag || !eintrag.layoutBeobachter) {
+    toastLayoutEinmalMessung(id) {
+      const eintrag = this.eintraege.find((e) => e && e.id === id);
+      if (!eintrag || eintrag._layoutGemessen) {
         return;
       }
-      eintrag.layoutBeobachter.disconnect();
-      eintrag.layoutBeobachter = null;
-    },
-    aktualisiereToastLayout(el, eintrag) {
-      if (!el || !eintrag) {
+      const sicherId = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(id) : id;
+      const el = document.querySelector(`[data-toast-id="${sicherId}"]`);
+      if (!el) {
         return;
       }
       const textEl = el.querySelector('.htbah-erfolgs-toast-text');
@@ -46,20 +45,14 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
       }
       const zeilenHoehe = parseFloat(window.getComputedStyle(textEl).lineHeight);
       if (!Number.isFinite(zeilenHoehe) || zeilenHoehe <= 0) {
+        eintrag._layoutGemessen = true;
         return;
       }
       eintrag.mehrzeilig = textEl.scrollHeight > zeilenHoehe + 1;
-    },
-    setToastRef(el, eintrag) {
-      this.toastLayoutBeobachterFreigeben(eintrag);
-      if (!el || !eintrag) {
-        return;
-      }
-      const messen = () => this.aktualisiereToastLayout(el, eintrag);
-      this.$nextTick(messen);
-      if (typeof ResizeObserver !== 'undefined') {
-        eintrag.layoutBeobachter = new ResizeObserver(messen);
-        eintrag.layoutBeobachter.observe(el);
+      eintrag._layoutGemessen = true;
+      const DIAG = window.HTBAH_DIAG;
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('UiToastHost', 'layout-gemessen', { id, mehrzeilig: eintrag.mehrzeilig });
       }
     },
     dismiss(id) {
@@ -71,7 +64,6 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
       if (eintrag && eintrag.timer) {
         window.clearTimeout(eintrag.timer);
       }
-      this.toastLayoutBeobachterFreigeben(eintrag);
       this.eintraege.splice(idx, 1);
     },
     alertClass(typ) {
@@ -89,7 +81,6 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
       if (eintrag && eintrag.timer) {
         window.clearTimeout(eintrag.timer);
       }
-      this.toastLayoutBeobachterFreigeben(eintrag);
     });
     this.eintraege = [];
   },
@@ -98,8 +89,8 @@ window.HTBAH_KOMPONENTEN.UiToastHost = {
       <div
         v-for="eintrag in eintraege"
         :key="eintrag.id"
-        :ref="(el) => setToastRef(el, eintrag)"
-        class="htbah-erfolgs-toast alert alert-dismissible py-2 mb-0 text-center shadow"
+        :data-toast-id="eintrag.id"
+        class="htbah-erfolgs-toast alert alert-dismissible py-2 mb-0 text-center shadow-lg"
         :class="[alertClass(eintrag.typ), { 'htbah-erfolgs-toast--mehrzeilig': eintrag.mehrzeilig }]"
         role="status">
         <span class="htbah-erfolgs-toast-text">{{ eintrag.text }}</span>

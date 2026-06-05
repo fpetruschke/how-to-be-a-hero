@@ -410,6 +410,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.speichernFlushen();
       },
       onKampagneDatenGeaendert(ev) {
+        if (window.HTBAH && typeof window.HTBAH.istSpeicherAktionAktiv === 'function' && window.HTBAH.istSpeicherAktionAktiv()) {
+          return;
+        }
         const d = ev && ev.detail ? ev.detail : {};
         if (d.kampagneId && d.kampagneId !== this.kampagneIdEffektiv) {
           return;
@@ -775,6 +778,31 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           }),
         );
       },
+      entitaetBearbeiten(teilnehmer) {
+        if (!teilnehmer || teilnehmer.fehlt) {
+          return;
+        }
+        const payload = {
+          entityType: teilnehmer.typ,
+          entityId: teilnehmer.entityId,
+          kampagneId: this.kampagneIdEffektiv,
+          openMode: 'open',
+        };
+        const mentionApi =
+          window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions
+            ? window.HTBAH_SHARED.QuillEntityMentions
+            : null;
+        if (mentionApi && typeof mentionApi.oeffneEntitaetGlobal === 'function') {
+          mentionApi.oeffneEntitaetGlobal(payload);
+          return;
+        }
+        window.dispatchEvent(
+          new CustomEvent('htbah:open-entity-request', {
+            detail: { ...payload, ts: Date.now() },
+            cancelable: true,
+          }),
+        );
+      },
       probeOeffnen(payload) {
         const t = payload && payload.teilnehmer ? payload.teilnehmer : null;
         if (!t || t.fehlt) {
@@ -855,7 +883,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           <div
             v-show="!minimiert"
             ref="fensterElement"
-            class="regelwerk-modal-window card shadow htbah-konflikt-modal-window"
+            class="regelwerk-modal-window card shadow-lg htbah-konflikt-modal-window"
             :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
             :style="fensterStil"
             role="dialog"
@@ -953,7 +981,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     :class="{ active: konflikt.aktiverTab === 'kampf', disabled: !hatTeilnehmer }"
                     :disabled="!hatTeilnehmer"
                     @click="setzeTab('kampf')">
-                    Übersicht
+                    Konflikt
                   </button>
                 </li>
               </ul>
@@ -1159,8 +1187,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                             <konflikt-teilnehmer-karte-inhalt
                               :teilnehmer="t"
                               :konflikt="konflikt"
+                              :kampagne-id="kampagneIdEffektiv"
                               :kampf-zustand-optionen="kampfZustandOptionen"
                               @entfernen="entferneTeilnehmer(t)"
+                              @bearbeiten="entitaetBearbeiten(t)"
                               @seite="setzeSeite(t, $event)"
                               @initiative="onInitiativeInput(t, $event)"
                               @initiative-wuerfeln="initiativeWuerfeln(t)"
@@ -1224,8 +1254,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                             <konflikt-teilnehmer-karte-inhalt
                               :teilnehmer="t"
                               :konflikt="konflikt"
+                              :kampagne-id="kampagneIdEffektiv"
                               :kampf-zustand-optionen="kampfZustandOptionen"
                               @entfernen="entferneTeilnehmer(t)"
+                              @bearbeiten="entitaetBearbeiten(t)"
                               @seite="setzeSeite(t, $event)"
                               @initiative="onInitiativeInput(t, $event)"
                               @initiative-wuerfeln="initiativeWuerfeln(t)"
@@ -1261,7 +1293,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   type="button"
                   class="btn btn-primary btn-sm"
                   @click="setzeTab('kampf')">
-                  Weiter: Übersicht →
+                  Weiter: Konflikt →
                 </button>
                 <button type="button" class="btn btn-secondary btn-sm" @click="schliessen">
                   Schließen
@@ -1293,10 +1325,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     props: {
       teilnehmer: { type: Object, required: true },
       konflikt: { type: Object, required: true },
+      kampagneId: { type: String, default: '' },
       kampfZustandOptionen: { type: Array, default: () => [] },
     },
     emits: [
       'entfernen',
+      'bearbeiten',
       'seite',
       'initiative',
       'initiative-wuerfeln',
@@ -1416,6 +1450,21 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           zielwert: spalte.wert,
         });
       },
+      kategorieBegabungProbeWuerfeln(kat) {
+        if (!kat || !kat.id) {
+          return;
+        }
+        this.$emit('probe', {
+          teilnehmer: this.teilnehmer,
+          modus: 'begabung',
+          kategorie: kat.id,
+          zielwert: kat.begabung,
+        });
+      },
+      seiteWechseln() {
+        const ziel = this.teilnehmer.seite === 'helden' ? 'gegner' : 'helden';
+        this.$emit('seite', ziel);
+      },
     },
     template: `
       <div class="htbah-konflikt-teilnehmer-wrap">
@@ -1454,6 +1503,22 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               <button
                 type="button"
                 class="btn btn-sm btn-outline-secondary htbah-konflikt-teilnehmer-aktion-btn"
+                title="Charakter, NPC oder Bestie bearbeiten"
+                aria-label="Bearbeiten"
+                @click.stop="$emit('bearbeiten')">
+                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary htbah-konflikt-teilnehmer-aktion-btn"
+                title="Seite wechseln (Gruppe ↔ Gegner)"
+                aria-label="Seite wechseln"
+                @click.stop="seiteWechseln">
+                <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary htbah-konflikt-teilnehmer-aktion-btn"
                 title="Aus Konflikt entfernen"
                 aria-label="Aus Konflikt entfernen"
                 @click.stop="$emit('entfernen')">
@@ -1462,8 +1527,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               <button
                 type="button"
                 class="btn btn-sm btn-outline-secondary htbah-konflikt-teilnehmer-aktion-btn"
-                title="In Kampagne / Welt öffnen"
-                aria-label="Auf Welt anzeigen"
+                title="In interaktiver Welt öffnen"
+                aria-label="In interaktiver Welt öffnen"
                 @click.stop="$emit('welt')">
                 <span aria-hidden="true">🌍</span>
               </button>
@@ -1506,17 +1571,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               class="btn"
               :class="teilnehmer.kampfZustand === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
               @click="$emit('kampf-zustand', opt.id)">
-              <span aria-hidden="true">{{ opt.emoji }}</span>
-              <span class="ms-1 d-none d-sm-inline">{{ opt.label }}</span>
+              <span class="htbah-kampf-zustand-btn-inhalt">
+                <span class="htbah-kampf-zustand-btn-ico" aria-hidden="true">{{ opt.emoji }}</span>
+                <span class="htbah-kampf-zustand-btn-text">{{ opt.label }}</span>
+              </span>
             </button>
           </div>
           <div class="d-flex flex-wrap gap-2 mb-2">
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              @click="$emit('seite', teilnehmer.seite === 'helden' ? 'gegner' : 'helden')">
-              Seite wechseln
-            </button>
             <button
               type="button"
               class="btn btn-sm btn-outline-primary"
@@ -1535,12 +1596,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             class="htbah-konflikt-sl-uebersicht border-top pt-2"
             role="region"
             aria-label="Kampf- und Handelnwerte">
-            <div v-if="zeigtFaehigkeitSpalten" class="row g-2 mb-2 htbah-konflikt-kat-spalten">
+            <div v-if="zeigtFaehigkeitSpalten" class="htbah-faehigkeit-kat-spalten htbah-konflikt-kat-spalten mb-2">
+              <div class="htbah-faehigkeit-kat-spalten-inner">
               <template v-if="zeigtBegabungSpalten">
                 <div
                   v-for="spalte in begabungSpalten"
                   :key="teilnehmer.refKey + '-bsp-' + spalte.id"
-                  class="col-12 col-md-4">
+                  class="htbah-faehigkeit-kat-spalte">
                   <div class="card htbah-konflikt-kat-card h-100 shadow-sm">
                     <button
                       type="button"
@@ -1575,21 +1637,29 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               <div
                 v-for="kat in faehigkeitKategorien"
                 :key="teilnehmer.refKey + '-kat-' + kat.id"
-                class="col-12 col-md-4">
+                class="htbah-faehigkeit-kat-spalte">
                 <div class="card htbah-konflikt-kat-card h-100 shadow-sm">
                   <button
                     type="button"
                     class="card-header py-1 px-2 htbah-konflikt-kat-kopf-btn d-flex align-items-center justify-content-between gap-1"
                     :aria-expanded="kategorieIstOffen(kat.id) ? 'true' : 'false'"
                     @click="toggleKategorie(kat.id)">
-                    <span class="fw-semibold small text-truncate">{{ kat.label }}</span>
-                    <span class="d-flex align-items-center gap-1 flex-shrink-0 flex-wrap justify-content-end">
+                    <span class="fw-semibold small htbah-konflikt-kat-label">{{ kat.label }}</span>
+                    <span class="d-flex align-items-center gap-1 flex-shrink-0 htbah-konflikt-kat-badges">
                       <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-summe">
                         Σ {{ kat.summe }}
                       </span>
                       <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-begabung">
                         B {{ kat.begabung }}
                       </span>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary py-0 px-2"
+                        :aria-label="'Probe würfeln: Begabung ' + kat.label"
+                        :title="'Nur Begabung ' + kat.label + ' würfeln'"
+                        @click.stop="kategorieBegabungProbeWuerfeln(kat)">
+                        🎲
+                      </button>
                       <span
                         v-if="kat.gbVerbleibend != null"
                         class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-geistesblitz">
@@ -1628,6 +1698,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     <p v-else class="small text-body-secondary mb-0">Keine Fähigkeiten mit Punkten.</p>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
             <div v-if="slUebersicht.kampfZeilen.length" class="card htbah-konflikt-kat-card shadow-sm mb-2">

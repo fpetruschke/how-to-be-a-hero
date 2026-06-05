@@ -29,6 +29,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   const ALLE_WERKZEUGE = [...ZEICHEN_WERKZEUGE, 'hand', 'auswahl'];
   /** Klick auf den ersten Polygonpunkt (CSS-Pixel), skaliert mit Zoom. */
   const POLYGON_SNAP_CSS_PX = 14;
+  /** Dreh-Handle an der Auswahl (CSS-Pixel, skaliert mit Zoom). */
+  const DREH_HANDLE_OFFSET_CSS = 28;
+  const DREH_HANDLE_RADIUS_CSS = 9;
 
   const WERKZEUG_META = {
     freihand: { label: 'Freihand', kurz: 'Freihand', icon: 'gesture' },
@@ -215,7 +218,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(w) || !Number.isFinite(h)) {
         return null;
       }
-      return { i: id, t: typ, c, d, x, y, w, h };
+      const rot = Number(roh.rot);
+      const basis = { i: id, t: typ, c, d, x, y, w, h };
+      if (Number.isFinite(rot) && rot !== 0) {
+        basis.rot = rot;
+      }
+      return basis;
     }
     if (typ === 'm') {
       const x = Number(roh.x);
@@ -226,7 +234,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       if (!src || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(w) || !Number.isFinite(h)) {
         return null;
       }
-      return { i: id, t: 'm', c: normalisiereFarbe(roh.c || '#111827'), d: 1, x, y, w, h, src };
+      const rot = Number(roh.rot);
+      const basis = { i: id, t: 'm', c: normalisiereFarbe(roh.c || '#111827'), d: 1, x, y, w, h, src };
+      if (Number.isFinite(rot) && rot !== 0) {
+        basis.rot = rot;
+      }
+      return basis;
     }
     return null;
   }
@@ -256,11 +269,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         basis.w = Math.round(el.w * 10) / 10;
         basis.h = Math.round(el.h * 10) / 10;
         basis.src = el.src;
+        if (Number(el.rot)) {
+          basis.rot = Math.round(el.rot * 10) / 10;
+        }
       } else {
         basis.x = Math.round(el.x * 10) / 10;
         basis.y = Math.round(el.y * 10) / 10;
         basis.w = Math.round(el.w * 10) / 10;
         basis.h = Math.round(el.h * 10) / 10;
+        if (Number(el.rot)) {
+          basis.rot = Math.round(el.rot * 10) / 10;
+        }
       }
       return basis;
     });
@@ -282,12 +301,51 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     return { x: nx, y: ny, w: nw, h: nh };
   }
 
+  function aabbAusPunkten(punkte, pad) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const punkt of punkte) {
+      const x = punkt[0];
+      const y = punkt[1];
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+    if (!Number.isFinite(minX)) {
+      return null;
+    }
+    const p = Math.max(0, pad || 0);
+    return { x: minX - p, y: minY - p, w: maxX - minX + 2 * p, h: maxY - minY + 2 * p };
+  }
+
+  function formElementEcken(el) {
+    const norm = normalisiereBox(el.x, el.y, el.w, el.h);
+    if (el.t === 'tri') {
+      const p = dreieckPunkte(el);
+      return [
+        [p[0], p[1]],
+        [p[2], p[3]],
+        [p[4], p[5]],
+      ];
+    }
+    return [
+      [norm.x, norm.y],
+      [norm.x + norm.w, norm.y],
+      [norm.x + norm.w, norm.y + norm.h],
+      [norm.x, norm.y + norm.h],
+    ];
+  }
+
+  function formElementMittelpunkt(el) {
+    const norm = normalisiereBox(el.x, el.y, el.w, el.h);
+    return { x: norm.x + norm.w / 2, y: norm.y + norm.h / 2 };
+  }
+
   function boundingBox(el) {
     if (!el) return null;
-    if (el.t === 'm') {
-      const norm = normalisiereBox(el.x, el.y, el.w, el.h);
-      return { x: norm.x, y: norm.y, w: norm.w, h: norm.h };
-    }
     if (el.t === 's' || el.t === 'poly') {
       let minX = Infinity;
       let minY = Infinity;
@@ -309,6 +367,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         w: maxX - minX + el.d,
         h: maxY - minY + el.d,
       };
+    }
+    if (el.t === 'm' || el.t === 'r' || el.t === 'e' || el.t === 'tri') {
+      const halb = el.d / 2;
+      const rot = Number(el.rot) || 0;
+      const ecken = formElementEcken(el);
+      if (!rot) {
+        return aabbAusPunkten(ecken, halb);
+      }
+      const mitte = formElementMittelpunkt(el);
+      const rad = (rot * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const rotiert = ecken.map(([x, y]) => drehePunktUm(x, y, mitte.x, mitte.y, cos, sin));
+      return aabbAusPunkten(rotiert, halb);
     }
     const norm = normalisiereBox(el.x, el.y, el.w, el.h);
     const halb = el.d / 2;
@@ -568,6 +640,130 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     }
   }
 
+  function drehePunktUm(px, py, cx, cy, cos, sin) {
+    const dx = px - cx;
+    const dy = py - cy;
+    return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
+  }
+
+  function wendeAuswahlDrehungAufElement(el, zentrum, cos, sin, deltaGrad, orig) {
+    const basis = orig || el;
+    if (basis.t === 's' || basis.t === 'poly') {
+      el.p = [];
+      for (let i = 0; i + 1 < basis.p.length; i += 2) {
+        const [nx, ny] = drehePunktUm(basis.p[i], basis.p[i + 1], zentrum.x, zentrum.y, cos, sin);
+        el.p.push(nx, ny);
+      }
+      return;
+    }
+    if (orig) {
+      const kopie = klone([orig])[0];
+      Object.assign(el, kopie);
+      el.rot = (Number(orig.rot) || 0) + deltaGrad;
+      return;
+    }
+    el.rot = (Number(el.rot) || 0) + deltaGrad;
+  }
+
+  /** Interaktive Drehung: Snapshot-Original + Winkel-Delta gegenüber Startpointer. */
+  function wendeAuswahlDrehungAusSnapshot(elemente, originals, zentrum, deltaRad) {
+    const cos = Math.cos(deltaRad);
+    const sin = Math.sin(deltaRad);
+    const deltaGrad = (deltaRad * 180) / Math.PI;
+    for (const el of elemente) {
+      const orig = originals.get(el.i);
+      if (!orig) {
+        continue;
+      }
+      wendeAuswahlDrehungAufElement(el, zentrum, cos, sin, deltaGrad, orig);
+    }
+  }
+
+  function skalierePunktUm(px, py, cx, cy, faktor) {
+    return [cx + (px - cx) * faktor, cy + (py - cy) * faktor];
+  }
+
+  /** Nicht-Strich-Elemente per Pixelmaske radieren (destination-out), Ergebnis als Bitmap-Element. */
+  function radiereNichtStrichAufPixelEbene(el, cx, cy, R, neueIdFn, zeichneElementFn) {
+    const box = boundingBox(el);
+    if (!box || box.w < RADIER_EPS || box.h < RADIER_EPS) {
+      return [el];
+    }
+    const pad = Math.ceil(Math.max(RADIER_EPS, R)) + 6;
+    const ox = box.x - pad;
+    const oy = box.y - pad;
+    const bw = Math.max(1, Math.ceil(box.w + pad * 2));
+    const bh = Math.max(1, Math.ceil(box.h + pad * 2));
+    const off = document.createElement('canvas');
+    off.width = bw;
+    off.height = bh;
+    const ctx = off.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      return [el];
+    }
+    ctx.save();
+    ctx.translate(-ox, -oy);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    zeichneElementFn(ctx, el);
+    ctx.restore();
+    const lx = cx - ox;
+    const ly = cy - oy;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    ctx.beginPath();
+    ctx.arc(lx, ly, Math.max(RADIER_EPS, R), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    const data = ctx.getImageData(0, 0, bw, bh).data;
+    let sichtbar = false;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > 12) {
+        sichtbar = true;
+        break;
+      }
+    }
+    if (!sichtbar) {
+      return [];
+    }
+    return [
+      {
+        i: neueIdFn(),
+        t: 'm',
+        c: el.c || '#111827',
+        d: 1,
+        x: ox,
+        y: oy,
+        w: bw,
+        h: bh,
+        src: off.toDataURL('image/png'),
+        rot: Number(el.rot) || 0,
+      },
+    ];
+  }
+
+  function zeichneMitRotation(ctx, el, zeichneInner) {
+    const rot = Number(el.rot) || 0;
+    if (!rot) {
+      zeichneInner();
+      return;
+    }
+    const mitte = formElementMittelpunkt(el);
+    if (!mitte) {
+      zeichneInner();
+      return;
+    }
+    const rcx = mitte.x;
+    const rcy = mitte.y;
+    ctx.save();
+    ctx.translate(rcx, rcy);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.translate(-rcx, -rcy);
+    zeichneInner();
+    ctx.restore();
+  }
+
   window.HTBAH_KOMPONENTEN.ZeichenModal = {
     props: ['uiZustand'],
     data() {
@@ -600,8 +796,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         ]),
         /** Karoraster in Weltkoordinaten: bei 100 % Zoom entspricht eine Kante 0,5 cm auf dem Bildschirm; läuft mit Pan und Zoom mit. */
         karopapierGitter: false,
-        /** CSS-Pixel auf dem Canvas; Vorschau-Rahmen nur bei Freihand. */
+        /** CSS-Pixel auf dem Canvas; Vorschau-Rahmen bei Freihand und Radiergummi. */
         stiftVorschauPos: null,
+        drehHandleHover: false,
         WERKZEUG_META,
         ZEICHEN_WERKZEUGE,
       };
@@ -616,6 +813,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       this._dragStartWelt = null;
       this._dragLetzteWelt = null;
       this._moveOriginal = null;
+      this._rotateOriginal = null;
+      this._rotateZentrum = null;
+      this._rotateStartWinkel = null;
       this._lassoBox = null;
       this._pinchStart = null;
       this._panMaus = null;
@@ -651,11 +851,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       istAuswahlModus() {
         return this.werkzeug === 'auswahl';
       },
+      istDrehZiehen() {
+        return this._dragModus === 'drehen';
+      },
       istHandModus() {
         return this.werkzeug === 'hand';
       },
       istRadierModus() {
         return this.werkzeug === 'radiergummi';
+      },
+      hatWerkzeugVorschauRahmen() {
+        return this.werkzeug === 'freihand' || this.werkzeug === 'radiergummi';
       },
       istPipetteModus() {
         return this.werkzeug === 'pipette';
@@ -720,7 +926,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       dicke() {
         if (this.zustandGeladen) this.persistDebounce();
-        if (this.werkzeug === 'freihand' && this.stiftVorschauPos) this.zeichneAlles();
+        if (this.hatWerkzeugVorschauRahmen && this.stiftVorschauPos) this.zeichneAlles();
       },
       werkzeug(neu) {
         if (this.zustandGeladen) this.persistDebounce();
@@ -729,7 +935,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.brichFormEntwurf(true);
           neuZeichnen = true;
         }
-        if (neu !== 'freihand') {
+        if (neu !== 'freihand' && neu !== 'radiergummi') {
           if (this.stiftVorschauPos) neuZeichnen = true;
           this.stiftVorschauPos = null;
         }
@@ -1159,11 +1365,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this._dragStartWelt = null;
         this._dragLetzteWelt = null;
         this._moveOriginal = null;
+        this._rotateOriginal = null;
+        this._rotateZentrum = null;
+        this._rotateStartWinkel = null;
         this._lassoBox = null;
         this._pinchStart = null;
         this._panMaus = null;
         this._ctx = null;
         this.stiftVorschauPos = null;
+        this.drehHandleHover = false;
         this._formEntwurf = null;
         this.rasterBildCacheLeeren();
       },
@@ -1302,6 +1512,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
 
         if (this.werkzeug === 'auswahl') {
+          if (this.hatAuswahl && this.trifftDrehHandle(welt.x, welt.y)) {
+            this.starteDrehen(welt);
+            this.zeichneAlles();
+            return;
+          }
           const trefferId = this.findeElementUnterPunkt(welt.x, welt.y);
           if (trefferId) {
             if (event.shiftKey) {
@@ -1353,7 +1568,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const canvas = this.$refs.canvas;
         if (!canvas) return;
         const pos = this.pointerKoordinate(event);
-        if (this.werkzeug === 'freihand') {
+        if (this.werkzeug === 'auswahl' && this.hatAuswahl && this._dragModus !== 'drehen') {
+          const weltHover = this.canvasZuWelt(pos.x, pos.y);
+          this.drehHandleHover = this.trifftDrehHandle(weltHover.x, weltHover.y);
+        } else if (this.drehHandleHover) {
+          this.drehHandleHover = false;
+        }
+        if (this.hatWerkzeugVorschauRahmen) {
           this.stiftVorschauPos = { x: pos.x, y: pos.y };
         } else {
           this.stiftVorschauPos = null;
@@ -1366,7 +1587,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
         if (!this._aktivePointers) return;
         if (!this._aktivePointers.has(event.pointerId)) {
-          if (this.werkzeug === 'freihand') this.zeichneAlles();
+          if (this.hatWerkzeugVorschauRahmen) this.zeichneAlles();
           return;
         }
         const eintrag = this._aktivePointers.get(event.pointerId);
@@ -1391,6 +1612,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.radiereStrecke(this._dragStartWelt, welt);
           this._dragStartWelt = welt;
           this.zeichneAlles();
+          return;
+        }
+        if (this._dragModus === 'drehen') {
+          this.aktualisiereDrehen(welt);
           return;
         }
         if (this._dragModus === 'zeichnen') {
@@ -1436,6 +1661,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.persistDebounce();
           return;
         }
+        if (this._dragModus === 'drehen') {
+          this._rotateOriginal = null;
+          this._rotateZentrum = null;
+          this._rotateStartWinkel = null;
+          this._dragModus = null;
+          this.rasterBildCacheLeeren();
+          this.persistDebounce();
+          return;
+        }
         if (this._dragModus === 'verschieben') {
           this._moveOriginal = null;
           this._dragModus = null;
@@ -1455,9 +1689,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.onPointerUp(event);
           return;
         }
-        if (this.werkzeug === 'freihand' && this.stiftVorschauPos) {
+        if (this.hatWerkzeugVorschauRahmen && this.stiftVorschauPos) {
           this.stiftVorschauPos = null;
           this.zeichneAlles();
+        }
+        if (this.drehHandleHover) {
+          this.drehHandleHover = false;
         }
       },
       onWheel(event) {
@@ -1498,9 +1735,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           if (this._moveOriginal && this.undoStack.length) {
             this.elemente = this.undoStack.pop();
           }
+        } else if (this._dragModus === 'drehen') {
+          if (this._rotateOriginal && this.undoStack.length) {
+            this.elemente = this.undoStack.pop();
+          }
         }
         this._dragElement = null;
         this._moveOriginal = null;
+        this._rotateOriginal = null;
+        this._rotateZentrum = null;
+        this._rotateStartWinkel = null;
         this._lassoBox = null;
         this._dragModus = null;
       },
@@ -1534,11 +1778,119 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             for (const t of teile) {
               if (t.p && t.p.length >= 2) neu.push(t);
             }
-          } else if (!hitTest(el, wx, wy, halbRadier)) {
+          } else if (hitTest(el, wx, wy, halbRadier)) {
+            const teile = radiereNichtStrichAufPixelEbene(el, wx, wy, halbRadier, neueId, (ctx, e) =>
+              this.zeichneElement(ctx, e),
+            );
+            neu.push(...teile);
+          } else {
             neu.push(el);
           }
         }
         this.elemente = neu;
+        this.rasterBildCacheLeeren();
+      },
+      auswahlZentrum() {
+        const ausw = this.auswahlSet;
+        const box = gesamtBoundingBox(this.elemente.filter((el) => ausw.has(el.i)));
+        if (!box) {
+          return null;
+        }
+        return { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+      },
+      drehHandleMetrik() {
+        const skala = this.ansicht.scale || 1;
+        return {
+          offset: DREH_HANDLE_OFFSET_CSS / skala,
+          radius: DREH_HANDLE_RADIUS_CSS / skala,
+          pad: 4 / skala,
+        };
+      },
+      drehHandleWeltPosition() {
+        const box = gesamtBoundingBox(this.elemente.filter((el) => this.auswahlSet.has(el.i)));
+        if (!box) {
+          return null;
+        }
+        const m = this.drehHandleMetrik();
+        const mitteX = box.x + box.w / 2;
+        return {
+          x: mitteX,
+          y: box.y - m.pad - m.offset,
+          ankrepx: mitteX,
+          ankrepy: box.y - m.pad,
+        };
+      },
+      trifftDrehHandle(wx, wy) {
+        if (!this.hatAuswahl || this.werkzeug !== 'auswahl') {
+          return false;
+        }
+        const pos = this.drehHandleWeltPosition();
+        if (!pos) {
+          return false;
+        }
+        const m = this.drehHandleMetrik();
+        const dx = wx - pos.x;
+        const dy = wy - pos.y;
+        return Math.sqrt(dx * dx + dy * dy) <= m.radius * 1.4;
+      },
+      dreheAuswahl(grad) {
+        if (!this.hatAuswahl || !grad) {
+          return;
+        }
+        const z = this.auswahlZentrum();
+        if (!z) {
+          return;
+        }
+        this.verlaufSchnappschuss();
+        const rad = (grad * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const ausw = this.auswahlSet;
+        for (const el of this.elemente) {
+          if (!ausw.has(el.i)) {
+            continue;
+          }
+          wendeAuswahlDrehungAufElement(el, z, cos, sin, grad, klone([el])[0]);
+        }
+        this.zeichneAlles();
+        this.rasterBildCacheLeeren();
+        this.persistDebounce();
+      },
+      skaliereAuswahl(faktor) {
+        if (!this.hatAuswahl || !Number.isFinite(faktor) || faktor <= 0) {
+          return;
+        }
+        const z = this.auswahlZentrum();
+        if (!z) {
+          return;
+        }
+        this.verlaufSchnappschuss();
+        const ausw = this.auswahlSet;
+        for (const el of this.elemente) {
+          if (!ausw.has(el.i)) {
+            continue;
+          }
+          if (el.t === 's' || el.t === 'poly') {
+            for (let i = 0; i + 1 < el.p.length; i += 2) {
+              const [nx, ny] = skalierePunktUm(el.p[i], el.p[i + 1], z.x, z.y, faktor);
+              el.p[i] = nx;
+              el.p[i + 1] = ny;
+            }
+          } else {
+            const norm = normalisiereBox(el.x, el.y, el.w, el.h);
+            const ncx = norm.x + norm.w / 2;
+            const ncy = norm.y + norm.h / 2;
+            const nw = Math.max(0.5, norm.w * faktor);
+            const nh = Math.max(0.5, norm.h * faktor);
+            el.x = ncx - nw / 2;
+            el.y = ncy - nh / 2;
+            el.w = nw;
+            el.h = nh;
+          }
+        }
+        this.zeichneAlles();
+        this.rasterBildCacheLeeren();
+        this.persistDebounce();
       },
       radiereStrecke(von, nach) {
         const dx = nach.x - von.x;
@@ -1603,6 +1955,32 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           }
         }
         this._dragModus = 'verschieben';
+      },
+      starteDrehen(welt) {
+        const z = this.auswahlZentrum();
+        if (!z) {
+          return;
+        }
+        this.verlaufSchnappschuss();
+        this._rotateOriginal = new Map();
+        for (const el of this.elemente) {
+          if (this.auswahlSet.has(el.i)) {
+            this._rotateOriginal.set(el.i, klone([el])[0]);
+          }
+        }
+        this._rotateZentrum = z;
+        this._rotateStartWinkel = Math.atan2(welt.y - z.y, welt.x - z.x);
+        this._dragModus = 'drehen';
+      },
+      aktualisiereDrehen(welt) {
+        if (!this._rotateOriginal || !this._rotateZentrum || this._rotateStartWinkel == null) {
+          return;
+        }
+        const z = this._rotateZentrum;
+        const aktuell = Math.atan2(welt.y - z.y, welt.x - z.x);
+        const deltaRad = aktuell - this._rotateStartWinkel;
+        wendeAuswahlDrehungAusSnapshot(this.elemente, this._rotateOriginal, z, deltaRad);
+        this.zeichneAlles();
       },
       aktualisiereVerschieben(welt) {
         if (!this._moveOriginal) return;
@@ -1824,7 +2202,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         ctx.restore();
       },
       zeichneStiftspitzenRahmen(ctx, canvas, dpr) {
-        if (this.werkzeug !== 'freihand' || !this.stiftVorschauPos) return;
+        if (!this.hatWerkzeugVorschauRahmen || !this.stiftVorschauPos) return;
         const cx = this.stiftVorschauPos.x;
         const cy = this.stiftVorschauPos.y;
         if (!Number.isFinite(cx) || !Number.isFinite(cy)) return;
@@ -2045,15 +2423,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (el.t === 'm') {
           const img = this.holeRasterBild(el);
           if (!img || !img.complete || !img.naturalWidth) return;
-          ctx.save();
-          ctx.drawImage(img, el.x, el.y, el.w, el.h);
-          ctx.restore();
+          zeichneMitRotation(ctx, el, () => {
+            ctx.drawImage(img, el.x, el.y, el.w, el.h);
+          });
           return;
         }
-        ctx.beginPath();
         ctx.strokeStyle = el.c;
         ctx.lineWidth = el.d;
         if (el.t === 's') {
+          ctx.beginPath();
           if (el.p.length < 2) return;
           if (el.p.length === 2) {
             ctx.fillStyle = el.c;
@@ -2069,31 +2447,41 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           return;
         }
         if (el.t === 'r') {
-          const norm = normalisiereBox(el.x, el.y, el.w, el.h);
-          ctx.rect(norm.x, norm.y, norm.w, norm.h);
-          ctx.stroke();
+          zeichneMitRotation(ctx, el, () => {
+            const norm = normalisiereBox(el.x, el.y, el.w, el.h);
+            ctx.beginPath();
+            ctx.rect(norm.x, norm.y, norm.w, norm.h);
+            ctx.stroke();
+          });
           return;
         }
         if (el.t === 'e') {
-          const norm = normalisiereBox(el.x, el.y, el.w, el.h);
-          const rx = norm.w / 2;
-          const ry = norm.h / 2;
-          if (rx <= 0 || ry <= 0) return;
-          ctx.ellipse(norm.x + rx, norm.y + ry, rx, ry, 0, 0, Math.PI * 2);
-          ctx.stroke();
+          zeichneMitRotation(ctx, el, () => {
+            const norm = normalisiereBox(el.x, el.y, el.w, el.h);
+            const rx = norm.w / 2;
+            const ry = norm.h / 2;
+            if (rx <= 0 || ry <= 0) return;
+            ctx.beginPath();
+            ctx.ellipse(norm.x + rx, norm.y + ry, rx, ry, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          });
           return;
         }
         if (el.t === 'tri') {
-          const p = dreieckPunkte(el);
-          ctx.moveTo(p[0], p[1]);
-          ctx.lineTo(p[2], p[3]);
-          ctx.lineTo(p[4], p[5]);
-          ctx.closePath();
-          ctx.stroke();
+          zeichneMitRotation(ctx, el, () => {
+            const p = dreieckPunkte(el);
+            ctx.beginPath();
+            ctx.moveTo(p[0], p[1]);
+            ctx.lineTo(p[2], p[3]);
+            ctx.lineTo(p[4], p[5]);
+            ctx.closePath();
+            ctx.stroke();
+          });
           return;
         }
         if (el.t === 'poly') {
           if (el.p.length < 4) return;
+          ctx.beginPath();
           ctx.moveTo(el.p[0], el.p[1]);
           for (let i = 2; i + 1 < el.p.length; i += 2) {
             ctx.lineTo(el.p[i], el.p[i + 1]);
@@ -2105,17 +2493,39 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       zeichneAuswahlOverlay(ctx) {
         if (!this.auswahl.length) return;
         const auswSet = this.auswahlSet;
+        const ausgewaehlt = this.elemente.filter((el) => auswSet.has(el.i));
+        const gesamt = gesamtBoundingBox(ausgewaehlt);
         ctx.save();
         const skala = this.ansicht.scale || 1;
         ctx.lineWidth = 1.5 / skala;
         ctx.setLineDash([6 / skala, 4 / skala]);
         ctx.strokeStyle = '#2563eb';
-        for (const el of this.elemente) {
-          if (!auswSet.has(el.i)) continue;
-          const box = boundingBox(el);
-          if (!box) continue;
+        if (gesamt) {
           const pad = 4 / skala;
-          ctx.strokeRect(box.x - pad, box.y - pad, box.w + 2 * pad, box.h + 2 * pad);
+          ctx.strokeRect(gesamt.x - pad, gesamt.y - pad, gesamt.w + 2 * pad, gesamt.h + 2 * pad);
+        }
+        if (this.werkzeug === 'auswahl') {
+          const handle = this.drehHandleWeltPosition();
+          if (handle) {
+            const m = this.drehHandleMetrik();
+            const r = m.radius;
+            ctx.setLineDash([]);
+            ctx.lineWidth = 1.75 / skala;
+            ctx.strokeStyle = '#2563eb';
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(handle.ankrepx, handle.ankrepy);
+            ctx.lineTo(handle.x, handle.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(handle.x, handle.y, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            const bogenR = Math.max(r * 0.42, 2.5 / skala);
+            ctx.beginPath();
+            ctx.arc(handle.x, handle.y, bogenR, -Math.PI * 0.85, Math.PI * 0.35);
+            ctx.stroke();
+          }
         }
         ctx.restore();
       },
@@ -2255,7 +2665,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         <div
           v-show="!minimiert"
           ref="fensterElement"
-          class="regelwerk-modal-window card shadow htbah-zeichen-modal-window"
+          class="regelwerk-modal-window card shadow-lg htbah-zeichen-modal-window"
           :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
           :style="fensterStil"
           role="dialog"
@@ -2455,6 +2865,42 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 aria-label="Auswahl löschen">
                 <span class="material-symbols-outlined">delete</span>
               </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                :disabled="!hatAuswahl"
+                @click="dreheAuswahl(-15)"
+                title="Auswahl 15° gegen den Uhrzeigersinn drehen"
+                aria-label="Gegen den Uhrzeigersinn drehen">
+                <span class="material-symbols-outlined">rotate_left</span>
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                :disabled="!hatAuswahl"
+                @click="dreheAuswahl(15)"
+                title="Auswahl 15° im Uhrzeigersinn drehen"
+                aria-label="Im Uhrzeigersinn drehen">
+                <span class="material-symbols-outlined">rotate_right</span>
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                :disabled="!hatAuswahl"
+                @click="skaliereAuswahl(1 / 1.15)"
+                title="Auswahl verkleinern"
+                aria-label="Auswahl verkleinern">
+                <span class="material-symbols-outlined">zoom_out</span>
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                :disabled="!hatAuswahl"
+                @click="skaliereAuswahl(1.15)"
+                title="Auswahl vergrößern"
+                aria-label="Auswahl vergrößern">
+                <span class="material-symbols-outlined">zoom_in</span>
+              </button>
             </div>
 
             <div class="htbah-zeichen-werkzeuggruppe d-flex align-items-center gap-1 ms-auto">
@@ -2474,6 +2920,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               class="htbah-zeichen-modal-canvas"
               :class="{
                 'htbah-zeichen-modal-canvas--auswahl': istAuswahlModus,
+                'htbah-zeichen-modal-canvas--dreh-handle': istAuswahlModus && drehHandleHover && !istDrehZiehen,
+                'htbah-zeichen-modal-canvas--dreh-zieht': istDrehZiehen,
                 'htbah-zeichen-modal-canvas--hand': istHandModus,
                 'htbah-zeichen-modal-canvas--pipette': istPipetteModus,
                 'htbah-zeichen-modal-canvas--fuell': istFuellModus,
@@ -2481,7 +2929,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               :style="{ touchAction: 'none' }"></canvas>
             <div class="htbah-zeichen-modal-tipp small text-muted">
               <template v-if="istAuswahlModus">
-                Klicken oder Rahmen ziehen zum Auswählen · Shift = Auswahl erweitern · Ziehen verschiebt · Strg+C/X/V · Entf löscht
+                Klicken oder Rahmen ziehen zum Auswählen · Shift = Auswahl erweitern · Ziehen verschiebt · Dreh-Handle oben ziehen zum Drehen · Strg+C/X/V · Entf löscht
               </template>
               <template v-else-if="istHandModus">
                 Mit Maus oder Finger ziehen, um die Ansicht zu verschieben · Mausrad: zoomen · Shift + Mausrad: horizontal · Zwei Finger: zoomen
@@ -2493,7 +2941,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 Klicken, um eine zusammenhängende Fläche mit der aktuellen Farbe zu füllen (von Linien begrenzt; Karomuster zählt nicht)
               </template>
               <template v-else-if="istRadierModus">
-                Radiergummi: über Linien ziehen · Größe = Pinseldicke · Strg+Z rückgängig
+                Radiergummi auf Pixelebene: über Zeichnungen ziehen · Größe = Pinseldicke · Strg+Z rückgängig
               </template>
               <template v-else-if="istLinieModus">
                 Erster Klick: Startpunkt · Zweiter Klick: Linie setzen · Klick außerhalb des Canvas bricht ab (Zoom ausgenommen)

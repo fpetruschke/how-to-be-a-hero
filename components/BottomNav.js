@@ -105,6 +105,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       _kampagnenModalNurUiVerstecken: false,
       _badgeDragMoveHandler: null,
       _badgeDragUpHandler: null,
+      browserVollbildAktiv: false,
     };
   },
   created() {
@@ -128,6 +129,15 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     zeigeNav() {
       const p = this.$route.path || '/';
       return p !== '/';
+    },
+    browserVollbildUnterstuetzt() {
+      return !!(typeof document !== 'undefined' && document.fullscreenEnabled);
+    },
+    browserVollbildIcon() {
+      return this.browserVollbildAktiv ? 'close_fullscreen' : 'open_in_full';
+    },
+    browserVollbildLabel() {
+      return this.browserVollbildAktiv ? 'Vollbild beenden' : 'Vollbild';
     },
     atmosphaereBadgeCombinedStyle() {
       const o = {
@@ -213,7 +223,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     },
     aktiveKampagneId() {
       void this.$route.fullPath;
-      const z = window.HTBAH.ladeSpielleitungZustand();
+      const z =
+        window.HTBAH && typeof window.HTBAH.ladeSpielleitungZustandLeicht === 'function'
+          ? window.HTBAH.ladeSpielleitungZustandLeicht()
+          : window.HTBAH.ladeSpielleitungZustand();
       return typeof z.aktiveKampagneId === 'string' && z.aktiveKampagneId ? z.aktiveKampagneId : '';
     },
     istInKampagneRoute() {
@@ -439,7 +452,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       if (!id || !window.HTBAH || typeof window.HTBAH.ladeSpielleitungZustand !== 'function') {
         return null;
       }
-      const sl = window.HTBAH.ladeSpielleitungZustand();
+      const sl =
+        typeof window.HTBAH.ladeSpielleitungZustandLeicht === 'function'
+          ? window.HTBAH.ladeSpielleitungZustandLeicht()
+          : window.HTBAH.ladeSpielleitungZustand();
       const liste = Array.isArray(sl.kampagnen) ? sl.kampagnen : [];
       return liste.find((k) => k && k.id === id) || null;
     },
@@ -680,6 +696,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     window.addEventListener('orientationchange', this._fabViewportHandler, { passive: true });
     window.addEventListener('htbah:wuerfel-einstellungen-geaendert', this.onWuerfelEinstellungenGlobalGeaendert);
     window.addEventListener('htbah:kampagne-daten-geaendert', this.onHtbahKampagneZufallstabellenGeaendert);
+    this._browserVollbildChangeHandler = () => this.syncBrowserVollbildState();
+    document.addEventListener('fullscreenchange', this._browserVollbildChangeHandler);
+    this.syncBrowserVollbildState();
   },
   beforeUnmount() {
     this.sicherheitsmechanismenModalOffen = false;
@@ -733,6 +752,10 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         'htbah:floating-fab-speicher-geleert',
         this._onFloatingFabSpeicherGeleert,
       );
+    }
+    if (this._browserVollbildChangeHandler) {
+      document.removeEventListener('fullscreenchange', this._browserVollbildChangeHandler);
+      this._browserVollbildChangeHandler = null;
     }
     this.wuerfelBeutelBeendeZiehen();
     this.wuerfelBeutelBeendeResize();
@@ -798,6 +821,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.ladeDiceFarbwahl();
     },
     onHtbahKampagneZufallstabellenGeaendert(ev) {
+      if (window.HTBAH && typeof window.HTBAH.istSpeicherAktionAktiv === 'function' && window.HTBAH.istSpeicherAktionAktiv()) {
+        return;
+      }
       const d = ev && ev.detail;
       if (!d || typeof d.art !== 'string') {
         return;
@@ -1082,10 +1108,28 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this._navReserveObserver = null;
       }
     },
+    syncBrowserVollbildState() {
+      this.browserVollbildAktiv = !!document.fullscreenElement;
+    },
+    async browserVollbildUmschalten() {
+      if (!this.browserVollbildUnterstuetzt) {
+        return;
+      }
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch {
+        /* Browser kann Vollbild ablehnen (z. B. ohne Nutzeraktion) */
+      }
+      this.syncBrowserVollbildState();
+    },
     syncBottomNavReserve() {
       const el = this.$refs.navbarFixedEl;
       const root = document.documentElement;
-      const istDesktop = window.matchMedia('(min-width: 992px)').matches;
+      const istDesktop = window.matchMedia('(min-width: 768px)').matches;
       if (!el) {
         root.style.setProperty('--htbah-bottom-nav-reserve', '0px');
         root.style.setProperty('--htbah-top-nav-reserve', '0px');
@@ -2873,11 +2917,11 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         v-if="zeigeNav"
         ref="navbarFixedEl"
         class="navbar-fixed">
-        <div class="htbah-top-nav-desktop d-none d-lg-flex align-items-center">
+        <div class="htbah-top-nav-desktop d-none d-md-flex align-items-center">
           <router-link to="/" title="Startseite" class="htbah-top-nav-logo">
             <img src="assets/img/htbah-begleit-app-logo.png" alt="How To Be A Hero Begleit-App" />
           </router-link>
-          <div class="htbah-top-nav-menu d-flex align-items-center gap-1">
+          <div class="htbah-top-nav-menu d-flex align-items-center gap-1 flex-grow-1">
             <router-link
               to="/"
               title="App-Startseite (Rollenwahl)"
@@ -2964,9 +3008,18 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
               <span class="htbah-nav-item-label">Einstellungen</span>
             </router-link>
           </div>
+          <button
+            v-if="browserVollbildUnterstuetzt"
+            type="button"
+            class="htbah-top-nav-vollbild-btn"
+            :title="browserVollbildLabel"
+            :aria-label="browserVollbildLabel"
+            @click="browserVollbildUmschalten">
+            <span class="material-symbols-outlined" aria-hidden="true">{{ browserVollbildIcon }}</span>
+          </button>
         </div>
 
-        <div class="htbah-bottom-nav-inner d-flex d-lg-none flex-nowrap align-items-stretch w-100 px-2 py-2">
+        <div class="htbah-bottom-nav-inner d-flex d-md-none flex-nowrap align-items-stretch w-100 px-2 py-2">
           <template v-if="rolle === 'charakter'">
             <router-link
               to="/"
@@ -3230,7 +3283,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         <div
           v-show="!musikboardFenster.minimiert"
           ref="musikboardFensterRef"
-          class="regelwerk-modal-window card shadow htbah-musik-modal-window"
+          class="regelwerk-modal-window card shadow-lg htbah-musik-modal-window"
           :style="musikboardFensterStil"
           role="dialog"
           aria-modal="true"
@@ -3292,7 +3345,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         <div
           v-show="!wuerfelBeutelFenster.minimiert"
           ref="wuerfelBeutelFensterRef"
-          class="regelwerk-modal-window card shadow htbah-wuerfel-beutel-window"
+          class="regelwerk-modal-window card shadow-lg htbah-wuerfel-beutel-window"
           :style="wuerfelBeutelFensterStil"
           role="dialog"
           aria-modal="true"

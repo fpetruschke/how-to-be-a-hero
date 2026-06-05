@@ -177,7 +177,7 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
     <div v-if="offen && pdfUrl" class="regelwerk-modal-layer">
       <div
         ref="fensterElement"
-        class="regelwerk-modal-window regelwerk-modal-window-fullscreen card shadow"
+        class="regelwerk-modal-window regelwerk-modal-window-fullscreen card shadow-lg"
         role="dialog"
         aria-modal="true"
         aria-label="Charakterbogen PDF"

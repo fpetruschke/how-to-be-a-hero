@@ -359,7 +359,7 @@ window.HTBAH_SEITEN.PresetEditor = {
         aria-hidden="true"
         v-on="{ 'hidden.bs.modal': bearbeitungModalGeschlossen }">
         <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title" id="peFaehigkeitBearbeitenLabel">Fähigkeit bearbeiten</h5>
               <button

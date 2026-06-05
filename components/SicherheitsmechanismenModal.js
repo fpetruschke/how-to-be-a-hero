@@ -214,7 +214,7 @@ window.HTBAH_KOMPONENTEN.SicherheitsmechanismenModal = {
       aria-hidden="true"
       @hidden.bs.modal="onModalHidden">
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title" id="htbahSicherheitsmechanismenTitel">Sicherheitsmechanismen</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>

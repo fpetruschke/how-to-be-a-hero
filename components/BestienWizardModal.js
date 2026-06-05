@@ -210,7 +210,7 @@ window.HTBAH_KOMPONENTEN.BestienWizardModal = {
       :aria-labelledby="modalId + 'Label'"
       aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header py-2">
             <h5 class="modal-title" :id="modalId + 'Label'">🧙 Bestiarium-Wizard</h5>
             <button

@@ -37,8 +37,19 @@ function normalisiereBeispielManifestEintrag(roh) {
 
 window.HTBAH_SEITEN.KampagnenUebersicht = {
   data() {
+    const initListe =
+      window.HTBAH && typeof window.HTBAH.ladeSpielleitungKampagnenUebersichtListe === 'function'
+        ? window.HTBAH.ladeSpielleitungKampagnenUebersichtListe()
+        : [];
+    const cache = Array.isArray(initListe) ? initListe : [];
+    const zustandFn =
+      window.HTBAH && typeof window.HTBAH.ladeSpielleitungZustandLeicht === 'function'
+        ? window.HTBAH.ladeSpielleitungZustandLeicht
+        : window.HTBAH.ladeSpielleitungZustand;
     return {
-      zustand: window.HTBAH.ladeSpielleitungZustand(),
+      zustand: zustandFn.call(window.HTBAH),
+      kampagnenCache:
+        typeof Vue !== 'undefined' && typeof Vue.markRaw === 'function' ? Vue.markRaw(cache) : cache,
       neueKampagneNameEntwurf: '',
       beispielManifest: [],
       beispielManifestLaedt: false,
@@ -51,6 +62,9 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
     };
   },
   computed: {
+    kampagnenListe() {
+      return Array.isArray(this.kampagnenCache) ? this.kampagnenCache : [];
+    },
     aktuellesBeispiel() {
       if (!this.ausgewaehltesBeispielDatei) {
         return null;
@@ -64,7 +78,27 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
     },
   },
   mounted() {
+    this._beispielLadenKomponenteAktiv = true;
+    this._speicherAktionLaeuft = false;
+    this._onKampagneDatenGeaendert = (ev) => {
+      if (this._speicherAktionLaeuft) {
+        return;
+      }
+      const d = ev && ev.detail;
+      if (!d || d.art !== 'spielleitung') {
+        return;
+      }
+      this.aktualisiereKampagnenAnsicht();
+    };
+    window.addEventListener('htbah:kampagne-daten-geaendert', this._onKampagneDatenGeaendert);
     this.ladeBeispielManifest();
+  },
+  beforeUnmount() {
+    this._beispielLadenKomponenteAktiv = false;
+    if (this._onKampagneDatenGeaendert) {
+      window.removeEventListener('htbah:kampagne-daten-geaendert', this._onKampagneDatenGeaendert);
+      this._onKampagneDatenGeaendert = null;
+    }
   },
   watch: {
     ausgewaehltesBeispielDatei(datei) {
@@ -95,16 +129,51 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
         return vorhanden === ziel;
       });
     },
+    spielleitungZustandAusSpeicher() {
+      return window.HTBAH && typeof window.HTBAH.ladeSpielleitungZustandLeicht === 'function'
+        ? window.HTBAH.ladeSpielleitungZustandLeicht()
+        : window.HTBAH.ladeSpielleitungZustand();
+    },
     persist() {
       window.HTBAH.speichereSpielleitungZustand(this.zustand);
+      this.aktualisiereKampagnenAnsicht();
+    },
+    aktualisiereKampagnenAnsicht() {
+      if (!this._beispielLadenKomponenteAktiv) {
+        return;
+      }
+      const liste =
+        window.HTBAH && typeof window.HTBAH.ladeSpielleitungKampagnenUebersichtListe === 'function'
+          ? window.HTBAH.ladeSpielleitungKampagnenUebersichtListe()
+          : [];
+      this.kampagnenCache =
+        typeof Vue !== 'undefined' && typeof Vue.markRaw === 'function' ? Vue.markRaw(liste) : liste;
+      const DIAG = window.HTBAH_DIAG;
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('KampagnenUebersicht', 'liste-aktualisiert', this.kampagnenCache.length);
+      }
+    },
+    kampagneLabelsBadges(g) {
+      const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+      const labels = g && Array.isArray(g.labels) ? g.labels : [];
+      if (!KL || typeof KL.normalisiereKampagneLabels !== 'function') {
+        return labels;
+      }
+      return KL.normalisiereKampagneLabels(labels);
+    },
+    labelBadgeKlasse(lab) {
+      return window.HTBAH && typeof window.HTBAH.kampagnenLabelBadgeKlasse === 'function'
+        ? window.HTBAH.kampagnenLabelBadgeKlasse(lab)
+        : 'text-bg-secondary';
     },
     zeigeStatus(text) {
       window.HTBAH.ui.notify({ text, typ: 'success' });
     },
     neueKampagne() {
+      const z = this.spielleitungZustandAusSpeicher();
       const name =
         (this.neueKampagneNameEntwurf || '').trim() ||
-        'Kampagne ' + (this.zustand.kampagnen.length + 1);
+        'Kampagne ' + ((Array.isArray(z.kampagnen) ? z.kampagnen.length : 0) + 1);
       if (this.kampagnenNameExistiert(name)) {
         window.HTBAH.ui.notify({
           text: 'Eine Kampagne mit diesem Namen existiert bereits.',
@@ -113,8 +182,11 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
         return;
       }
       const id = window.HTBAH.neueEntropieId();
-      this.zustand.kampagnen.push({ id, name, mitglieder: [] });
-      this.zustand.aktiveKampagneId = id;
+      const kampagnen = Array.isArray(z.kampagnen) ? z.kampagnen.slice() : [];
+      kampagnen.push({ id, name, mitglieder: [] });
+      z.kampagnen = kampagnen;
+      z.aktiveKampagneId = id;
+      this.zustand = z;
       this.neueKampagneNameEntwurf = '';
       this.persist();
       this.zeigeStatus('Kampagne angelegt.');
@@ -124,7 +196,9 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
       if (!g || !g.id) {
         return;
       }
-      this.zustand.aktiveKampagneId = g.id;
+      const z = this.spielleitungZustandAusSpeicher();
+      z.aktiveKampagneId = g.id;
+      this.zustand = z;
       this.persist();
       this.$router.push(window.HTBAH.kampagnenPfad('gruppe', g.id));
     },
@@ -154,7 +228,19 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
         });
         return;
       }
-      g.name = t;
+      const z = this.spielleitungZustandAusSpeicher();
+      const kampagnen = Array.isArray(z.kampagnen) ? z.kampagnen : [];
+      const idx = kampagnen.findIndex((k) => k && k.id === g.id);
+      if (idx < 0) {
+        window.HTBAH.ui.notify({
+          text: 'Die Kampagne konnte nicht gefunden werden.',
+          typ: 'danger',
+        });
+        return;
+      }
+      kampagnen[idx] = { ...kampagnen[idx], name: t };
+      z.kampagnen = kampagnen;
+      this.zustand = z;
       this.persist();
       this.zeigeStatus('Name gespeichert.');
     },
@@ -173,7 +259,17 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
         return;
       }
       const gid = g.id;
-      const ergebnis = window.HTBAH.loescheSpielleitungKampagneKomplett(gid);
+      this._speicherAktionLaeuft = true;
+      let ergebnis = null;
+      try {
+        ergebnis = await window.HTBAH.ui.mitFortschritt({
+          titel: `Kampagne „${g.name}“ wird gelöscht …`,
+          aufgabe: (report) =>
+            window.HTBAH.loescheSpielleitungKampagneKomplettAsync(gid, report),
+        });
+      } finally {
+        this._speicherAktionLaeuft = false;
+      }
       if (!ergebnis || !ergebnis.ok) {
         window.HTBAH.ui.notify({
           text: 'Die Kampagne konnte nicht gelöscht werden.',
@@ -181,8 +277,41 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
         });
         return;
       }
-      this.zustand = window.HTBAH.ladeSpielleitungZustand();
+      if (window.HTBAH && window.HTBAH.ui && typeof window.HTBAH.ui.bereinigeModalBackdrop === 'function') {
+        window.HTBAH.ui.bereinigeModalBackdrop();
+      }
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+      if (
+        window.HTBAH &&
+        typeof window.HTBAH.ladeSpielleitungZustandLeicht === 'function'
+      ) {
+        this.zustand = window.HTBAH.ladeSpielleitungZustandLeicht();
+      }
+      const DIAG = window.HTBAH_DIAG;
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('KampagnenUebersicht', 'render-vor');
+      }
+      this.aktualisiereKampagnenAnsicht();
+      await this.$nextTick();
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('KampagnenUebersicht', 'render-nach');
+      }
       this.zeigeStatus('Kampagne gelöscht.');
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('KampagnenUebersicht', 'toast-gesendet');
+      }
+      await this.$nextTick();
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('KampagnenUebersicht', 'toast-dom-fertig');
+      }
+      if (window.HTBAH && window.HTBAH.ui && typeof window.HTBAH.ui.bereinigeModalBackdrop === 'function') {
+        window.HTBAH.ui.bereinigeModalBackdrop();
+      }
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('KampagnenUebersicht', 'loeschen-abgeschlossen');
+      }
     },
     mitgliedName(mitglied) {
       const name =
@@ -314,38 +443,46 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
       if (!beispiel || this.beispielLaeuftDatei) {
         return;
       }
-      if (this.beispielVorschauLabelsLaden) {
-        await this.ladeBeispielLabelsVorschau(beispiel.datei);
-      } else if (!this.beispielVorschauLabels.length) {
-        await this.ladeBeispielLabelsVorschau(beispiel.datei);
-      }
-      const quellenZeile = this.beispielQuellenZeile(beispiel);
-      const beschreibungTeile = [
-        `<p>Die Kampagne <strong>„${this.beispielHtmlEscape(beispiel.titel)}“</strong> wird <em>additiv</em> hinzugefügt — ` +
-          'vorhandene Kampagnen und Zufallstabellen-Einträge bleiben unverändert. Bereits ' +
-          'vorhandene Beispiel-Einträge (gleiche ID) werden übersprungen.</p>',
-      ];
-      const labelsHtml = this.beispielLabelsBeschreibungHtml(this.beispielVorschauLabels);
-      if (labelsHtml) {
-        beschreibungTeile.push(labelsHtml);
-      }
-      if (quellenZeile) {
-        beschreibungTeile.push(
-          `<p class="mb-0 small text-body-secondary">${this.beispielHtmlEscape(quellenZeile)}.</p>`,
-        );
-      }
-      const bestaetigt = await window.HTBAH.ui.confirm({
-        titel: `„${beispiel.titel}“ laden?`,
-        beschreibung: beschreibungTeile.join(''),
-        bestaetigenText: 'Hinzufügen',
-        bestaetigenButtonClass: 'btn-primary',
-      });
-      if (!bestaetigt) {
-        return;
-      }
-
       this.beispielLaeuftDatei = beispiel.datei;
       try {
+        if (this.beispielVorschauLabelsLaden) {
+          await this.ladeBeispielLabelsVorschau(beispiel.datei);
+        } else if (!this.beispielVorschauLabels.length) {
+          await this.ladeBeispielLabelsVorschau(beispiel.datei);
+        }
+        const quellenZeile = this.beispielQuellenZeile(beispiel);
+        const beschreibungTeile = [
+          `<p>Die Demo-Kampagne <strong>„${this.beispielHtmlEscape(beispiel.titel)}“</strong> wird als <em>eigene Kampagne</em> angelegt — ` +
+            'mit allen Inhalten, aber ohne Charaktere in der Gruppe. Jeder Ladevorgang erzeugt eine ' +
+            'neue Kopie (Name mit <strong>#1</strong>, <strong>#2</strong>, …) für eine weitere Spielrunde.</p>',
+        ];
+        const labelsHtml = this.beispielLabelsBeschreibungHtml(this.beispielVorschauLabels);
+        if (labelsHtml) {
+          beschreibungTeile.push(labelsHtml);
+        }
+        if (quellenZeile) {
+          beschreibungTeile.push(
+            `<p class="mb-0 small text-body-secondary">${quellenZeile}</p>`,
+          );
+        }
+        const bestaetigt = await window.HTBAH.ui.confirm({
+          titel: `„${beispiel.titel}“ laden?`,
+          beschreibung: beschreibungTeile.join(''),
+          bestaetigenText: 'Hinzufügen',
+          bestaetigenButtonClass: 'btn-primary',
+          warnhinweisAnzeigen: false,
+        });
+        if (!bestaetigt) {
+          return;
+        }
+
+        if (window.HTBAH && window.HTBAH.ui && typeof window.HTBAH.ui.bereinigeModalBackdrop === 'function') {
+          window.HTBAH.ui.bereinigeModalBackdrop();
+        }
+        await new Promise((resolve) => {
+          setTimeout(resolve, 80);
+        });
+
         const url = `${SL_BEISPIEL_KAMPAGNEN_VERZEICHNIS}/${beispiel.datei}`;
         const response = await fetch(url, { cache: 'no-cache' });
         if (!response.ok) {
@@ -355,44 +492,119 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
         if (!paket || paket.typ !== 'lokaler-speicher' || !Array.isArray(paket.daten)) {
           throw new Error('Ungültiges Paketformat (erwartet typ: "lokaler-speicher").');
         }
-        const ergebnis = this.beispielPaketAdditivAnwenden(paket);
+        const ergebnis = await this.beispielPaketMitFortschrittAnwenden(paket, beispiel.titel);
         if (!ergebnis.kampagneId) {
           throw new Error('Im Paket wurde keine Kampagne gefunden.');
         }
+        this.aktualisiereKampagnenAnsicht();
+        await this.$nextTick();
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
 
-        const zusammenfassung = [];
-        if (ergebnis.kampagneStatus === 'neu') {
-          zusammenfassung.push('Kampagne hinzugefügt');
-        } else if (ergebnis.kampagneStatus === 'vorhanden') {
-          zusammenfassung.push('Kampagne war bereits vorhanden');
-        }
-        if (ergebnis.zufallNeu > 0) {
-          zusammenfassung.push(`${ergebnis.zufallNeu} Zufallstabellen-Einträge hinzugefügt`);
-        }
-        if (ergebnis.zufallVorhanden > 0) {
-          zusammenfassung.push(`${ergebnis.zufallVorhanden} bereits vorhanden (übersprungen)`);
-        }
+        const zusammenfassung = [
+          `Kampagne „${ergebnis.kampagneName || beispiel.titel}“ angelegt`,
+        ];
         window.HTBAH.ui.notify({
-          text: `„${beispiel.titel}“: ${zusammenfassung.join(', ') || 'nichts geändert'}.`,
+          text: `„${beispiel.titel}“: ${zusammenfassung.join(', ')}.`,
           typ: 'success',
         });
 
-        this.$router.push(window.HTBAH.kampagnenPfad('gruppe', ergebnis.kampagneId));
+        const ziel =
+          window.HTBAH && typeof window.HTBAH.kampagnenPfad === 'function'
+            ? window.HTBAH.kampagnenPfad('gruppe', ergebnis.kampagneId)
+            : '';
+        if (
+          ziel &&
+          this.$router &&
+          typeof this.$router.push === 'function' &&
+          (!this.$route || this.$route.path !== ziel)
+        ) {
+          const nav = this.$router.push(ziel);
+          if (nav && typeof nav.then === 'function') {
+            await nav.catch(() => {});
+          }
+        }
       } catch (err) {
-        await window.HTBAH.ui.alert({
-          titel: 'Laden fehlgeschlagen',
-          beschreibung: `Das Beispiel „${beispiel.titel}“ konnte nicht geladen werden: ${
-            err && err.message ? err.message : err
-          }`,
-          bestaetigenButtonClass: 'btn-danger',
-        });
+        console.error('Beispiel-Kampagne laden fehlgeschlagen:', err);
+        try {
+          await window.HTBAH.ui.alert({
+            titel: 'Laden fehlgeschlagen',
+            beschreibung: `Das Beispiel „${beispiel.titel}“ konnte nicht geladen werden: ${
+              err && err.message ? err.message : err
+            }`,
+            bestaetigenButtonClass: 'btn-danger',
+          });
+        } catch (alertErr) {
+          console.error('Fehlerdialog konnte nicht angezeigt werden:', alertErr);
+        }
       } finally {
         this.beispielLaeuftDatei = '';
       }
     },
-    beispielPaketAdditivAnwenden(paket) {
-      const ergebnis = window.HTBAH.wendeBeispielLokalerSpeicherPaketAdditivAn(paket);
-      this.zustand = window.HTBAH.ladeSpielleitungZustand();
+    async beispielPaketMitFortschrittAnwenden(paket, beispielTitel) {
+      const DIAG = window.HTBAH_DIAG;
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('KampagnenUebersicht', 'import-start', beispielTitel);
+      }
+      const titel =
+        typeof beispielTitel === 'string' && beispielTitel.trim()
+          ? `„${beispielTitel.trim()}“ wird importiert …`
+          : 'Beispiel-Kampagne wird importiert …';
+      const syncApi =
+        window.HTBAH &&
+        typeof window.HTBAH.wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAn === 'function'
+          ? window.HTBAH.wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAn
+          : null;
+      if (!syncApi) {
+        throw new Error('Import-API nicht verfügbar.');
+      }
+      const asyncApi =
+        window.HTBAH &&
+        typeof window.HTBAH.wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAsync === 'function'
+          ? window.HTBAH.wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAsync
+          : null;
+      const ui = window.HTBAH && window.HTBAH.ui;
+      let ergebnis = null;
+      this._speicherAktionLaeuft = true;
+      try {
+        if (asyncApi && ui && typeof ui.mitFortschritt === 'function') {
+          try {
+            ergebnis = await ui.mitFortschritt({
+              titel,
+              aufgabe: (report) => asyncApi(paket, report),
+            });
+          } catch (fortschrittFehler) {
+            console.warn('Fortschritts-Import fehlgeschlagen, Sync-Fallback:', fortschrittFehler);
+            ergebnis = syncApi(paket);
+            if (
+              window.HTBAH &&
+              typeof window.HTBAH.flushKampagneDatenEventsAsync === 'function'
+            ) {
+              await window.HTBAH.flushKampagneDatenEventsAsync();
+            }
+          }
+        } else {
+          await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+          });
+          ergebnis = syncApi(paket);
+          if (
+            window.HTBAH &&
+            typeof window.HTBAH.flushKampagneDatenEventsAsync === 'function'
+          ) {
+            await window.HTBAH.flushKampagneDatenEventsAsync();
+          }
+        }
+      } finally {
+        this._speicherAktionLaeuft = false;
+      }
+      if (!ergebnis || !ergebnis.kampagneId) {
+        throw new Error('Import lieferte keine Kampagnen-ID.');
+      }
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('KampagnenUebersicht', 'import-fertig', ergebnis.kampagneId);
+      }
       return ergebnis;
     },
   },
@@ -432,7 +644,7 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
       <div class="card p-3 mb-3 text-start">
         <h5 class="mb-2">Kampagnen</h5>
 
-        <div v-if="!zustand.kampagnen.length" class="alert alert-secondary mb-0">
+        <div v-if="!kampagnenListe.length" class="alert alert-secondary mb-0">
           Noch keine Kampagne — oben „Hinzufügen“ nutzen.
         </div>
 
@@ -447,16 +659,25 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="g in zustand.kampagnen" :key="g.id">
+              <tr v-for="g in kampagnenListe" :key="g.id">
                 <td>
                   <button type="button" class="btn btn-link p-0 fw-medium text-decoration-none" @click="kampagneBearbeiten(g)">
                     {{ g.name }}
                   </button>
                 </td>
                 <td style="min-width: 14rem;">
-                  <kampagnen-labels-editor
-                    :kampagne-id="g.id"
-                    nur-anzeige />
+                  <div
+                    v-if="kampagneLabelsBadges(g).length"
+                    class="d-flex flex-wrap gap-1"
+                    role="list"
+                    :aria-label="'Labels für ' + (g.name || 'Kampagne')">
+                    <span
+                      v-for="lab in kampagneLabelsBadges(g)"
+                      :key="'kl-desk-' + g.id + '-' + lab.id"
+                      class="badge"
+                      :class="labelBadgeKlasse(lab)"
+                      role="listitem">{{ lab.name }}</span>
+                  </div>
                 </td>
               <td>
                 <div class="d-flex flex-wrap gap-1">
@@ -501,9 +722,9 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
             </tbody>
           </table>
         </div>
-        <div v-if="zustand.kampagnen.length" class="d-md-none mt-2">
+        <div v-if="kampagnenListe.length" class="d-md-none mt-2">
           <div
-            v-for="g in zustand.kampagnen"
+            v-for="g in kampagnenListe"
             :key="'grp-card-' + g.id"
             class="card zufallstabellen-mobile-card mb-2 p-3 htbah-kampagne-mobile-card">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
@@ -553,11 +774,16 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
               </span>
               <span v-if="!g.mitglieder.length" class="small text-body-secondary">Noch keine Charaktere in der Gruppe</span>
             </div>
-            <div class="mt-2 pt-2 border-top">
+            <div v-if="kampagneLabelsBadges(g).length" class="mt-2 pt-2 border-top">
               <div class="small fw-semibold mb-1">Labels</div>
-              <kampagnen-labels-editor
-                :kampagne-id="g.id"
-                nur-anzeige />
+              <div class="d-flex flex-wrap gap-1" role="list" :aria-label="'Labels für ' + (g.name || 'Kampagne')">
+                <span
+                  v-for="lab in kampagneLabelsBadges(g)"
+                  :key="'kl-mob-' + g.id + '-' + lab.id"
+                  class="badge"
+                  :class="labelBadgeKlasse(lab)"
+                  role="listitem">{{ lab.name }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -594,8 +820,8 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
           </p>
         </div>
         <p class="small text-body-secondary mb-2">
-          Wähle eine Kampagne aus und füge sie <strong>additiv</strong> zu deinen Daten hinzu.
-          Vorhandene Kampagnen und Zufallstabellen-Einträge bleiben unverändert; gleiche IDs werden übersprungen.
+          Wähle eine Demo-Kampagne und lege sie als eigene Kampagne an — jeder Ladevorgang erzeugt eine
+          <strong>neue Kopie</strong> (z. B. mit <strong>#1</strong>, <strong>#2</strong> im Namen) für eine weitere Spielrunde.
         </p>
         <div class="row g-2 align-items-stretch mb-2">
           <div class="col-12 col-sm">

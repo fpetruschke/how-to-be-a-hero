@@ -481,7 +481,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         class="regelwerk-modal-layer htbah-sl-pdf-export-modal-layer"
         @click.self="schliessen">
         <div
-          class="regelwerk-modal-window htbah-sl-pdf-export-modal-window card shadow"
+          class="regelwerk-modal-window htbah-sl-pdf-export-modal-window card shadow-lg"
           role="dialog"
           aria-modal="true"
           aria-labelledby="htbah-sl-pdf-export-titel">

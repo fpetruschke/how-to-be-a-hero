@@ -265,7 +265,7 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
       aria-hidden="true"
       v-on="{ 'hidden.bs.modal': onModalVerborgen }">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title d-flex align-items-center gap-2" :id="modalTitleId">
               <span class="material-symbols-outlined" aria-hidden="true">swords</span>

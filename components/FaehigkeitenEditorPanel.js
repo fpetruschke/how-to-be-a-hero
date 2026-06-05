@@ -313,8 +313,9 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
       <div v-if="!istSl" class="progress mb-3" style="height:10px;">
         <div class="progress-bar" :style="{ width: Math.min(100, punkte / 400 * 100) + '%' }"></div>
       </div>
-      <div class="row g-2 mb-2">
-        <div v-for="kategorie in ['handeln','wissen','soziales']" :key="idPrefix + '-' + kategorie" class="col-12 col-md-4">
+      <div class="htbah-faehigkeit-kat-spalten mb-2">
+        <div class="htbah-faehigkeit-kat-spalten-inner">
+        <div v-for="kategorie in ['handeln','wissen','soziales']" :key="idPrefix + '-' + kategorie" class="htbah-faehigkeit-kat-spalte">
           <div class="card p-2 h-100">
             <h5 class="text-uppercase fw-bold d-flex align-items-center gap-1 mb-2">
               <span>{{ kategorieAnzeige(kategorie) }}</span>
@@ -393,6 +394,7 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
             </div>
           </div>
         </div>
+        </div>
       </div>
       <div v-if="zeigeNeuFormular" class="card p-2">
         <h5 class="h6 mb-2">Neue Fähigkeit</h5>
@@ -410,7 +412,7 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
         aria-hidden="true"
         v-on="{ 'hidden.bs.modal': bearbeitungModalGeschlossen }">
         <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title">Fähigkeit bearbeiten</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>

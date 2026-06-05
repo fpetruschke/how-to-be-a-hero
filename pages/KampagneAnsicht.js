@@ -755,7 +755,7 @@ window.HTBAH_SEITEN.KampagneAnsicht = {
           aria-labelledby="spielleitungVerschiebenModalLabel"
           aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content shadow">
+            <div class="modal-content shadow-lg">
               <div class="modal-header">
                 <h5 class="modal-title" id="spielleitungVerschiebenModalLabel">
                   In andere Kampagne verschieben

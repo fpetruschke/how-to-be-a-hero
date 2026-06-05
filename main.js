@@ -428,7 +428,7 @@ function istKampagnenSpeicherKey(key) {
   return key === SPEICHER_KEY_SPIELLEITUNG || key === SPEICHER_KEY_SPIELLEITUNG_LEGACY;
 }
 
-function ladeSpielleitungZustand() {
+function leseSpielleitungZustandRoh() {
   let roh = htbahSpeicher.leseJson(SPEICHER_KEY_SPIELLEITUNG, null);
   if (!roh || typeof roh !== 'object') {
     const legacy = htbahSpeicher.leseJson(SPEICHER_KEY_SPIELLEITUNG_LEGACY, null);
@@ -438,7 +438,48 @@ function ladeSpielleitungZustand() {
       htbahSpeicher.loescheKey(SPEICHER_KEY_SPIELLEITUNG_LEGACY);
     }
   }
-  if (!roh || typeof roh !== 'object') {
+  return roh && typeof roh === 'object' ? roh : null;
+}
+
+function normalisiereMitgliedFuerKampagnenUebersicht(mitglied) {
+  if (!mitglied || typeof mitglied !== 'object') {
+    return null;
+  }
+  const id = typeof mitglied.id === 'string' ? mitglied.id : '';
+  const name =
+    mitglied.charakter && typeof mitglied.charakter.name === 'string'
+      ? mitglied.charakter.name.trim()
+      : '';
+  const charakterBild =
+    typeof mitglied.charakterBild === 'string' ? mitglied.charakterBild : '';
+  return {
+    id,
+    charakter: { name },
+    charakterBild,
+  };
+}
+
+/** Leichtgewichtige Kampagnenliste für die Übersicht (ohne Abenteuerbuch-/Konflikt-Normalisierung). */
+function ladeSpielleitungKampagnenUebersichtListe() {
+  const roh = leseSpielleitungZustandRoh();
+  if (!roh || !Array.isArray(roh.kampagnen)) {
+    return [];
+  }
+  return roh.kampagnen
+    .filter((g) => g && typeof g.id === 'string' && g.id.trim())
+    .map((g) => ({
+      id: g.id.trim(),
+      name: typeof g.name === 'string' && g.name.trim() ? g.name.trim() : 'Kampagne',
+      mitglieder: Array.isArray(g.mitglieder)
+        ? g.mitglieder.map(normalisiereMitgliedFuerKampagnenUebersicht).filter(Boolean)
+        : [],
+      labels: Array.isArray(g.labels) ? g.labels : [],
+    }));
+}
+
+function ladeSpielleitungZustandLeicht() {
+  const roh = leseSpielleitungZustandRoh();
+  if (!roh) {
     return {
       version: 1,
       kampagnen: [],
@@ -448,6 +489,48 @@ function ladeSpielleitungZustand() {
       aktiveGruppeId: null,
       mitgliedWahlProGruppe: {},
     };
+  }
+  return ladeSpielleitungZustandLeichtAusRoh(roh);
+}
+
+function ladeSpielleitungZustandLeichtAusRoh(roh) {
+  const kampagnen = Array.isArray(roh.kampagnen)
+    ? roh.kampagnen.filter((g) => g && typeof g.id === 'string' && g.id)
+    : [];
+  let aktiveKampagneId = typeof roh.aktiveKampagneId === 'string' ? roh.aktiveKampagneId : null;
+  if (aktiveKampagneId && !kampagnen.some((g) => g.id === aktiveKampagneId)) {
+    aktiveKampagneId = kampagnen[0] ? kampagnen[0].id : null;
+  }
+  const mitgliedWahl =
+    roh.mitgliedWahlProKampagne && typeof roh.mitgliedWahlProKampagne === 'object'
+      ? roh.mitgliedWahlProKampagne
+      : {};
+  return {
+    version: 1,
+    kampagnen,
+    aktiveKampagneId,
+    mitgliedWahlProKampagne: mitgliedWahl,
+    gruppen: kampagnen,
+    aktiveGruppeId: aktiveKampagneId,
+    mitgliedWahlProGruppe: mitgliedWahl,
+  };
+}
+
+function ladeSpielleitungZustand() {
+  const roh = leseSpielleitungZustandRoh();
+  if (!roh) {
+    return {
+      version: 1,
+      kampagnen: [],
+      aktiveKampagneId: null,
+      mitgliedWahlProKampagne: {},
+      gruppen: [],
+      aktiveGruppeId: null,
+      mitgliedWahlProGruppe: {},
+    };
+  }
+  if (htbahSpeicherBulkModusTiefe > 0) {
+    return ladeSpielleitungZustandLeichtAusRoh(roh);
   }
   const kampagnen = Array.isArray(roh.kampagnen)
     ? roh.kampagnen.map(normalisiereSpielleitungKampagne).filter(Boolean)
@@ -473,12 +556,151 @@ function ladeSpielleitungZustand() {
   };
 }
 
+let htbahKampagneDatenEventUnterdrueckungTiefe = 0;
+let htbahSpeicherBulkModusTiefe = 0;
+let htbahFortschrittAktiv = false;
+const htbahKampagneDatenEventQueue = [];
+
+const SAH =
+  window.HTBAH_SHARED && window.HTBAH_SHARED.SpeicherAufgabeHilfen
+    ? window.HTBAH_SHARED.SpeicherAufgabeHilfen
+    : null;
+
+const HTBAH_DIAG_LOG = window.HTBAH_DIAG || null;
+
+function htbahDiagLog(bereich, phase, details) {
+  if (HTBAH_DIAG_LOG && typeof HTBAH_DIAG_LOG.log === 'function') {
+    HTBAH_DIAG_LOG.log(bereich, phase, details);
+  }
+}
+
+function htbahYieldAnMainThread() {
+  if (SAH && typeof SAH.yieldAnMainThread === 'function') {
+    return SAH.yieldAnMainThread();
+  }
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+function htbahEnqueueKampagneDatenGeaendert(detail) {
+  if (!detail || typeof detail !== 'object') {
+    return;
+  }
+  htbahKampagneDatenEventQueue.push(detail);
+  htbahDiagLog('events', 'enqueue', detail);
+}
+
+function htbahFlushKampagneDatenEvents() {
+  if (!htbahKampagneDatenEventQueue.length) {
+    return;
+  }
+  const queue = htbahKampagneDatenEventQueue.splice(0);
+  htbahDiagLog('events', 'flush-sync', queue.length);
+  queue.forEach((detail) => {
+    try {
+      window.dispatchEvent(new CustomEvent('htbah:kampagne-daten-geaendert', { detail }));
+    } catch {
+      /* ignorieren */
+    }
+  });
+}
+
+async function htbahFlushKampagneDatenEventsAsync() {
+  if (!htbahKampagneDatenEventQueue.length) {
+    return;
+  }
+  const queue = htbahKampagneDatenEventQueue.splice(0);
+  htbahDiagLog('events', 'flush-async-start', queue.length);
+  for (let i = 0; i < queue.length; i += 1) {
+    const detail = queue[i];
+    await htbahYieldAnMainThread();
+    try {
+      htbahDiagLog('events', 'dispatch', detail);
+      window.dispatchEvent(new CustomEvent('htbah:kampagne-daten-geaendert', { detail }));
+    } catch {
+      /* ignorieren */
+    }
+  }
+  htbahDiagLog('events', 'flush-async-fertig');
+}
+
 function htbahDispatchKampagneDatenGeaendert(detail) {
+  if (htbahFortschrittAktiv || htbahKampagneDatenEventUnterdrueckungTiefe > 0) {
+    htbahEnqueueKampagneDatenGeaendert(detail);
+    return;
+  }
   try {
+    htbahDiagLog('events', 'dispatch', detail);
     window.dispatchEvent(new CustomEvent('htbah:kampagne-daten-geaendert', { detail }));
   } catch {
     /* ignorieren */
   }
+}
+
+function htbahBulkSpeicherModusBeendet() {
+  if (htbahKampagneDatenEventUnterdrueckungTiefe === 0 && !htbahFortschrittAktiv) {
+    htbahFlushKampagneDatenEvents();
+  }
+}
+
+function htbahMitUnterdruecktenKampagneDatenEvents(fn) {
+  htbahKampagneDatenEventUnterdrueckungTiefe += 1;
+  try {
+    return fn();
+  } finally {
+    htbahKampagneDatenEventUnterdrueckungTiefe -= 1;
+  }
+}
+
+/** Unterdrückt Events und vermeidet teure Voll-Normalisierung bei jedem Speicher-Lesen. */
+function htbahMitBulkSpeicherModus(fn) {
+  htbahKampagneDatenEventUnterdrueckungTiefe += 1;
+  htbahSpeicherBulkModusTiefe += 1;
+  try {
+    return fn();
+  } finally {
+    htbahSpeicherBulkModusTiefe -= 1;
+    htbahKampagneDatenEventUnterdrueckungTiefe -= 1;
+    htbahBulkSpeicherModusBeendet();
+  }
+}
+
+async function htbahMitBulkSpeicherModusAsync(fn) {
+  htbahKampagneDatenEventUnterdrueckungTiefe += 1;
+  htbahSpeicherBulkModusTiefe += 1;
+  try {
+    return await fn();
+  } finally {
+    htbahSpeicherBulkModusTiefe -= 1;
+    htbahKampagneDatenEventUnterdrueckungTiefe -= 1;
+    htbahBulkSpeicherModusBeendet();
+  }
+}
+
+function speichereSpielleitungRoh(roh) {
+  if (!roh || typeof roh !== 'object') {
+    return false;
+  }
+  return htbahSpeicher.schreibeJson(SPEICHER_KEY_SPIELLEITUNG, roh);
+}
+
+function listeSpeicherKeysMitPraefix(praefix) {
+  if (typeof praefix !== 'string' || !praefix) {
+    return [];
+  }
+  const keys = [];
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(praefix)) {
+        keys.push(key);
+      }
+    }
+  } catch {
+    /* ignorieren */
+  }
+  return keys;
 }
 
 function speichereSpielleitungZustand(zustand) {
@@ -1206,28 +1428,192 @@ function loescheSpielleitungKampagneKomplett(kampagneId) {
   if (!gid) {
     return { ok: false, grund: 'Keine Kampagne.' };
   }
-  const zustand = ladeSpielleitungZustand();
-  const kampagnen = Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
+  return htbahMitBulkSpeicherModus(() => loescheSpielleitungKampagneKomplettIntern(gid));
+}
+
+function loescheSpielleitungKampagneKomplettIntern(gid, opts) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const eventsMelden = o.eventsMelden !== false;
+  const roh = leseSpielleitungZustandRoh();
+  const kampagnen = roh && Array.isArray(roh.kampagnen) ? roh.kampagnen : [];
   if (!kampagnen.some((k) => k && k.id === gid)) {
-    return { ok: false, grund: 'Kampagne nicht gefunden.' };
+    return { ok: false, grund: 'Kampagne nicht gefunden.', aktivKampagneId: null };
   }
   loescheZufallstabellenUndWeltenbauFuerKampagne(gid);
-  htbahDispatchKampagneDatenGeaendert({ art: 'zufallstabellen', kampagneId: gid });
-  htbahDispatchKampagneDatenGeaendert({ art: 'weltenbau', kampagneId: gid });
-  zustand.kampagnen = kampagnen.filter((x) => !x || x.id !== gid);
-  if (!zustand.mitgliedWahlProKampagne || typeof zustand.mitgliedWahlProKampagne !== 'object') {
-    zustand.mitgliedWahlProKampagne = {};
+  roh.kampagnen = kampagnen.filter((x) => !x || x.id !== gid);
+  if (!roh.mitgliedWahlProKampagne || typeof roh.mitgliedWahlProKampagne !== 'object') {
+    roh.mitgliedWahlProKampagne = {};
   }
-  delete zustand.mitgliedWahlProKampagne[gid];
-  if (zustand.aktiveKampagneId === gid) {
-    zustand.aktiveKampagneId = zustand.kampagnen[0] ? zustand.kampagnen[0].id : null;
+  delete roh.mitgliedWahlProKampagne[gid];
+  if (roh.aktiveKampagneId === gid) {
+    const erste = roh.kampagnen.find((k) => k && k.id);
+    roh.aktiveKampagneId = erste ? erste.id : null;
   }
-  speichereSpielleitungZustand(zustand);
+  speichereSpielleitungRoh(roh);
   const fabSpeicher = window.HTBAH_FLOATING_FAB_SPEICHER;
   if (fabSpeicher && typeof fabSpeicher.entferneKampagne === 'function') {
     fabSpeicher.entferneKampagne(gid);
   }
-  return { ok: true };
+  const aktiv =
+    typeof roh.aktiveKampagneId === 'string' && roh.aktiveKampagneId.trim()
+      ? roh.aktiveKampagneId.trim()
+      : null;
+  if (eventsMelden) {
+    htbahDispatchKampagneDatenGeaendert({ art: 'zufallstabellen', kampagneId: gid });
+    htbahDispatchKampagneDatenGeaendert({ art: 'weltenbau', kampagneId: gid });
+    htbahDispatchKampagneDatenGeaendert({ art: 'spielleitung', kampagneId: aktiv });
+  }
+  return { ok: true, aktivKampagneId: aktiv };
+}
+
+async function loescheSpielleitungKampagneKomplettAsync(kampagneId, report) {
+  const gid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!gid) {
+    return { ok: false, grund: 'Keine Kampagne.' };
+  }
+  htbahDiagLog('loeschen', 'kampagne-start', gid);
+  return htbahMitBulkSpeicherModusAsync(async () => {
+    const schritte = [
+      {
+        label: 'Zufallstabellen und Weltenbau werden entfernt …',
+        fn: async () => {
+          loescheZufallstabellenUndWeltenbauFuerKampagne(gid);
+        },
+      },
+      {
+        label: 'Kampagne wird aus der Liste entfernt …',
+        fn: async () => {
+          const roh = leseSpielleitungZustandRoh();
+          const kampagnen = roh && Array.isArray(roh.kampagnen) ? roh.kampagnen : [];
+          if (!kampagnen.some((k) => k && k.id === gid)) {
+            throw new Error('Kampagne nicht gefunden.');
+          }
+          roh.kampagnen = kampagnen.filter((x) => !x || x.id !== gid);
+          if (!roh.mitgliedWahlProKampagne || typeof roh.mitgliedWahlProKampagne !== 'object') {
+            roh.mitgliedWahlProKampagne = {};
+          }
+          delete roh.mitgliedWahlProKampagne[gid];
+          if (roh.aktiveKampagneId === gid) {
+            const erste = roh.kampagnen.find((k) => k && k.id);
+            roh.aktiveKampagneId = erste ? erste.id : null;
+          }
+          speichereSpielleitungRoh(roh);
+        },
+      },
+      {
+        label: 'Floating Buttons werden bereinigt …',
+        fn: async () => {
+          const fabSpeicher = window.HTBAH_FLOATING_FAB_SPEICHER;
+          if (fabSpeicher && typeof fabSpeicher.entferneKampagne === 'function') {
+            fabSpeicher.entferneKampagne(gid);
+          }
+        },
+      },
+    ];
+    try {
+      if (SAH && typeof SAH.fuehreSchritteMitFortschrittAus === 'function') {
+        await SAH.fuehreSchritteMitFortschrittAus(schritte, report);
+      } else {
+        for (const schritt of schritte) {
+          await htbahYieldAnMainThread();
+          await schritt.fn();
+          if (typeof report === 'function') {
+            report({ prozent: 50, text: schritt.label });
+          }
+        }
+      }
+      if (typeof report === 'function') {
+      report({ prozent: 100, text: 'Kampagne gelöscht.' });
+    }
+    await htbahYieldAnMainThread();
+    htbahDiagLog('loeschen', 'kampagne-fertig', gid);
+    return { ok: true };
+    } catch (err) {
+      htbahDiagLog('loeschen', 'kampagne-fehler', err && err.message ? err.message : err);
+      if (typeof report === 'function') {
+        report({
+          prozent: 0,
+          text: err && err.message ? err.message : 'Löschen fehlgeschlagen.',
+        });
+      }
+      return { ok: false, grund: err && err.message ? err.message : 'Löschen fehlgeschlagen.' };
+    }
+  });
+}
+
+const ALLE_LOKALEN_APP_SPEICHER_KEYS = [
+  'htbah_app_rolle',
+  'htbah_active_character_id',
+  'htbah_characters',
+  'htbah_character',
+  'htbah_character_image',
+  'htbah_presets',
+  'htbah_theme',
+  'htbah_spielleitung_kampagnen',
+  'htbah_kampagnen_labels_katalog',
+  'htbah_zufallstabellen',
+  'htbah_weltenbau',
+  'htbah_wuerfel_audio',
+  'htbah_wuerfel_sound',
+  'htbah_zeitmessung_einstellungen',
+  'htbah_zeitmessung_badge_pos',
+  'htbah_abenteuerbuch_einstellungen',
+  'htbah_dice_colors',
+  'htbah_wuerfel_beutel_fenster',
+  'htbah_konflikt_fenster',
+  'htbah_offene_modals',
+  'htbah_floating_fab_pos',
+  'htbah_wuerfelbecher_bundle',
+  'htbah_orientation_mode',
+  'htbah_orientation_anchor_angle',
+  'htbah_interaktive_welt_stats_anzeigen',
+  'verstanden_am',
+  'entwicklungshinweis_verstanden_am',
+];
+
+async function loescheAlleLokalenAppDatenAsync(report) {
+  htbahDiagLog('loeschen', 'alles-start');
+  return htbahMitBulkSpeicherModusAsync(async () => {
+    if (typeof report === 'function') {
+      report({ prozent: 0, text: 'Speicher-Einträge werden gesammelt …' });
+    }
+    await htbahYieldAnMainThread();
+    const keySet = new Set(ALLE_LOKALEN_APP_SPEICHER_KEYS);
+    listeSpeicherKeysMitPraefix(HTBAH_SPEICHER_KEYS.zufallstabellenProKampagnePraefix).forEach((k) =>
+      keySet.add(k),
+    );
+    listeSpeicherKeysMitPraefix(HTBAH_SPEICHER_KEYS.weltenbauProKampagnePraefix).forEach((k) =>
+      keySet.add(k),
+    );
+    const keys = [...keySet];
+    if (SAH && typeof SAH.loescheKeysMitFortschritt === 'function') {
+      await SAH.loescheKeysMitFortschritt(keys, report, {
+        paketGroesse: 2,
+        label: 'Lokale App-Daten',
+        maxProzent: 85,
+        abschlussMelden: false,
+      });
+    } else {
+      keys.forEach((k) => htbahSpeicher.loescheKey(k));
+      if (typeof report === 'function') {
+        report({ prozent: 85, text: 'Lokale App-Daten gelöscht.' });
+      }
+    }
+    if (typeof report === 'function') {
+      report({ prozent: 90, text: 'Modale und Floating Buttons werden zurückgesetzt …' });
+    }
+    await htbahYieldAnMainThread();
+    if (window.HTBAH && typeof window.HTBAH.loescheOffeneModalsSpeicher === 'function') {
+      window.HTBAH.loescheOffeneModalsSpeicher();
+    }
+    loescheFloatingFabSpeicherKomplett();
+    if (typeof report === 'function') {
+      report({ prozent: 100, text: 'Alle lokalen Daten wurden gelöscht.' });
+    }
+    await htbahYieldAnMainThread();
+    htbahDiagLog('loeschen', 'alles-fertig');
+    return { ok: true, appDatenGeleert: true };
+  });
 }
 
 function loescheFloatingFabSpeicherKomplett() {
@@ -3439,6 +3825,748 @@ function zstDuplizierMergeWeltenbauKarteile(wbQuelle, wbZiel, feld, idMaps) {
   return zielRoot;
 }
 
+const BEISPIEL_ZTF_KAT_ZU_DUPLIZIER_TYP = Object.freeze({
+  orte: 'ort',
+  fraktionen: 'fraktion',
+  npcs: 'npc',
+  gegenstaende: 'gegenstand',
+  raetsel: 'raetsel',
+  bestien: 'bestie',
+  pantheon: 'pantheon',
+});
+
+/** Eindeutiger Kampagnenname für Beispiel-Import: Basisname ohne Suffix, ab #2 nur bei Namenskollision. */
+function beispielNaechsterKampagnenInstanzName(basisName) {
+  const basis =
+    typeof basisName === 'string' && basisName.trim() ? basisName.trim() : 'Demo-Kampagne';
+  const kampagnen = ladeSpielleitungKampagnenUebersichtListe();
+  const basisNorm = normalisiereKampagnenNameVergleich(basis);
+  let maxNum = 0;
+  kampagnen.forEach((k) => {
+    if (!k || typeof k.name !== 'string') {
+      return;
+    }
+    const nameNorm = normalisiereKampagnenNameVergleich(k.name);
+    if (nameNorm === basisNorm) {
+      maxNum = Math.max(maxNum, 1);
+      return;
+    }
+    const praefix = `${basisNorm} #`;
+    if (!nameNorm.startsWith(praefix)) {
+      return;
+    }
+    const nr = parseInt(nameNorm.slice(praefix.length).trim(), 10);
+    if (Number.isFinite(nr) && nr > 0) {
+      maxNum = Math.max(maxNum, nr);
+    }
+  });
+  if (maxNum === 0) {
+    return basis;
+  }
+  return `${basis} #${maxNum + 1}`;
+}
+
+function beispielSammleEntityIdMapsAusPaketDaten(daten) {
+  const idMaps = zstDuplizierLeeresIdMaps();
+  (Array.isArray(daten) ? daten : []).forEach((bereich) => {
+    if (!bereich || typeof bereich.key !== 'string' || !bereich.vorhanden || typeof bereich.wert !== 'string') {
+      return;
+    }
+    const meta = parseLsExportKeyMetaBeispiel(bereich.key);
+    if (!meta || meta.lsTyp !== 'ztf_kategorie') {
+      return;
+    }
+    const typ = BEISPIEL_ZTF_KAT_ZU_DUPLIZIER_TYP[meta.kategorie];
+    if (!typ) {
+      return;
+    }
+    let p = null;
+    try {
+      p = JSON.parse(bereich.wert);
+    } catch {
+      return;
+    }
+    (Array.isArray(p.zeilen) ? p.zeilen : []).forEach((z) => {
+      if (!z || typeof z.id !== 'string' || !z.id || idMaps[typ][z.id]) {
+        return;
+      }
+      idMaps[typ][z.id] = neueEntropieId();
+    });
+  });
+  return idMaps;
+}
+
+function beispielRemapEntityLinksInText(text, idMaps) {
+  if (typeof text !== 'string' || !text) {
+    return text;
+  }
+  let out = text;
+  const praefixe = ['https://htbah.local/entity/', 'htbah://entity/'];
+  Object.keys(idMaps).forEach((typ) => {
+    const map = idMaps[typ];
+    if (!map) {
+      return;
+    }
+    Object.entries(map).forEach(([altId, neuId]) => {
+      praefixe.forEach((prefix) => {
+        const altUrl = `${prefix}${encodeURIComponent(typ)}/${encodeURIComponent(altId)}`;
+        const neuUrl = `${prefix}${encodeURIComponent(typ)}/${encodeURIComponent(neuId)}`;
+        out = out.split(altUrl).join(neuUrl);
+        const altPlain = `${prefix}${typ}/${altId}`;
+        const neuPlain = `${prefix}${typ}/${neuId}`;
+        out = out.split(altPlain).join(neuPlain);
+      });
+    });
+  });
+  return out;
+}
+
+function beispielRemapZeileHtmlFelder(zeile, idMaps) {
+  if (!zeile || typeof zeile !== 'object') {
+    return;
+  }
+  ['notizenHtml', 'beschreibungHtml', 'text', 'hinweisHtml'].forEach((feld) => {
+    if (typeof zeile[feld] === 'string' && zeile[feld]) {
+      zeile[feld] = beispielRemapEntityLinksInText(zeile[feld], idMaps);
+    }
+  });
+}
+
+function beispielBaueZustandAusPaketZtfKategorien(daten, quellKid, idMaps) {
+  const zustand = {
+    orte: [],
+    fraktionen: [],
+    npcs: [],
+    gegenstaende: [],
+    raetsel: [],
+    bestien: [],
+    pantheon: [],
+  };
+  (Array.isArray(daten) ? daten : []).forEach((bereich) => {
+    const meta = parseLsExportKeyMetaBeispiel(bereich && bereich.key);
+    if (!meta || meta.lsTyp !== 'ztf_kategorie' || meta.kampagneId !== quellKid) {
+      return;
+    }
+    const typ = BEISPIEL_ZTF_KAT_ZU_DUPLIZIER_TYP[meta.kategorie];
+    const listeKey = typ && ZST_DUPLIZIER_TYP_ZU_LISTE[typ];
+    if (!listeKey) {
+      return;
+    }
+    let p = null;
+    try {
+      p = JSON.parse(bereich.wert);
+    } catch {
+      return;
+    }
+    (Array.isArray(p.zeilen) ? p.zeilen : []).forEach((z) => {
+      if (!z || typeof z.id !== 'string' || !z.id) {
+        return;
+      }
+      const neuZeilenId = idMaps[typ] && idMaps[typ][z.id] ? idMaps[typ][z.id] : neueEntropieId();
+      const copy = JSON.parse(JSON.stringify(z));
+      copy.id = neuZeilenId;
+      beispielRemapZeileHtmlFelder(copy, idMaps);
+      zustand[listeKey].push(copy);
+    });
+  });
+  zstDuplizierAktualisiereParentReferenzen(zustand, idMaps);
+  Object.values(zustand).forEach((liste) => {
+    if (!Array.isArray(liste)) {
+      return;
+    }
+    liste.forEach((z) => beispielRemapZeileHtmlFelder(z, idMaps));
+  });
+  return zustand;
+}
+
+function beispielRemapWeltenbauBereichDaten(daten, idMaps) {
+  if (!daten || typeof daten !== 'object') {
+    return daten;
+  }
+  const out = JSON.parse(JSON.stringify(daten));
+  ['mapLayouts', 'mapBildLayouts', 'mapElementLocks'].forEach((feld) => {
+    const root = out[feld];
+    if (!root || typeof root !== 'object') {
+      return;
+    }
+    const neuRoot = {};
+    Object.keys(root).forEach((gruppeKey) => {
+      const layer = root[gruppeKey];
+      if (!layer || typeof layer !== 'object') {
+        return;
+      }
+      const neuLayer = {};
+      Object.entries(layer).forEach(([layoutKey, val]) => {
+        const nk = zstDuplizierMapLayoutKey(layoutKey, idMaps) || layoutKey;
+        neuLayer[nk] = val;
+      });
+      neuRoot[gruppeKey] = neuLayer;
+    });
+    out[feld] = neuRoot;
+  });
+  return out;
+}
+
+function beispielRemapAbenteuerbuchPaket(p, idMaps) {
+  if (!p || typeof p !== 'object') {
+    return;
+  }
+  if (typeof p.abenteuerbuchHtml === 'string') {
+    p.abenteuerbuchHtml = beispielRemapEntityLinksInText(p.abenteuerbuchHtml, idMaps);
+  }
+  if (p.abenteuerbuch && Array.isArray(p.abenteuerbuch.reiter)) {
+    p.abenteuerbuch.reiter.forEach((r) => {
+      if (r && typeof r.html === 'string') {
+        r.html = beispielRemapEntityLinksInText(r.html, idMaps);
+      }
+    });
+  }
+}
+
+function beispielRemapZtfZustandObjekt(roh, idMaps) {
+  if (!roh || typeof roh !== 'object') {
+    return roh;
+  }
+  const zustand = JSON.parse(JSON.stringify(roh));
+  Object.entries(BEISPIEL_ZTF_KAT_ZU_DUPLIZIER_TYP).forEach(([kat, typ]) => {
+    const listeKey = ZST_DUPLIZIER_TYP_ZU_LISTE[typ];
+    if (!listeKey || !Array.isArray(zustand[listeKey])) {
+      return;
+    }
+    zustand[listeKey] = zustand[listeKey].map((z) => {
+      if (!z || typeof z.id !== 'string' || !z.id) {
+        return z;
+      }
+      const copy = JSON.parse(JSON.stringify(z));
+      if (idMaps[typ] && idMaps[typ][z.id]) {
+        copy.id = idMaps[typ][z.id];
+      }
+      beispielRemapZeileHtmlFelder(copy, idMaps);
+      return copy;
+    });
+  });
+  zstDuplizierAktualisiereParentReferenzen(zustand, idMaps);
+  Object.values(zustand).forEach((liste) => {
+    if (!Array.isArray(liste)) {
+      return;
+    }
+    liste.forEach((z) => beispielRemapZeileHtmlFelder(z, idMaps));
+  });
+  return zustand;
+}
+
+function beispielParsePaketBereichWert(bereich) {
+  if (!bereich || !bereich.vorhanden || typeof bereich.wert !== 'string') {
+    return null;
+  }
+  try {
+    const p = JSON.parse(bereich.wert);
+    return p && typeof p === 'object' ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Legt aus einem Beispiel-Paket eine neue Kampagnen-Instanz an (eigene ID, Name mit #N).
+ * Importiert Inhalte direkt in die neue Kampagne — ohne vollständiges Paket-Klonen.
+ */
+function wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAn(paket) {
+  const ergebnis = {
+    kampagneId: '',
+    kampagneStatus: 'neu',
+    zufallNeu: 0,
+    zufallVorhanden: 0,
+    kampagneName: '',
+    warKopie: true,
+  };
+  if (!paket || paket.typ !== 'lokaler-speicher' || !Array.isArray(paket.daten)) {
+    return ergebnis;
+  }
+
+  const importErgebnis = htbahMitBulkSpeicherModus(() => {
+  const quellIds = [...kampagneIdsAusLokalerSpeicherPaket(paket)];
+  const altKid = quellIds[0] || '';
+  if (!altKid) {
+    return wendeBeispielLokalerSpeicherPaketAdditivAn(paket);
+  }
+
+  const neuKid = neueEntropieId();
+  const basisName = beispielKampagneNameAusPaket(paket, altKid);
+  const neuerName = beispielNaechsterKampagnenInstanzName(basisName);
+  const daten = paket.daten;
+  const idMaps = beispielSammleEntityIdMapsAusPaketDaten(daten);
+  const ztfZustand = beispielBaueZustandAusPaketZtfKategorien(daten, altKid, idMaps);
+
+  const teilBereich = daten.find((bereich) => {
+    const meta = parseLsExportKeyMetaBeispiel(bereich && bereich.key);
+    return (
+      meta &&
+      meta.kampagneId === altKid &&
+      (meta.lsTyp === 'spielleitung_teil' || meta.lsTyp === 'spielleitung_ohne_gruppe')
+    );
+  });
+  const teilPaket = beispielParsePaketBereichWert(teilBereich);
+  if (teilPaket) {
+    if (teilPaket.kampagne && typeof teilPaket.kampagne === 'object') {
+      teilPaket.kampagne = {
+        ...teilPaket.kampagne,
+        id: neuKid,
+        name: neuerName,
+        mitglieder: [],
+      };
+    }
+    teilPaket.kampagneId = neuKid;
+    const sicher = sicherstelleSpielleitungKampagneFuerBeispielImport(neuKid, {
+      name: neuerName,
+      kampagneRoh: teilPaket.kampagne,
+    });
+    if (!sicher.ok) {
+      throw new Error(sicher.fehler || 'Kampagne konnte nicht angelegt werden.');
+    }
+    importiereSpielleitungKampagneTeilPaket(neuKid, teilPaket);
+  } else {
+    const sicher = sicherstelleSpielleitungKampagneFuerBeispielImport(neuKid, { name: neuerName });
+    if (!sicher.ok) {
+      throw new Error(sicher.fehler || 'Kampagne konnte nicht angelegt werden.');
+    }
+  }
+
+  const ztfLeer = ladeZufallstabellenZustand(neuKid);
+  Object.keys(ztfZustand).forEach((kat) => {
+    const liste = ztfZustand[kat];
+    if (!Array.isArray(liste) || !liste.length) {
+      return;
+    }
+    ztfLeer[kat] = liste;
+    ergebnis.zufallNeu += liste.length;
+  });
+  speichereZufallstabellenZustand(ztfLeer, neuKid);
+
+  daten.forEach((bereich) => {
+    if (!bereich || !bereich.vorhanden || typeof bereich.wert !== 'string') {
+      return;
+    }
+    const meta = parseLsExportKeyMetaBeispiel(bereich.key);
+    if (!meta || meta.kampagneId !== altKid) {
+      return;
+    }
+    if (
+      meta.lsTyp === 'spielleitung_teil' ||
+      meta.lsTyp === 'spielleitung_ohne_gruppe' ||
+      meta.lsTyp === 'ztf_kategorie' ||
+      meta.lsTyp === 'sl_mitglied'
+    ) {
+      return;
+    }
+
+    const p = beispielParsePaketBereichWert(bereich);
+    if (!p) {
+      return;
+    }
+    p.kampagneId = neuKid;
+
+    if (meta.lsTyp === 'sl_abenteuerbuch') {
+      beispielRemapAbenteuerbuchPaket(p, idMaps);
+      importiereSpielleitungAbenteuerbuchExportPaket(neuKid, p);
+    } else if (meta.lsTyp === 'sl_atmosphaere') {
+      importiereSpielleitungAtmosphaereExportPaket(neuKid, p);
+    } else if (meta.lsTyp === 'sl_zeitmessung') {
+      importiereSpielleitungZeitmessungExportPaket(neuKid, p);
+    } else if (meta.lsTyp === 'wb_bereich' && p.daten) {
+      p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps);
+      importiereWeltenbauBereichPaket(neuKid, p);
+    } else if (meta.lsTyp === 'wb_kampagne' && p.daten) {
+      p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps);
+      importiereWeltenbauKampagnePaket(neuKid, p);
+    } else if (meta.lsTyp === 'ztf_kampagne' && p.daten) {
+      const remapped = beispielRemapZtfZustandObjekt(p.daten, idMaps);
+      importiereZufallstabellenKampagnePaket(neuKid, { ...p, daten: remapped });
+    } else if (meta.lsTyp === 'kampagne_komplett' || meta.lsTyp === 'kampagne_komplett_ohne_gruppe') {
+      p.kampagneId = neuKid;
+      const teil = leseSpielleitungTeilAusExport(p);
+      if (teil && teil.kampagne && typeof teil.kampagne === 'object') {
+        teil.kampagne.id = neuKid;
+        teil.kampagne.name = neuerName;
+        teil.kampagne.mitglieder = [];
+      }
+      if (p.zufallstabellenKampagne && p.zufallstabellenKampagne.daten) {
+        p.zufallstabellenKampagne = {
+          ...p.zufallstabellenKampagne,
+          daten: beispielRemapZtfZustandObjekt(p.zufallstabellenKampagne.daten, idMaps),
+        };
+      }
+      if (p.weltenbauKampagne && p.weltenbauKampagne.daten) {
+        p.weltenbauKampagne = {
+          ...p.weltenbauKampagne,
+          daten: beispielRemapWeltenbauBereichDaten(p.weltenbauKampagne.daten, idMaps),
+        };
+      }
+      importiereKampagneKomplettBackupBundle(neuKid, p);
+    }
+  });
+
+  const zufLegacy = daten.find((d) => d && d.key === 'htbah_zufallstabellen');
+  const zufLegacyPaket = beispielParsePaketBereichWert(zufLegacy);
+  if (zufLegacyPaket && typeof zufLegacyPaket === 'object') {
+    if (
+      zufLegacyPaket.typ === 'htbah-zufallstabellen-pro-kampagne' &&
+      zufLegacyPaket.proKampagne &&
+      zufLegacyPaket.proKampagne[altKid]
+    ) {
+      const remapped = beispielRemapZtfZustandObjekt(zufLegacyPaket.proKampagne[altKid], idMaps);
+      importiereZufallstabellenKampagnePaket(neuKid, {
+        htbahExportVersion: 1,
+        typ: EXPORT_TYP_ZUFALLSTABELLEN_KAMPAGNE,
+        kampagneId: neuKid,
+        daten: remapped,
+      });
+    }
+  }
+
+  const welLegacy = daten.find((d) => d && d.key === 'htbah_weltenbau');
+  const welLegacyPaket = beispielParsePaketBereichWert(welLegacy);
+  if (welLegacyPaket && typeof welLegacyPaket === 'object') {
+    if (
+      welLegacyPaket.typ === 'htbah-weltenbau-pro-kampagne' &&
+      welLegacyPaket.proKampagne &&
+      welLegacyPaket.proKampagne[altKid]
+    ) {
+      const wbDaten = beispielRemapWeltenbauBereichDaten(welLegacyPaket.proKampagne[altKid], idMaps);
+      if (Number(wbDaten.version) === 4) {
+        speichereWeltenbauZustand(wbDaten, neuKid);
+      }
+    }
+  }
+
+  ergebnis.kampagneId = neuKid;
+  ergebnis.kampagneName = neuerName;
+  const rohAktiv = leseSpielleitungZustandRoh();
+  if (rohAktiv) {
+    rohAktiv.aktiveKampagneId = neuKid;
+    speichereSpielleitungRoh(rohAktiv);
+  }
+  return ergebnis;
+  });
+  const finalesErgebnis = importErgebnis || ergebnis;
+  if (finalesErgebnis && finalesErgebnis.kampagneId) {
+    htbahDispatchKampagneDatenGeaendert({
+      art: 'zufallstabellen',
+      kampagneId: finalesErgebnis.kampagneId,
+    });
+    htbahDispatchKampagneDatenGeaendert({ art: 'weltenbau', kampagneId: finalesErgebnis.kampagneId });
+    htbahDispatchKampagneDatenGeaendert({ art: 'spielleitung', kampagneId: finalesErgebnis.kampagneId });
+  }
+  return finalesErgebnis;
+}
+
+function beispielImportBereicheFuerSchritte(daten, altKid) {
+  return (Array.isArray(daten) ? daten : []).filter((bereich) => {
+    if (!bereich || !bereich.vorhanden || typeof bereich.wert !== 'string') {
+      return false;
+    }
+    const meta = parseLsExportKeyMetaBeispiel(bereich.key);
+    if (!meta || meta.kampagneId !== altKid) {
+      return false;
+    }
+    if (
+      meta.lsTyp === 'spielleitung_teil' ||
+      meta.lsTyp === 'spielleitung_ohne_gruppe' ||
+      meta.lsTyp === 'ztf_kategorie' ||
+      meta.lsTyp === 'sl_mitglied'
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function beispielImportierePaketBereich(neuKid, neuerName, bereich, idMaps) {
+  const meta = parseLsExportKeyMetaBeispiel(bereich && bereich.key);
+  if (!meta) {
+    return;
+  }
+  const p = beispielParsePaketBereichWert(bereich);
+  if (!p) {
+    return;
+  }
+  p.kampagneId = neuKid;
+  if (meta.lsTyp === 'sl_abenteuerbuch') {
+    beispielRemapAbenteuerbuchPaket(p, idMaps);
+    importiereSpielleitungAbenteuerbuchExportPaket(neuKid, p);
+  } else if (meta.lsTyp === 'sl_atmosphaere') {
+    importiereSpielleitungAtmosphaereExportPaket(neuKid, p);
+  } else if (meta.lsTyp === 'sl_zeitmessung') {
+    importiereSpielleitungZeitmessungExportPaket(neuKid, p);
+  } else if (meta.lsTyp === 'wb_bereich' && p.daten) {
+    p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps);
+    importiereWeltenbauBereichPaket(neuKid, p);
+  } else if (meta.lsTyp === 'wb_kampagne' && p.daten) {
+    p.daten = beispielRemapWeltenbauBereichDaten(p.daten, idMaps);
+    importiereWeltenbauKampagnePaket(neuKid, p);
+  } else if (meta.lsTyp === 'ztf_kampagne' && p.daten) {
+    const remapped = beispielRemapZtfZustandObjekt(p.daten, idMaps);
+    importiereZufallstabellenKampagnePaket(neuKid, { ...p, daten: remapped });
+  } else if (meta.lsTyp === 'kampagne_komplett' || meta.lsTyp === 'kampagne_komplett_ohne_gruppe') {
+    p.kampagneId = neuKid;
+    const teil = leseSpielleitungTeilAusExport(p);
+    if (teil && teil.kampagne && typeof teil.kampagne === 'object') {
+      teil.kampagne.id = neuKid;
+      teil.kampagne.name = neuerName;
+      teil.kampagne.mitglieder = [];
+    }
+    if (p.zufallstabellenKampagne && p.zufallstabellenKampagne.daten) {
+      p.zufallstabellenKampagne = {
+        ...p.zufallstabellenKampagne,
+        daten: beispielRemapZtfZustandObjekt(p.zufallstabellenKampagne.daten, idMaps),
+      };
+    }
+    if (p.weltenbauKampagne && p.weltenbauKampagne.daten) {
+      p.weltenbauKampagne = {
+        ...p.weltenbauKampagne,
+        daten: beispielRemapWeltenbauBereichDaten(p.weltenbauKampagne.daten, idMaps),
+      };
+    }
+    importiereKampagneKomplettBackupBundle(neuKid, p);
+  }
+}
+
+function beispielImportLegacyDaten(daten, altKid, neuKid, idMaps) {
+  const zufLegacy = daten.find((d) => d && d.key === 'htbah_zufallstabellen');
+  const zufLegacyPaket = beispielParsePaketBereichWert(zufLegacy);
+  if (zufLegacyPaket && typeof zufLegacyPaket === 'object') {
+    if (
+      zufLegacyPaket.typ === 'htbah-zufallstabellen-pro-kampagne' &&
+      zufLegacyPaket.proKampagne &&
+      zufLegacyPaket.proKampagne[altKid]
+    ) {
+      const remapped = beispielRemapZtfZustandObjekt(zufLegacyPaket.proKampagne[altKid], idMaps);
+      importiereZufallstabellenKampagnePaket(neuKid, {
+        htbahExportVersion: 1,
+        typ: EXPORT_TYP_ZUFALLSTABELLEN_KAMPAGNE,
+        kampagneId: neuKid,
+        daten: remapped,
+      });
+    }
+  }
+
+  const welLegacy = daten.find((d) => d && d.key === 'htbah_weltenbau');
+  const welLegacyPaket = beispielParsePaketBereichWert(welLegacy);
+  if (welLegacyPaket && typeof welLegacyPaket === 'object') {
+    if (
+      welLegacyPaket.typ === 'htbah-weltenbau-pro-kampagne' &&
+      welLegacyPaket.proKampagne &&
+      welLegacyPaket.proKampagne[altKid]
+    ) {
+      const wbDaten = beispielRemapWeltenbauBereichDaten(welLegacyPaket.proKampagne[altKid], idMaps);
+      if (Number(wbDaten.version) === 4) {
+        speichereWeltenbauZustand(wbDaten, neuKid);
+      }
+    }
+  }
+}
+
+function beispielImportBereichLabel(meta) {
+  if (!meta || typeof meta.lsTyp !== 'string') {
+    return 'Datenbereich';
+  }
+  const labels = {
+    sl_abenteuerbuch: 'Abenteuerbuch',
+    sl_atmosphaere: 'Atmosphäre',
+    sl_zeitmessung: 'Zeitmessung',
+    wb_bereich: 'Weltenbau-Bereich',
+    wb_kampagne: 'Weltenbau',
+    ztf_kampagne: 'Zufallstabellen',
+    kampagne_komplett: 'Kampagne (komplett)',
+    kampagne_komplett_ohne_gruppe: 'Kampagne (komplett)',
+  };
+  if (meta.lsTyp === 'wb_bereich' && meta.kategorie) {
+    return `Weltenbau: ${meta.kategorie}`;
+  }
+  if (meta.lsTyp === 'ztf_kategorie' && meta.kategorie) {
+    return `Zufallstabellen: ${meta.kategorie}`;
+  }
+  return labels[meta.lsTyp] || meta.lsTyp;
+}
+
+async function wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAsync(paket, report) {
+  const leer = {
+    kampagneId: '',
+    kampagneStatus: 'neu',
+    zufallNeu: 0,
+    zufallVorhanden: 0,
+    kampagneName: '',
+    warKopie: true,
+  };
+  if (!paket || paket.typ !== 'lokaler-speicher' || !Array.isArray(paket.daten)) {
+    return leer;
+  }
+
+  if (HTBAH_DIAG_LOG && typeof HTBAH_DIAG_LOG.mark === 'function') {
+    HTBAH_DIAG_LOG.mark('beispiel-import');
+  }
+  htbahDiagLog('import', 'start');
+
+  const quellIds = [...kampagneIdsAusLokalerSpeicherPaket(paket)];
+  const altKid = quellIds[0] || '';
+  if (!altKid) {
+    htbahDiagLog('import', 'additiv-fallback');
+    const ergebnis = wendeBeispielLokalerSpeicherPaketAdditivAn(paket);
+    if (typeof report === 'function') {
+      report({ prozent: 100, text: 'Import abgeschlossen.' });
+    }
+    return ergebnis;
+  }
+
+  const ergebnis = { ...leer };
+  const neuKid = neueEntropieId();
+  const basisName = beispielKampagneNameAusPaket(paket, altKid);
+  const neuerName = beispielNaechsterKampagnenInstanzName(basisName);
+  const daten = paket.daten;
+  const idMaps = beispielSammleEntityIdMapsAusPaketDaten(daten);
+  const ztfZustand = beispielBaueZustandAusPaketZtfKategorien(daten, altKid, idMaps);
+
+  const teilBereich = daten.find((bereich) => {
+    const meta = parseLsExportKeyMetaBeispiel(bereich && bereich.key);
+    return (
+      meta &&
+      meta.kampagneId === altKid &&
+      (meta.lsTyp === 'spielleitung_teil' || meta.lsTyp === 'spielleitung_ohne_gruppe')
+    );
+  });
+  const teilPaket = beispielParsePaketBereichWert(teilBereich);
+
+  const schritte = [
+    {
+      label: 'Import wird vorbereitet …',
+      fn: async () => {},
+    },
+    {
+      label: 'Kampagne wird angelegt …',
+      fn: async () => {
+        htbahMitBulkSpeicherModus(() => {
+          if (teilPaket) {
+            if (teilPaket.kampagne && typeof teilPaket.kampagne === 'object') {
+              teilPaket.kampagne = {
+                ...teilPaket.kampagne,
+                id: neuKid,
+                name: neuerName,
+                mitglieder: [],
+              };
+            }
+            teilPaket.kampagneId = neuKid;
+            const sicher = sicherstelleSpielleitungKampagneFuerBeispielImport(neuKid, {
+              name: neuerName,
+              kampagneRoh: teilPaket.kampagne,
+            });
+            if (!sicher.ok) {
+              throw new Error(sicher.fehler || 'Kampagne konnte nicht angelegt werden.');
+            }
+            importiereSpielleitungKampagneTeilPaket(neuKid, teilPaket);
+          } else {
+            const sicher = sicherstelleSpielleitungKampagneFuerBeispielImport(neuKid, {
+              name: neuerName,
+            });
+            if (!sicher.ok) {
+              throw new Error(sicher.fehler || 'Kampagne konnte nicht angelegt werden.');
+            }
+          }
+        });
+      },
+    },
+    {
+      label: 'Zufallstabellen werden importiert …',
+      fn: async () => {
+        htbahMitBulkSpeicherModus(() => {
+          const ztfLeer = ladeZufallstabellenZustand(neuKid);
+          Object.keys(ztfZustand).forEach((kat) => {
+            const liste = ztfZustand[kat];
+            if (!Array.isArray(liste) || !liste.length) {
+              return;
+            }
+            ztfLeer[kat] = liste;
+            ergebnis.zufallNeu += liste.length;
+          });
+          speichereZufallstabellenZustand(ztfLeer, neuKid);
+        });
+      },
+    },
+  ];
+
+  beispielImportBereicheFuerSchritte(daten, altKid).forEach((bereich) => {
+    const meta = parseLsExportKeyMetaBeispiel(bereich.key);
+    schritte.push({
+      label: `${beispielImportBereichLabel(meta)} wird importiert …`,
+      fn: async () => {
+        htbahMitBulkSpeicherModus(() => {
+          beispielImportierePaketBereich(neuKid, neuerName, bereich, idMaps);
+        });
+      },
+    });
+  });
+
+  schritte.push(
+    {
+      label: 'Legacy-Daten werden übernommen …',
+      fn: async () => {
+        htbahMitBulkSpeicherModus(() => {
+          beispielImportLegacyDaten(daten, altKid, neuKid, idMaps);
+        });
+      },
+    },
+    {
+      label: 'Kampagne wird aktiviert …',
+      fn: async () => {
+        htbahMitBulkSpeicherModus(() => {
+          ergebnis.kampagneId = neuKid;
+          ergebnis.kampagneName = neuerName;
+          const rohAktiv = leseSpielleitungZustandRoh();
+          if (rohAktiv) {
+            rohAktiv.aktiveKampagneId = neuKid;
+            speichereSpielleitungRoh(rohAktiv);
+          }
+        });
+      },
+    },
+  );
+
+  await htbahMitBulkSpeicherModusAsync(async () => {
+    if (SAH && typeof SAH.fuehreSchritteMitFortschrittAus === 'function') {
+      await SAH.fuehreSchritteMitFortschrittAus(schritte, report);
+    } else {
+      for (const schritt of schritte) {
+        await htbahYieldAnMainThread();
+        await schritt.fn();
+        if (typeof report === 'function') {
+          report({ prozent: 50, text: schritt.label });
+        }
+      }
+    }
+  });
+
+  if (ergebnis.kampagneId) {
+    htbahDispatchKampagneDatenGeaendert({
+      art: 'zufallstabellen',
+      kampagneId: ergebnis.kampagneId,
+    });
+    htbahDispatchKampagneDatenGeaendert({ art: 'weltenbau', kampagneId: ergebnis.kampagneId });
+    htbahDispatchKampagneDatenGeaendert({ art: 'spielleitung', kampagneId: ergebnis.kampagneId });
+  }
+
+  if (typeof report === 'function') {
+    report({
+      prozent: 100,
+      text: ergebnis.kampagneId ? `„${neuerName}“ wurde angelegt.` : 'Import abgeschlossen.',
+    });
+  }
+
+  if (HTBAH_DIAG_LOG && typeof HTBAH_DIAG_LOG.measure === 'function') {
+    HTBAH_DIAG_LOG.measure('beispiel-import');
+  }
+  htbahDiagLog('import', 'fertig', ergebnis.kampagneId);
+  return ergebnis;
+}
+
 function dupliziereZufallstabellenEntitaeten(opts) {
   const o = opts && typeof opts === 'object' ? opts : {};
   const quelle = ermittleKampagneIdFuerKampagnenSpeicher(o.quelleKampagneId);
@@ -4617,6 +5745,8 @@ window.HTBAH = {
   loescheCharakterBild,
   neueEntropieId,
   ladeSpielleitungZustand,
+  ladeSpielleitungZustandLeicht,
+  ladeSpielleitungKampagnenUebersichtListe,
   speichereSpielleitungZustand,
   ladeKampagnenLabelsKatalog,
   speichereKampagnenLabelsKatalog,
@@ -4655,6 +5785,13 @@ window.HTBAH = {
   loescheZufallstabellenListeFuerKampagne,
   loescheWeltenbauBereichFuerKampagne,
   loescheSpielleitungKampagneKomplett,
+  loescheSpielleitungKampagneKomplettAsync,
+  loescheAlleLokalenAppDatenAsync,
+  flushKampagneDatenEvents: htbahFlushKampagneDatenEvents,
+  flushKampagneDatenEventsAsync: htbahFlushKampagneDatenEventsAsync,
+  istSpeicherAktionAktiv() {
+    return htbahFortschrittAktiv;
+  },
   erstelleSpielleitungKampagneTeilExportPaket,
   erstelleSpielleitungKampagneTeilOhneMitgliederExportPaket,
   importiereSpielleitungKampagneTeilPaket,
@@ -4683,6 +5820,8 @@ window.HTBAH = {
   erstelleKampagneKomplettOhneGruppeBackupBundle,
   importiereKampagneKomplettBackupBundle,
   wendeBeispielLokalerSpeicherPaketAdditivAn,
+  wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAn,
+  wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAsync,
   extrahiereKampagneLabelsAusLokalerSpeicherPaket,
   importierePantheonPaketInKampagne,
   ladeKampagnenAtmosphaereZustand,
@@ -4725,6 +5864,7 @@ const uiApi = {
     bestaetigenModal: null,
     hinweisModal: null,
     eingabeModal: null,
+    fortschrittModal: null,
     toastHost: null,
   },
   setRefs(refs) {
@@ -4732,6 +5872,12 @@ const uiApi = {
       ...this._refs,
       ...(refs && typeof refs === 'object' ? refs : {}),
     };
+  },
+  bereinigeModalBackdrop() {
+    const H = window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper;
+    if (H && typeof H.bereinigeBackdrop === 'function') {
+      H.bereinigeBackdrop();
+    }
   },
   confirm({
     titel = 'Bestätigen',
@@ -4755,6 +5901,66 @@ const uiApi = {
         onAbbrechen: () => resolve(false),
       });
     });
+  },
+  async mitFortschritt({ titel = 'Bitte warten …', aufgabe } = {}) {
+    const modal = this._refs.fortschrittModal;
+    const reportLeer = () => {};
+    if (typeof aufgabe !== 'function') {
+      return undefined;
+    }
+    if (!modal || typeof modal.oeffnen !== 'function') {
+      return aufgabe(reportLeer);
+    }
+
+    htbahFortschrittAktiv = true;
+    htbahDiagLog('mitFortschritt', 'start', titel);
+    if (HTBAH_DIAG_LOG && typeof HTBAH_DIAG_LOG.mark === 'function') {
+      HTBAH_DIAG_LOG.mark('mitFortschritt');
+    }
+
+    this.bereinigeModalBackdrop();
+    await htbahYieldAnMainThread();
+    modal.oeffnen({ titel });
+    await htbahYieldAnMainThread();
+
+    let ergebnis;
+    try {
+      const report = (opts) => {
+        if (typeof modal.setzeFortschritt === 'function') {
+          modal.setzeFortschritt({
+            prozent: opts && opts.prozent != null ? opts.prozent : 0,
+            text: opts && opts.text ? opts.text : '',
+          });
+        }
+      };
+      ergebnis = await aufgabe(report);
+      htbahDiagLog('mitFortschritt', 'aufgabe-fertig');
+    } finally {
+      try {
+        if (typeof modal.schliessen === 'function') {
+          const schliessenPromise = modal.schliessen({ minAnzeigeMs: 150 });
+          if (schliessenPromise && typeof schliessenPromise.then === 'function') {
+            await schliessenPromise;
+          }
+        } else if (typeof modal.warteAufGeschlossen === 'function') {
+          await modal.warteAufGeschlossen();
+        }
+        this.bereinigeModalBackdrop();
+        await htbahYieldAnMainThread();
+        await htbahFlushKampagneDatenEventsAsync();
+        htbahFortschrittAktiv = false;
+        if (HTBAH_DIAG_LOG && typeof HTBAH_DIAG_LOG.measure === 'function') {
+          HTBAH_DIAG_LOG.measure('mitFortschritt');
+        }
+        htbahDiagLog('mitFortschritt', 'fertig');
+      } catch (schliessenFehler) {
+        await htbahFlushKampagneDatenEventsAsync();
+        htbahFortschrittAktiv = false;
+        htbahDiagLog('mitFortschritt', 'schliessen-fehler', schliessenFehler);
+        this.bereinigeModalBackdrop();
+      }
+    }
+    return ergebnis;
   },
   alert({
     titel = 'Hinweis',
@@ -5246,6 +6452,7 @@ const app = Vue.createApp({
       bestaetigenModal: this.$refs.globalBestaetigenModal || null,
       hinweisModal: this.$refs.globalHinweisModal || null,
       eingabeModal: this.$refs.globalEingabeModal || null,
+      fortschrittModal: this.$refs.globalFortschrittModal || null,
       toastHost: this.$refs.globalToastHost || null,
     });
     const dispatch = window.HTBAH_SHARED && window.HTBAH_SHARED.EntityOpenDispatch;
@@ -5269,6 +6476,7 @@ const app = Vue.createApp({
     <bestaetigen-modal ref="globalBestaetigenModal" modal-id="htbahGlobalBestaetigenModal" />
     <hinweis-modal ref="globalHinweisModal" />
     <eingabe-modal ref="globalEingabeModal" />
+    <fortschritt-modal ref="globalFortschrittModal" modal-id="htbahGlobalFortschrittModal" />
     <ui-toast-host ref="globalToastHost" />
     <lokaler-speicher-hinweis-modal />
     <entwicklungshinweis-modal />
@@ -5318,6 +6526,7 @@ app.component('modal-minimize-dock', window.HTBAH_KOMPONENTEN.ModalMinimizeDock)
 app.component('bestaetigen-modal', window.HTBAH_KOMPONENTEN.BestaetigenModal);
 app.component('hinweis-modal', window.HTBAH_KOMPONENTEN.HinweisModal);
 app.component('eingabe-modal', window.HTBAH_KOMPONENTEN.EingabeModal);
+app.component('fortschritt-modal', window.HTBAH_KOMPONENTEN.FortschrittModal);
 app.component('ui-toast-host', window.HTBAH_KOMPONENTEN.UiToastHost);
 app.component('lebenspunkte-status-banner', window.HTBAH_KOMPONENTEN.LebenspunkteStatusBanner);
 app.component('icon-text-button', window.HTBAH_KOMPONENTEN.IconTextButton);

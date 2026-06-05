@@ -300,7 +300,7 @@ window.HTBAH_KOMPONENTEN.EntityKartenIconModal = {
         tabindex="-1"
         aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered htbah-entity-karten-icon-modal-dialog">
-          <div class="modal-content shadow htbah-entity-karten-icon-modal-content">
+          <div class="modal-content shadow-lg htbah-entity-karten-icon-modal-content">
             <div class="modal-header py-2">
               <h5 class="modal-title mb-0">Karten-Icon festlegen</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>

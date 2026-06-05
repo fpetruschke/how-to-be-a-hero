@@ -141,17 +141,18 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenKompaktPanel = {
       <p v-if="zeigeUeberschrift" class="form-label small text-secondary mb-1">
         Fähigkeiten &amp; Begabungen
       </p>
-      <div class="row g-2">
+      <div class="htbah-faehigkeit-kat-spalten">
+        <div class="htbah-faehigkeit-kat-spalten-inner">
         <div
           v-for="kategorie in kategorien"
           :key="'iw-kompakt-' + kategorie"
-          class="col-12 col-md-4">
+          class="htbah-faehigkeit-kat-spalte">
           <div class="card h-100 htbah-iw-charakter-begabung-karte">
             <div class="card-body py-2 px-2">
               <h6 class="card-title small text-uppercase fw-bold mb-1">
                 {{ kategorieLabel(kategorie) }}
               </h6>
-              <div class="d-flex flex-wrap align-items-center gap-1 mb-2">
+              <div class="d-flex align-items-center gap-1 mb-2 htbah-faehigkeit-kat-zeilen-scroll">
                 <span class="badge rounded-pill faehigkeiten-stat-badge faehigkeiten-stat-badge-begabung">
                   Begabung {{ begabungen[kategorie] }}
                 </span>
@@ -202,6 +203,7 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenKompaktPanel = {
               </p>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

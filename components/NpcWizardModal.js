@@ -184,7 +184,7 @@ window.HTBAH_KOMPONENTEN.NpcWizardModal = {
       :aria-labelledby="modalId + 'Label'"
       aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header py-2">
             <h5 class="modal-title" :id="modalId + 'Label'">🧙 NPC-Wizard</h5>
             <button

@@ -290,7 +290,7 @@ window.HTBAH_KOMPONENTEN.BildCropperModal = {
       aria-hidden="true"
       :class="modalClass">
       <div :class="'modal-dialog modal-dialog-centered modal-dialog-scrollable ' + dialogClass">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title" :id="modalId + 'Label'">{{ titel }}</h5>
             <button

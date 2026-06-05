@@ -135,7 +135,7 @@ window.HTBAH_KOMPONENTEN.EingabeModal = {
       :aria-labelledby="titelLabelId"
       aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title" :id="titelLabelId">{{ titel }}</h5>
             <button

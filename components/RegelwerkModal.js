@@ -192,7 +192,7 @@ window.HTBAH_KOMPONENTEN.RegelwerkModal = {
       <div
         v-show="!minimiert"
         ref="fensterElement"
-        class="regelwerk-modal-window card shadow"
+        class="regelwerk-modal-window card shadow-lg"
         :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
         :style="fensterStil"
         role="dialog"

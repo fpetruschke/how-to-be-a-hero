@@ -312,7 +312,7 @@ window.HTBAH_SEITEN.Startseite = {
         aria-hidden="true"
         @hidden.bs.modal="onPenPaperModalHidden">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title" id="htbahPenPaperModalTitel">Pen &amp; Paper - Einstieg</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>

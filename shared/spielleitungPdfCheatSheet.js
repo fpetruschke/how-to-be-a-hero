@@ -266,11 +266,18 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
           .join('')}</div>`;
       }
     }
-    html += rest
-      .map((karte) =>
-        baueInfoCardHtml(karte.titel, baueKartenInhaltHtml(karte, kontext), s, kontext),
-      )
-      .join('');
+    if (rest.length) {
+      const restHtml = rest
+        .map((karte) =>
+          baueInfoCardHtml(karte.titel, baueKartenInhaltHtml(karte, kontext), s, kontext),
+        )
+        .join('');
+      if (kontext === 'anzeige') {
+        html += `<div class="htbah-cheat-sheet-karten-stapel">${restHtml}</div>`;
+      } else {
+        html += restHtml;
+      }
+    }
     return html;
   }
 

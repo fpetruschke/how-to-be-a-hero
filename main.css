@@ -1685,16 +1685,20 @@ input::placeholder {
 .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeiten-kompakt {
   font-size: 0.78rem;
   max-height: 12rem;
+  overflow-x: auto;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-zeile,
 .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-zeile {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.2rem 0;
+  min-width: max-content;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -1705,10 +1709,8 @@ input::placeholder {
 
 .htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-name,
 .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .htbah-weltenbau-charakter-modal-body .htbah-iw-faehigkeiten-stats .htbah-iw-faehigkeit-werte,
@@ -2004,6 +2006,34 @@ input::placeholder {
   border-color: color-mix(in srgb, var(--primary-color) 50%, transparent);
 }
 
+.htbah-top-nav-vollbild-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.35rem;
+  height: 2.35rem;
+  margin-left: 0.35rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--border-color) 85%, transparent);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--bs-body-bg) 88%, var(--navbar-bg));
+  color: var(--navbar-link);
+  cursor: pointer;
+}
+
+.htbah-top-nav-vollbild-btn .material-symbols-outlined {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.htbah-top-nav-vollbild-btn:hover,
+.htbah-top-nav-vollbild-btn:focus-visible {
+  color: var(--heading-color);
+  border-color: color-mix(in srgb, var(--primary-color) 50%, transparent);
+  background: color-mix(in srgb, var(--primary-color) 14%, var(--bs-body-bg));
+}
+
 /* Platz unter dem scrollbaren Inhalt: gemessene Navbar-Höhe + extra Luft + Home-Indikator (iOS) */
 .content {
   padding-bottom: calc(
@@ -2013,7 +2043,7 @@ input::placeholder {
   );
 }
 
-@media (min-width: 992px) {
+@media (min-width: 768px) {
   html {
     overflow: hidden;
     height: 100dvh;
@@ -2621,28 +2651,41 @@ input::placeholder {
   font-size: 1.25rem;
 }
 
-.regelwerk-modal-window-fullscreen {
+.regelwerk-modal-window.regelwerk-modal-window-fullscreen {
+  position: fixed !important;
   top: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
   left: 0 !important;
   width: 100vw !important;
+  width: 100dvw !important;
   height: 100vh !important;
   height: 100dvh !important;
-  max-width: none;
-  max-height: none;
-  min-width: 0;
-  min-height: 0;
-  margin: 0;
+  max-width: none !important;
+  max-height: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
   padding: 0;
   border-radius: 0;
   border: none;
   resize: none;
+  overflow: hidden !important;
 }
 
-.regelwerk-modal-window-fullscreen .regelwerk-modal-header {
+.regelwerk-modal-window.regelwerk-modal-window-fullscreen .regelwerk-modal-header {
   cursor: default;
   touch-action: auto;
+  flex-shrink: 0;
+}
+
+.regelwerk-modal-window.regelwerk-modal-window-fullscreen > .flex-grow-1,
+.regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-zeichen-modal-canvas-host,
+.regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-musik-iframe-wrap,
+.regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-inventar-modal-body,
+.regelwerk-modal-window.regelwerk-modal-window-fullscreen > .abenteuerbuch-modal-editor-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 @media print {
@@ -2740,6 +2783,38 @@ input::placeholder {
 
 .htbah-cheat-sheet-tabelle {
   font-size: 0.8125rem;
+}
+
+.htbah-cheat-sheet-karten-stapel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (max-width: 767.98px) {
+  .htbah-cheat-sheet-anzeige {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .htbah-cheat-sheet-anzeige-kopf.mb-3 {
+    margin-bottom: 0 !important;
+  }
+
+  .htbah-cheat-sheet-grid-2x2 {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .htbah-cheat-sheet-grid-2x2 .htbah-cheat-sheet-grid-zeile {
+    margin-bottom: 0 !important;
+  }
+
+  .htbah-cheat-sheet-anzeige > p.text-center.mt-3 {
+    margin-top: 0 !important;
+  }
 }
 
 /* Spielleitung: Abenteuerbuch (FAB + Quill im schwebenden Fenster) */
@@ -3129,6 +3204,14 @@ input::placeholder {
 
 .htbah-zeichen-modal-canvas.htbah-zeichen-modal-canvas--auswahl {
   cursor: default;
+}
+
+.htbah-zeichen-modal-canvas.htbah-zeichen-modal-canvas--dreh-handle {
+  cursor: grab;
+}
+
+.htbah-zeichen-modal-canvas.htbah-zeichen-modal-canvas--dreh-zieht {
+  cursor: grabbing;
 }
 
 .htbah-zeichen-modal-canvas.htbah-zeichen-modal-canvas--hand {
@@ -4107,9 +4190,55 @@ input::placeholder {
   min-height: 2.9rem;
 }
 
+.htbah-kampf-zustand-toggle {
+  container-type: inline-size;
+  display: flex;
+  width: 100%;
+}
+
 .htbah-kampf-zustand-toggle .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1 1 0;
   min-width: 0;
+  padding-inline: 0.35rem;
+}
+
+.htbah-kampf-zustand-btn-inhalt {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.htbah-kampf-zustand-btn-ico {
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.htbah-kampf-zustand-btn-text {
+  min-width: 0;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+/* Eng: alle drei Zustände einheitlich Icon oben, Text unten */
+@container (max-width: 20rem) {
+  .htbah-kampf-zustand-btn-inhalt {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .htbah-kampf-zustand-btn-text {
+    white-space: normal;
+    text-align: center;
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
 }
 
 /* Startseite: Hero-Kopf */
@@ -4730,6 +4859,7 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 .htbah-konflikt-partei-card {
   border-width: 2px;
   overflow: hidden;
+  padding: 0;
 }
 
 .htbah-konflikt-partei-card:not(.htbah-konflikt-partei-card--gegner) {
@@ -4738,7 +4868,6 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 
 .htbah-konflikt-partei-card--gegner {
   border-color: color-mix(in srgb, #c2410c 50%, var(--border-color));
-  padding: 0;
 }
 
 .htbah-konflikt-partei-kopf-btn {
@@ -4851,6 +4980,53 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   background: var(--bs-body-bg);
 }
 
+/* Handeln / Wissen / Soziales: Spalten nach Containerbreite stapeln, bei Bedarf horizontal scrollen */
+.htbah-faehigkeit-kat-spalten {
+  container-type: inline-size;
+  container-name: htbah-faehigkeit-kat;
+  min-width: 0;
+}
+
+.htbah-faehigkeit-kat-spalten-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.htbah-faehigkeit-kat-spalte {
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@container htbah-faehigkeit-kat (min-width: 36rem) {
+  .htbah-faehigkeit-kat-spalte {
+    flex: 1 1 calc((100% - 1rem) / 3);
+    max-width: calc((100% - 1rem) / 3);
+  }
+}
+
+.htbah-faehigkeit-kat-zeilen-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  flex-wrap: nowrap;
+}
+
+.htbah-faehigkeit-kat-spalte .faehigkeiten-stat-badges-row {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  align-items: center;
+}
+
+.htbah-faehigkeiten-editor-panel,
+.htbah-iw-faehigkeiten-stats,
+.htbah-konflikt-sl-uebersicht {
+  min-width: 0;
+}
+
 .htbah-konflikt-kat-spalten {
   align-items: stretch;
 }
@@ -4866,6 +5042,17 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   min-height: 2.1rem;
 }
 
+.htbah-konflikt-kat-label {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.htbah-konflikt-kat-badges {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
 .htbah-konflikt-kat-kopf-btn {
   width: 100%;
   border: none;
@@ -4873,6 +5060,9 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   color: inherit;
   text-align: left;
   cursor: pointer;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
 }
 
 .htbah-konflikt-kat-kopf-btn:hover {
@@ -4927,15 +5117,19 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 
 .htbah-konflikt-sl-faehigkeiten {
   max-height: 10rem;
+  overflow-x: auto;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .htbah-konflikt-sl-faehigkeit-zeile {
   display: flex;
+  flex-wrap: nowrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.12rem 0;
+  min-width: max-content;
   border-bottom: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
 }
 
@@ -4944,10 +5138,19 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 }
 
 .htbah-konflikt-sl-faehigkeit-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@container htbah-faehigkeit-kat (max-width: 35.99rem) {
+  .htbah-konflikt-kat-card .faehigkeiten-stat-badge {
+    font-size: 0.72rem;
+    padding: 0.3em 0.5em;
+  }
+
+  .htbah-konflikt-sl-faehigkeiten {
+    max-height: none;
+  }
 }
 
 .htbah-konflikt-sl-dl {

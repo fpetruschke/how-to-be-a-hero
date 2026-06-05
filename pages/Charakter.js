@@ -2151,8 +2151,10 @@ window.HTBAH_SEITEN.Charakter = {
                   :class="charakter.kampfZustand === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
                   :aria-pressed="charakter.kampfZustand === opt.id ? 'true' : 'false'"
                   @click="setzeCharakterKampfZustand(opt.id)">
-                  <span aria-hidden="true">{{ opt.emoji }}</span>
-                  <span class="ms-1">{{ opt.label }}</span>
+                  <span class="htbah-kampf-zustand-btn-inhalt">
+                    <span class="htbah-kampf-zustand-btn-ico" aria-hidden="true">{{ opt.emoji }}</span>
+                    <span class="htbah-kampf-zustand-btn-text">{{ opt.label }}</span>
+                  </span>
                 </button>
               </div>
               <p class="form-text mb-0 mt-1">
@@ -2323,7 +2325,7 @@ window.HTBAH_SEITEN.Charakter = {
         aria-labelledby="charakterImportAuswahlLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title" id="charakterImportAuswahlLabel">
                 Import-Inhalt auswählen
@@ -2374,7 +2376,7 @@ window.HTBAH_SEITEN.Charakter = {
         aria-labelledby="faehigkeitenHilfeLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title" id="faehigkeitenHilfeLabel">
                 Hilfe zu Fähigkeiten
@@ -2420,7 +2422,7 @@ window.HTBAH_SEITEN.Charakter = {
         aria-hidden="true"
         v-on="{ 'hidden.bs.modal': bearbeitungModalGeschlossen }">
         <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title" id="faehigkeitBearbeitenLabel">
                 Fähigkeit bearbeiten

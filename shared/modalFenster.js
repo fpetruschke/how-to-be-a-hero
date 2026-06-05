@@ -84,6 +84,14 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
         y: Math.min(Math.max(0, Math.round(y)), maxY),
       };
     },
+    zentriereFensterObjekt(fenster) {
+      if (!fenster || fenster.istVollbild || fenster.breite == null || fenster.hoehe == null) {
+        return;
+      }
+      const { viewportBreite, viewportHoehe } = window.HTBAH_MODAL_FENSTER.utils.ermittleViewportGroesse();
+      fenster.positionX = Math.max(0, Math.round((viewportBreite - fenster.breite) / 2));
+      fenster.positionY = Math.max(0, Math.round((viewportHoehe - fenster.hoehe) / 2));
+    },
   },
   erstelleBasisDaten() {
     return {
@@ -133,12 +141,7 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
       );
     },
     zentriereFenster() {
-      if (this.istVollbild || this.breite === null || this.hoehe === null) {
-        return;
-      }
-      const { viewportBreite, viewportHoehe } = this.ermittleViewportGroesse();
-      this.positionX = Math.max(0, Math.round((viewportBreite - this.breite) / 2));
-      this.positionY = Math.max(0, Math.round((viewportHoehe - this.hoehe) / 2));
+      window.HTBAH_MODAL_FENSTER.utils.zentriereFensterObjekt(this);
     },
     initialisierePosition() {
       const fenster = this.$refs.fensterElement;
@@ -238,20 +241,82 @@ window.HTBAH_MODAL_FENSTER = window.HTBAH_MODAL_FENSTER || {
       window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebundenDebounced.call(this);
     },
     vollbildUmschalten() {
-      const MF = window.HTBAH_MODAL_FENSTER;
-      const M = MF && MF.methoden;
+      const M = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.methoden;
+      const warVollbild = this.istVollbild;
       this.istVollbild = !this.istVollbild;
-      if (!this.istVollbild) {
+      if (!this.istVollbild && warVollbild) {
         this.$nextTick(() => {
-          this.stelleSichtbaresFensterSicher();
-          this.zentriereFenster();
           if (M) {
-            M.persistiereModalWennGebunden.call(this);
+            M.bereiteNachVollbildBeenden.call(this);
           }
         });
       } else if (M) {
         M.persistiereModalWennGebunden.call(this);
       }
+    },
+    bereiteNachVollbildBeenden() {
+      if (this.istVollbild) {
+        return;
+      }
+      if (this.breite == null || this.hoehe == null) {
+        const fenster = this.$refs && this.$refs.fensterElement;
+        if (fenster) {
+          const groesse = this.begrenzeFensterGroesse(fenster.offsetWidth, fenster.offsetHeight);
+          this.breite = groesse.breite;
+          this.hoehe = groesse.hoehe;
+        }
+      }
+      if (this.breite != null && this.hoehe != null) {
+        const groesse = this.begrenzeFensterGroesse(this.breite, this.hoehe);
+        this.breite = groesse.breite;
+        this.hoehe = groesse.hoehe;
+        this.zentriereFenster();
+        const pos = window.HTBAH_MODAL_FENSTER.utils.begrenzePosition(
+          this.positionX || 0,
+          this.positionY || 0,
+          this.breite,
+          this.hoehe,
+        );
+        this.positionX = pos.x;
+        this.positionY = pos.y;
+      }
+      this.persistiereModalWennGebunden();
+    },
+    bereiteFensterNachVollbildBeenden(fenster, vueKontext, refKey, begrenzeGroesseFn) {
+      const MF = window.HTBAH_MODAL_FENSTER;
+      if (!fenster || fenster.istVollbild || !MF) {
+        return;
+      }
+      const begrenze =
+        typeof begrenzeGroesseFn === 'function'
+          ? begrenzeGroesseFn
+          : (breite, hoehe) => MF.utils.begrenzeGroesse(breite, hoehe);
+      const el =
+        vueKontext && vueKontext.$refs
+          ? vueKontext.$refs[refKey || 'fensterElement']
+          : null;
+      if (fenster.breite == null || fenster.hoehe == null) {
+        if (el) {
+          const groesse = begrenze(el.offsetWidth, el.offsetHeight);
+          fenster.breite = groesse.breite;
+          fenster.hoehe = groesse.hoehe;
+        }
+      }
+      if (fenster.breite == null || fenster.hoehe == null) {
+        return;
+      }
+      const groesse = begrenze(fenster.breite, fenster.hoehe);
+      fenster.breite = groesse.breite;
+      fenster.hoehe = groesse.hoehe;
+      MF.utils.zentriereFensterObjekt(fenster);
+      const pos = MF.utils.begrenzePosition(
+        fenster.positionX || 0,
+        fenster.positionY || 0,
+        fenster.breite,
+        fenster.hoehe,
+      );
+      fenster.positionX = pos.x;
+      fenster.positionY = pos.y;
     },
     stelleSichtbaresFensterSicher() {
       if (this.istVollbild) {

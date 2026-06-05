@@ -1401,11 +1401,22 @@ var HTBAH_REFACTOR_UTILS =
         window.removeEventListener('pointercancel', this.beendeResize);
       },
       vollbildUmschalten() {
+        const M = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.methoden;
+        const warVollbild = this.modal.istVollbild;
         this.modal.istVollbild = !this.modal.istVollbild;
-        if (!this.modal.istVollbild) {
+        if (!this.modal.istVollbild && warVollbild) {
           this.$nextTick(() => {
-            this.stelleSichtbaresFensterSicher();
-            this.initialisierePosition();
+            if (M) {
+              M.bereiteFensterNachVollbildBeenden.call(
+                this,
+                this.modal,
+                this,
+                'fensterElement',
+                (breite, hoehe) => this.begrenzeFensterGroesse(breite, hoehe),
+              );
+            } else {
+              this.stelleSichtbaresFensterSicher();
+            }
           });
         }
         window.HTBAH_MODAL_FENSTER.methoden.persistiereModalWennGebunden.call(this.modal);
@@ -3945,9 +3956,24 @@ var HTBAH_REFACTOR_UTILS =
         window.removeEventListener('pointercancel', this.beendeCharakterResize);
       },
       charakterVollbildUmschalten() {
-        this.charakterModal.fenster.istVollbild = !this.charakterModal.fenster.istVollbild;
-        if (!this.charakterModal.fenster.istVollbild) {
-          this.$nextTick(() => this.stelleSichtbaresCharakterFensterSicher());
+        const M = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.methoden;
+        const fenster = this.charakterModal.fenster;
+        const warVollbild = fenster.istVollbild;
+        fenster.istVollbild = !fenster.istVollbild;
+        if (!fenster.istVollbild && warVollbild) {
+          this.$nextTick(() => {
+            if (M) {
+              M.bereiteFensterNachVollbildBeenden.call(
+                this,
+                fenster,
+                this,
+                'charakterFensterElement',
+                (breite, hoehe) => this.begrenzeCharakterFensterGroesse(breite, hoehe),
+              );
+            } else {
+              this.stelleSichtbaresCharakterFensterSicher();
+            }
+          });
         }
       },
       charakterNotizenHtml() {
@@ -4093,6 +4119,9 @@ var HTBAH_REFACTOR_UTILS =
         }
       },
       onKampagneDatenExternGeaendert(ev) {
+        if (window.HTBAH && typeof window.HTBAH.istSpeicherAktionAktiv === 'function' && window.HTBAH.istSpeicherAktionAktiv()) {
+          return;
+        }
         const d = ev && ev.detail ? ev.detail : {};
         if (d.art === 'spielleitung') {
           if (d.kampagneId && this.gruppeId && d.kampagneId !== this.gruppeId) {
@@ -6974,7 +7003,7 @@ var HTBAH_REFACTOR_UTILS =
         <div
           v-show="!modal.minimiert"
           ref="fensterElement"
-          class="regelwerk-modal-window card shadow htbah-weltenbau-map-window"
+          class="regelwerk-modal-window card shadow-lg htbah-weltenbau-map-window"
           :class="{ 'regelwerk-modal-window-fullscreen': modal.istVollbild }"
           :style="fensterStil">
           <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2 htbah-weltenbau-map-header" @pointerdown="starteZiehen($event)">
@@ -7498,7 +7527,7 @@ var HTBAH_REFACTOR_UTILS =
           </div>
           <div v-if="!modal.istVollbild" class="regelwerk-modal-resize-handle" @pointerdown="starteResize($event)"></div>
         </div>
-        <div v-if="modal.detailsOffen && detail" class="htbah-weltenbau-map-detail card shadow">
+        <div v-if="modal.detailsOffen && detail" class="htbah-weltenbau-map-detail card shadow-lg">
           <div class="card-header d-flex justify-content-between align-items-center py-2">
             <strong>{{ detail.label }}</strong>
             <button type="button" class="btn-close" aria-label="Details schließen" @click="modal.detailsOffen = false"></button>
@@ -7605,7 +7634,7 @@ var HTBAH_REFACTOR_UTILS =
           v-if="medienGalerieModalOffen"
           class="regelwerk-modal-layer"
           @click.self="schliesseMedienGalerieModal">
-          <div class="regelwerk-modal-window card shadow" style="width:min(960px,92vw);max-height:86vh;">
+          <div class="regelwerk-modal-window card shadow-lg" style="width:min(960px,92vw);max-height:86vh;">
             <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2">
               <strong>Bild aus Galerie wählen</strong>
               <button type="button" class="btn-close" aria-label="Schließen" @click="schliesseMedienGalerieModal"></button>
@@ -7640,7 +7669,7 @@ var HTBAH_REFACTOR_UTILS =
         <div
           v-if="charakterModal.offen && charakterModal.charakter"
           ref="charakterFensterElement"
-          class="regelwerk-modal-window card shadow htbah-weltenbau-charakter-modal-window"
+          class="regelwerk-modal-window card shadow-lg htbah-weltenbau-charakter-modal-window"
           :class="{ 'regelwerk-modal-window-fullscreen': charakterModal.fenster.istVollbild }"
           :style="charakterFensterStil">
           <div class="regelwerk-modal-header d-flex justify-content-between align-items-center p-2" @pointerdown="starteCharakterZiehen($event)">
@@ -7792,8 +7821,10 @@ var HTBAH_REFACTOR_UTILS =
                     :class="charakterModal.charakter.kampfZustand === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
                     :aria-pressed="charakterModal.charakter.kampfZustand === opt.id ? 'true' : 'false'"
                     @click="setzeCharakterModalKampfZustand(opt.id)">
-                    <span aria-hidden="true">{{ opt.emoji }}</span>
-                    <span class="ms-1">{{ opt.label }}</span>
+                    <span class="htbah-kampf-zustand-btn-inhalt">
+                      <span class="htbah-kampf-zustand-btn-ico" aria-hidden="true">{{ opt.emoji }}</span>
+                      <span class="htbah-kampf-zustand-btn-text">{{ opt.label }}</span>
+                    </span>
                   </button>
                 </div>
                 <p class="form-text mb-0 mt-1">

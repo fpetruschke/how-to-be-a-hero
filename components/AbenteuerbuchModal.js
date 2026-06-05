@@ -590,7 +590,7 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       <div
         v-show="!minimiert"
         ref="fensterElement"
-        class="regelwerk-modal-window card shadow abenteuerbuch-modal-window"
+        class="regelwerk-modal-window card shadow-lg abenteuerbuch-modal-window"
         :class="{ 'regelwerk-modal-window-fullscreen': istVollbild }"
         :style="fensterStil"
         role="dialog"

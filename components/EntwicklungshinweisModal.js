@@ -93,7 +93,7 @@ window.HTBAH_KOMPONENTEN.EntwicklungshinweisModal = {
       data-bs-backdrop="static"
       data-bs-keyboard="false">
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content shadow border-warning">
+        <div class="modal-content shadow-lg border-warning">
           <div class="modal-header text-bg-warning">
             <h5 class="modal-title d-flex align-items-center gap-2" id="htbahEntwicklungshinweisModalLabel">
               <span class="material-symbols-outlined" aria-hidden="true">construction</span>

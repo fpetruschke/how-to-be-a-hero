@@ -151,7 +151,7 @@ window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
       aria-labelledby="charakterVorlageModalLabel"
       aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title" id="charakterVorlageModalLabel">Charaktervorlage wählen</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>

@@ -184,7 +184,7 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
       aria-hidden="true"
       v-on="{ 'hidden.bs.modal': onModalVerborgen }">
       <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-lg">
           <div class="modal-header">
             <h5 class="modal-title d-flex align-items-center gap-2" :id="modalTitleId">
               <span class="material-symbols-outlined" aria-hidden="true">casino</span>
@@ -228,7 +228,7 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
 
             <icon-text-button
               type="button"
-              class="btn btn-primary btn-lg w-100 htbah-wuerfel-action-btn"
+              class="btn btn-primary btn-lg w-100 htbah-wuerfel-action-btn mb-3"
               icon="casino"
               @click="wuerfeln">
               1W100 würfeln

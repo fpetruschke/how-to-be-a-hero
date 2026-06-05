@@ -341,8 +341,10 @@ window.HTBAH_SEITEN.Einstellungen = {
       kampagneLoeschPayload: null,
       /** Pro Kampagnen-ID: detaillierte Lösch-Buttons sichtbar (Standard: aus = eingeklappt). */
       kampagnenLoeschDetailsSichtbar: {},
-      /** Bereich „Alle Kampagnen / global“: detaillierte Lösch-Buttons (Standard: eingeklappt). */
-      alleKampagnenLoeschDetailsAusgeklappt: false,
+      diagLoggingAktiv:
+        window.HTBAH_DIAG && typeof window.HTBAH_DIAG.istAktiv === 'function'
+          ? window.HTBAH_DIAG.istAktiv()
+          : false,
     };
   },
   computed: {
@@ -642,12 +644,6 @@ window.HTBAH_SEITEN.Einstellungen = {
         [kid]: next,
       };
     },
-    alleKampagnenLoeschDetailsIstOffen() {
-      return Boolean(this.alleKampagnenLoeschDetailsAusgeklappt);
-    },
-    alleKampagnenLoeschDetailsEinAus() {
-      this.alleKampagnenLoeschDetailsAusgeklappt = !this.alleKampagnenLoeschDetailsAusgeklappt;
-    },
     kampagneLoeschdialogTexte(payload) {
       const name = this.kampagneAnzeigeName({ name: payload.kampagneName });
       switch (payload.typ) {
@@ -728,10 +724,12 @@ window.HTBAH_SEITEN.Einstellungen = {
       this.$refs.bestaetigenModal.oeffnen({
         titel: tx.titel,
         beschreibung: tx.beschreibung,
-        onBestaetigen: () => this.fuehreKampagneLoeschAus(),
+        onBestaetigen: () => {
+          void this.fuehreKampagneLoeschAus();
+        },
       });
     },
-    fuehreKampagneLoeschAus() {
+    async fuehreKampagneLoeschAus() {
       const p = this.kampagneLoeschPayload;
       if (!p || !p.kampagneId) {
         return;
@@ -740,7 +738,15 @@ window.HTBAH_SEITEN.Einstellungen = {
       let ok = true;
       switch (p.typ) {
         case 'kampagne_komplett': {
-          const r = window.HTBAH.loescheSpielleitungKampagneKomplett(p.kampagneId);
+          const name =
+            typeof p.kampagneName === 'string' && p.kampagneName.trim()
+              ? p.kampagneName.trim()
+              : 'Kampagne';
+          const r = await window.HTBAH.ui.mitFortschritt({
+            titel: `Kampagne „${name}“ wird gelöscht …`,
+            aufgabe: (report) =>
+              window.HTBAH.loescheSpielleitungKampagneKomplettAsync(p.kampagneId, report),
+          });
           if (!r || !r.ok) {
             ok = false;
             this.statusAnzeigen('Die Kampagne konnte nicht gelöscht werden.', 'danger');
@@ -802,6 +808,10 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
       this.kampagneLoeschPayload = null;
       if (ok) {
+        await this.$nextTick();
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
         this.kampagnenCacheTick += 1;
         this.statusAnzeigen(tx.erfolg, 'success');
       }
@@ -838,6 +848,13 @@ window.HTBAH_SEITEN.Einstellungen = {
     themeUmschalten() {
       const neuesTheme = this.istHellesTheme ? 'light' : 'dark';
       window.HTBAH.setzeTheme(neuesTheme);
+    },
+    speichereDiagLoggingEinstellung() {
+      const DIAG = window.HTBAH_DIAG;
+      if (!DIAG || typeof DIAG.setzeAktiv !== 'function') {
+        return;
+      }
+      DIAG.setzeAktiv(this.diagLoggingAktiv);
     },
     setzeOrientierungModus(modus) {
       if (!window.HTBAH || typeof window.HTBAH.speichereOrientierungModus !== 'function') {
@@ -981,17 +998,38 @@ window.HTBAH_SEITEN.Einstellungen = {
       this.$refs.bestaetigenModal.oeffnen({
         titel: eintrag.titel,
         beschreibung: eintrag.beschreibung,
-        onBestaetigen: () => this.speicherBereichLoeschen(),
+        onBestaetigen: () => {
+          void this.speicherBereichLoeschenAsync();
+        },
       });
     },
-    speicherBereichLoeschen() {
+    async speicherBereichLoeschenAsync() {
       const bereich = SPEICHER_BEREICHE[this.zuLoeschenderBereich];
 
       if (!bereich) {
         return;
       }
 
-      if (this.zuLoeschenderBereich === 'sicherheitsmechanismen') {
+      const DIAG = window.HTBAH_DIAG;
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('Einstellungen', 'loeschen-start', this.zuLoeschenderBereich);
+      }
+
+      if (this.zuLoeschenderBereich === 'alles') {
+        await window.HTBAH.ui.mitFortschritt({
+          titel: 'Alle lokalen Daten werden gelöscht …',
+          aufgabe: (report) => window.HTBAH.loescheAlleLokalenAppDatenAsync(report),
+        });
+        await this.$nextTick();
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
+        try {
+          window.dispatchEvent(new CustomEvent('htbah:app-daten-vollstaendig-geleert'));
+        } catch {
+          /* ignorieren */
+        }
+      } else if (this.zuLoeschenderBereich === 'sicherheitsmechanismen') {
         const sammlung = window.HTBAH.ladeCharakterSammlung();
         const aktiveIdVorher = window.HTBAH.ladeAktivenCharakterId();
         (sammlung.charaktere || []).forEach((eintrag) => {
@@ -1009,28 +1047,23 @@ window.HTBAH_SEITEN.Einstellungen = {
         window.HTBAH.setzeAktivenCharakterId(aktiveIdVorher);
       } else if (Array.isArray(bereich.keys)) {
         window.HTBAH.speicher.loescheKeys(bereich.keys);
-        if (
-          this.zuLoeschenderBereich === 'modaleZustand' ||
-          this.zuLoeschenderBereich === 'alles'
-        ) {
+        if (this.zuLoeschenderBereich === 'modaleZustand') {
           if (typeof window.HTBAH.loescheOffeneModalsSpeicher === 'function') {
             window.HTBAH.loescheOffeneModalsSpeicher();
           }
         }
-        if (this.zuLoeschenderBereich === 'alles') {
-          window.HTBAH.speicher.loescheKeysMitPraefix(
-            window.HTBAH.speicherKeys.zufallstabellenProKampagnePraefix,
-          );
-          window.HTBAH.speicher.loescheKeysMitPraefix(
-            window.HTBAH.speicherKeys.weltenbauProKampagnePraefix,
-          );
-        }
       } else if (this.zuLoeschenderBereich === 'zufallstabellen') {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
         window.HTBAH.speicher.loescheKeysMitPraefix(
           window.HTBAH.speicherKeys.zufallstabellenProKampagnePraefix,
         );
         window.HTBAH.speicher.loescheKey(bereich.key);
       } else if (this.zuLoeschenderBereich === 'weltenbau') {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
         window.HTBAH.speicher.loescheKeysMitPraefix(
           window.HTBAH.speicherKeys.weltenbauProKampagnePraefix,
         );
@@ -1047,16 +1080,23 @@ window.HTBAH_SEITEN.Einstellungen = {
       this.statusAnzeigen(bereich.erfolg, 'success');
 
       if (this.zuLoeschenderBereich === 'alles') {
+        await this.$nextTick();
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
         this.$router.push('/');
       }
 
+      if (DIAG && typeof DIAG.log === 'function') {
+        DIAG.log('Einstellungen', 'loeschen-fertig', this.zuLoeschenderBereich);
+      }
+
       if (this.browserSpeicherInitialErmittelt) {
-        this.speicherSchaetzungLaden();
+        setTimeout(() => this.speicherSchaetzungLaden(), 250);
       }
       if (
         this.zuLoeschenderBereich === 'floatingFabZustand' ||
-        this.zuLoeschenderBereich === 'spielleitung' ||
-        this.zuLoeschenderBereich === 'alles'
+        this.zuLoeschenderBereich === 'spielleitung'
       ) {
         if (typeof window.HTBAH.loescheFloatingFabSpeicherKomplett === 'function') {
           window.HTBAH.loescheFloatingFabSpeicherKomplett();
@@ -2219,105 +2259,109 @@ window.HTBAH_SEITEN.Einstellungen = {
               eingebettet>
             <div class="d-flex flex-column gap-2 ps-2 border-start border-secondary border-opacity-50 ms-1">
               <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.presets.buttonSymbol"
+                @click="oeffneLoeschDialog('presets')">
+                {{ speicherBereiche.presets.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.kampagnenLabels.buttonSymbol"
+                @click="oeffneLoeschDialog('kampagnenLabels')">
+                {{ speicherBereiche.kampagnenLabels.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.spielleitung.buttonSymbol"
+                @click="oeffneLoeschDialog('spielleitung')">
+                {{ speicherBereiche.spielleitung.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.zufallstabellen.buttonSymbol"
+                @click="oeffneLoeschDialog('zufallstabellen')">
+                {{ speicherBereiche.zufallstabellen.buttonLabel }} (alle Kampagnen)
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.weltenbau.buttonSymbol"
+                @click="oeffneLoeschDialog('weltenbau')">
+                {{ speicherBereiche.weltenbau.buttonLabel }} (alle Kampagnen)
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.wuerfelbeutelLayout.buttonSymbol"
+                @click="oeffneLoeschDialog('wuerfelbeutelLayout')">
+                {{ speicherBereiche.wuerfelbeutelLayout.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.modaleZustand.buttonSymbol"
+                @click="oeffneLoeschDialog('modaleZustand')">
+                {{ speicherBereiche.modaleZustand.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.floatingFabZustand.buttonSymbol"
+                @click="oeffneLoeschDialog('floatingFabZustand')">
+                {{ speicherBereiche.floatingFabZustand.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.sicherheitsmechanismen.buttonSymbol"
+                @click="oeffneLoeschDialog('sicherheitsmechanismen')">
+                {{ speicherBereiche.sicherheitsmechanismen.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.theme.buttonSymbol"
+                @click="oeffneLoeschDialog('theme')">
+                {{ speicherBereiche.theme.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
                 class="btn btn-danger btn-sm w-100 text-start"
                 type="button"
                 :symbol="speicherBereiche.alles.buttonSymbol"
                 @click="oeffneLoeschDialog('alles')">
                 {{ speicherBereiche.alles.buttonLabel }}
               </icon-text-button>
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2 w-100 text-start"
-                :aria-expanded="alleKampagnenLoeschDetailsIstOffen() ? 'true' : 'false'"
-                aria-controls="htbah-loesch-details-body-global"
-                :aria-label="alleKampagnenLoeschDetailsIstOffen() ? 'Detaillierte Lösch-Optionen einklappen' : 'Detaillierte Lösch-Optionen ausklappen'"
-                @click="alleKampagnenLoeschDetailsEinAus">
-                <span class="material-symbols-outlined fs-5" aria-hidden="true">
-                  {{ alleKampagnenLoeschDetailsIstOffen() ? 'expand_less' : 'expand_more' }}
-                </span>
-                <span class="small">Detaillierte Lösch-Optionen</span>
-              </button>
-              <div
-                v-show="alleKampagnenLoeschDetailsIstOffen()"
-                id="htbah-loesch-details-body-global"
-                class="pt-1">
-                <div class="d-flex flex-column gap-2">
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.presets.buttonSymbol"
-                    @click="oeffneLoeschDialog('presets')">
-                    {{ speicherBereiche.presets.buttonLabel }}
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.kampagnenLabels.buttonSymbol"
-                    @click="oeffneLoeschDialog('kampagnenLabels')">
-                    {{ speicherBereiche.kampagnenLabels.buttonLabel }}
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.spielleitung.buttonSymbol"
-                    @click="oeffneLoeschDialog('spielleitung')">
-                    {{ speicherBereiche.spielleitung.buttonLabel }}
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.zufallstabellen.buttonSymbol"
-                    @click="oeffneLoeschDialog('zufallstabellen')">
-                    {{ speicherBereiche.zufallstabellen.buttonLabel }} (alle Kampagnen)
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.weltenbau.buttonSymbol"
-                    @click="oeffneLoeschDialog('weltenbau')">
-                    {{ speicherBereiche.weltenbau.buttonLabel }} (alle Kampagnen)
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.wuerfelbeutelLayout.buttonSymbol"
-                    @click="oeffneLoeschDialog('wuerfelbeutelLayout')">
-                    {{ speicherBereiche.wuerfelbeutelLayout.buttonLabel }}
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.modaleZustand.buttonSymbol"
-                    @click="oeffneLoeschDialog('modaleZustand')">
-                    {{ speicherBereiche.modaleZustand.buttonLabel }}
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.floatingFabZustand.buttonSymbol"
-                    @click="oeffneLoeschDialog('floatingFabZustand')">
-                    {{ speicherBereiche.floatingFabZustand.buttonLabel }}
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.sicherheitsmechanismen.buttonSymbol"
-                    @click="oeffneLoeschDialog('sicherheitsmechanismen')">
-                    {{ speicherBereiche.sicherheitsmechanismen.buttonLabel }}
-                  </icon-text-button>
-                  <icon-text-button
-                    class="btn btn-outline-danger btn-sm w-100 text-start"
-                    type="button"
-                    :symbol="speicherBereiche.theme.buttonSymbol"
-                    @click="oeffneLoeschDialog('theme')">
-                    {{ speicherBereiche.theme.buttonLabel }}
-                  </icon-text-button>
-                </div>
-              </div>
             </div>
             </einstellungen-sektion>
           </template>
         </div>
+      </einstellungen-sektion>
+
+      <hr class="my-4 border-secondary border-2 opacity-100" />
+
+      <einstellungen-sektion titel="Debugging" section-id="debugging" emoji="🐛" :default-offen="false">
+        <div class="d-flex align-items-center justify-content-between">
+          <label class="form-check-label d-flex align-items-center gap-2 mb-0" for="settings-diag-logging">
+            <span class="material-symbols-outlined" aria-hidden="true">terminal</span>
+            <span>Ausführliche Logausgaben</span>
+          </label>
+          <div class="form-check form-switch m-0">
+            <input
+              id="settings-diag-logging"
+              class="form-check-input"
+              type="checkbox"
+              role="switch"
+              v-model="diagLoggingAktiv"
+              @change="speichereDiagLoggingEinstellung" />
+          </div>
+        </div>
+        <p class="small text-body-secondary mb-0 mt-2 text-start">
+          Ausführliche Logausgaben ein- und ausschalten. Nur für Entwicklung relevant — die Meldungen erscheinen in der Browser-Konsole (F12).
+        </p>
       </einstellungen-sektion>
 
       <div class="abstandshalter" aria-hidden="true"></div>
@@ -2330,7 +2374,7 @@ window.HTBAH_SEITEN.Einstellungen = {
         aria-labelledby="htbahExportModalLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title" id="htbahExportModalLabel">Daten exportieren</h5>
               <button
@@ -2416,7 +2460,7 @@ window.HTBAH_SEITEN.Einstellungen = {
         aria-labelledby="htbahImportModalLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-          <div class="modal-content shadow">
+          <div class="modal-content shadow-lg">
             <div class="modal-header">
               <h5 class="modal-title" id="htbahImportModalLabel">Daten importieren</h5>
               <button

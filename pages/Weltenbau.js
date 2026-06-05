@@ -1174,7 +1174,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       <div v-if="generatorModal.offen" class="regelwerk-modal-layer htbah-generator-modal-layer">
         <div
           ref="generatorFenster"
-          class="regelwerk-modal-window card shadow htbah-generator-modal-window"
+          class="regelwerk-modal-window card shadow-lg htbah-generator-modal-window"
           :class="{ 'regelwerk-modal-window-fullscreen': generatorModal.istVollbild }"
           :style="generatorModalStil"
           role="dialog"

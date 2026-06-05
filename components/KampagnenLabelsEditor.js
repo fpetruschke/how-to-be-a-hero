@@ -6,6 +6,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   window.HTBAH_KOMPONENTEN.KampagnenLabelsEditor = {
     props: {
       kampagneId: { type: String, default: '' },
+      kampagneName: { type: String, default: '' },
+      /** Optional: Labels der Zeile (vermeidet Speicher-Lesen in der Übersicht). */
+      labels: { type: Array, default: null },
       /** Nur Badges anzeigen (Übersicht). */
       nurAnzeige: { type: Boolean, default: false },
     },
@@ -19,20 +22,36 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     },
     computed: {
       kampagne() {
+        if (this.nurAnzeige && Array.isArray(this.labels)) {
+          return null;
+        }
         void this.refreshTick;
         const kid = typeof this.kampagneId === 'string' ? this.kampagneId.trim() : '';
         if (!kid || !window.HTBAH || typeof window.HTBAH.ladeSpielleitungZustand !== 'function') {
           return null;
         }
-        const z = window.HTBAH.ladeSpielleitungZustand();
+        const z =
+          typeof window.HTBAH.ladeSpielleitungZustandLeicht === 'function'
+            ? window.HTBAH.ladeSpielleitungZustandLeicht()
+            : window.HTBAH.ladeSpielleitungZustand();
         const liste = Array.isArray(z && z.kampagnen) ? z.kampagnen : [];
         return liste.find((k) => k && k.id === kid) || null;
       },
       kampagneLabels() {
+        if (Array.isArray(this.labels) && KL) {
+          return KL.normalisiereKampagneLabels(this.labels);
+        }
         if (!this.kampagne || !KL) {
           return [];
         }
         return KL.normalisiereKampagneLabels(this.kampagne.labels);
+      },
+      labelAnzeigeName() {
+        const name = typeof this.kampagneName === 'string' ? this.kampagneName.trim() : '';
+        if (name) {
+          return name;
+        }
+        return this.kampagne && this.kampagne.name ? this.kampagne.name : 'Kampagne';
       },
       datalistId() {
         return `htbah-kampagnen-labels-dl-${this.kampagneId || 'x'}`;
@@ -52,7 +71,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
     },
     mounted() {
-      this.katalogNeuLaden();
+      if (!this.nurAnzeige) {
+        this.katalogNeuLaden();
+      }
     },
     methods: {
       katalogNeuLaden() {
@@ -136,7 +157,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     template: `
       <div class="htbah-kampagnen-labels-editor">
         <template v-if="kampagneId">
-          <div v-if="kampagneLabels.length" class="d-flex flex-wrap gap-1" :class="{ 'mb-2': !nurAnzeige }" role="list" :aria-label="'Labels für ' + (kampagne && kampagne.name ? kampagne.name : 'Kampagne')">
+          <div v-if="kampagneLabels.length" class="d-flex flex-wrap gap-1" :class="{ 'mb-2': !nurAnzeige }" role="list" :aria-label="'Labels für ' + labelAnzeigeName">
             <span
               v-for="lab in kampagneLabels"
               :key="'kl-snap-' + kampagneId + '-' + lab.id"

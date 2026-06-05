@@ -294,7 +294,7 @@ window.HTBAH_KOMPONENTEN.BildbetrachterHost = {
         <div
           v-for="f in fenster"
           :key="f.id"
-          class="htbah-bb-fenster card shadow d-flex flex-column"
+          class="htbah-bb-fenster card shadow-lg d-flex flex-column"
           :class="{ 'htbah-bb-fenster-fs': f.fullscreen }"
           :style="fensterStyle(f)"
           @pointerdown="fokus(f)">
