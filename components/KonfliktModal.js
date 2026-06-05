@@ -1581,14 +1581,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             <button
               type="button"
               class="btn btn-sm btn-outline-primary"
-              @click="$emit('schaden')">
-              💥 Schaden
+              @click="$emit('parade')">
+              🛡️ Parade
             </button>
             <button
               type="button"
               class="btn btn-sm btn-outline-primary"
-              @click="$emit('parade')">
-              🛡️ Parade
+              @click="$emit('schaden')">
+              💥 Schaden
             </button>
           </div>
           <div

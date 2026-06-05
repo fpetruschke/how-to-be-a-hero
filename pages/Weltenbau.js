@@ -261,7 +261,7 @@ window.HTBAH_SEITEN.Weltenbau = {
       ) {
         return tab;
       }
-      return 'gruppe';
+      return 'einstellungen';
     },
   },
   watch: {

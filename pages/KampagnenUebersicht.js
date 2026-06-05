@@ -190,7 +190,7 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
       this.neueKampagneNameEntwurf = '';
       this.persist();
       this.zeigeStatus('Kampagne angelegt.');
-      this.$router.push(window.HTBAH.kampagnenPfad('gruppe', id));
+      this.$router.push(window.HTBAH.kampagnenPfad(null, id));
     },
     kampagneBearbeiten(g) {
       if (!g || !g.id) {
@@ -200,7 +200,7 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
       z.aktiveKampagneId = g.id;
       this.zustand = z;
       this.persist();
-      this.$router.push(window.HTBAH.kampagnenPfad('gruppe', g.id));
+      this.$router.push(window.HTBAH.kampagnenPfad(null, g.id));
     },
     async kampagneUmbenennen(g) {
       if (!g) {
@@ -512,7 +512,7 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
 
         const ziel =
           window.HTBAH && typeof window.HTBAH.kampagnenPfad === 'function'
-            ? window.HTBAH.kampagnenPfad('gruppe', ergebnis.kampagneId)
+            ? window.HTBAH.kampagnenPfad(null, ergebnis.kampagneId)
             : '';
         if (
           ziel &&

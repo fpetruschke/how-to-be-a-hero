@@ -201,12 +201,12 @@ function htbahZeitmessungNormalisiereBadgePosition(roh) {
 }
 
 function htbahZeitmessungLeererKampagnenZustand() {
-  const ms = htbahZeitmessungMsAusTeilen(0, 5, 0);
+  const ms = htbahZeitmessungMsAusTeilen(0, 0, 0);
   return {
     modus: 'timer',
     status: 'bereit',
     eingabeH: 0,
-    eingabeM: 5,
+    eingabeM: 0,
     eingabeS: 0,
     anzeigeMs: ms,
     basisMs: 0,
@@ -242,7 +242,7 @@ function htbahZeitmessungNormalisiereKampagnenZustand(roh) {
     typeof roh.zielMs === 'number' && Number.isFinite(roh.zielMs)
       ? Math.max(0, Math.round(roh.zielMs))
       : eingabeMs;
-  const startWallMs =
+  let startWallMs =
     typeof roh.startWallMs === 'number' && Number.isFinite(roh.startWallMs) && roh.startWallMs > 0
       ? Math.round(roh.startWallMs)
       : 0;

@@ -17,7 +17,9 @@
   --border-color: #334155;
   --input-bg: #0f172a;
   --input-color: #f1f5f9;
-  --placeholder-color: #64748b;
+  --placeholder-color: #b0bcc9;
+  --form-floating-label-muted: #b0bcc9;
+  --form-floating-label-floated: #cbd5e1;
   --navbar-bg: #1e293b;
   --navbar-link: #cbd5f5;
   --primary-color: #509b4a;
@@ -55,7 +57,9 @@
   --border-color: #cbd5e1;
   --input-bg: #ffffff;
   --input-color: #0f172a;
-  --placeholder-color: #64748b;
+  --placeholder-color: #94a3b8;
+  --form-floating-label-muted: #94a3b8;
+  --form-floating-label-floated: #64748b;
   --navbar-bg: #ffffff;
   --navbar-link: #334155;
   --primary-color: #336a2b;
@@ -366,6 +370,22 @@ select.is-invalid {
 
 input::placeholder {
   color: var(--placeholder-color);
+}
+
+/* Floating Labels: leeres Feld (Label steht im Input, z. B. „Geschlecht“) */
+.form-floating > label {
+  color: var(--form-floating-label-muted);
+}
+
+/* Floating Labels: fokussiert oder befüllt (Label schwebt oben) */
+.form-floating > .form-control:focus ~ label,
+.form-floating > textarea.form-control:focus ~ label,
+.form-floating > .form-control:not(:-moz-placeholder-shown) ~ label,
+.form-floating > textarea.form-control:not(:-moz-placeholder-shown) ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label,
+.form-floating > textarea.form-control:not(:placeholder-shown) ~ label,
+.form-floating > .form-select ~ label {
+  color: var(--form-floating-label-floated);
 }
 
 .btn-primary {
@@ -2684,6 +2704,7 @@ input::placeholder {
 .regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-zeichen-modal-canvas-host,
 .regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-musik-iframe-wrap,
 .regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-inventar-modal-body,
+.regelwerk-modal-window.regelwerk-modal-window-fullscreen > .htbah-notizen-modal-body,
 .regelwerk-modal-window.regelwerk-modal-window-fullscreen > .abenteuerbuch-modal-editor-wrap {
   flex: 1 1 auto;
   min-height: 0;
@@ -2840,6 +2861,47 @@ input::placeholder {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+}
+
+/* Charakter: Notizen (verschiebbares Fenster) */
+.htbah-notizen-modal-window.regelwerk-modal-window {
+  width: min(96vw, 720px);
+  height: min(82vh, 640px);
+  max-height: min(88dvh, 680px);
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.htbah-notizen-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.htbah-notizen-quill-host.quill-editor-host {
+  min-height: 0 !important;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.htbah-notizen-quill-host .ql-toolbar.ql-snow {
+  flex-shrink: 0;
+}
+
+.htbah-notizen-quill-host .ql-container.ql-snow {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.htbah-notizen-quill-host .ql-editor {
+  min-height: 100%;
 }
 
 .abenteuerbuch-modal-editor-wrap {
@@ -4002,6 +4064,18 @@ input::placeholder {
   border-color: var(--border-color);
 }
 
+.faehigkeit-hinzufuegen-gruppe .faehigkeit-hinzufuegen-name {
+  flex: 4 1 0;
+  min-width: 0;
+}
+
+.faehigkeit-hinzufuegen-gruppe .faehigkeit-hinzufuegen-wert {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+  text-align: end;
+}
+
 /* Charakter: Summe / Begabung / Geistesblitz als Badges */
 .faehigkeiten-stat-badges-row {
   display: flex;
@@ -4976,6 +5050,14 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
       var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 4.2rem + 3rem + 0.45rem
     );
   }
+
+  .htbah-wuerfelbeutel-fab-stack--ohne-konflikt:not(.htbah-fab-stack--custom-pos) {
+    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 0.6rem);
+  }
+
+  body.htbah-mit-lp-banner .htbah-wuerfelbeutel-fab-stack--ohne-konflikt:not(.htbah-fab-stack--custom-pos) {
+    top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 4.2rem);
+  }
 }
 
 /* Mobil/Tablet: rechts unten über Bottom-Nav (Nav ist unten fixiert, nicht oben) */
@@ -4994,6 +5076,12 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
     left: auto;
     right: max(0.6rem, env(safe-area-inset-right, 0px));
     bottom: calc(var(--htbah-bottom-nav-reserve, 3.5rem) + env(safe-area-inset-bottom, 0px) + 0.35rem);
+  }
+
+  .htbah-wuerfelbeutel-fab-stack--ohne-konflikt:not(.htbah-fab-stack--custom-pos) {
+    bottom: calc(
+      var(--htbah-bottom-nav-reserve, 3.5rem) + env(safe-area-inset-bottom, 0px) + 3rem + 0.45rem
+    );
   }
 }
 

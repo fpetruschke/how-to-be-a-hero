@@ -33,7 +33,11 @@ window.HTBAH_SEITEN.Charakter = {
       aktiveInfo: null,
       aktiveKategorieInfo: null,
       zeigePresetAktionen: true,
-      neueFaehigkeit: { name: '', value: 0, type: 'handeln' },
+      neueFaehigkeitenEntwurf: {
+        handeln: { name: '', value: 0, type: 'handeln' },
+        wissen: { name: '', value: 0, type: 'wissen' },
+        soziales: { name: '', value: 0, type: 'soziales' },
+      },
       bearbeitungEntwurf: { name: '', value: 0, type: 'handeln' },
       bearbeitungReferenz: null,
       bearbeitungKategorie: '',
@@ -1069,8 +1073,16 @@ window.HTBAH_SEITEN.Charakter = {
         },
       });
     },
-    async faehigkeitHinzufuegen() {
-      const nameTrim = String(this.neueFaehigkeit.name || '').trim();
+    leererFaehigkeitEntwurf(kategorie) {
+      return { name: '', value: 0, type: kategorie };
+    },
+    async faehigkeitHinzufuegenFuerKategorie(kategorie) {
+      const entwurf = this.neueFaehigkeitenEntwurf[kategorie];
+      if (!entwurf) {
+        return;
+      }
+
+      const nameTrim = String(entwurf.name || '').trim();
       if (!nameTrim) {
         await window.HTBAH.ui.alert({
           titel: 'Eingabe unvollständig',
@@ -1079,7 +1091,7 @@ window.HTBAH_SEITEN.Charakter = {
         return;
       }
 
-      const wert = Number(this.neueFaehigkeit.value);
+      const wert = Number(entwurf.value);
 
       if (!Number.isFinite(wert) || wert < 0) {
         await window.HTBAH.ui.alert({
@@ -1103,13 +1115,12 @@ window.HTBAH_SEITEN.Charakter = {
         return;
       }
 
-      this.charakter[this.neueFaehigkeit.type].push({
+      this.charakter[kategorie].push({
         name: nameTrim,
         value: wert,
       });
 
-      this.neueFaehigkeit.name = '';
-      this.neueFaehigkeit.value = 0;
+      this.neueFaehigkeitenEntwurf[kategorie] = this.leererFaehigkeitEntwurf(kategorie);
     },
     bildVerwaltungOeffnen() {
       this.$refs.charakterBildModal.oeffnen();
@@ -1172,7 +1183,14 @@ window.HTBAH_SEITEN.Charakter = {
       const rohName = typeof this.charakter.name === 'string' ? this.charakter.name : '';
       const sicher =
         rohName.replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 64) || 'charakter';
-      window.HTBAH.dateiHerunterladenJson(paket, `htbah-charakter-${sicher}.json`);
+      const datum = new Date();
+      const yyyy = String(datum.getFullYear());
+      const mm = String(datum.getMonth() + 1).padStart(2, '0');
+      const dd = String(datum.getDate()).padStart(2, '0');
+      window.HTBAH.dateiHerunterladenJson(
+        paket,
+        `htbah-charakter-${sicher}-${yyyy}-${mm}-${dd}.json`,
+      );
     },
     async sicherheitsmechanismenImportieren(event) {
       const input = event?.target;
@@ -1436,31 +1454,45 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div
-        v-if="!spielleitungMitglied && istNeuModus"
-        class="card p-3 mb-2">
-        <h6 class="mb-2">Bestehenden Charakter importieren</h6>
-        <p class="small text-body-secondary mb-2">
-          Einzel-Export oder Komplett-Export. Bei mehreren enthaltenen Charakteren kannst du danach einen auswählen.
-        </p>
+      <div v-if="!spielleitungMitglied && istNeuModus" class="mb-2">
         <div class="row g-2">
           <div class="col-12 col-md-6">
-            <div class="form-floating">
-              <input
-                id="ce-char-import"
-                type="file"
-                accept="application/json,.json"
-                class="form-control"
-                @change="importDateiAusgewaehlt" />
-              <label for="ce-char-import">Charakter aus Datei importieren</label>
+            <div class="card p-3 h-100">
+              <h6 class="mb-2">Bestehenden Charakter importieren</h6>
+              <p class="small text-body-secondary mb-2">
+                Einzel-Export oder Komplett-Export. Bei mehreren enthaltenen Charakteren kannst du danach einen auswählen.
+              </p>
+              <div class="form-floating">
+                <input
+                  id="ce-char-import"
+                  type="file"
+                  accept="application/json,.json"
+                  class="form-control"
+                  @change="importDateiAusgewaehlt" />
+                <label for="ce-char-import">Charakter aus Datei importieren</label>
+              </div>
             </div>
           </div>
-          <div v-if="importDateiname" class="col-12">
-            <p class="small text-body-secondary mb-0">
-              Datei: {{ importDateiname }}
-            </p>
+          <div class="col-12 col-md-6">
+            <div class="card p-3 h-100 d-flex flex-column">
+              <h6 class="mb-2">Beispiel-Stereotyp auswählen</h6>
+              <p class="small text-body-secondary mb-2">
+                Starte mit einem Heldentyp aus Mittelalter/Fantasy, Gegenwart oder Sci-Fi — inklusive
+                vorgeschlagener Stammdaten, Fähigkeiten und Inventar (nur Preset-Fähigkeiten).
+              </p>
+              <icon-text-button
+                type="button"
+                class="btn btn-outline-primary w-100 mt-auto"
+                symbol="🧙"
+                @click="charakterVorlageModalOeffnen">
+                Beispiel-Stereotyp wählen
+              </icon-text-button>
+            </div>
           </div>
         </div>
+        <p v-if="importDateiname" class="small text-body-secondary mb-0 mt-2">
+          Datei: {{ importDateiname }}
+        </p>
       </div>
 
       <div v-if="importHinweis && !spielleitungMitglied && istNeuModus" class="alert alert-secondary py-2 mb-2">
@@ -1590,15 +1622,19 @@ window.HTBAH_SEITEN.Charakter = {
                   @focus="lebenspunkteEingabeFokus"
                   @blur="lebenspunkteEingabeBlur">
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-3">
                 <p class="small text-body-secondary mb-1">Geschlecht</p>
                 <p class="mb-2">{{ charakter.geschlecht || '—' }}</p>
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-3">
+                <p class="small text-body-secondary mb-1">Statur</p>
+                <p class="mb-2">{{ charakter.statur || '—' }}</p>
+              </div>
+              <div class="col-12 col-md-3">
                 <p class="small text-body-secondary mb-1">Beruf</p>
                 <p class="mb-2">{{ charakter.beruf || '—' }}</p>
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-3">
                 <p class="small text-body-secondary mb-1">Fraktion</p>
                 <p class="mb-2">{{ charakter.fraktion || '—' }}</p>
               </div>
@@ -1663,7 +1699,7 @@ window.HTBAH_SEITEN.Charakter = {
               </div>
               <div :class="istNeuModus ? 'col-12 col-md-6' : 'col-12 col-md-4'">
                 <div class="form-floating">
-                  <input id="ce-char-alter" type="number" class="form-control" v-model.number="charakter.alter" min="0" placeholder=" ">
+                  <input id="ce-char-alter" type="text" inputmode="numeric" class="form-control" v-model.number="charakter.alter" placeholder=" ">
                   <label for="ce-char-alter">Alter</label>
                 </div>
               </div>
@@ -1671,10 +1707,10 @@ window.HTBAH_SEITEN.Charakter = {
                 <div class="form-floating">
                   <input
                     id="ce-char-lp"
-                    type="number"
+                    type="text"
+                    inputmode="numeric"
                     class="form-control"
                     v-model.number="charakter.lebenspunkte"
-                    min="0"
                     placeholder=" "
                     @focus="lebenspunkteEingabeFokus"
                     @blur="lebenspunkteEingabeBlur">
@@ -1810,23 +1846,6 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div
-        v-if="!spielleitungMitglied && istSetupTabAktiv && !istNeuModus"
-        class="card p-3 mb-2">
-        <h6 class="mb-2">Charaktervorlage (Epoche)</h6>
-        <p class="small text-body-secondary mb-2">
-          Starte mit einem Heldentyp aus Mittelalter/Fantasy, Gegenwart oder Sci-Fi — inklusive
-          vorgeschlagener Fähigkeiten und Inventar (nur Preset-Fähigkeiten).
-        </p>
-        <icon-text-button
-          type="button"
-          class="btn btn-outline-primary w-100"
-          symbol="🧙"
-          @click="charakterVorlageModalOeffnen">
-          Charaktervorlage wählen
-        </icon-text-button>
-      </div>
-
       <div v-if="(spielleitungMitglied || istSetupTabAktiv) && !istNeuModus" class="card p-3 mb-2">
         <h5 class="mb-2">Vor- &amp; Nachteile</h5>
         <p class="small text-body-secondary mb-3 mb-md-2">
@@ -1945,7 +1964,7 @@ window.HTBAH_SEITEN.Charakter = {
 
             <div
               v-if="punkte < 400 || !( !spielleitungMitglied && istEditModus && istSpielTabAktiv )"
-              class="progress"
+              class="progress mb-2"
               style="height:10px;">
               <div class="progress-bar" :style="{width: (punkte/400*100) + '%'}"></div>
             </div>
@@ -1958,9 +1977,10 @@ window.HTBAH_SEITEN.Charakter = {
               <button
                 type="button"
                 class="btn btn-sm"
-                :class="geistesblitzAusgebenModus ? 'btn-warning' : 'btn-outline-secondary'"
+                :class="geistesblitzAusgebenModus ? 'btn-warning' : 'btn-secondary'"
                 @click="geistesblitzAusgebenModusUmschalten">
-                {{ geistesblitzAusgebenModus ? 'Geistesblitzpunkte ausgeben: an' : 'Geistesblitzpunkte ausgeben' }}
+                <span aria-hidden="true">⚡</span>
+                {{ geistesblitzAusgebenModus ? ' Geistesblitzpunkte abziehen: an' : ' Geistesblitzpunkte abziehen' }}
               </button>
               <button
                 type="button"
@@ -2045,10 +2065,11 @@ window.HTBAH_SEITEN.Charakter = {
                     <button
                       v-if="geistesblitzAusgebenModus"
                       type="button"
-                      class="btn btn-sm btn-outline-warning py-0 px-2"
+                      class="btn btn-sm btn-warning py-0 px-2"
+                      :aria-label="'Geistesblitzpunkt abziehen (' + kategorie + ')'"
                       :disabled="!charakter.geistesblitzVerbleibend[kategorie]"
                       @click="geistesblitzPunktAusgeben(kategorie)">
-                      −1
+                      <span aria-hidden="true">⚡</span> −1
                     </button>
                   </div>
                 </div>
@@ -2125,16 +2146,29 @@ window.HTBAH_SEITEN.Charakter = {
                   </tbody>
                 </table>
               </div>
+
+              <faehigkeit-formular
+                v-if="!( !spielleitungMitglied && istEditModus && istSpielTabAktiv )"
+                v-model="neueFaehigkeitenEntwurf[kategorie]"
+                class="mt-2"
+                :id-prefix="'ce-neu-' + kategorie"
+                :fixed-type="kategorie"
+                inline
+                @submit="faehigkeitHinzufuegenFuerKategorie(kategorie)" />
             </div>
           </div>
           </div>
         </div>
+      </div>
 
-        <div v-if="!( !spielleitungMitglied && istEditModus && istSpielTabAktiv )" class="card p-2">
-          <h5>Neue Fähigkeit</h5>
-          <faehigkeit-formular v-model="neueFaehigkeit" id-prefix="ce-neu" />
-          <button class="btn btn-primary w-100 mt-2" @click="faehigkeitHinzufuegen">Hinzufügen</button>
-        </div>
+      <div v-if="!spielleitungMitglied && istEditModus && istSetupTabAktiv" class="card p-3 mb-2">
+        <icon-text-button
+          type="button"
+          class="btn btn-primary w-100"
+          icon="check"
+          @click="wechsleCharakterTab('spiel')">
+          Fertig
+        </icon-text-button>
       </div>
 
       <div v-if="spielleitungMitglied || istSpielTabAktiv || istNeuModus" class="card p-3 mb-2">
@@ -2177,9 +2211,9 @@ window.HTBAH_SEITEN.Charakter = {
                   v-if="spielleitungMitglied || (istSpielTabAktiv && !istNeuModus)"
                   type="button"
                   class="btn btn-outline-primary btn-lg w-100"
-                  symbol="💥"
-                  @click="schadenModalOeffnen">
-                  Schaden erwürfeln
+                  symbol="🛡️"
+                  @click="paradeModalOeffnen">
+                  Parieren
                 </icon-text-button>
               </div>
               <div class="col-12 col-md-4">
@@ -2187,9 +2221,9 @@ window.HTBAH_SEITEN.Charakter = {
                   v-if="spielleitungMitglied || (istSpielTabAktiv && !istNeuModus)"
                   type="button"
                   class="btn btn-outline-primary btn-lg w-100"
-                  symbol="🛡️"
-                  @click="paradeModalOeffnen">
-                  Parieren
+                  symbol="💥"
+                  @click="schadenModalOeffnen">
+                  Schaden erwürfeln
                 </icon-text-button>
               </div>
             </div>

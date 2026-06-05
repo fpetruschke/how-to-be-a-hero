@@ -3289,8 +3289,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                             @nach-unten="zeileReihenfolgeAendern('npc', row.id, 'unten')" />
                         </li>
                         <li><hr class="dropdown-divider" /></li>
-                        <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'npc')">Schaden</button></li>
                         <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'npc')">Parieren</button></li>
+                        <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'npc')">Schaden</button></li>
                         <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                         <li><button type="button" class="dropdown-item" @click="npcBearbeiten(row, indexNachId(zustand.npcs, row.id))">Bearbeiten</button></li>
                         <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('npc', row.id)">Löschen</button></li>
@@ -3364,8 +3364,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                         @nach-unten="zeileReihenfolgeAendern('npc', row.id, 'unten')" />
                     </li>
                     <li><hr class="dropdown-divider" /></li>
-                    <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'npc')">Schaden</button></li>
                     <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'npc')">Parieren</button></li>
+                    <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'npc')">Schaden</button></li>
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                     <li><button type="button" class="dropdown-item" @click="npcBearbeiten(row, indexNachId(zustand.npcs, row.id))">Bearbeiten</button></li>
                     <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('npc', row.id)">Löschen</button></li>
@@ -4002,8 +4002,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                             @nach-unten="zeileReihenfolgeAendern('bestie', row.id, 'unten')" />
                         </li>
                         <li><hr class="dropdown-divider" /></li>
-                        <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">Schaden</button></li>
                         <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">Parieren</button></li>
+                        <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">Schaden</button></li>
                         <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                         <li><button type="button" class="dropdown-item" @click="bestieBearbeiten(row, indexNachId(zustand.bestien, row.id))">Bearbeiten</button></li>
                         <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('bestie', row.id)">Löschen</button></li>
@@ -4088,8 +4088,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                         @nach-unten="zeileReihenfolgeAendern('bestie', row.id, 'unten')" />
                     </li>
                     <li><hr class="dropdown-divider" /></li>
-                    <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">Schaden</button></li>
                     <li><button type="button" class="dropdown-item" @click="paradeWuerfelnFuerEntitaet(row, 'bestie')">Parieren</button></li>
+                    <li><button type="button" class="dropdown-item" @click="schadenWuerfelnFuerEntitaet(row, 'bestie')">Schaden</button></li>
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                     <li><button type="button" class="dropdown-item" @click="bestieBearbeiten(row, indexNachId(zustand.bestien, row.id))">Bearbeiten</button></li>
                     <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('bestie', row.id)">Löschen</button></li>

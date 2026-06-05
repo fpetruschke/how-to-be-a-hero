@@ -38,6 +38,11 @@ const GLOBAL_BLATT_DEFINITIONEN = [
     nurSpielleitung: true,
   },
   {
+    id: 'zeichen',
+    key: 'htbah_zeichen_brett',
+    label: 'Zeichenbrett (Zeichnungen & Bilder)',
+  },
+  {
     id: 'kampagnen_labels',
     key: 'htbah_kampagnen_labels_katalog',
     label: 'Kampagnen-Label-Katalog',

@@ -973,16 +973,16 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
               <button
                 type="button"
                 class="btn btn-outline-primary btn-sm w-100"
-                @click="schadenModalOeffnenFuerZeile">
-                💥 Schaden erwürfeln
+                @click="paradeModalOeffnenFuerZeile">
+                🛡️ Parieren
               </button>
             </div>
             <div class="col-6">
               <button
                 type="button"
                 class="btn btn-outline-primary btn-sm w-100"
-                @click="paradeModalOeffnenFuerZeile">
-                🛡️ Parieren
+                @click="schadenModalOeffnenFuerZeile">
+                💥 Schaden erwürfeln
               </button>
             </div>
             <div class="col-12">

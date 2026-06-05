@@ -7835,16 +7835,16 @@ var HTBAH_REFACTOR_UTILS =
                 <button
                   type="button"
                   class="btn btn-outline-primary btn-sm w-100"
-                  @click="charakterModalSchadenOeffnen">
-                  💥 Schaden erwürfeln
+                  @click="charakterModalParadeOeffnen">
+                  🛡️ Parieren
                 </button>
               </div>
               <div class="col-6">
                 <button
                   type="button"
                   class="btn btn-outline-primary btn-sm w-100"
-                  @click="charakterModalParadeOeffnen">
-                  🛡️ Parieren
+                  @click="charakterModalSchadenOeffnen">
+                  💥 Schaden erwürfeln
                 </button>
               </div>
             </div>

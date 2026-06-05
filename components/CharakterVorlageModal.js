@@ -159,7 +159,7 @@ window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
           <div class="modal-body">
             <p class="small text-body-secondary">
               Wähle eine Epoche und einen Heldentyp. Die Vorlage setzt Fähigkeiten (nur Preset-Namen),
-              Inventar und einen Berufs-Vorschlag. Geistesblitzpunkte werden danach automatisch ermittelt.
+              Inventar und Stammdaten-Vorschläge (z. B. Name und Beruf). Geistesblitzpunkte werden danach automatisch ermittelt.
             </p>
             <div v-if="laedt" class="text-center py-3 text-body-secondary">Vorlagen werden geladen …</div>
             <div v-else-if="fehler" class="alert alert-warning py-2">{{ fehler }}</div>

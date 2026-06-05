@@ -216,6 +216,16 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
       name,
       untertitel: typeof roh.untertitel === 'string' ? roh.untertitel.trim() : '',
       beruf: typeof roh.beruf === 'string' ? roh.beruf.trim() : '',
+      geschlecht: typeof roh.geschlecht === 'string' ? roh.geschlecht.trim() : '',
+      alter:
+        typeof roh.alter === 'number' && Number.isFinite(roh.alter) && roh.alter >= 0
+          ? roh.alter
+          : null,
+      statur: typeof roh.statur === 'string' ? roh.statur.trim() : '',
+      fraktion: typeof roh.fraktion === 'string' ? roh.fraktion.trim() : '',
+      glaube: typeof roh.glaube === 'string' ? roh.glaube.trim() : '',
+      familienstand: typeof roh.familienstand === 'string' ? roh.familienstand.trim() : '',
+      aufenthaltsort: typeof roh.aufenthaltsort === 'string' ? roh.aufenthaltsort.trim() : '',
       kernFaehigkeiten: Array.isArray(roh.kernFaehigkeiten)
         ? roh.kernFaehigkeiten.map((k) => String(k).trim()).filter(Boolean)
         : [],
@@ -254,13 +264,37 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
     return { ok: true, vorlage };
   };
 
+  M.stammdatenAusVorlageUebernehmen = function stammdatenAusVorlageUebernehmen(basis, vorlage) {
+    if (!basis || !vorlage || typeof vorlage !== 'object') {
+      return;
+    }
+    if (vorlage.name) {
+      basis.name = vorlage.name;
+    }
+    const textFelder = [
+      'beruf',
+      'geschlecht',
+      'statur',
+      'fraktion',
+      'glaube',
+      'familienstand',
+      'aufenthaltsort',
+    ];
+    for (const feld of textFelder) {
+      if (typeof vorlage[feld] === 'string' && vorlage[feld].trim()) {
+        basis[feld] = vorlage[feld].trim();
+      }
+    }
+    const alter = Number(vorlage.alter);
+    if (Number.isFinite(alter) && alter >= 0) {
+      basis.alter = alter;
+    }
+  };
+
   M.vorlageAufCharakterAnwenden = function vorlageAufCharakterAnwenden(charakter, vorlage) {
     const CM = window.HTBAH_CHARAKTER_MODEL;
     const basis = CM.charakterMitDefaults(charakter);
-    basis.name = vorlage.name || basis.name;
-    if (vorlage.beruf) {
-      basis.beruf = vorlage.beruf;
-    }
+    M.stammdatenAusVorlageUebernehmen(basis, vorlage);
     basis.handeln = JSON.parse(JSON.stringify(vorlage.handeln));
     basis.wissen = JSON.parse(JSON.stringify(vorlage.wissen));
     basis.soziales = JSON.parse(JSON.stringify(vorlage.soziales));

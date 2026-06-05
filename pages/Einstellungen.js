@@ -78,10 +78,19 @@ const SPEICHER_BEREICHE = {
     ],
     titel: 'Modale zurücksetzen?',
     beschreibung:
-      'Größe, Position, Vollbild- und Minimieren-Zustand sowie welche schwebenden Fenster geöffnet waren (Regelwerk, Abenteuerbuch, Zeichnen, Weltenbau, Würfelbeutel, Musik, Konflikt, Inventar usw.) werden zurückgesetzt. Inhaltliche Daten (z. B. Konflikt-Teilnehmer) bleiben erhalten.',
+      'Größe, Position, Vollbild- und Minimieren-Zustand sowie welche schwebenden Fenster geöffnet waren (Regelwerk, Abenteuerbuch, Zeichnen, Weltenbau, Würfelbeutel, Musik, Konflikt, Inventar usw.) werden zurückgesetzt. Inhaltliche Daten (z. B. Konflikt-Teilnehmer, Zeichnungen) bleiben erhalten.',
     erfolg: 'Modal-Einstellungen wurden zurückgesetzt.',
     buttonSymbol: '🪟',
     buttonLabel: 'Modale zurücksetzen',
+  },
+  zeichenModal: {
+    key: 'htbah_zeichen_brett',
+    titel: 'Zeichenbrett löschen?',
+    beschreibung:
+      'Alle Ebenen, Zeichnungen und eingefügten Bilder im Zeichenbrett werden aus dem lokalen Speicher entfernt.',
+    erfolg: 'Zeichenbrett wurde gelöscht.',
+    buttonSymbol: '✏️',
+    buttonLabel: 'Zeichenbrett löschen',
   },
   floatingFabZustand: {
     keys: ['htbah_floating_fab_pos'],
@@ -145,10 +154,11 @@ const SPEICHER_BEREICHE = {
       'htbah_orientation_mode',
       'htbah_orientation_anchor_angle',
       'htbah_interaktive_welt_stats_anzeigen',
+      'htbah_zeichen_brett',
     ],
     titel: 'Alle lokalen Daten löschen?',
     beschreibung:
-      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleitung-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen und Weltenbau-Daten je Kampagne, deine Theme-Auswahl, die Würfel- und Zeitmessungs-Einstellungen, 3D-Würfel-Farben sowie offene Fenster inkl. Größe, Position und Minimieren-Zustand entfernt. Die App entspricht danach einem frischen Start.',
+      'Es werden Charakterdaten, Charakterbild, gespeicherte Fähigkeiten-Presets, Spielleitung-Kampagnen (inkl. Abenteuerbücher, Wetter/Tageszeit und Badge-Position), Zufallstabellen und Weltenbau-Daten je Kampagne, Zeichnungen und Bilder im Zeichenbrett, deine Theme-Auswahl, die Würfel- und Zeitmessungs-Einstellungen, 3D-Würfel-Farben sowie offene Fenster inkl. Größe, Position und Minimieren-Zustand entfernt. Die App entspricht danach einem frischen Start.',
     erfolg: 'Alle gespeicherten Daten wurden gelöscht.',
     buttonSymbol: '🗑️',
     buttonLabel: 'Alles löschen',
@@ -1068,6 +1078,13 @@ window.HTBAH_SEITEN.Einstellungen = {
           window.HTBAH.speicherKeys.weltenbauProKampagnePraefix,
         );
         window.HTBAH.speicher.loescheKey(bereich.key);
+      } else if (this.zuLoeschenderBereich === 'zeichenModal') {
+        window.HTBAH.speicher.loescheKey(bereich.key);
+        try {
+          window.dispatchEvent(new CustomEvent('htbah:zeichen-speicher-geaendert'));
+        } catch {
+          /* ignorieren */
+        }
       } else {
         window.HTBAH.speicher.loescheKey(bereich.key);
       }
@@ -1608,6 +1625,19 @@ window.HTBAH_SEITEN.Einstellungen = {
       });
       window.HTBAH.migriereLegacyCharakterSpeicherWennNoetig();
       if (
+        ausgewaehlteBereiche.some(
+          (b) =>
+            b.key === 'htbah_zeichen_brett' ||
+            b.key === (window.HTBAH.speicherKeys && window.HTBAH.speicherKeys.zeichenModal),
+        )
+      ) {
+        try {
+          window.dispatchEvent(new CustomEvent('htbah:zeichen-speicher-geaendert'));
+        } catch {
+          /* ignorieren */
+        }
+      }
+      if (
         this.appRolle === 'spielleitung' &&
         ausgewaehlteBereiche.some(
           (b) =>
@@ -2122,6 +2152,13 @@ window.HTBAH_SEITEN.Einstellungen = {
           <icon-text-button
             class="btn btn-outline-danger w-100 mb-2"
             type="button"
+            :symbol="speicherBereiche.zeichenModal.buttonSymbol"
+            @click="oeffneLoeschDialog('zeichenModal')">
+            {{ speicherBereiche.zeichenModal.buttonLabel }}
+          </icon-text-button>
+          <icon-text-button
+            class="btn btn-outline-danger w-100 mb-2"
+            type="button"
             :symbol="speicherBereiche.modaleZustand.buttonSymbol"
             @click="oeffneLoeschDialog('modaleZustand')">
             {{ speicherBereiche.modaleZustand.buttonLabel }}
@@ -2299,6 +2336,13 @@ window.HTBAH_SEITEN.Einstellungen = {
                 :symbol="speicherBereiche.wuerfelbeutelLayout.buttonSymbol"
                 @click="oeffneLoeschDialog('wuerfelbeutelLayout')">
                 {{ speicherBereiche.wuerfelbeutelLayout.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.zeichenModal.buttonSymbol"
+                @click="oeffneLoeschDialog('zeichenModal')">
+                {{ speicherBereiche.zeichenModal.buttonLabel }}
               </icon-text-button>
               <icon-text-button
                 class="btn btn-outline-danger btn-sm w-100 text-start"

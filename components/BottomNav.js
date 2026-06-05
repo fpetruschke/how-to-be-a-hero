@@ -72,7 +72,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       zeitmessungBasisMs: 0,
       zeitmessungZielMs: 0,
       zeitmessungEingabeH: 0,
-      zeitmessungEingabeM: 5,
+      zeitmessungEingabeM: 0,
       zeitmessungEingabeS: 0,
       zeitmessungStartPerformance: 0,
       zeitmessungTickIntervalId: null,
@@ -255,6 +255,14 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const p = this.$route.path || '';
       return p.startsWith('/charakter/neu');
     },
+    /** Gespeicherter Charakter ab Session Zero (nicht Neuerstellung unter /charakter/neu). */
+    charakterAbSessionZeroAktiv() {
+      const p = this.$route.path || '';
+      if (p.startsWith('/charakter/neu')) {
+        return false;
+      }
+      return /^\/charakter\/[^/]+\/(?:session-zero|aktives-spiel|daten)$/.test(p);
+    },
     charakterLink() {
       const id = window.HTBAH.ladeAktivenCharakterId();
       const pfad = this.$route && typeof this.$route.path === 'string' ? this.$route.path : '';
@@ -317,10 +325,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       );
     },
     zeitmessungOverlaySichtbar() {
-      return (
-        this.hatAktiveKampagne &&
-        (this.zeitmessungLaeuft || this.zeitmessungPausiert || this.zeitmessungAbgelaufen)
-      );
+      return this.zeitmessungLaeuft || this.zeitmessungPausiert || this.zeitmessungAbgelaufen;
     },
     zeitmessungCountdownProfil() {
       return window.HTBAH && typeof window.HTBAH.ladeZeitmessungProfil === 'function'
@@ -496,19 +501,34 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       return charakter.sicherheitsmechanismen;
     },
     sicherheitsButtonAnzeigen() {
-      return (
-        this.zeigeNav &&
-        !this.charakterErstellenAktiv &&
-        !this.einstellungenAktiv &&
-        this.hatAktiveKampagne &&
-        (this.rolle === 'spielleitung' || this.rolle === 'charakter')
-      );
+      if (!this.zeigeNav || this.einstellungenAktiv) {
+        return false;
+      }
+      if (this.rolle === 'spielleitung' && this.hatAktiveKampagne) {
+        return true;
+      }
+      if (this.rolle === 'charakter' && this.charakterAbSessionZeroAktiv) {
+        return true;
+      }
+      return false;
     },
     sicherheitsmodalNurLesen() {
       return this.rolle !== 'spielleitung';
     },
     konfliktFabAnzeigen() {
       return this.zeigeNav && this.istSpielleitung && this.hatAktiveKampagne;
+    },
+    wuerfelbeutelFabAnzeigen() {
+      if (!this.zeigeNav) {
+        return false;
+      }
+      if (this.konfliktFabAnzeigen) {
+        return true;
+      }
+      if (this.rolle === 'charakter' && this.charakterAbSessionZeroAktiv) {
+        return true;
+      }
+      return false;
     },
   },
   watch: {
@@ -673,7 +693,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this._navReserveObserver = null;
     this.$nextTick(() => {
       this.bindNavReserveObserver();
-      if (this.hatAktiveKampagne && this.wuerfelBeutelOffen) {
+      if (this.wuerfelBeutelOffen) {
         this.wuerfelBeutelInitialisierePosition();
         this.bottomNavModalNachOeffnen('wuerfelBeutelFenster', 'wuerfel-beutel', {
           minBreite: 300,
@@ -1161,7 +1181,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.atmosphaere = {};
         this.badgePos = null;
         this.fabPos = { sicherheits: null, konflikt: null, wuerfelbeutel: null };
-        this.zeitmessungSetzeAufStandardZustand();
+        this._zeitmessungGeladeneKampagneId = null;
         return;
       }
       if (
@@ -1334,21 +1354,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
       this._kampagnenModalNurUiVerstecken = true;
       try {
-        if (this.wuerfelBeutelOffen) {
-          if (S) {
-            S.beimModalUiAusblenden(
-              'wuerfel-beutel',
-              this.wuerfelBeutelFenster,
-              () => this.wuerfelBeutelSpeicherExtras(),
-            );
-          } else {
-            window.HTBAH_MODAL_FENSTER.methoden.bereinigeMinimiertZustand.call(
-              this.wuerfelBeutelFenster,
-              'wuerfel-beutel',
-            );
-          }
-          this.wuerfelBeutelOffen = false;
-        }
         if (this.musikboardOffen) {
           if (S) {
             S.beimModalUiAusblenden('musikboard', this.musikboardFenster, () => ({
@@ -1370,9 +1375,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       }
     },
     stelleOffeneBottomNavModalsAusSpeicherWiederHer() {
-      if (!this.hatAktiveKampagne) {
-        return;
-      }
       const S = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.speicher;
       const M = window.HTBAH_MODAL_FENSTER && window.HTBAH_MODAL_FENSTER.methoden;
       if (!S || !M) {
@@ -1380,7 +1382,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       }
       const I = S.MODAL_IDS;
       const w = S.lade(I.wuerfelBeutel);
-      if (w && w.offen && this.modalSpeicherPasstZurAktivenKampagne(w)) {
+      if (w && w.offen) {
         S.migriereLegacyEinmalig(I.wuerfelBeutel, this.wuerfelBeutelFenster, {
           minBreite: 300,
           minHoehe: 260,
@@ -1396,6 +1398,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           this.wuerfelModalTab = this.wuerfelBeutelTabNormalisieren(w.wuerfelModalTab);
         }
         this.wuerfelBeutelOffen = true;
+      }
+      if (!this.hatAktiveKampagne) {
+        return;
       }
       const m = S.lade(I.musikboard);
       if (m && m.offen && this.modalSpeicherPasstZurAktivenKampagne(m)) {
@@ -1535,7 +1540,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       const leer =
         ZU && typeof ZU.leererKampagnenZustand === 'function'
           ? ZU.leererKampagnenZustand()
-          : { modus: 'timer', status: 'bereit', eingabeH: 0, eingabeM: 5, eingabeS: 0, anzeigeMs: 300000, zielMs: 300000 };
+          : { modus: 'timer', status: 'bereit', eingabeH: 0, eingabeM: 0, eingabeS: 0, anzeigeMs: 0, zielMs: 0 };
       this.zeitmessungWendeGespeichertenZustandAn(leer, { badgePos: null });
     },
     zeitmessungLadeAusKampagne(kampagneId) {
@@ -3140,19 +3145,20 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
 
     <teleport to="body">
       <div
-        v-if="konfliktFabAnzeigen"
+        v-if="wuerfelbeutelFabAnzeigen"
         ref="fabStackWuerfelbeutel"
         class="htbah-wuerfelbeutel-fab-stack"
         :class="{
           'htbah-fab-stack--custom-pos': fabPos.wuerfelbeutel && fabPos.wuerfelbeutel.mode === 'fixed',
           'htbah-fab-stack--ziehen': fabZiehtId === 'wuerfelbeutel',
+          'htbah-wuerfelbeutel-fab-stack--ohne-konflikt': !konfliktFabAnzeigen,
         }"
         :style="fabStackInlineStyle('wuerfelbeutel')"
         @pointerdown="fabHoldStart($event, 'wuerfelbeutel')">
         <button
           type="button"
           class="htbah-wuerfelbeutel-fab"
-          title="Würfelbeutel (Werkzeuge). Gedrückt halten zum Verschieben."
+          :title="istSpielleitung ? 'Würfelbeutel (Werkzeuge). Gedrückt halten zum Verschieben.' : 'Würfelbeutel. Gedrückt halten zum Verschieben.'"
           aria-label="Würfelbeutel öffnen"
           @click="fabButtonKlick($event, () => wuerfelModalOeffnen('wuerfel'))">
           <span class="htbah-wuerfelbeutel-fab-icon" aria-hidden="true">🎲</span>
@@ -3537,7 +3543,6 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                 </div>
 
                 <div
-                  v-if="zeitmessungOverlaySichtbar"
                   class="htbah-zeitmessung-modal-anzeige mb-3"
                   aria-live="polite"
                   aria-atomic="true">

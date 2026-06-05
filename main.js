@@ -722,9 +722,79 @@ function kampagnenSlugAusName(name) {
   return basis || 'kampagne';
 }
 
-function kampagnenPfad(tab = 'gruppe', kampagneId = null) {
-  const erlaubt = new Set(['gruppe', 'einstellungen', 'welt', 'zufallstabellen', 'generatoren']);
-  const zielTab = erlaubt.has(tab) ? tab : 'gruppe';
+const KAMPAGNEN_TAB_IDS = new Set(['gruppe', 'einstellungen', 'welt', 'zufallstabellen', 'generatoren']);
+
+function normalisiereKampagnenTabId(tab, fallback = 'einstellungen') {
+  return KAMPAGNEN_TAB_IDS.has(tab) ? tab : fallback;
+}
+
+function leseTabProKampagneMap() {
+  const roh = leseSpielleitungZustandRoh();
+  if (!roh || !roh.tabProKampagne || typeof roh.tabProKampagne !== 'object') {
+    return {};
+  }
+  return roh.tabProKampagne;
+}
+
+function leseGespeichertenKampagnenTab(kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return null;
+  }
+  const tab = leseTabProKampagneMap()[kid];
+  return KAMPAGNEN_TAB_IDS.has(tab) ? tab : null;
+}
+
+function kampagnenEinstiegsTab(kampagneId) {
+  return leseGespeichertenKampagnenTab(kampagneId) || 'einstellungen';
+}
+
+function speichereKampagnenTab(kampagneId, tab) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  const normal = KAMPAGNEN_TAB_IDS.has(tab) ? tab : null;
+  if (!kid || !normal) {
+    return false;
+  }
+  const roh = leseSpielleitungZustandRoh();
+  if (!roh) {
+    return false;
+  }
+  if (!roh.tabProKampagne || typeof roh.tabProKampagne !== 'object') {
+    roh.tabProKampagne = {};
+  }
+  if (roh.tabProKampagne[kid] === normal) {
+    return true;
+  }
+  roh.tabProKampagne[kid] = normal;
+  return speichereSpielleitungRoh(roh);
+}
+
+function kampagneIdAusSlug(slugRaw) {
+  const slug = typeof slugRaw === 'string' ? decodeURIComponent(slugRaw) : '';
+  if (!slug) {
+    return null;
+  }
+  const zustand = ladeSpielleitungZustandLeicht();
+  const kampagnen = Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
+  const gefunden = kampagnen.find((k) => k && kampagnenSlugAusName(k.name) === slug) || null;
+  return gefunden && typeof gefunden.id === 'string' && gefunden.id ? gefunden.id : null;
+}
+
+function kampagnenEinstiegsPfadFuerSlug(slugRaw) {
+  const slug = typeof slugRaw === 'string' ? decodeURIComponent(slugRaw) : '';
+  const kid = kampagneIdAusSlug(slug);
+  if (kid) {
+    return kampagnenPfad(null, kid);
+  }
+  const sichererSlug = slug || 'kampagne';
+  return `/kampagnen/${encodeURIComponent(sichererSlug)}/einstellungen`;
+}
+
+function kampagnenPfad(tab = null, kampagneId = null) {
+  const zielTab =
+    tab === null || tab === undefined
+      ? null
+      : normalisiereKampagnenTabId(tab, 'einstellungen');
   const zustand = ladeSpielleitungZustand();
   const kampagnen = Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
   if (!kampagnen.length) {
@@ -743,7 +813,8 @@ function kampagnenPfad(tab = 'gruppe', kampagneId = null) {
   if (!aktive) {
     return '/kampagnen';
   }
-  return `/kampagnen/${encodeURIComponent(kampagnenSlugAusName(aktive.name))}/${zielTab}`;
+  const tabEffektiv = zielTab || kampagnenEinstiegsTab(aktive.id);
+  return `/kampagnen/${encodeURIComponent(kampagnenSlugAusName(aktive.name))}/${tabEffektiv}`;
 }
 
 function normalisiereZufallstabellenMedium(eintrag) {
@@ -1445,6 +1516,10 @@ function loescheSpielleitungKampagneKomplettIntern(gid, opts) {
     roh.mitgliedWahlProKampagne = {};
   }
   delete roh.mitgliedWahlProKampagne[gid];
+  if (!roh.tabProKampagne || typeof roh.tabProKampagne !== 'object') {
+    roh.tabProKampagne = {};
+  }
+  delete roh.tabProKampagne[gid];
   if (roh.aktiveKampagneId === gid) {
     const erste = roh.kampagnen.find((k) => k && k.id);
     roh.aktiveKampagneId = erste ? erste.id : null;
@@ -1493,6 +1568,10 @@ async function loescheSpielleitungKampagneKomplettAsync(kampagneId, report) {
             roh.mitgliedWahlProKampagne = {};
           }
           delete roh.mitgliedWahlProKampagne[gid];
+          if (!roh.tabProKampagne || typeof roh.tabProKampagne !== 'object') {
+            roh.tabProKampagne = {};
+          }
+          delete roh.tabProKampagne[gid];
           if (roh.aktiveKampagneId === gid) {
             const erste = roh.kampagnen.find((k) => k && k.id);
             roh.aktiveKampagneId = erste ? erste.id : null;
@@ -1567,6 +1646,7 @@ const ALLE_LOKALEN_APP_SPEICHER_KEYS = [
   'htbah_orientation_mode',
   'htbah_orientation_anchor_angle',
   'htbah_interaktive_welt_stats_anzeigen',
+  'htbah_zeichen_brett',
   'verstanden_am',
   'entwicklungshinweis_verstanden_am',
 ];
@@ -1942,7 +2022,7 @@ function ladeKampagnenZeitmessungZustand(kampagneId) {
   const leer =
     ZU && typeof ZU.leererKampagnenZustand === 'function'
       ? ZU.leererKampagnenZustand()
-      : { modus: 'timer', status: 'bereit', eingabeH: 0, eingabeM: 5, eingabeS: 0 };
+      : { modus: 'timer', status: 'bereit', eingabeH: 0, eingabeM: 0, eingabeS: 0 };
   const kampagne = findeKampagneById(ladeSpielleitungZustand(), kampagneId);
   return normalisiereKampagnenZeitmessungZustand(kampagne && kampagne.zeitmessung) || leer;
 }
@@ -5801,6 +5881,10 @@ window.HTBAH = {
   kampagnenLabelBadgeKlasse,
   aktualisiereKampagneLabels,
   kampagnenSlugAusName,
+  kampagnenEinstiegsTab,
+  kampagnenEinstiegsPfadFuerSlug,
+  kampagneIdAusSlug,
+  speichereKampagnenTab,
   kampagnenPfad,
   erstelleCharakterExportPaket,
   parseCharakterImportKandidaten,
@@ -6094,14 +6178,20 @@ const routes = [
   { path: '/einstellungen', component: window.HTBAH_SEITEN.Einstellungen },
   { path: '/kampagnen', component: window.HTBAH_SEITEN.KampagnenUebersicht },
   { path: '/kampagnen/:kampagneId', component: window.HTBAH_SEITEN.KampagneAnsicht },
-  { path: '/kampagnen/:kampagneSlug', redirect: (to) => `/kampagnen/${to.params.kampagneSlug}/gruppe` },
+  {
+    path: '/kampagnen/:kampagneSlug',
+    redirect: (to) => window.HTBAH.kampagnenEinstiegsPfadFuerSlug(to.params.kampagneSlug),
+  },
   { path: '/kampagnen/:kampagneSlug/:tab', component: window.HTBAH_SEITEN.Weltenbau },
-  { path: '/weltenbau', redirect: () => window.HTBAH.kampagnenPfad('gruppe') },
+  { path: '/weltenbau', redirect: () => window.HTBAH.kampagnenPfad() },
   { path: '/weltenbau/:tab', redirect: (to) => window.HTBAH.kampagnenPfad(to.params.tab) },
   { path: '/spielleitung', redirect: '/kampagnen' },
   { path: '/spielleiter', redirect: '/kampagnen' },
   { path: '/kampagne/:kampagneSlug/:tab', redirect: (to) => `/kampagnen/${to.params.kampagneSlug}/${to.params.tab}` },
-  { path: '/kampagne/:kampagneSlug', redirect: (to) => `/kampagnen/${to.params.kampagneSlug}/gruppe` },
+  {
+    path: '/kampagne/:kampagneSlug',
+    redirect: (to) => window.HTBAH.kampagnenEinstiegsPfadFuerSlug(to.params.kampagneSlug),
+  },
   { path: '/create', redirect: '/charakter/neu' },
   { path: '/presets', redirect: '/faehigkeiten-presets' },
   { path: '/presets/form', redirect: '/faehigkeiten-preset-bearbeiten' },
@@ -6534,6 +6624,13 @@ const app = Vue.createApp({
 app.use(router);
 router.afterEach((to) => {
   if (to.path.startsWith('/kampagnen/')) {
+    const parts = to.path.split('/').filter(Boolean);
+    if (parts.length >= 3 && parts[0] === 'kampagnen' && KAMPAGNEN_TAB_IDS.has(parts[2])) {
+      const kid = kampagneIdAusSlug(parts[1]);
+      if (kid) {
+        speichereKampagnenTab(kid, parts[2]);
+      }
+    }
     return;
   }
   if (to.path === '/nicht-gefunden') {

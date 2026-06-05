@@ -35,6 +35,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
   /** Dreh-Handle an der Auswahl (CSS-Pixel, skaliert mit Zoom). */
   const DREH_HANDLE_OFFSET_CSS = 28;
   const DREH_HANDLE_RADIUS_CSS = 9;
+  /** Max. Kantenlänge eingefügter Bilder (nach Zuschnitt, vor Speicherung). */
+  const BILD_EINFUEGE_MAX_KANTE = 2048;
+  const BILD_JPEG_QUALITAET = 0.84;
+  const BILD_WEBP_QUALITAET = 0.82;
 
   const WERKZEUG_META = {
     freihand: { label: 'Freihand', kurz: 'Freihand', icon: 'gesture' },
@@ -853,6 +857,67 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     ];
   }
 
+  function zeichenCanvasSkalierenMaxKante(inputCanvas, maxKante) {
+    if (!inputCanvas || !Number.isFinite(maxKante) || maxKante <= 0) {
+      return inputCanvas;
+    }
+    const breite = Number(inputCanvas.width) || 0;
+    const hoehe = Number(inputCanvas.height) || 0;
+    if (breite <= 0 || hoehe <= 0) {
+      return inputCanvas;
+    }
+    const groessteKante = Math.max(breite, hoehe);
+    if (groessteKante <= maxKante) {
+      return inputCanvas;
+    }
+    const faktor = maxKante / groessteKante;
+    const zielBreite = Math.max(1, Math.round(breite * faktor));
+    const zielHoehe = Math.max(1, Math.round(hoehe * faktor));
+    const canvas = document.createElement('canvas');
+    canvas.width = zielBreite;
+    canvas.height = zielHoehe;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return inputCanvas;
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(inputCanvas, 0, 0, zielBreite, zielHoehe);
+    return canvas;
+  }
+
+  function zeichenCanvasZuDataUrl(canvas) {
+    if (!canvas) {
+      return '';
+    }
+    const webpProbe = canvas.toDataURL('image/webp', BILD_WEBP_QUALITAET);
+    if (webpProbe.indexOf('data:image/webp') === 0) {
+      return webpProbe;
+    }
+    return canvas.toDataURL('image/jpeg', BILD_JPEG_QUALITAET);
+  }
+
+  function berechneBildEinfuegeBox(bildBreite, bildHoehe, ansicht, canvasBreite, canvasHoehe) {
+    const s = ansicht?.scale || 1;
+    const sichtbareW = canvasBreite / s;
+    const sichtbareH = canvasHoehe / s;
+    const ox = -((ansicht?.offsetX || 0) / s);
+    const oy = -((ansicht?.offsetY || 0) / s);
+    let w = Math.max(1, bildBreite);
+    let h = Math.max(1, bildHoehe);
+    const maxW = Math.max(32, sichtbareW * 0.75);
+    const maxH = Math.max(32, sichtbareH * 0.75);
+    const faktor = Math.min(1, maxW / w, maxH / h);
+    w *= faktor;
+    h *= faktor;
+    return {
+      x: ox + (sichtbareW - w) / 2,
+      y: oy + (sichtbareH - h) / 2,
+      w,
+      h,
+    };
+  }
+
   function zeichneMitRotation(ctx, el, zeichneInner) {
     const rot = Number(el.rot) || 0;
     if (!rot) {
@@ -876,6 +941,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
   window.HTBAH_KOMPONENTEN.ZeichenModal = {
     props: ['uiZustand'],
+    components: {
+      BildCropperModal: window.HTBAH_KOMPONENTEN.BildCropperModal,
+    },
     data() {
       const initEbenen = (() => {
         const erste = erstelleStandardEbene('Ebene 1');
@@ -1140,6 +1208,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       window.addEventListener('resize', this.beiFensterGroesseGeaendert);
       window.addEventListener('pagehide', this.flushSpeichern);
       window.addEventListener('pointerdown', this.beiGlobalemPointerdown, true);
+      this._zeichenSpeicherGeaendert = () => {
+        if (!this.uiZustand?.zeichenModalOffen) return;
+        this.ladeAusSpeicher();
+        this.rasterBildCacheLeeren();
+        this.zeichneAlles();
+      };
+      window.addEventListener('htbah:zeichen-speicher-geaendert', this._zeichenSpeicherGeaendert);
+      window.addEventListener('htbah:app-daten-vollstaendig-geleert', this._zeichenSpeicherGeaendert);
       if (this.uiZustand.zeichenModalOffen) {
         this.$nextTick(() => this.wiederherstelleZeichenAusSpeicher());
       }
@@ -1149,6 +1225,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       window.removeEventListener('pagehide', this.flushSpeichern);
       window.removeEventListener('keydown', this.onTastatur);
       window.removeEventListener('pointerdown', this.beiGlobalemPointerdown, true);
+      if (this._zeichenSpeicherGeaendert) {
+        window.removeEventListener('htbah:zeichen-speicher-geaendert', this._zeichenSpeicherGeaendert);
+        window.removeEventListener('htbah:app-daten-vollstaendig-geleert', this._zeichenSpeicherGeaendert);
+        this._zeichenSpeicherGeaendert = null;
+      }
       this.beendeZiehen();
       this.beendeResize();
       this.unbindCanvas();
@@ -1370,6 +1451,19 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       ladeAusSpeicher() {
         const z = ladeRoh();
+        if (!z || typeof z !== 'object') {
+          const ebene = erstelleStandardEbene('Ebene 1');
+          this.ebenen = [ebene];
+          this.aktiveEbeneId = ebene.id;
+          this.auswahl = [];
+          this.undoStack = [];
+          this.redoStack = [];
+          this.zwischenablage = [];
+          if (this.breite == null) this.breite = STANDARD_BREITE;
+          if (this.hoehe == null) this.hoehe = STANDARD_HOEHE;
+          this.zustandGeladen = true;
+          return;
+        }
         if (z && typeof z === 'object') {
           if (z.fenster && typeof z.fenster === 'object') {
             const f = z.fenster;
@@ -3035,6 +3129,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           });
           return;
         }
+        await this.warteRasterBilderFuerFuell();
         const sichtbareElemente = holeSichtbareElemente(this.ebenen);
         let box = gesamtBoundingBox(sichtbareElemente);
         if (!box) {
@@ -3087,6 +3182,79 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           document.body.removeChild(a);
           window.setTimeout(() => URL.revokeObjectURL(url), 1500);
         }, 'image/png');
+      },
+      bildEinfuegenOeffnen() {
+        const input = this.$refs.bildDateiInput;
+        if (!input) return;
+        input.value = '';
+        input.click();
+      },
+      async bildDateiAusgewaehlt(event) {
+        const datei = event?.target?.files?.[0];
+        if (event?.target) {
+          event.target.value = '';
+        }
+        if (!datei) return;
+        if (!String(datei.type || '').startsWith('image/')) {
+          await window.HTBAH.ui.alert({
+            titel: 'Ungültige Datei',
+            beschreibung: 'Bitte wähle eine Bilddatei aus.',
+          });
+          return;
+        }
+        const cropper = this.$refs.bildCropperModal;
+        if (!cropper || typeof cropper.oeffnenMitDatei !== 'function') return;
+        cropper.oeffnenMitDatei(datei);
+      },
+      async onBildCropSpeichern(canvas) {
+        const exportCanvas = zeichenCanvasSkalierenMaxKante(canvas, BILD_EINFUEGE_MAX_KANTE);
+        if (!exportCanvas) {
+          await window.HTBAH.ui.alert({
+            titel: 'Zuschnitt fehlgeschlagen',
+            beschreibung:
+              'Der Zuschnitt konnte nicht erstellt werden (Bild möglicherweise zu groß für den Browser).',
+          });
+          return false;
+        }
+        let src;
+        try {
+          src = zeichenCanvasZuDataUrl(exportCanvas);
+        } catch {
+          src = '';
+        }
+        if (!src || !src.startsWith('data:image/')) {
+          await window.HTBAH.ui.alert({
+            titel: 'Komprimierung fehlgeschlagen',
+            beschreibung: 'Das Bild konnte nicht für die Speicherung vorbereitet werden.',
+          });
+          return false;
+        }
+        const platz = berechneBildEinfuegeBox(
+          exportCanvas.width,
+          exportCanvas.height,
+          this.ansicht,
+          this.canvasBreite,
+          this.canvasHoehe,
+        );
+        this.verlaufSchnappschuss();
+        const neu = {
+          i: neueId(),
+          t: 'm',
+          c: '#111827',
+          d: 1,
+          x: platz.x,
+          y: platz.y,
+          w: platz.w,
+          h: platz.h,
+          src,
+        };
+        this.elemente.push(neu);
+        this.auswahl = [neu.i];
+        this.werkzeug = 'auswahl';
+        this.rasterBildCacheLeeren();
+        this.zeichneAlles();
+        this.persistDebounce();
+        return true;
       },
     },
     template: `
@@ -3341,6 +3509,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             </div>
 
             <div class="htbah-zeichen-werkzeuggruppe d-flex align-items-center gap-1 ms-auto">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                @click="bildEinfuegenOeffnen"
+                title="Bild einfügen (Zuschnitt)"
+                aria-label="Bild einfügen">
+                <span class="material-symbols-outlined">add_photo_alternate</span>
+                <span class="d-none d-lg-inline ms-1">Bild</span>
+              </button>
               <button type="button" class="btn btn-sm btn-outline-primary" :disabled="!kannExportieren" @click="exportierePng" title="Als PNG exportieren" aria-label="PNG exportieren">
                 <span class="material-symbols-outlined">download</span>
                 <span class="d-none d-md-inline ms-1">PNG</span>
@@ -3367,7 +3544,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               :style="{ touchAction: 'none' }"></canvas>
             <div class="htbah-zeichen-modal-tipp small text-muted">
               <template v-if="istAuswahlModus">
-                Klicken oder Rahmen ziehen zum Auswählen · Shift = Auswahl erweitern · Ziehen verschiebt · Dreh-Handle oben ziehen zum Drehen · Strg+C/X/V · Entf löscht
+                Klicken oder Rahmen ziehen zum Auswählen · Shift = Auswahl erweitern · Ziehen verschiebt · Dreh-Handle oben ziehen zum Drehen · Vergrößern/Verkleinern über Toolbar · Strg+C/X/V · Entf löscht
               </template>
               <template v-else-if="istHandModus">
                 Mit Maus oder Finger ziehen, um die Ansicht zu verschieben · Mausrad: zoomen · Shift + Mausrad: horizontal · Zwei Finger: zoomen
@@ -3577,6 +3754,24 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             aria-hidden="true"
             @pointerdown="starteResize"></div>
         </div>
+        <input
+          ref="bildDateiInput"
+          type="file"
+          accept="image/*"
+          class="visually-hidden"
+          tabindex="-1"
+          aria-hidden="true"
+          @change="bildDateiAusgewaehlt" />
+        <bild-cropper-modal
+          ref="bildCropperModal"
+          modal-id="htbahZeichenBildCropperModal"
+          modal-class="htbah-zeichen-bild-cropper-modal"
+          titel="Bild zuschneiden"
+          beschreibung="Wähle den sichtbaren Bildausschnitt. Das Bild wird komprimiert gespeichert (max. 2048 px Kantenlänge)."
+          speichern-text="Einfügen"
+          bild-alt-text="Bild zuschneiden"
+          dialog-class="modal-lg"
+          :on-speichern="onBildCropSpeichern" />
       </div>
     `,
   };
