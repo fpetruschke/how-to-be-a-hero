@@ -306,6 +306,24 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
     return basis;
   };
 
+  /** Session Zero: nur Fähigkeiten; Inventar optional. Stammdaten, Notizen und Vor-/Nachteile bleiben unberührt. */
+  M.vorlageSessionZeroAufCharakterAnwenden = function vorlageSessionZeroAufCharakterAnwenden(
+    charakter,
+    vorlage,
+    optionen = {},
+  ) {
+    const CM = window.HTBAH_CHARAKTER_MODEL;
+    const basis = CM.charakterMitDefaults(charakter);
+    basis.handeln = JSON.parse(JSON.stringify(vorlage.handeln));
+    basis.wissen = JSON.parse(JSON.stringify(vorlage.wissen));
+    basis.soziales = JSON.parse(JSON.stringify(vorlage.soziales));
+    if (optionen.inventarUeberschreiben) {
+      basis.inventar = JSON.parse(JSON.stringify(vorlage.inventar));
+    }
+    basis.geistesblitzVerbleibend = null;
+    return basis;
+  };
+
   M.faehigkeitenListenHtml = function faehigkeitenListenHtml(vorlage) {
     const kern = new Set(
       Array.isArray(vorlage.kernFaehigkeiten) ? vorlage.kernFaehigkeiten : [],

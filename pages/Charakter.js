@@ -32,7 +32,9 @@ window.HTBAH_SEITEN.Charakter = {
       charakterId: null,
       aktiveInfo: null,
       aktiveKategorieInfo: null,
-      zeigePresetAktionen: true,
+      zeigePresetAktionen: false,
+      stereotypInventarUeberschreiben: false,
+      charakterVorlageModalModus: 'erstellung',
       neueFaehigkeitenEntwurf: {
         handeln: { name: '', value: 0, type: 'handeln' },
         wissen: { name: '', value: 0, type: 'wissen' },
@@ -259,7 +261,6 @@ window.HTBAH_SEITEN.Charakter = {
         }
         this.aktualisiereAktivesSpielBegonnenAusRoute();
       }
-      this.zeigePresetAktionen = !this.spielleitungMitglied && this.istSetupTabAktiv;
     },
     charakter: {
       deep: true,
@@ -340,7 +341,7 @@ window.HTBAH_SEITEN.Charakter = {
         this.charakterId = null;
         this.charakterLokal = M.charakterMitDefaults(M.leererCharakter());
         this.charakterBildLokal = '';
-        this.zeigePresetAktionen = true;
+        this.zeigePresetAktionen = false;
         this.initialisiereGeistesblitzVerbleibend();
         this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
         this._prevLpSnapshot = this.normalisiereLp(this.charakterLokal.lebenspunkte);
@@ -372,7 +373,7 @@ window.HTBAH_SEITEN.Charakter = {
       this.charakterId = eintrag.id;
       this.charakterLokal = M.charakterMitDefaults(eintrag.charakter);
       this.charakterBildLokal = eintrag.charakterBild || '';
-      this.zeigePresetAktionen = pfad.endsWith('/session-zero');
+      this.zeigePresetAktionen = false;
       window.HTBAH.setzeAktivenCharakterId(eintrag.id);
       this.initialisiereGeistesblitzVerbleibend();
       this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
@@ -864,11 +865,31 @@ window.HTBAH_SEITEN.Charakter = {
       this.charakter.wissen = JSON.parse(JSON.stringify(preset.wissen));
       this.charakter.soziales = JSON.parse(JSON.stringify(preset.soziales));
     },
-    charakterVorlageModalOeffnen() {
+    charakterVorlageModalOeffnen(modus = 'erstellung') {
+      this.charakterVorlageModalModus = modus === 'sessionZero' ? 'sessionZero' : 'erstellung';
       this.$refs.charakterVorlageModal?.oeffnen();
     },
     charakterVorlageAngewendet(vorlage) {
       if (!vorlage || typeof vorlage !== 'object') {
+        return;
+      }
+      if (this.charakterVorlageModalModus === 'sessionZero') {
+        const VM = window.HTBAH_CHARAKTERVORLAGEN_MODEL;
+        if (!VM || typeof VM.vorlageSessionZeroAufCharakterAnwenden !== 'function') {
+          return;
+        }
+        const angewendet = VM.vorlageSessionZeroAufCharakterAnwenden(
+          this.charakterLokal,
+          vorlage,
+          { inventarUeberschreiben: this.stereotypInventarUeberschreiben },
+        );
+        this.charakterLokal = angewendet;
+        this.initialisiereGeistesblitzVerbleibend();
+        this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
+        const name = vorlage.name || 'Stereotyp';
+        this.importHinweis = this.stereotypInventarUeberschreiben
+          ? `Stereotyp „${name}“ – Fähigkeiten und Inventar wurden übernommen.`
+          : `Stereotyp „${name}“ – Fähigkeiten wurden übernommen.`;
         return;
       }
       const angewendet = window.HTBAH.wendeCharaktervorlageAufCharakter(
@@ -1428,6 +1449,7 @@ window.HTBAH_SEITEN.Charakter = {
         <h6 class="mb-2">Blanko-PDF-Export</h6>
         <p class="small text-body-secondary mb-2">
           Exportiert ein leeres Charakterblatt (inkl. Notizen- und Sicherheitsseite), damit Werte handschriftlich eingetragen werden können.
+          Perfekt, wenn ihr komplett analog spielt. Es gibt später noch eine PDF-Export-Option mit den Daten, die Du digital ausgefüllt hast. 
         </p>
         <div class="htbah-pdf-export-gruppe mb-0">
           <icon-text-button
@@ -1458,9 +1480,9 @@ window.HTBAH_SEITEN.Charakter = {
         <div class="row g-2">
           <div class="col-12 col-md-6">
             <div class="card p-3 h-100">
-              <h6 class="mb-2">Bestehenden Charakter importieren</h6>
+              <h6 class="mb-2">Bestehenden Charakter importieren (optional)</h6>
               <p class="small text-body-secondary mb-2">
-                Einzel-Export oder Komplett-Export. Bei mehreren enthaltenen Charakteren kannst du danach einen auswählen.
+                Einzel-Export oder Komplett-Export. Bei mehreren enthaltenen Charakteren kannst du nach der Dateiauswahl einen auswählen.
               </p>
               <div class="form-floating">
                 <input
@@ -1475,9 +1497,9 @@ window.HTBAH_SEITEN.Charakter = {
           </div>
           <div class="col-12 col-md-6">
             <div class="card p-3 h-100 d-flex flex-column">
-              <h6 class="mb-2">Beispiel-Stereotyp auswählen</h6>
+              <h6 class="mb-2">Beispiel-Stereotyp auswählen (optional)</h6>
               <p class="small text-body-secondary mb-2">
-                Starte mit einem Heldentyp aus Mittelalter/Fantasy, Gegenwart oder Sci-Fi — inklusive
+                Starte mit einem Heldentyp aus Beispiel "Epochen" — inklusive
                 vorgeschlagener Stammdaten, Fähigkeiten und Inventar (nur Preset-Fähigkeiten).
               </p>
               <icon-text-button
@@ -1495,7 +1517,9 @@ window.HTBAH_SEITEN.Charakter = {
         </p>
       </div>
 
-      <div v-if="importHinweis && !spielleitungMitglied && istNeuModus" class="alert alert-secondary py-2 mb-2">
+      <div
+        v-if="importHinweis && !spielleitungMitglied && (istNeuModus || istSetupTabAktiv)"
+        class="alert alert-secondary py-2 mb-2">
         {{ importHinweis }}
       </div>
 
@@ -1504,7 +1528,7 @@ window.HTBAH_SEITEN.Charakter = {
         class="alert alert-info mb-2"
         role="note">
         <p class="small mb-0">
-          Wie sieht Dein Charakter aus? Gibt es eine Hintergrundgeschichte? Was steckt bereits im Inventar?
+          <span aria-hidden="true">💡</span> Wie sieht Dein Charakter aus? Gibt es eine Hintergrundgeschichte? Was steckt bereits im Inventar?
         </p>
       </div>
 
@@ -1897,14 +1921,15 @@ window.HTBAH_SEITEN.Charakter = {
           <h5 class="mb-0">Fähigkeiten</h5>
           <div class="d-flex align-items-center gap-2">
             <button
-              v-if="!spielleitungMitglied"
+              v-if="!spielleitungMitglied && istSetupTabAktiv"
               type="button"
               class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
               @click="presetAktionenUmschalten"
               :aria-expanded="zeigePresetAktionen ? 'true' : 'false'"
-              aria-controls="ce-preset-karte"
-              aria-label="Fähigkeiten-Preset-Bereich ein- oder ausklappen">
-              <span>Presets</span>
+              aria-controls="ce-import-beispiele-bereich"
+              aria-label="Import- und Beispielbereich ein- oder ausklappen">
+              <span class="material-symbols-outlined" aria-hidden="true">library_add</span>
+              <span>Import &amp; Beispiele</span>
               <span class="material-symbols-outlined" aria-hidden="true">
                 {{ zeigePresetAktionen ? 'expand_less' : 'expand_more' }}
               </span>
@@ -1920,32 +1945,69 @@ window.HTBAH_SEITEN.Charakter = {
           </div>
         </div>
 
-        <div v-if="zeigePresetAktionen && !spielleitungMitglied" id="ce-preset-karte" class="card p-2 mb-2">
-          <h6 class="mb-1">Fähigkeiten-Presets importieren</h6>
-          <p class="small text-body-secondary mb-2">
-            Die Spielleitung kann Dir ein Fähigkeiten-Preset als .json-Datei zukommen lassen.
-            Dieses kannst Du dann hier importieren, um es als Basis zu nutzen.
-          </p>
-          <div class="form-floating mb-2">
-            <select id="ce-preset-wahl" class="form-select" v-model="ausgewaehltesPreset">
-              <option value="">Fähigkeiten-Preset wählen …</option>
-              <option v-for="preset in presets" :value="preset.name">
-                {{preset.name}}
-              </option>
-            </select>
-            <label for="ce-preset-wahl">Fähigkeiten-Preset (lokal gespeichert)</label>
+        <div
+          v-if="zeigePresetAktionen && !spielleitungMitglied && istSetupTabAktiv"
+          id="ce-import-beispiele-bereich"
+          class="row g-2 mb-2">
+          <div class="col-12 col-md-6">
+            <div id="ce-preset-karte" class="card p-2 h-100">
+              <strong class="mb-1 d-block">Fähigkeiten-Presets importieren</strong>
+              <p class="small text-body-secondary mb-2">
+                Die Spielleitung kann Dir ein Fähigkeiten-Preset als .json-Datei zukommen lassen.
+                Dieses kannst Du dann hier importieren, um es als Basis zu nutzen.
+              </p>
+              <label for="ce-preset-wahl" class="form-label small text-body-secondary mb-1">
+                Fähigkeiten-Preset
+              </label>
+              <div class="input-group mb-2">
+                <select id="ce-preset-wahl" class="form-select" v-model="ausgewaehltesPreset">
+                  <option value="">Fähigkeiten-Preset wählen …</option>
+                  <option v-for="preset in presets" :value="preset.name">
+                    {{preset.name}}
+                  </option>
+                </select>
+                <button type="button" class="btn btn-primary" @click="presetAnwenden">
+                  Fähigkeiten-Preset anwenden
+                </button>
+              </div>
+              <p class="small text-body-secondary text-center mb-2">oder</p>
+              <div class="form-floating mb-0">
+                <input
+                  id="ce-preset-import"
+                  type="file"
+                  accept="application/json,.json"
+                  class="form-control"
+                  @change="presetAusDateiAnwenden" />
+                <label for="ce-preset-import">Fähigkeiten-Preset aus Datei laden</label>
+              </div>
+            </div>
           </div>
-          <button class="btn btn-primary w-100 mb-2" @click="presetAnwenden">
-            Fähigkeiten-Preset anwenden
-          </button>
-          <div class="form-floating mb-0">
-            <input
-              id="ce-preset-import"
-              type="file"
-              accept="application/json,.json"
-              class="form-control"
-              @change="presetAusDateiAnwenden" />
-            <label for="ce-preset-import">Fähigkeiten-Preset aus Datei laden</label>
+          <div class="col-12 col-md-6">
+            <div id="ce-stereotyp-karte" class="card p-2 h-100 d-flex flex-column">
+              <strong class="mb-1 d-block">Beispiel-Stereotyp auswählen</strong>
+              <p class="small text-body-secondary mb-2">
+                Übernimm Fähigkeiten eines Heldentyps aus Mittelalter/Fantasy, Gegenwart oder Sci-Fi.
+                Stammdaten und Notizen bleiben unverändert; optional kann das Inventar mit übernommen werden.
+              </p>
+              <div class="form-check form-switch mb-2">
+                <input
+                  id="ce-stereotyp-inventar"
+                  v-model="stereotypInventarUeberschreiben"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch" />
+                <label class="form-check-label" for="ce-stereotyp-inventar">
+                  Inventar des Stereotypen übernehmen
+                </label>
+              </div>
+              <icon-text-button
+                type="button"
+                class="btn btn-outline-primary w-100 mt-auto"
+                symbol="🧙"
+                @click="charakterVorlageModalOeffnen('sessionZero')">
+                Beispiel-Stereotyp wählen
+              </icon-text-button>
+            </div>
           </div>
         </div>
 
@@ -2520,6 +2582,8 @@ window.HTBAH_SEITEN.Charakter = {
       />
       <charakter-vorlage-modal
         ref="charakterVorlageModal"
+        :modus="charakterVorlageModalModus"
+        :inventar-ueberschreiben="stereotypInventarUeberschreiben"
         @angewendet="charakterVorlageAngewendet"
       />
       <div class="abstandshalter" aria-hidden="true"></div>

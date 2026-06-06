@@ -2,6 +2,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 const HTBAH_VORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL;
 
 window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
+  props: {
+    modus: {
+      type: String,
+      default: 'erstellung',
+      validator: (v) => v === 'erstellung' || v === 'sessionZero',
+    },
+    inventarUeberschreiben: {
+      type: Boolean,
+      default: false,
+    },
+  },
   emits: ['angewendet'],
   data() {
     return {
@@ -47,6 +58,21 @@ window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
     },
     kannUebernehmen() {
       return Boolean(this.vorlageVorschau) && this.vorschauPunkte <= 400;
+    },
+    istSessionZeroModus() {
+      return this.modus === 'sessionZero';
+    },
+    modalTitel() {
+      return this.istSessionZeroModus ? 'Beispiel-Stereotyp wählen' : 'Charaktervorlage wählen';
+    },
+    einleitungstext() {
+      if (this.istSessionZeroModus) {
+        return 'Wähle eine Epoche und einen Heldentyp. Es werden nur die Fähigkeiten (Handeln, Wissen, Soziales) übernommen — Stammdaten und Notizen bleiben erhalten.';
+      }
+      return 'Wähle eine Epoche und einen Heldentyp. Die Vorlage setzt Fähigkeiten (nur Preset-Namen), Inventar und Stammdaten-Vorschläge (z. B. Name und Beruf). Geistesblitzpunkte werden danach automatisch ermittelt.';
+    },
+    uebernehmenButtonText() {
+      return this.istSessionZeroModus ? 'Stereotyp übernehmen' : 'Vorlage übernehmen';
     },
   },
   methods: {
@@ -126,14 +152,23 @@ window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
       if (!this.kannUebernehmen || !this.vorlageVorschau) {
         return;
       }
-      const titel = this.vorlageVorschau.name
-        ? `„${this.vorlageVorschau.name}“ übernehmen?`
-        : 'Vorlage übernehmen?';
+      const nameTeil = this.vorlageVorschau.name
+        ? `„${this.vorlageVorschau.name}“`
+        : 'den gewählten Stereotyp';
+      let beschreibung;
+      if (this.istSessionZeroModus) {
+        const faehigkeitenTeil = `Die Fähigkeiten (Handeln, Wissen, Soziales) von ${nameTeil} ersetzen die bisherigen Fähigkeiten. Stammdaten und Notizen bleiben erhalten.`;
+        beschreibung = this.inventarUeberschreiben
+          ? `${faehigkeitenTeil} Das Inventar wird ebenfalls durch das des Stereotypen ersetzt.`
+          : faehigkeitenTeil;
+      } else {
+        beschreibung = `${nameTeil} übernehmen? Fähigkeiten, Inventar und Stammdaten-Vorschläge werden gesetzt. Bereits eingegebene Werte in diesen Bereichen werden ersetzt.`;
+      }
       const bestaetigt = await window.HTBAH.ui.confirm({
-        titel: 'Charaktervorlage anwenden?',
-        beschreibung: `${titel} Fähigkeiten, Inventar und Stammdaten-Vorschläge werden gesetzt. Bereits eingegebene Werte in diesen Bereichen werden ersetzt.`,
-        bestaetigenText: 'Vorlage übernehmen',
-        bestaetigenButtonClass: 'btn-primary',
+        titel: this.istSessionZeroModus ? 'Stereotyp anwenden?' : 'Charaktervorlage anwenden?',
+        beschreibung,
+        bestaetigenText: this.uebernehmenButtonText,
+        bestaetigenButtonClass: this.istSessionZeroModus ? 'btn-danger' : 'btn-primary',
         warnhinweisAnzeigen: false,
       });
       if (!bestaetigt) {
@@ -153,14 +188,11 @@ window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content shadow-lg">
           <div class="modal-header">
-            <h5 class="modal-title" id="charakterVorlageModalLabel">Charaktervorlage wählen</h5>
+            <h5 class="modal-title" id="charakterVorlageModalLabel">{{ modalTitel }}</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
           </div>
           <div class="modal-body">
-            <p class="small text-body-secondary">
-              Wähle eine Epoche und einen Heldentyp. Die Vorlage setzt Fähigkeiten (nur Preset-Namen),
-              Inventar und Stammdaten-Vorschläge (z. B. Name und Beruf). Geistesblitzpunkte werden danach automatisch ermittelt.
-            </p>
+            <p class="small text-body-secondary">{{ einleitungstext }}</p>
             <div v-if="laedt" class="text-center py-3 text-body-secondary">Vorlagen werden geladen …</div>
             <div v-else-if="fehler" class="alert alert-warning py-2">{{ fehler }}</div>
             <template v-else>
@@ -227,7 +259,7 @@ window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
             <button type="button" class="btn btn-primary" :disabled="!kannUebernehmen" @click="uebernehmen">
-              Vorlage übernehmen
+              {{ uebernehmenButtonText }}
             </button>
           </div>
         </div>
