@@ -18,7 +18,11 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
     return {
       aktiveInfo: null,
       aktiveKategorieInfo: null,
-      neueFaehigkeit: { name: '', value: 0, type: 'handeln' },
+      neueFaehigkeitenEntwurf: {
+        handeln: { name: '', value: 0, type: 'handeln' },
+        wissen: { name: '', value: 0, type: 'wissen' },
+        soziales: { name: '', value: 0, type: 'soziales' },
+      },
       bearbeitungReferenz: null,
       bearbeitungKategorie: '',
       bearbeitungEntwurf: { name: '', value: 0, type: 'handeln' },
@@ -65,20 +69,6 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
     },
     zeigtHeldenLimitHinweis() {
       return this.istSl && this.punkte > 400;
-    },
-    presetSkillNamen() {
-      const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
-      const pid =
-        this.presetId ||
-        (EF && typeof EF.presetIdFuerEntitaet === 'function'
-          ? EF.presetIdFuerEntitaet('npc', this.entitaet, 'mittelalter')
-          : '');
-      const preset = EF && typeof EF.findePreset === 'function' ? EF.findePreset(pid) : null;
-      const CV = window.HTBAH_CHARAKTERVORLAGEN_MODEL;
-      if (!preset || !CV || typeof CV.skillNamenAusPreset !== 'function') {
-        return [];
-      }
-      return [...CV.skillNamenAusPreset(preset)].sort((a, b) => a.localeCompare(b, 'de'));
     },
     maxWertProSkill() {
       return this.istSl ? 200 : 100;
@@ -269,8 +259,15 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
         this.entitaet[kategorie].splice(index, 1);
       }
     },
-    async faehigkeitHinzufuegen() {
-      const nameTrim = String(this.neueFaehigkeit.name || '').trim();
+    leererFaehigkeitEntwurf(kategorie) {
+      return { name: '', value: 0, type: kategorie };
+    },
+    async faehigkeitHinzufuegenFuerKategorie(kategorie) {
+      const entwurf = this.neueFaehigkeitenEntwurf[kategorie];
+      if (!entwurf) {
+        return;
+      }
+      const nameTrim = String(entwurf.name || '').trim();
       if (!nameTrim) {
         await window.HTBAH.ui.alert({
           titel: 'Eingabe unvollständig',
@@ -278,17 +275,15 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
         });
         return;
       }
-      const wert = Number(this.neueFaehigkeit.value);
+      const wert = Number(entwurf.value);
       if (!(await this.wertGueltig(wert, this.punkte, 0))) {
         return;
       }
-      const kat = this.neueFaehigkeit.type;
-      if (!Array.isArray(this.entitaet[kat])) {
-        this.entitaet[kat] = [];
+      if (!Array.isArray(this.entitaet[kategorie])) {
+        this.entitaet[kategorie] = [];
       }
-      this.entitaet[kat].push({ name: nameTrim, value: wert });
-      this.neueFaehigkeit.name = '';
-      this.neueFaehigkeit.value = 0;
+      this.entitaet[kategorie].push({ name: nameTrim, value: wert });
+      this.neueFaehigkeitenEntwurf[kategorie] = this.leererFaehigkeitEntwurf(kategorie);
     },
   },
   template: `
@@ -392,17 +387,17 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
                 </tbody>
               </table>
             </div>
+            <faehigkeit-formular
+              v-if="zeigeNeuFormular"
+              v-model="neueFaehigkeitenEntwurf[kategorie]"
+              class="mt-2"
+              :id-prefix="idPrefix + '-neu-' + kategorie"
+              :fixed-type="kategorie"
+              inline
+              @submit="faehigkeitHinzufuegenFuerKategorie(kategorie)" />
           </div>
         </div>
         </div>
-      </div>
-      <div v-if="zeigeNeuFormular" class="card p-2">
-        <h5 class="h6 mb-2">Neue Fähigkeit</h5>
-        <faehigkeit-formular v-model="neueFaehigkeit" :id-prefix="idPrefix + '-neu'" />
-        <datalist v-if="presetSkillNamen.length" :id="idPrefix + '-skill-datalist'">
-          <option v-for="n in presetSkillNamen" :key="idPrefix + '-sk-' + n" :value="n"></option>
-        </datalist>
-        <button type="button" class="btn btn-primary w-100 mt-2 btn-sm" @click="faehigkeitHinzufuegen">Hinzufügen</button>
       </div>
       <div
         class="modal fade"

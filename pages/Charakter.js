@@ -1299,7 +1299,7 @@ window.HTBAH_SEITEN.Charakter = {
       this.$refs.initiativeModal.oeffnen();
     },
     schadenModalOeffnen() {
-      this.$refs.schadenModal.oeffnen();
+      this.$refs.schadenModal.oeffnen({ charakter: this.charakter });
     },
     paradeModalOeffnen() {
       const inventar = Array.isArray(this.charakter?.inventar) ? this.charakter.inventar : [];

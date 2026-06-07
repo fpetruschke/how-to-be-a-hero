@@ -148,6 +148,7 @@ var HTBAH_REFACTOR_UTILS =
           startNodeX: 0,
           startNodeY: 0,
           bewegt: false,
+          besitzerBeiStart: null,
         },
         ortBildDrag: {
           aktiv: false,
@@ -223,6 +224,7 @@ var HTBAH_REFACTOR_UTILS =
           prevLpSnapshot: 0,
           fenster: { ...window.HTBAH_MODAL_FENSTER.erstelleBasisDaten() },
         },
+        charakterModalAllein: false,
         spielleitungTick: 0,
         interaktiveWeltStatsAnzeigen:
           window.HTBAH && typeof window.HTBAH.ladeInteraktiveWeltStatsAnzeigen === 'function'
@@ -601,6 +603,9 @@ var HTBAH_REFACTOR_UTILS =
         }
         return statusFuerLebenspunkte(this.charakterModal.charakter);
       },
+      zeigtKartenHauptfenster() {
+        return !this.charakterModalAllein;
+      },
       charakterKampfZustandOptionen() {
         return [
           { id: 'vital', label: 'Vital', emoji: '💚' },
@@ -974,7 +979,7 @@ var HTBAH_REFACTOR_UTILS =
           this.schliesseAnlageModalOhnePruefung();
         }
         if (this.charakterModal.offen) {
-          this.schliesseCharakterModalOhnePruefung();
+          this.schliesseCharakterModalOhnePruefung(true);
         }
       },
       async speichereAlleUngespeicherteBearbeitungen() {
@@ -1117,7 +1122,22 @@ var HTBAH_REFACTOR_UTILS =
           return;
         }
         const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
-        if (!mentionApi || typeof mentionApi.consumeNavigationTarget !== 'function') {
+        if (
+          !mentionApi ||
+          typeof mentionApi.peekNavigationTarget !== 'function' ||
+          typeof mentionApi.consumeNavigationTarget !== 'function'
+        ) {
+          return;
+        }
+        const pending = mentionApi.peekNavigationTarget();
+        if (!pending || !pending.entityType || !pending.entityId) {
+          return;
+        }
+        if (
+          typeof mentionApi.istNavigationTargetAktuell === 'function' &&
+          !mentionApi.istNavigationTargetAktuell(pending)
+        ) {
+          mentionApi.consumeNavigationTarget();
           return;
         }
         const target = mentionApi.consumeNavigationTarget();
@@ -1125,6 +1145,12 @@ var HTBAH_REFACTOR_UTILS =
           return;
         }
         const focusOnly = target.openMode === 'focus';
+        const bearbeitenNur = target.openMode === 'open';
+        if (bearbeitenNur && String(target.entityType || '').trim() === 'charakter') {
+          this.charakterModalAllein = true;
+          this.oeffneCharakterModal({ data: { entityType: 'charakter', entityId: target.entityId } });
+          return;
+        }
         if (!focusOnly) {
           const erfolg = this.oeffneEntitaetAusMention(target);
           if (!erfolg) {
@@ -1166,7 +1192,25 @@ var HTBAH_REFACTOR_UTILS =
         if (!detail || !detail.entityType || !detail.entityId) {
           return;
         }
+        const ts = Number(detail.ts);
+        const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
+        if (
+          Number.isFinite(ts) &&
+          ts > 0 &&
+          mentionApi &&
+          typeof mentionApi.istNavigationTargetAktuell === 'function' &&
+          !mentionApi.istNavigationTargetAktuell({ ts })
+        ) {
+          return;
+        }
         const focusOnly = detail.openMode === 'focus';
+        const bearbeitenNur = detail.openMode === 'open';
+        if (bearbeitenNur && String(detail.entityType || '').trim() === 'charakter') {
+          this.charakterModalAllein = true;
+          this.oeffneCharakterModal({ data: { entityType: 'charakter', entityId: detail.entityId } });
+          event.preventDefault();
+          return;
+        }
         const erfolg = focusOnly ? true : this.oeffneEntitaetAusMention(detail);
         if (erfolg) {
           this.$nextTick(() => {
@@ -1463,7 +1507,6 @@ var HTBAH_REFACTOR_UTILS =
         this.$nextTick(() => {
           this.$nextTick(() => {
             this.wendeCharakterErstfokusWennNoetig();
-            this.verarbeiteMentionNavigationTarget();
           });
         });
       },
@@ -2659,6 +2702,40 @@ var HTBAH_REFACTOR_UTILS =
         });
         return { closest, distance: closestD };
       },
+      findeDropZielFuerNodeDrag(sourceNode, event) {
+        if (!sourceNode || !sourceNode.data) {
+          return null;
+        }
+        const overlapZiel = this.findeUeberlappendesZuordnungsZiel(sourceNode);
+        if (overlapZiel) {
+          return overlapZiel;
+        }
+        if (this.map && this.map.dragHoverNodeId) {
+          const hover = this.findeNode(this.map.dragHoverNodeId);
+          if (hover && hover.id !== sourceNode.id) {
+            return hover;
+          }
+        }
+        return this.findeDropTargetNode(event, sourceNode.id);
+      },
+      gegenstandZeileFuerId(gegenstandId) {
+        const id = String(gegenstandId || '').trim();
+        if (!id) {
+          return null;
+        }
+        return (this.zustand.gegenstaende || []).find((g) => g && g.id === id) || null;
+      },
+      gegenstandBesitzerSnapshot(gegenstandRow) {
+        if (!gegenstandRow || typeof gegenstandRow !== 'object') {
+          return null;
+        }
+        const typ = String(gegenstandRow.besitzerTyp || '').trim();
+        const id = String(gegenstandRow.besitzerId || '').trim();
+        if (!typ || !id) {
+          return null;
+        }
+        return { typ, id };
+      },
       findeDropTargetNode(event, draggedNodeId) {
         if (!event || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) {
           return null;
@@ -3430,6 +3507,17 @@ var HTBAH_REFACTOR_UTILS =
               ),
             };
           });
+          if (
+            this.charakterModal.offen &&
+            this.charakterModal.mitgliedId === id &&
+            this.charakterModal.charakter &&
+            Array.isArray(this.charakterModal.charakter.inventar)
+          ) {
+            this.charakterModal.charakter.inventar = this.charakterModal.charakter.inventar.filter(
+              (item) => item && String(item.gegenstandId || '').trim() !== gid,
+            );
+            this.$nextTick(() => this.charakterInventarEditorenSync());
+          }
         }
       },
       befreieGegenstandBesitzer(gegenstandId) {
@@ -3544,8 +3632,17 @@ var HTBAH_REFACTOR_UTILS =
         if (!gegenstandId || !targetId) {
           return false;
         }
+        const gid = String(gegenstandId);
+        const altRow = this.gegenstandZeileFuerId(gid);
+        const altBesitzer = this.gegenstandBesitzerSnapshot(altRow);
+        if (
+          altBesitzer &&
+          (altBesitzer.typ !== targetType || altBesitzer.id !== String(targetId))
+        ) {
+          this.entferneGegenstandAusBesitzerInventar(altBesitzer.typ, altBesitzer.id, gid);
+        }
         const eintrag = this.erzeugeInventarEintragAusGegenstand(gegenstand);
-        eintrag.gegenstandId = String(gegenstandId);
+        eintrag.gegenstandId = gid;
         let ok = false;
         if (targetType === 'charakter') {
           ok = this.updateCharakterZuordnung(targetId, (charakter) => {
@@ -3718,6 +3815,11 @@ var HTBAH_REFACTOR_UTILS =
         this.nodeDrag.startNodeX = (node.position && Number(node.position.x)) || 0;
         this.nodeDrag.startNodeY = (node.position && Number(node.position.y)) || 0;
         this.nodeDrag.bewegt = false;
+        this.nodeDrag.besitzerBeiStart = null;
+        if (node.data && node.data.entityType === 'gegenstand') {
+          const row = this.gegenstandZeileFuerId(node.data.entityId);
+          this.nodeDrag.besitzerBeiStart = this.gegenstandBesitzerSnapshot(row);
+        }
         this.setzeDragHoverZiel('');
         event.preventDefault();
       },
@@ -3824,7 +3926,8 @@ var HTBAH_REFACTOR_UTILS =
         }
         this.schliesseCharakterModalOhnePruefung();
       },
-      schliesseCharakterModalOhnePruefung() {
+      schliesseCharakterModalOhnePruefung(skipParentSchliessen) {
+        const warAllein = this.charakterModalAllein;
         this.charakterQuillAufraeumen();
         this.uebernehmeCharakterInventarQuillInModel();
         this.beendeCharakterInventarEditoren();
@@ -3841,6 +3944,10 @@ var HTBAH_REFACTOR_UTILS =
         this.charakterModal.fenster.istVollbild = false;
         this.bearbeitungSnapshots.charakter = '';
         this.bearbeitungUngespeichert.charakter = false;
+        this.charakterModalAllein = false;
+        if (warAllein && !skipParentSchliessen) {
+          this.$emit('schliessen');
+        }
       },
       begrenzeCharakterFensterGroesse(breite, hoehe) {
         return window.HTBAH_MODAL_FENSTER.utils.begrenzeGroesse(breite, hoehe, 420, 320);
@@ -5066,10 +5173,10 @@ var HTBAH_REFACTOR_UTILS =
             if (node.data && node.data.entityType !== 'ort') {
               let wurdeAktualisiert = false;
               if (this.nodeDrag.bewegt) {
-                const dropTarget =
-                  this.findeDropTargetNode(event, node.id) ||
-                  (this.map.dragHoverNodeId ? this.findeNode(this.map.dragHoverNodeId) : null);
-                wurdeAktualisiert = this.wendeDropVerknuepfungAn(node, dropTarget);
+                const dropTarget = this.findeDropZielFuerNodeDrag(node, event);
+                if (dropTarget) {
+                  wurdeAktualisiert = this.wendeDropVerknuepfungAn(node, dropTarget);
+                }
               }
               if (!wurdeAktualisiert && node.data.entityType !== 'charakter') {
                 const nah = this.naechsterOrtNodeZu(node);
@@ -5083,6 +5190,17 @@ var HTBAH_REFACTOR_UTILS =
                   }
                 }
               }
+              if (
+                !wurdeAktualisiert &&
+                node.data.entityType === 'gegenstand' &&
+                this.nodeDrag.bewegt &&
+                this.nodeDrag.besitzerBeiStart &&
+                this.nodeDrag.besitzerBeiStart.typ &&
+                this.nodeDrag.besitzerBeiStart.id
+              ) {
+                this.befreieGegenstandBesitzer(node.data.entityId);
+                wurdeAktualisiert = true;
+              }
               if (wurdeAktualisiert) {
                 this.refreshGraph();
               }
@@ -5091,6 +5209,7 @@ var HTBAH_REFACTOR_UTILS =
         }
         this.nodeDrag.aktiv = false;
         this.nodeDrag.nodeId = '';
+        this.nodeDrag.besitzerBeiStart = null;
         this.setzeDragHoverZiel('');
         this.map.panning = false;
         this.bestaetigeVerlaufAktion();
@@ -5388,7 +5507,6 @@ var HTBAH_REFACTOR_UTILS =
             geheimnis: '',
             stimme: '',
             lebenspunkte: '60',
-            waffenloserKampf: '',
             aufenthaltsort: ortDefault,
             handeln: 12,
             wissen: 14,
@@ -5466,9 +5584,6 @@ var HTBAH_REFACTOR_UTILS =
         const zeile = {
           id: window.HTBAH.neueEntropieId(),
           name: '',
-          istWaffe: false,
-          schadenswertNahkampf: '',
-          schadenswertFernkampf: '',
           aufenthaltsort: ortDefault,
           inGegenstandId: '',
           besitzerTyp: '',
@@ -6661,15 +6776,29 @@ var HTBAH_REFACTOR_UTILS =
         const index = Number.isInteger(this.anlage.index) ? this.anlage.index : -1;
         const z = JSON.parse(JSON.stringify(this.anlage.zeile));
         if (typ === 'npc') {
-          z.handeln = this.normalisiereBegabungswert(z.handeln);
-          z.wissen = this.normalisiereBegabungswert(z.wissen);
-          z.soziales = this.normalisiereBegabungswert(z.soziales);
-          z.initiative = this.normalisiereInitiativeWert(z.initiative, z.handeln);
+          const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+          if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
+            z.handeln = this.normalisiereBegabungswert(z.handeln);
+            z.wissen = this.normalisiereBegabungswert(z.wissen);
+            z.soziales = this.normalisiereBegabungswert(z.soziales);
+          }
+          const handelnBeg =
+            EF && typeof EF.begabungHandelnAusEntitaet === 'function'
+              ? EF.begabungHandelnAusEntitaet(z)
+              : this.normalisiereBegabungswert(z.handeln);
+          z.initiative = this.normalisiereInitiativeWert(z.initiative, handelnBeg);
         } else if (typ === 'bestie') {
-          z.handeln = this.normalisiereBegabungswert(z.handeln);
-          z.wissen = this.normalisiereBegabungswert(z.wissen);
-          z.soziales = this.normalisiereBegabungswert(z.soziales);
-          z.initiative = this.normalisiereInitiativeWert(z.initiative, z.handeln);
+          const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+          if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
+            z.handeln = this.normalisiereBegabungswert(z.handeln);
+            z.wissen = this.normalisiereBegabungswert(z.wissen);
+            z.soziales = this.normalisiereBegabungswert(z.soziales);
+          }
+          const handelnBeg =
+            EF && typeof EF.begabungHandelnAusEntitaet === 'function'
+              ? EF.begabungHandelnAusEntitaet(z)
+              : this.normalisiereBegabungswert(z.handeln);
+          z.initiative = this.normalisiereInitiativeWert(z.initiative, handelnBeg);
           z.fraktionen = this.normalisiereFraktionenArray(z.fraktionen);
         } else if (typ === 'gegenstand') {
           z.initiative = this.normalisiereInitiativeWert(z.initiative, 40);
@@ -7001,7 +7130,7 @@ var HTBAH_REFACTOR_UTILS =
     template: `
       <div v-if="offen" class="regelwerk-modal-layer htbah-weltenbau-map-layer">
         <div
-          v-show="!modal.minimiert"
+          v-show="zeigtKartenHauptfenster && !modal.minimiert"
           ref="fensterElement"
           class="regelwerk-modal-window card shadow-lg htbah-weltenbau-map-window"
           :class="{ 'regelwerk-modal-window-fullscreen': modal.istVollbild }"
@@ -7729,8 +7858,8 @@ var HTBAH_REFACTOR_UTILS =
                 class="htbah-map-charakterbild htbah-map-charakterbild--gross" />
               <div class="fw-semibold">{{ charakterModal.charakter.name || 'Charakter' }}</div>
             </div>
-            <div class="row g-2">
-              <div class="col-md-6">
+            <div class="row g-2 mb-2 align-items-start">
+              <div class="col-md-4">
                 <div class="form-floating">
                   <input
                     class="form-control"
@@ -7743,6 +7872,29 @@ var HTBAH_REFACTOR_UTILS =
                   <label>Lebenspunkte</label>
                 </div>
               </div>
+              <div class="col-md-8">
+                <label class="form-label small text-secondary mb-1">Zustand</label>
+                <div class="btn-group w-100 htbah-kampf-zustand-toggle" role="group" aria-label="Kampfzustand">
+                  <button
+                    v-for="opt in charakterKampfZustandOptionen"
+                    :key="'wb-char-kz-' + opt.id"
+                    type="button"
+                    class="btn btn-sm"
+                    :class="charakterModal.charakter.kampfZustand === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
+                    :aria-pressed="charakterModal.charakter.kampfZustand === opt.id ? 'true' : 'false'"
+                    @click="setzeCharakterModalKampfZustand(opt.id)">
+                    <span class="htbah-kampf-zustand-btn-inhalt">
+                      <span class="htbah-kampf-zustand-btn-ico" aria-hidden="true">{{ opt.emoji }}</span>
+                      <span class="htbah-kampf-zustand-btn-text">{{ opt.label }}</span>
+                    </span>
+                  </button>
+                </div>
+                <p class="form-text mb-0 mt-1">
+                  Wird bei LP-Änderung automatisch gesetzt (0 = tot, 1–10 oder −60+ auf einmal = bewusstlos).
+                </p>
+              </div>
+            </div>
+            <div class="row g-2">
               <div class="col-md-6">
                 <label class="form-label small text-secondary mb-1">Geistesblitz (Handeln/Wissen/Soziales)</label>
                 <div class="d-flex gap-1">
@@ -7810,27 +7962,6 @@ var HTBAH_REFACTOR_UTILS =
               </div>
             </div>
             <div class="row g-2 mt-1 mb-2">
-              <div class="col-12">
-                <label class="form-label small text-secondary mb-1">Zustand</label>
-                <div class="btn-group w-100 htbah-kampf-zustand-toggle" role="group" aria-label="Kampfzustand">
-                  <button
-                    v-for="opt in charakterKampfZustandOptionen"
-                    :key="'wb-char-kz-' + opt.id"
-                    type="button"
-                    class="btn btn-sm"
-                    :class="charakterModal.charakter.kampfZustand === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
-                    :aria-pressed="charakterModal.charakter.kampfZustand === opt.id ? 'true' : 'false'"
-                    @click="setzeCharakterModalKampfZustand(opt.id)">
-                    <span class="htbah-kampf-zustand-btn-inhalt">
-                      <span class="htbah-kampf-zustand-btn-ico" aria-hidden="true">{{ opt.emoji }}</span>
-                      <span class="htbah-kampf-zustand-btn-text">{{ opt.label }}</span>
-                    </span>
-                  </button>
-                </div>
-                <p class="form-text mb-0 mt-1">
-                  Wird bei LP-Änderung automatisch gesetzt (0 = tot, 1–10 oder −60+ auf einmal = bewusstlos).
-                </p>
-              </div>
               <div class="col-6">
                 <button
                   type="button"

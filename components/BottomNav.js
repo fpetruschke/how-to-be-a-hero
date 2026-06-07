@@ -22,6 +22,12 @@ const HTBAH_FAB_HOLD_BEWEGUNG_ABBRUCH_PX = 12;
 
 /** Abstand zwischen zwei übereinander gestapelten FABs (3rem + gap). */
 const HTBAH_FAB_STACK_OFFSET_PX = 55;
+/** Atmosphäre-Badge: Intro-Skalierung und Dauer beim Kampagnenwechsel. */
+const HTBAH_ATMOSPHAERE_BADGE_INTRO_SCALE = 5;
+const HTBAH_ATMOSPHAERE_BADGE_INTRO_MS = 1000;
+/** Intro-Startpunkt relativ zum Viewport (0–1), leicht oberhalb links der Mitte. */
+const HTBAH_ATMOSPHAERE_BADGE_INTRO_ANKER_X = 0.44;
+const HTBAH_ATMOSPHAERE_BADGE_INTRO_ANKER_Y = 0.42;
 
 window.HTBAH_KOMPONENTEN.BottomNav = {
   components: {
@@ -105,6 +111,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       _kampagnenModalNurUiVerstecken: false,
       _badgeDragMoveHandler: null,
       _badgeDragUpHandler: null,
+      atmosphaereBadgeIntroAktiv: false,
+      atmosphaereBadgeIntroAnimiert: false,
+      atmosphaereBadgeIntroTransform: null,
+      _atmosphaereBadgeIntroRaf: null,
+      _atmosphaereBadgeIntroEndTimer: null,
+      _atmosphaereBadgeIntroTransitionEnd: null,
       browserVollbildAktiv: false,
     };
   },
@@ -148,6 +160,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         o.top = `${this.badgePos.top}px`;
         o.right = 'auto';
         o.bottom = 'auto';
+      }
+      if (this.atmosphaereBadgeIntroTransform) {
+        Object.assign(o, this.atmosphaereBadgeIntroTransform);
+      }
+      if (this.atmosphaereBadgeIntroAktiv) {
+        o['--atmosphaere-intro-dauer'] = `${HTBAH_ATMOSPHAERE_BADGE_INTRO_MS}ms`;
       }
       return o;
     },
@@ -543,13 +561,16 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         this.zeitmessungPersistiereFuerKampagne(altId);
       }
       this.synchronisiereKampagnenbasierteDaten();
+      this.$nextTick(() => this.atmosphaereBadgeIntroPlanen());
     },
     hatAktiveKampagne(neu) {
       if (neu) {
         this.synchronisiereKampagnenbasierteDaten();
         this.stelleOffeneBottomNavModalsAusSpeicherWiederHer();
+        this.$nextTick(() => this.atmosphaereBadgeIntroPlanen());
         return;
       }
+      this.atmosphaereBadgeIntroAbbrechen();
       this.versteckeKampagnenModale();
       if (this.wuerfelModalTab === 'atmosphaere' || this.wuerfelModalTab === 'begegnung') {
         this.wuerfelModalTab = 'wuerfel';
@@ -707,6 +728,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
           minHoehe: 280,
         });
       }
+      if (this.hatAktiveKampagne) {
+        this.atmosphaereBadgeIntroPlanen();
+      }
     });
     this.ladeDiceFarbwahl();
     this._fabViewportHandler = () => {
@@ -783,6 +807,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     this.musikboardBeendeResize();
     this.badgeZiehenCleanup();
     this.zeitmessungBadgeZiehenCleanup();
+    this.atmosphaereBadgeIntroAbbrechen();
   },
   methods: {
     onOffeneModalsSpeicherGeleert() {
@@ -2525,6 +2550,125 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         kontext.speichern();
       }
     },
+    atmosphaereBadgeIntroAbbrechen() {
+      if (this._atmosphaereBadgeIntroRaf != null) {
+        window.cancelAnimationFrame(this._atmosphaereBadgeIntroRaf);
+        this._atmosphaereBadgeIntroRaf = null;
+      }
+      if (this._atmosphaereBadgeIntroEndTimer != null) {
+        window.clearTimeout(this._atmosphaereBadgeIntroEndTimer);
+        this._atmosphaereBadgeIntroEndTimer = null;
+      }
+      const el = this.$refs.atmosphaereBadgeEl;
+      if (el && this._atmosphaereBadgeIntroTransitionEnd) {
+        el.removeEventListener('transitionend', this._atmosphaereBadgeIntroTransitionEnd);
+      }
+      this._atmosphaereBadgeIntroTransitionEnd = null;
+      this.atmosphaereBadgeIntroAktiv = false;
+      this.atmosphaereBadgeIntroAnimiert = false;
+      this.atmosphaereBadgeIntroTransform = null;
+    },
+    atmosphaereBadgeIntroPlanen() {
+      this.atmosphaereBadgeIntroAbbrechen();
+      if (
+        !this.zeigeNav ||
+        !this.istSpielleitung ||
+        !this.hatAktiveKampagne ||
+        !this.atmosphaereHatWerte
+      ) {
+        return;
+      }
+      if (
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ) {
+        return;
+      }
+      this.atmosphaereBadgeIntroAktiv = true;
+      this.atmosphaereBadgeIntroAnimiert = false;
+      this.atmosphaereBadgeIntroTransform = null;
+      this.$nextTick(() => {
+        this._atmosphaereBadgeIntroRaf = window.requestAnimationFrame(() => {
+          this._atmosphaereBadgeIntroRaf = window.requestAnimationFrame(() => {
+            this._atmosphaereBadgeIntroRaf = null;
+            this.atmosphaereBadgeIntroAusfuehren();
+          });
+        });
+      });
+    },
+    atmosphaereBadgeIntroBeenden() {
+      if (!this.atmosphaereBadgeIntroAktiv && !this.atmosphaereBadgeIntroTransform) {
+        return;
+      }
+      const el = this.$refs.atmosphaereBadgeEl;
+      if (el && this._atmosphaereBadgeIntroTransitionEnd) {
+        el.removeEventListener('transitionend', this._atmosphaereBadgeIntroTransitionEnd);
+      }
+      this._atmosphaereBadgeIntroTransitionEnd = null;
+      if (this._atmosphaereBadgeIntroEndTimer != null) {
+        window.clearTimeout(this._atmosphaereBadgeIntroEndTimer);
+        this._atmosphaereBadgeIntroEndTimer = null;
+      }
+      this.atmosphaereBadgeIntroAktiv = false;
+      this.atmosphaereBadgeIntroAnimiert = false;
+      this.atmosphaereBadgeIntroTransform = null;
+    },
+    atmosphaereBadgeIntroAusfuehren() {
+      if (!this.atmosphaereBadgeIntroAktiv) {
+        return;
+      }
+      const el = this.$refs.atmosphaereBadgeEl;
+      if (!el) {
+        this.atmosphaereBadgeIntroBeenden();
+        return;
+      }
+      const final = el.getBoundingClientRect();
+      if (final.width <= 0 || final.height <= 0) {
+        this.atmosphaereBadgeIntroBeenden();
+        return;
+      }
+      const scale = HTBAH_ATMOSPHAERE_BADGE_INTRO_SCALE;
+      const cx = window.innerWidth * HTBAH_ATMOSPHAERE_BADGE_INTRO_ANKER_X;
+      const cy = window.innerHeight * HTBAH_ATMOSPHAERE_BADGE_INTRO_ANKER_Y;
+      const fx = final.left + final.width * 0.5;
+      const fy = final.top + final.height * 0.5;
+      const dx = cx - fx;
+      const dy = cy - fy;
+      this.atmosphaereBadgeIntroAnimiert = false;
+      this.atmosphaereBadgeIntroTransform = {
+        transform: `translate(${dx}px, ${dy}px) scale(${scale})`,
+        transformOrigin: 'center center',
+      };
+      void el.offsetWidth;
+      this._atmosphaereBadgeIntroTransitionEnd = (ev) => {
+        if (ev.target !== el || ev.propertyName !== 'transform') {
+          return;
+        }
+        this.atmosphaereBadgeIntroBeenden();
+      };
+      el.addEventListener('transitionend', this._atmosphaereBadgeIntroTransitionEnd);
+      this._atmosphaereBadgeIntroEndTimer = window.setTimeout(() => {
+        this.atmosphaereBadgeIntroBeenden();
+      }, HTBAH_ATMOSPHAERE_BADGE_INTRO_MS + 180);
+      this.$nextTick(() => {
+        window.requestAnimationFrame(() => {
+          if (!this.atmosphaereBadgeIntroAktiv) {
+            return;
+          }
+          this.atmosphaereBadgeIntroAnimiert = true;
+          void el.offsetWidth;
+          window.requestAnimationFrame(() => {
+            if (!this.atmosphaereBadgeIntroAktiv) {
+              return;
+            }
+            this.atmosphaereBadgeIntroTransform = {
+              transform: 'translate(0, 0) scale(1)',
+              transformOrigin: 'center center',
+            };
+          });
+        });
+      });
+    },
     badgeEntferneZiehenListener() {
       if (this._badgeDragMoveHandler) {
         document.removeEventListener('pointermove', this._badgeDragMoveHandler);
@@ -2541,6 +2685,9 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       this.badgeZiehenEnd();
     },
     badgeZiehenStart(e) {
+      if (this.atmosphaereBadgeIntroAktiv) {
+        return;
+      }
       if (e.button != null && e.button !== 0) {
         return;
       }
@@ -2766,7 +2913,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
     begegnungNpcWaffenWerteText(row) {
       const M = window.HTBAH_CHARAKTER_MODEL;
       if (M && typeof M.entitaetInventarWaffenAnzeigeText === 'function') {
-        return M.entitaetInventarWaffenAnzeigeText(row, { waffenloser: true });
+        return M.entitaetInventarWaffenAnzeigeText(row);
       }
       return '—';
     },
@@ -3177,7 +3324,12 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
         v-if="zeigeNav && istSpielleitung && hatAktiveKampagne"
         ref="atmosphaereBadgeEl"
         class="htbah-atmosphaere-badge"
-        :class="{ 'htbah-atmosphaere-badge--custom-pos': badgePos && badgePos.mode === 'fixed' }"
+        :class="{
+          'htbah-atmosphaere-badge--custom-pos': badgePos && badgePos.mode === 'fixed',
+          'htbah-atmosphaere-badge--intro': atmosphaereBadgeIntroAktiv,
+          'htbah-atmosphaere-badge--intro-play': atmosphaereBadgeIntroAnimiert,
+          'htbah-atmosphaere-badge--intro-pending': atmosphaereBadgeIntroAktiv && !atmosphaereBadgeIntroTransform,
+        }"
         :style="atmosphaereBadgeCombinedStyle">
         <div
           class="htbah-atmosphaere-badge__drag"

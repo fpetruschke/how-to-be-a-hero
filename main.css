@@ -628,10 +628,6 @@ input::placeholder {
   box-shadow: none;
 }
 
-.htbah-npc-feld-anheben {
-  margin-top: -0.35rem;
-}
-
 @media (max-width: 575.98px) {
   .htbah-weltenbau-pill-tabs {
     gap: 0.35rem;
@@ -5551,6 +5547,27 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 .htbah-atmosphaere-badge--custom-pos {
   right: auto;
   bottom: auto;
+}
+
+.htbah-atmosphaere-badge--intro {
+  z-index: calc(var(--htbah-z-modal-base, 1050) + 12);
+  pointer-events: none;
+  will-change: transform;
+  overflow: visible;
+}
+
+.htbah-atmosphaere-badge--intro-play {
+  transition: transform var(--atmosphaere-intro-dauer, 1s) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.htbah-atmosphaere-badge--intro-pending {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .htbah-atmosphaere-badge--intro-play {
+    transition: none;
+  }
 }
 
 .htbah-atmosphaere-badge__drag {

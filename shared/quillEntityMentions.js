@@ -281,6 +281,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     // Wichtig: Kein Redirect/Fallback-Navigation. URL bleibt unverändert.
   }
 
+  const NAV_TARGET_MAX_ALTER_MS = 30000;
+
   function leseNavigationTargetRaw() {
     const data = leseNavTarget();
     if (!data || typeof data !== 'object') {
@@ -293,7 +295,18 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     }
     const openModeRaw = typeof data.openMode === 'string' ? data.openMode.trim().toLowerCase() : '';
     const openMode = openModeRaw === 'focus' ? 'focus' : 'open';
-    return { entityType, entityId, openMode };
+    const tsRaw = Number(data.ts);
+    const ts = Number.isFinite(tsRaw) ? tsRaw : 0;
+    return { entityType, entityId, openMode, ts };
+  }
+
+  function istNavigationTargetAktuell(target, maxAlterMs) {
+    const max = Number.isFinite(maxAlterMs) ? maxAlterMs : NAV_TARGET_MAX_ALTER_MS;
+    const ts = target && Number(target.ts);
+    if (!Number.isFinite(ts) || ts <= 0) {
+      return false;
+    }
+    return Date.now() - ts <= max;
   }
 
   function peekNavigationTarget() {
@@ -673,5 +686,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     oeffneEntitaetGlobal,
     peekNavigationTarget,
     consumeNavigationTarget,
+    istNavigationTargetAktuell,
+    NAV_TARGET_MAX_ALTER_MS,
   };
 })();

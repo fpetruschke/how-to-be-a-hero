@@ -305,7 +305,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           'ziel',
           'geheimnis',
           'stimme',
-          'waffenloserKampf',
           'initiative',
           'notizenHtml',
         ];
@@ -322,15 +321,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           row,
           [
             'name',
-            'schadenswertNahkampf',
-            'schadenswertFernkampf',
             'aufenthaltsort',
             'inGegenstandId',
             'initiative',
             'beschreibungHtml',
           ],
           q,
-          this.gegenstandWaffenWerteText(row),
         ),
       );
     },
@@ -454,7 +450,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           'ziel',
           'geheimnis',
           'stimme',
-          'waffenloserKampf',
           'initiative',
           'notizenHtml',
         ];
@@ -472,14 +467,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           row,
           [
             'name',
-            'schadenswertNahkampf',
-            'schadenswertFernkampf',
             'aufenthaltsort',
             'initiative',
             'beschreibungHtml',
           ],
           gq,
-          this.gegenstandWaffenWerteText(row),
         ),
       );
     },
@@ -1601,7 +1593,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
     },
     npcWaffenWerteText(row) {
-      return this.entitaetInventarWaffenAnzeigeText(row, { waffenloser: true });
+      return this.entitaetInventarWaffenAnzeigeText(row);
     },
     bestieKategorieLabel(kategorie) {
       const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
@@ -1617,17 +1609,32 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       return '—';
     },
+    begabungenAusEntitaetZeile(row) {
+      const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+      if (!row || typeof row !== 'object' || !EF || typeof EF.begabungenAusEntitaet !== 'function') {
+        return { handeln: 0, wissen: 0, soziales: 0 };
+      }
+      return EF.begabungenAusEntitaet(row);
+    },
+    begabungHandelnAusEntitaetZeile(row) {
+      const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+      if (!row || typeof row !== 'object' || !EF || typeof EF.begabungHandelnAusEntitaet !== 'function') {
+        return 0;
+      }
+      return EF.begabungHandelnAusEntitaet(row);
+    },
     begabungswerteKurzText(row) {
       if (!row || typeof row !== 'object') {
         return 'H 0 · W 0 · S 0';
       }
-      const h = this.normalisiereBegabungswert(row.handeln);
-      const w = this.normalisiereBegabungswert(row.wissen);
-      const s = this.normalisiereBegabungswert(row.soziales);
+      const b = this.begabungenAusEntitaetZeile(row);
+      const h = this.normalisiereBegabungswert(b.handeln);
+      const w = this.normalisiereBegabungswert(b.wissen);
+      const s = this.normalisiereBegabungswert(b.soziales);
       return `H ${h} · W ${w} · S ${s}`;
     },
     paradeWuerfelnFuerEntitaet(row, typ) {
-      const handeln = this.normalisiereBegabungswert(row && row.handeln);
+      const handeln = this.begabungHandelnAusEntitaetZeile(row);
       const typLabel = typ === 'bestie' ? 'Bestie' : 'NPC';
       const name = this.zeilenWertAlsText(row && row.name);
       this.$refs.paradeModal?.oeffnen({
@@ -1647,17 +1654,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     schadenWuerfelnFuerEntitaet(row, typ) {
       const typLabel = typ === 'bestie' ? 'Bestie' : 'NPC';
       const name = this.zeilenWertAlsText(row && row.name);
-      const M = window.HTBAH_CHARAKTER_MODEL;
-      const inventar =
-        M && typeof M.inventarWaffenAusEntitaet === 'function'
-          ? M.inventarWaffenAusEntitaet(row, { prefix: typ, waffenloser: typ === 'npc' })
-          : [];
       this.$refs.schadenModal?.oeffnen({
         titel: `Schaden würfeln (${typLabel}${name ? `: ${name}` : ''})`,
-        charakter: {
-          inventar,
-          handeln: [],
-        },
+        charakter: row,
       });
     },
     gegenstandWaffenWerteText(row) {
@@ -1697,7 +1696,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         stimme: '',
         lebenspunkte: '',
         kampfZustand: 'vital',
-        waffenloserKampf: '',
         aufenthaltsort: '',
         presetId: 'htbah-mittelalter-fantasy',
         handeln: [],
@@ -1730,9 +1728,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         id: window.HTBAH.neueEntropieId(),
         name: '',
         beschreibungHtml: '',
-        istWaffe: false,
-        schadenswertNahkampf: '',
-        schadenswertFernkampf: '',
         aufenthaltsort: '',
         inGegenstandId: '',
         besitzerTyp: '',
@@ -2516,15 +2511,21 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         z.aggressivitaetSkala = a;
       }
       if (typ === 'npc' && z) {
-        z.handeln = this.normalisiereBegabungswert(z.handeln);
-        z.wissen = this.normalisiereBegabungswert(z.wissen);
-        z.soziales = this.normalisiereBegabungswert(z.soziales);
-        z.initiative = this.normalisiereInitiativeWert(z.initiative, z.handeln);
+        const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+        if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
+          z.handeln = this.normalisiereBegabungswert(z.handeln);
+          z.wissen = this.normalisiereBegabungswert(z.wissen);
+          z.soziales = this.normalisiereBegabungswert(z.soziales);
+        }
+        z.initiative = this.normalisiereInitiativeWert(z.initiative, this.begabungHandelnAusEntitaetZeile(z));
       } else if (typ === 'bestie' && z) {
-        z.handeln = this.normalisiereBegabungswert(z.handeln);
-        z.wissen = this.normalisiereBegabungswert(z.wissen);
-        z.soziales = this.normalisiereBegabungswert(z.soziales);
-        z.initiative = this.normalisiereInitiativeWert(z.initiative, z.handeln);
+        const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+        if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
+          z.handeln = this.normalisiereBegabungswert(z.handeln);
+          z.wissen = this.normalisiereBegabungswert(z.wissen);
+          z.soziales = this.normalisiereBegabungswert(z.soziales);
+        }
+        z.initiative = this.normalisiereInitiativeWert(z.initiative, this.begabungHandelnAusEntitaetZeile(z));
       } else if (typ === 'gegenstand' && z) {
         z.initiative = this.normalisiereInitiativeWert(z.initiative, 40);
       } else if (typ === 'fraktion' && z) {
@@ -3413,7 +3414,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     <span class="visually-hidden">Auswahl</span>
                   </th>
                   <th>Name</th>
-                  <th>Kampfwerte</th>
                   <th>Aufenthaltsort</th>
                   <th>Beschreibung</th>
                   <th class="text-end text-nowrap">Aktionen</th>
@@ -3421,7 +3421,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </thead>
               <tbody>
                 <tr v-if="!anzeigeGegenstaende.length">
-                  <td :colspan="entitaetenAuswahlModus ? 6 : 5" class="text-secondary text-center py-3">
+                  <td :colspan="entitaetenAuswahlModus ? 5 : 4" class="text-secondary text-center py-3">
                     {{ zufallstabellenLeerNachricht((zustand.gegenstaende || []).length, sucheGegenstaende) }}
                   </td>
                 </tr>
@@ -3439,7 +3439,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                       @change="toggleEntitaetAuswahl('gegenstand', row.id)" />
                   </td>
                   <td>{{ karteWert(row.name) }}</td>
-                  <td class="small text-nowrap">{{ gegenstandWaffenWerteText(row) }}</td>
                   <td>{{ karteWert(row.aufenthaltsort) }}</td>
                   <td class="small">
                     <div
@@ -3492,7 +3491,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   <label class="form-check-label small" :for="'zst-gegenstand-sel-' + row.id">Auswählen</label>
                 </div>
                 <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
-                <div class="small"><span class="text-secondary">Kampfwerte:</span> {{ gegenstandWaffenWerteText(row) }}</div>
                 <div class="small"><span class="text-secondary">Ort:</span> {{ karteWert(row.aufenthaltsort) }}</div>
                 <div
                   v-if="featuredBildAusZeile(row)"

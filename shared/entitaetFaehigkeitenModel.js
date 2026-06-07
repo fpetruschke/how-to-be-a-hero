@@ -126,9 +126,16 @@ window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL = window.HTBAH_ENTITAET_FAEHIGKEITEN_MO
   };
 
   M.begabungenAusEntitaet = function begabungenAusEntitaet(zeile) {
-    const s = M.summenAusEntitaet(zeile);
-    const b = (v) => Math.max(0, Math.round(Number(v) / 10));
-    return { handeln: b(s.handeln), wissen: b(s.wissen), soziales: b(s.soziales) };
+    if (M.istFaehigkeitenArrayFormat(zeile)) {
+      const s = M.summenAusEntitaet(zeile);
+      const b = (v) => Math.max(0, Math.round(Number(v) / 10));
+      return { handeln: b(s.handeln), wissen: b(s.wissen), soziales: b(s.soziales) };
+    }
+    return {
+      handeln: M.legacyBegabungAusZeile(zeile, 'handeln'),
+      wissen: M.legacyBegabungAusZeile(zeile, 'wissen'),
+      soziales: M.legacyBegabungAusZeile(zeile, 'soziales'),
+    };
   };
 
   M.begabungHandelnAusEntitaet = function begabungHandelnAusEntitaet(zeile) {
@@ -392,10 +399,6 @@ window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL = window.HTBAH_ENTITAET_FAEHIGKEITEN_MO
         boost('Fernkampf', 3);
       }
     });
-    const wl = String(ctx.waffenloserKampf || '').trim();
-    if (wl) {
-      boost('Nahkampf (unbewaffnet)', 3);
-    }
     return gewicht;
   }
 
@@ -568,7 +571,6 @@ window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL = window.HTBAH_ENTITAET_FAEHIGKEITEN_MO
       alter: z.alter,
       statur: z.statur,
       inventar: z.inventar,
-      waffenloserKampf: z.waffenloserKampf,
       kategorie: z.kategorie,
       aggressivitaetSkala: z.aggressivitaetSkala,
       zielBegabungen: legacy,

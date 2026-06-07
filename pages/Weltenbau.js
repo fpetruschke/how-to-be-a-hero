@@ -303,11 +303,43 @@ window.HTBAH_SEITEN.Weltenbau = {
       if (!pending) {
         return;
       }
+      if (
+        typeof mentionApi.istNavigationTargetAktuell === 'function' &&
+        !mentionApi.istNavigationTargetAktuell(pending)
+      ) {
+        if (typeof mentionApi.consumeNavigationTarget === 'function') {
+          mentionApi.consumeNavigationTarget();
+        }
+        return;
+      }
+      const bearbeitenNur = pending.openMode === 'open';
+      if (bearbeitenNur) {
+        if (pending.entityType === 'charakter' && this.aktiveWeltenbauTab === 'welt') {
+          if (!this.weltenbauMapModalOffen) {
+            this.weltenbauMapModalOffen = true;
+          }
+          this.$nextTick(() => {
+            const modal = this.$refs.weltenbauMapModal;
+            if (modal && typeof modal.verarbeiteMentionNavigationTarget === 'function') {
+              modal.verarbeiteMentionNavigationTarget();
+            }
+          });
+        }
+        return;
+      }
       if (this.aktiveWeltenbauTab !== 'welt') {
         return;
       }
       if (!this.weltenbauMapModalOffen) {
         this.weltenbauMapModalOffen = true;
+        this.$nextTick(() => {
+          this.$nextTick(() => {
+            const modal = this.$refs.weltenbauMapModal;
+            if (modal && typeof modal.verarbeiteMentionNavigationTarget === 'function') {
+              modal.verarbeiteMentionNavigationTarget();
+            }
+          });
+        });
         return;
       }
       this.$nextTick(() => {

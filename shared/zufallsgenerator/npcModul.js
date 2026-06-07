@@ -128,44 +128,10 @@ window.HTBAH = window.HTBAH || {};
         schadenswertNahkampf = basis;
       }
     }
-    if (!schadenswertNahkampf && Math.random() < 0.25) {
-      schadenswertNahkampf = waffenloserNahkampfSchaden(statur);
-    }
     if (!schadenswertFernkampf && Math.random() < 0.2) {
       schadenswertFernkampf = U.zufaellig(['1W10+2', '2W10', '2W10+1']);
     }
     return { schadenswertNahkampf, schadenswertFernkampf };
-  }
-
-  /** Statur aus Liste erkennen, auch bei zusammengesetzten Freitexten (z. B. „Kräftig, leicht gebückt“). */
-  function staturKernFuerKampf(statur) {
-    const s = String(statur || '').trim();
-    const basis = L.STATUR || [];
-    for (let i = 0; i < basis.length; i += 1) {
-      const kern = basis[i];
-      if (s === kern || s.toLowerCase().includes(String(kern).toLowerCase())) {
-        return kern;
-      }
-    }
-    return s;
-  }
-
-  /** Schadensnotation wie bei Waffen (z. B. 1W10+2), für Fäuste/Tritte nach Statur abgestuft. */
-  function waffenloserNahkampfSchaden(statur) {
-    const kern = staturKernFuerKampf(statur);
-    const stark = ['Kräftig', 'Athletisch', 'Breitschultrig', 'Stämmig'];
-    const mittel = ['Schlank', 'Groß', 'Untersetzt', 'Schwerfällig'];
-    const gering = ['Klein', 'Zierlich', 'Dünn', 'Hager'];
-    if (stark.indexOf(kern) !== -1) {
-      return U.zufaellig(['2W10', '1W10+3', '2W10+1', '1W10+4']);
-    }
-    if (mittel.indexOf(kern) !== -1) {
-      return U.zufaellig(['1W10+1', '1W10+2', '2W10']);
-    }
-    if (gering.indexOf(kern) !== -1) {
-      return U.zufaellig(['1W10', '1W10+1', '1W10-1']);
-    }
-    return U.zufaellig(['1W10', '1W10+1']);
   }
 
   function lebenspunkteFuerStaturUndAlter(statur, alterStr) {
@@ -242,7 +208,6 @@ window.HTBAH = window.HTBAH || {};
       alter: kontext.alter || '',
       statur: kontext.statur || '',
       inventar: kontext.inventar || [],
-      waffenloserKampf: kontext.waffenloserKampf || '',
       zielBegabungen,
     });
     return {
@@ -320,8 +285,21 @@ window.HTBAH = window.HTBAH || {};
       alter: String(z.alter || ''),
       beruf: String(z.beruf || ''),
       statur: String(z.statur || ''),
-      waffe: String(z.waffe || ''),
+      inventar: Array.isArray(z.inventar) ? z.inventar : [],
     };
+  }
+
+  function inventarKampfPatch(zeile, opts) {
+    const M = window.HTBAH_CHARAKTER_MODEL;
+    if (!M) {
+      return {};
+    }
+    let inv = Array.isArray(zeile && zeile.inventar) ? zeile.inventar.map((item) => ({ ...item })) : [];
+    inv = M.inventarOhneWaffenlosEntraege ? M.inventarOhneWaffenlosEntraege(inv) : inv;
+    if (opts && opts.hauptwaffe) {
+      inv = M.inventarHauptwaffeAktualisieren(inv, opts.hauptwaffe);
+    }
+    return { inventar: inv };
   }
 
   function neuFeldUndAbhaengige(zeile, feld, opts) {
@@ -377,7 +355,6 @@ window.HTBAH = window.HTBAH || {};
       const neueStatur = staturAusAlterUndBeruf(neuesAlter, wirksamerBeruf);
       patch.statur = neueStatur;
       patch.lebenspunkte = lebenspunkteFuerStaturUndAlter(neueStatur, neuesAlter);
-      patch.waffenloserKampf = waffenloserNahkampfSchaden(neueStatur);
       return patch;
     }
 
@@ -391,12 +368,18 @@ window.HTBAH = window.HTBAH || {};
       const neueStatur = staturAusAlterUndBeruf(wirksamesAlter, neuerBeruf);
       patch.statur = neueStatur;
       const neueWaffe = waffeFuerBerufUndEpoche(neuerBeruf, kontext.epoche);
-      patch.waffe = neueWaffe.name;
       const waffenwerte = dualeWaffenwerte(neueWaffe, neueStatur);
-      patch.schadenswertNahkampf = waffenwerte.schadenswertNahkampf;
-      patch.schadenswertFernkampf = waffenwerte.schadenswertFernkampf;
       patch.lebenspunkte = lebenspunkteFuerStaturUndAlter(neueStatur, wirksamesAlter);
-      patch.waffenloserKampf = waffenloserNahkampfSchaden(neueStatur);
+      Object.assign(
+        patch,
+        inventarKampfPatch(zeile, {
+          hauptwaffe: {
+            name: neueWaffe.name,
+            schadenswertNahkampf: waffenwerte.schadenswertNahkampf,
+            schadenswertFernkampf: waffenwerte.schadenswertFernkampf,
+          },
+        }),
+      );
       Object.assign(
         patch,
         faehigkeitenPatchAusKontext({
@@ -404,7 +387,7 @@ window.HTBAH = window.HTBAH || {};
           beruf: neuerBeruf,
           alter: wirksamesAlter,
           statur: neueStatur,
-          waffenloserKampf: patch.waffenloserKampf,
+          inventar: patch.inventar,
         }),
       );
       return patch;
@@ -416,7 +399,6 @@ window.HTBAH = window.HTBAH || {};
       const neueStatur = staturAusAlterUndBeruf(wirksamesAlter, wirksamerBeruf);
       patch.statur = neueStatur;
       patch.lebenspunkte = lebenspunkteFuerStaturUndAlter(neueStatur, wirksamesAlter);
-      patch.waffenloserKampf = waffenloserNahkampfSchaden(neueStatur);
       return patch;
     }
 
@@ -427,10 +409,17 @@ window.HTBAH = window.HTBAH || {};
         patch.statur = wirksameStatur;
       }
       const neueWaffe = waffeFuerBerufUndEpoche(wirksamerBeruf, kontext.epoche);
-      patch.waffe = neueWaffe.name;
       const waffenwerte = dualeWaffenwerte(neueWaffe, wirksameStatur);
-      patch.schadenswertNahkampf = waffenwerte.schadenswertNahkampf;
-      patch.schadenswertFernkampf = waffenwerte.schadenswertFernkampf;
+      Object.assign(
+        patch,
+        inventarKampfPatch(zeile, {
+          hauptwaffe: {
+            name: neueWaffe.name,
+            schadenswertNahkampf: waffenwerte.schadenswertNahkampf,
+            schadenswertFernkampf: waffenwerte.schadenswertFernkampf,
+          },
+        }),
+      );
       return patch;
     }
 
@@ -513,22 +502,17 @@ window.HTBAH = window.HTBAH || {};
       return patch;
     }
     if (feld === 'waffe') {
-      patch.waffe = waffeFuerEpoche(kontext.epoche).name;
-      return patch;
-    }
-    if (feld === 'schadenswertNahkampf') {
-      patch.schadenswertNahkampf = U.zufaellig(['1W10', '1W10+1', '1W10+2', '2W10']);
-      return patch;
-    }
-    if (feld === 'schadenswertFernkampf') {
-      patch.schadenswertFernkampf = U.zufaellig(['1W10+2', '2W10', '2W10+1', '3W10']);
-      return patch;
-    }
-    if (feld === 'waffenloserKampf') {
       const wirksameStatur =
         kontext.statur || staturAusAlterUndBeruf(kontext.alter, kontext.beruf);
-      patch.waffenloserKampf = waffenloserNahkampfSchaden(wirksameStatur);
-      return patch;
+      const neueWaffe = waffeFuerEpoche(kontext.epoche);
+      const waffenwerte = dualeWaffenwerte(neueWaffe, wirksameStatur);
+      return inventarKampfPatch(zeile, {
+        hauptwaffe: {
+          name: neueWaffe.name,
+          schadenswertNahkampf: waffenwerte.schadenswertNahkampf,
+          schadenswertFernkampf: waffenwerte.schadenswertFernkampf,
+        },
+      });
     }
     if (feld === 'lebenspunkte') {
       patch.lebenspunkte = String(U.zufallsInt(45, 110));
@@ -556,10 +540,9 @@ window.HTBAH = window.HTBAH || {};
   window.HTBAH.ZufallsgeneratorNpcModul = {
     abhaengigkeiten() {
       return [
-        { ausloeser: 'alter', abhaengige: ['statur', 'lebenspunkte'] },
-        { ausloeser: 'beruf', abhaengige: ['statur', 'waffe', 'schadenswertNahkampf', 'schadenswertFernkampf', 'lebenspunkte', 'handeln', 'wissen', 'soziales'] },
-        { ausloeser: 'statur', abhaengige: ['lebenspunkte', 'waffenloserKampf'] },
-        { ausloeser: 'waffe', abhaengige: ['schadenswertNahkampf', 'schadenswertFernkampf'] },
+        { ausloeser: 'alter', abhaengige: ['statur', 'lebenspunkte', 'inventar'] },
+        { ausloeser: 'beruf', abhaengige: ['statur', 'inventar', 'lebenspunkte', 'handeln', 'wissen', 'soziales'] },
+        { ausloeser: 'statur', abhaengige: ['lebenspunkte', 'inventar'] },
       ];
     },
     neuBerechnenFeld(zeile, feld, opts) {
@@ -609,7 +592,6 @@ window.HTBAH = window.HTBAH || {};
       const waffenwerte = dualeWaffenwerte(waffe, statur);
       const geheimnis = geheimnisFuerEpoche(epoche);
       const lebenspunkte = lebenspunkteFuerStaturUndAlter(statur, alter);
-      const schadenWaffenlos = waffenloserNahkampfSchaden(statur);
       const M = window.HTBAH_CHARAKTER_MODEL;
       const inventar = [];
       if (M && typeof M.inventarEintragNachTypBereinigen === 'function') {
@@ -623,18 +605,6 @@ window.HTBAH = window.HTBAH || {};
             schadenswertFernkampf: waffenwerte.schadenswertFernkampf,
           }),
         );
-        if (schadenWaffenlos) {
-          inventar.push(
-            M.inventarEintragNachTypBereinigen({
-              id: M.neueInventarId(),
-              typ: 'waffe',
-              name: 'Waffenlos (Fäuste, Tritte)',
-              beschreibungHtml: '',
-              schadenswertNahkampf: schadenWaffenlos,
-              schadenswertFernkampf: '',
-            }),
-          );
-        }
       }
 
       const aufenthaltsort = aufenthaltsortAusOrteListe(opts.orteNamen);
@@ -652,7 +622,6 @@ window.HTBAH = window.HTBAH || {};
         alter,
         statur,
         inventar,
-        waffenloserKampf: schadenWaffenlos,
       });
 
       return {
@@ -667,7 +636,6 @@ window.HTBAH = window.HTBAH || {};
         ziel,
         geheimnis,
         stimme,
-        waffenloserKampf: schadenWaffenlos,
         lebenspunkte,
         aufenthaltsort,
         presetId: faehigkeiten.presetId,

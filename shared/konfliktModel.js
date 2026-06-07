@@ -303,19 +303,12 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       if (M && typeof M.entitaetInventarWaffenAnzeigeText === 'function') {
         const waffen = M.entitaetInventarWaffenAnzeigeText(payload, {
           prefix: typ === 'charakter' ? 'charakter' : typ,
-          waffenloser: typ === 'npc',
         });
         if (waffen && waffen !== '—') {
           kampfZeilen.push({
             label: typ === 'charakter' ? 'Waffen' : 'Waffen & Angriff',
             wert: waffen,
           });
-        }
-      }
-      if (typ === 'npc') {
-        const wl = String(payload.waffenloserKampf || '').trim();
-        if (wl && !kampfZeilen.some((z) => String(z.wert || '').includes(wl))) {
-          kampfZeilen.push({ label: 'Waffenlos', wert: wl });
         }
       }
     } else if (typ === 'npc' || typ === 'bestie') {
@@ -329,30 +322,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         faehigkeiten: [],
       });
       if (M && typeof M.entitaetInventarWaffenAnzeigeText === 'function') {
-        const waffen = M.entitaetInventarWaffenAnzeigeText(payload, {
-          prefix: typ,
-          waffenloser: typ === 'npc',
-        });
+        const waffen = M.entitaetInventarWaffenAnzeigeText(payload, { prefix: typ });
         if (waffen && waffen !== '—') {
           kampfZeilen.push({ label: 'Waffen & Angriff', wert: waffen });
-        }
-      }
-      const nah = String(payload.schadenswertNahkampf || '').trim();
-      const fern = String(payload.schadenswertFernkampf || '').trim();
-      if ((nah || fern) && !kampfZeilen.length) {
-        const teile = [];
-        if (nah) {
-          teile.push(`NK ${nah}`);
-        }
-        if (fern) {
-          teile.push(`FK ${fern}`);
-        }
-        kampfZeilen.push({ label: 'Schaden', wert: teile.join(' · ') });
-      }
-      if (typ === 'npc') {
-        const wl = String(payload.waffenloserKampf || '').trim();
-        if (wl && !kampfZeilen.some((z) => z.wert.includes(wl))) {
-          kampfZeilen.push({ label: 'Waffenlos', wert: wl });
         }
       }
     }

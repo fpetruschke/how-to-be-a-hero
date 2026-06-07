@@ -165,6 +165,13 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       const typ = this.anlage && this.anlage.typ;
       return (typ === 'npc' || typ === 'bestie') && this.istBearbeitung;
     },
+    entitaetLebenspunkteStatus() {
+      const zeile = this.anlage && this.anlage.zeile;
+      if (!zeile || typeof window.HTBAH.berechneLebenspunkteStatus !== 'function') {
+        return { tot: false, bewusstlos: false };
+      }
+      return window.HTBAH.berechneLebenspunkteStatus(zeile);
+    },
     zeigtRandomAlsDropdown() {
       if (!this.randomSichtbar) {
         return false;
@@ -701,13 +708,21 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       if (!this.anlage || !this.anlage.zeile) {
         return;
       }
+      const zeile = this.anlage.zeile;
       const basiswert = this.berechneHandelnFuerInitiative();
       const titelTeil = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
+      const inventar = Array.isArray(zeile.inventar) ? zeile.inventar : [];
+      const ruestungen = inventar
+        .filter((eintrag) => eintrag && eintrag.typ === 'rustung')
+        .map((eintrag) => ({
+          name: typeof eintrag.name === 'string' ? eintrag.name : '',
+          rustwert: eintrag.rustwert,
+        }));
       const payload = {
         titel: `Parade-Probe (${titelTeil})`,
         basiswert,
-        ruestungen: [],
-        waffenlosParade: true,
+        ruestungen,
+        waffenlosParade: !ruestungen.length,
       };
       this.paradeModalGeneration += 1;
       this.$nextTick(() => {
@@ -721,20 +736,9 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       const zeile = this.anlage.zeile;
       const typ = this.anlage.typ === 'bestie' ? 'Bestie' : 'NPC';
       const name = String(zeile.name || '').trim();
-      const M = window.HTBAH_CHARAKTER_MODEL;
-      const inventar =
-        M && typeof M.inventarWaffenAusEntitaet === 'function'
-          ? M.inventarWaffenAusEntitaet(zeile, {
-              prefix: this.anlage.typ || 'eintrag',
-              waffenloser: this.anlage.typ === 'npc',
-            })
-          : [];
       const payload = {
         titel: `Schaden würfeln (${typ}${name ? `: ${name}` : ''})`,
-        charakter: {
-          inventar,
-          handeln: [],
-        },
+        charakter: zeile,
       };
       this.schadenModalGeneration += 1;
       this.$nextTick(() => {
@@ -754,16 +758,13 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     },
     npcAbhaengigkeitsLabel(feld) {
       if (feld === 'alter') {
-        return 'mit Statur + LP + waffenloser Kampf';
+        return 'mit Statur + LP + Inventar-Waffen';
       }
       if (feld === 'beruf') {
-        return 'mit Statur, Waffe, Schaden, LP, Begabungen';
+        return 'mit Statur, Inventar-Waffen, LP, Begabungen';
       }
       if (feld === 'statur') {
-        return 'mit LP + waffenloser Kampf';
-      }
-      if (feld === 'waffe') {
-        return 'mit Schadenswerten';
+        return 'mit LP + Inventar-Waffen';
       }
       return '';
     },
@@ -934,8 +935,38 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         <div v-if="zeigtDatenTab" @focusout="datenBereichBlur">
         <section v-if="zeigtKampfSchnellaktionen" class="htbah-entitaet-bereich">
           <h6 class="htbah-entitaet-bereich-titel">⚔️ Kampf &amp; Proben</h6>
-          <div class="row g-2">
-            <div class="col-12">
+          <div
+            v-if="entitaetLebenspunkteStatus.tot || entitaetLebenspunkteStatus.bewusstlos"
+            class="alert py-2 px-3 mb-2 htbah-charakter-status-alert"
+            :class="entitaetLebenspunkteStatus.tot ? 'alert-secondary' : 'alert-warning'">
+            <strong v-if="entitaetLebenspunkteStatus.tot">💀 Tot</strong>
+            <strong v-else>😵 Bewusstlos</strong>
+            <span class="ms-1">— LP 0 = tot, LP 1–10 oder Massenschaden (≥60 Verlust) = bewusstlos.</span>
+          </div>
+          <div class="row g-2 mb-2 align-items-start">
+            <div class="col-md-4">
+              <label class="form-label small text-secondary mb-1">Lebenspunkte</label>
+              <div class="input-group">
+                <input
+                  class="form-control"
+                  v-model="anlage.zeile.lebenspunkte"
+                  placeholder="Lebenspunkte"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  @focus="onKampfLebenspunkteFocus"
+                  @blur="onKampfLebenspunkteBlur" />
+                <button
+                  v-if="anlage.typ === 'npc'"
+                  type="button"
+                  class="btn btn-outline-secondary htbah-input-icon-btn"
+                  :disabled="!zufallsgeneratorBereit || !randomSichtbar"
+                  title="Lebenspunkte neu würfeln"
+                  @click="npcFeldNeuWuerfeln('lebenspunkte', 'mitAbhaengigen')">
+                  <span class="material-symbols-outlined">refresh</span>
+                </button>
+              </div>
+            </div>
+            <div class="col-md-8">
               <label class="form-label small text-secondary mb-1">Zustand</label>
               <div class="btn-group w-100 htbah-kampf-zustand-toggle" role="group" aria-label="Kampfzustand">
                 <button
@@ -956,6 +987,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                 Wird bei LP-Änderung automatisch gesetzt (0 = tot, 1–10 oder −60+ auf einmal = bewusstlos).
               </p>
             </div>
+          </div>
+          <div class="row g-2">
             <div class="col-12">
               <div class="d-flex flex-wrap gap-2">
                 <button
@@ -1074,7 +1107,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           </section>
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">⚔️ Kampfwerte</h6>
-            <div class="row g-2 mb-2">
+            <div v-if="!zeigtKampfSchnellaktionen" class="row g-2 mb-2">
               <div class="col-md-6"><label class="form-label small text-secondary mb-1">Lebenspunkte</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder="Lebenspunkte" inputmode="numeric" autocomplete="off" @focus="onKampfLebenspunkteFocus" @blur="onKampfLebenspunkteBlur" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Lebenspunkte neu würfeln" @click="npcFeldNeuWuerfeln('lebenspunkte', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button></div></div>
             </div>
             <faehigkeiten-kompakt-panel
@@ -1088,26 +1121,18 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
               :preset-id="zeilePresetId"
               :id-prefix="'zfn-npc-' + (anlage.zeile.id || 'neu')"
               @probe="faehigkeitenProbeOeffnen" />
-            <div class="row g-2 mt-2">
-              <div class="col-md-6">
-                <label class="form-label small text-secondary mb-1">Waffenloser Kampf (Fäuste, Tritte)</label>
-                <div class="input-group">
-                  <input class="form-control" v-model="anlage.zeile.waffenloserKampf" placeholder="z. B. 1W10+2" autocomplete="off" />
-                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Waffenlosen Nahkampf neu würfeln (nach Statur)" @click="npcFeldNeuWuerfeln('waffenloserKampf', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
-                  <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Optionen</span></button>
-                  <ul class="dropdown-menu dropdown-menu-end">
-                    <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('waffenloserKampf', 'einzeln')">Nur waffenloser Kampf neu</button></li>
-                    <li><button type="button" class="dropdown-item" @click="npcFeldNeuWuerfeln('statur', 'mitAbhaengigen')">Statur + {{ npcAbhaengigkeitsLabel('statur') }}</button></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
           </section>
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧭 Zugehörigkeit & Kontext</h6>
             <div class="row g-2">
-              <div class="col-md-6"><label class="form-label small text-secondary mb-1">Gesinnung</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.gesinnung" placeholder="Gesinnung" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Gesinnung neu würfeln" @click="npcFeldNeuWuerfeln('gesinnung', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
-              <div class="col-md-6 htbah-npc-feld-anheben">
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1">Gesinnung</label>
+                <div class="input-group">
+                  <input class="form-control" v-model="anlage.zeile.gesinnung" placeholder="Gesinnung" />
+                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Gesinnung neu würfeln" @click="npcFeldNeuWuerfeln('gesinnung', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
+                </div>
+              </div>
+              <div class="col-md-6">
                 <label class="form-label small text-secondary mb-1" for="wb-zfn-glaube">Glaube</label>
                 <div class="input-group">
                   <input id="wb-zfn-glaube" class="form-control" v-model="anlage.zeile.glaube" :list="pantheonNamenListe.length ? 'wb-zfn-glaube-datalist' : undefined" placeholder="Leer, aus Liste wählen oder Freitext" autocomplete="off" />
@@ -1117,7 +1142,16 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                   <option v-for="n in pantheonNamenListe" :key="'wb-pg-' + n" :value="n"></option>
                 </datalist>
               </div>
-              <div class="col-md-6 htbah-npc-feld-anheben"><label class="form-label small text-secondary mb-1">Fraktion</label><div class="input-group"><select class="form-select" v-model="anlage.zeile.fraktion"><option value="">— keine —</option><option v-for="f in fraktionenMitNamen" :key="f.id" :value="f.name">{{ f.name }}</option></select><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Fraktion neu würfeln" @click="npcFeldNeuWuerfeln('fraktion', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button></div></div>
+              <div class="col-md-6">
+                <label class="form-label small text-secondary mb-1">Fraktion</label>
+                <div class="input-group">
+                  <select class="form-select" v-model="anlage.zeile.fraktion">
+                    <option value="">— keine —</option>
+                    <option v-for="f in fraktionenMitNamen" :key="f.id" :value="f.name">{{ f.name }}</option>
+                  </select>
+                  <button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Fraktion neu würfeln" @click="npcFeldNeuWuerfeln('fraktion', 'einzeln')"><span class="material-symbols-outlined">refresh</span></button>
+                </div>
+              </div>
               <div class="col-md-6">
                 <label class="form-label small text-secondary mb-1" for="wb-zfn-ort">Aufenthaltsort</label>
                 <div class="input-group">
@@ -1308,7 +1342,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           </section>
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">⚔️ Kampfwerte</h6>
-            <div class="row g-2 mb-2">
+            <div v-if="!zeigtKampfSchnellaktionen" class="row g-2 mb-2">
               <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " autocomplete="off" @focus="onKampfLebenspunkteFocus" @blur="onKampfLebenspunkteBlur" /><label>Lebenspunkte</label></div></div>
             </div>
             <faehigkeiten-kompakt-panel
@@ -1424,14 +1458,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
                 @click="anlage.zeile.initiative = ''">
                 Leeren
               </button>
-            </div>
-          </section>
-          <section class="htbah-entitaet-bereich">
-            <h6 class="htbah-entitaet-bereich-titel">🗡️ Kampffunktion</h6>
-            <div class="form-check mb-3"><input class="form-check-input" type="checkbox" v-model="anlage.zeile.istWaffe" id="wb-zg-waffe" /><label class="form-check-label" for="wb-zg-waffe">Waffe</label></div>
-            <div class="row g-2 mb-1 align-items-end" v-if="anlage.zeile.istWaffe">
-              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertNahkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Nahkampf (z. B. 2W10+1)</label></div></div>
-              <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.schadenswertFernkampf" placeholder=" " autocomplete="off" /><label>Schadenswert Fernkampf (z. B. 3W10)</label></div></div>
             </div>
           </section>
         </template>

@@ -177,20 +177,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return '—';
   }
 
-  function gegenstandWaffenWerteText(row) {
-    if (!row || !row.istWaffe) {
-      return '—';
-    }
-    const schadenswertNahkampf = String(row.schadenswertNahkampf || '').trim();
-    const schadenswertFernkampf = String(row.schadenswertFernkampf || '').trim();
-    const teile = [];
-    if (schadenswertNahkampf) {
-      teile.push(`Nahkampf ${schadenswertNahkampf}`);
-    }
-    if (schadenswertFernkampf) {
-      teile.push(`Fernkampf ${schadenswertFernkampf}`);
-    }
-    return teile.length ? teile.join(' · ') : '—';
+  function gegenstandWaffenWerteText() {
+    return '—';
   }
 
   function entitaetAnzeigeName(zeile, typ) {
@@ -335,8 +323,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       bereich('🧍 Körper & Merkmale', [plain('Statur', z.statur), plain('Stimme', z.stimme)]),
       bereich('⚔️ Kampfwerte', [
         plain('Lebenspunkte', z.lebenspunkte),
-        plain('Waffen (Inventar)', entitaetInventarWaffenAnzeigeText(z, { waffenloser: true })),
-        plain('Waffenloser Kampf (Fäuste, Tritte)', z.waffenloserKampf),
+        plain('Waffen (Inventar)', entitaetInventarWaffenAnzeigeText(z)),
         plain('Initiative', z.initiative),
       ]),
       bereich('🧭 Zugehörigkeit & Kontext', [
@@ -411,18 +398,14 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         plain('Aufenthaltsort', z.aufenthaltsort),
         plain('Ziel', z.ziel),
         plain('Stimme', z.stimme),
-        plain('Waffen (Inventar)', entitaetInventarWaffenAnzeigeText(z, { waffenloser: true })),
-        plain('Waffenloser Kampf (Fäuste, Tritte)', z.waffenloserKampf),
+        plain('Waffen (Inventar)', entitaetInventarWaffenAnzeigeText(z)),
         plain('Initiative', z.initiative),
         rich('Notizen', bereinigeNpcNotizenHtml(z.notizenHtml)),
       ];
     } else if (typ === 'gegenstand') {
-      const istWaffe = z && z.istWaffe ? 'Ja' : 'Nein';
       felder = [
         plain('Name', z.name),
         plain('Aufenthaltsort', z.aufenthaltsort),
-        plain('Ist Waffe / Kampfgegenstand', istWaffe),
-        plain('Kampfwerte', gegenstandWaffenWerteText(z)),
         plain('Initiative', z.initiative),
         rich('Beschreibung', z.beschreibungHtml),
       ];

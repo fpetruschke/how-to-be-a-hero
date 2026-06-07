@@ -894,6 +894,9 @@ function normalisiereZufallstabellenInventarListe(arr) {
       if (!item || typeof item !== 'object') {
         return null;
       }
+      if (M.istInventarWaffenlosEintrag && M.istInventarWaffenlosEintrag(item)) {
+        return null;
+      }
       return M.inventarEintragNachTypBereinigen({
         id:
           typeof item.id === 'string' && item.id
@@ -913,6 +916,44 @@ function normalisiereZufallstabellenInventarListe(arr) {
       });
     })
     .filter(Boolean);
+}
+
+/** Entity-Felder alter Speicherstände (Waffe/Schaden) — nur für Import-Migration ins Inventar. */
+function legacyKampfwerteAusImportZeile(z, typ) {
+  if (!z || typeof z !== 'object') {
+    return {};
+  }
+  const out = {};
+  const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : '');
+  const waffe = str(z.waffe);
+  if (waffe) {
+    out.waffe = waffe;
+  }
+  const nah = str(z.schadenswertNahkampf);
+  if (nah) {
+    out.schadenswertNahkampf = nah;
+  }
+  const fern = str(z.schadenswertFernkampf);
+  if (fern) {
+    out.schadenswertFernkampf = fern;
+  }
+  if (typ === 'npc') {
+    const wl = str(z.waffenloserKampf);
+    if (wl) {
+      out.waffenloserKampf = wl;
+    }
+  }
+  if (typ === 'bestie') {
+    const angriff = str(z.angriff);
+    if (angriff) {
+      out.angriff = angriff;
+    }
+    const verteidigung = str(z.verteidigung);
+    if (verteidigung) {
+      out.verteidigung = verteidigung;
+    }
+  }
+  return out;
 }
 
 function normalisiereZufallstabellenNpcZeile(z) {
@@ -935,12 +976,8 @@ function normalisiereZufallstabellenNpcZeile(z) {
     ziel: typeof z.ziel === 'string' ? z.ziel : '',
     geheimnis: typeof z.geheimnis === 'string' ? z.geheimnis : '',
     stimme: typeof z.stimme === 'string' ? z.stimme : '',
-    waffe: typeof z.waffe === 'string' ? z.waffe : '',
     lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
     kampfZustand: ermittleKampfZustandFuerNpcBestie(z),
-    schadenswertNahkampf: typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '',
-    schadenswertFernkampf: typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '',
-    waffenloserKampf: typeof z.waffenloserKampf === 'string' ? z.waffenloserKampf : '',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
     presetId: typeof z.presetId === 'string' ? z.presetId : '',
     handeln: Array.isArray(z.handeln) ? z.handeln : z.handeln,
@@ -956,7 +993,10 @@ function normalisiereZufallstabellenNpcZeile(z) {
   };
   let migriert =
     M && typeof M.migriereLegacyKampfwerteNachInventar === 'function'
-      ? M.migriereLegacyKampfwerteNachInventar(rohZeile, { npc: true })
+      ? M.migriereLegacyKampfwerteNachInventar(
+          { ...rohZeile, ...legacyKampfwerteAusImportZeile(z, 'npc') },
+          { npc: true },
+        )
       : rohZeile;
   if (EF && typeof EF.normalisiereEntitaetFaehigkeiten === 'function') {
     migriert = EF.normalisiereEntitaetFaehigkeiten(migriert, { typ: 'npc' });
@@ -986,18 +1026,11 @@ function normalisiereZufallstabellenGegenstandZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
   }
-  const schadenswertNahkampf =
-    typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '';
-  const schadenswertFernkampf =
-    typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '';
   const medien = normalisiereZufallstabellenMedienListe(z.medien);
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     name: typeof z.name === 'string' ? z.name : '',
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
-    istWaffe: !!z.istWaffe,
-    schadenswertNahkampf,
-    schadenswertFernkampf,
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
     inGegenstandId: typeof z.inGegenstandId === 'string' ? z.inGegenstandId.trim() : '',
     besitzerTyp: typeof z.besitzerTyp === 'string' ? z.besitzerTyp.trim() : '',
@@ -1339,9 +1372,6 @@ function normalisiereZufallstabellenBestieZeile(z) {
     epoche,
     kategorie,
     name: typeof z.name === 'string' ? z.name : '',
-    waffe: typeof z.waffe === 'string' ? z.waffe : '',
-    angriff: typeof z.angriff === 'string' ? z.angriff : '',
-    verteidigung: typeof z.verteidigung === 'string' ? z.verteidigung : '',
     lebenspunkte: typeof z.lebenspunkte === 'string' ? z.lebenspunkte : '',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
     presetId: typeof z.presetId === 'string' ? z.presetId : '',
@@ -1358,14 +1388,15 @@ function normalisiereZufallstabellenBestieZeile(z) {
       : [],
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
     aggressivitaetSkala: agg,
-    schadenswertNahkampf: typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '',
-    schadenswertFernkampf: typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '',
     inventar: normalisiereZufallstabellenInventarListe(z.inventar),
     medien: normalisiereZufallstabellenMedienListe(z.medien),
   };
   let migriert =
     M && typeof M.migriereLegacyKampfwerteNachInventar === 'function'
-      ? M.migriereLegacyKampfwerteNachInventar(rohZeile, { bestie: true })
+      ? M.migriereLegacyKampfwerteNachInventar(
+          { ...rohZeile, ...legacyKampfwerteAusImportZeile(z, 'bestie') },
+          { bestie: true },
+        )
       : rohZeile;
   if (EF && typeof EF.normalisiereEntitaetFaehigkeiten === 'function') {
     migriert = EF.normalisiereEntitaetFaehigkeiten(migriert, {
@@ -6551,6 +6582,11 @@ window.HTBAH.initialisiereCharakterKampfZustand = initialisiereCharakterKampfZus
 window.HTBAH.aktualisiereCharakterKampfZustandAusLp = aktualisiereCharakterKampfZustandAusLp;
 window.HTBAH.setzeCharakterKampfZustand = setzeCharakterKampfZustand;
 window.HTBAH.syncLebenspunkteStatusFromCharakter = syncLebenspunkteStatusFromCharakter;
+window.HTBAH.schliesseGlobaleInteraktiveWeltModal = function schliesseGlobaleInteraktiveWeltModal() {
+  uiZustand.weltenbauUebersichtModalOffen = false;
+  uiZustand.weltenbauUebersichtModalGruppeId = '';
+};
+
 window.HTBAH.oeffneInteraktiveWeltModal = function oeffneInteraktiveWeltModal(payload) {
   const kampagneId = typeof payload?.kampagneId === 'string' ? payload.kampagneId.trim() : '';
   const entityType = typeof payload?.entityType === 'string' ? payload.entityType.trim() : '';

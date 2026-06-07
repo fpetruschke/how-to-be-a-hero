@@ -27,11 +27,29 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
       return this.modalDomId + 'Label';
     },
     aktiveCharakterDaten() {
-      return this.kontextCharakter || this.charakter || {};
+      const prop = this.charakter && typeof this.charakter === 'object' ? this.charakter : null;
+      const kontext =
+        this.kontextCharakter && typeof this.kontextCharakter === 'object'
+          ? this.kontextCharakter
+          : null;
+      if (kontext && Array.isArray(kontext.inventar)) {
+        return kontext;
+      }
+      if (prop && Array.isArray(prop.inventar)) {
+        return prop;
+      }
+      return kontext || prop || {};
     },
     inventarWaffen() {
-      const inventar = Array.isArray(this.aktiveCharakterDaten?.inventar) ? this.aktiveCharakterDaten.inventar : [];
-      return inventar
+      const CM = window.HTBAH_CHARAKTER_MODEL;
+      const inventar = Array.isArray(this.aktiveCharakterDaten?.inventar)
+        ? this.aktiveCharakterDaten.inventar
+        : [];
+      const gefiltert =
+        CM && typeof CM.inventarOhneWaffenlosEntraege === 'function'
+          ? CM.inventarOhneWaffenlosEntraege(inventar)
+          : inventar;
+      return gefiltert
         .filter((eintrag) => eintrag && eintrag.typ === 'waffe')
         .map((eintrag, index) => {
           const name = typeof eintrag.name === 'string' && eintrag.name.trim()
@@ -48,6 +66,7 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
         });
     },
     waffenOptionen() {
+      const CM = window.HTBAH_CHARAKTER_MODEL;
       const basis = this.inventarWaffen.map((waffe) => {
         const nah = waffe.nah;
         const fern = waffe.fern;
@@ -68,13 +87,29 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
                   : 'Kein Schadenswert hinterlegt (Fallback 1W10)',
         };
       });
+      const unbewaffnetRoh =
+        CM && typeof CM.unbewaffnetSchadenswertTextAusEntitaet === 'function'
+          ? CM.unbewaffnetSchadenswertTextAusEntitaet(this.aktiveCharakterDaten)
+          : '1W10';
+      const unbewaffnetBonus =
+        CM && typeof CM.unbewaffnetSchadensbonusAusEntitaet === 'function'
+          ? CM.unbewaffnetSchadensbonusAusEntitaet(this.aktiveCharakterDaten)
+          : { bonus: 0, quelle: 'Handeln' };
+      const unbewaffnetNah = this.parseSchadenswert(unbewaffnetRoh) || {
+        notation: '1W10',
+        bonus: 0,
+        original: '1W10',
+      };
       basis.push({
         id: 'fallback-unarmed',
-        label: 'Waffenlos / improvisiert',
-        nah: { notation: '1W10', bonus: 0, original: '1W10' },
+        label: 'Waffenlos (Fäuste, Tritte)',
+        nah: unbewaffnetNah,
         fern: null,
-        notation: '1W10',
-        quelle: 'Regelwerk-Richtwert: 1W10',
+        notation: unbewaffnetNah.notation,
+        quelle:
+          unbewaffnetBonus.bonus > 0
+            ? `Regelwerk 1W10 · Bonus aus ${unbewaffnetBonus.quelle} (${unbewaffnetBonus.bonus})`
+            : 'Regelwerk-Richtwert: 1W10 (Handeln / Nahkampf unbewaffnet)',
       });
       return basis;
     },
@@ -165,6 +200,18 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
   watch: {
     ausgewaehlteWaffeId() {
       this.syncSchadensartNachWaffe();
+    },
+    inventarWaffen(waffen) {
+      if (!Array.isArray(waffen) || !waffen.length) {
+        if (this.ausgewaehlteWaffeId !== 'fallback-unarmed') {
+          this.ausgewaehlteWaffeId = 'fallback-unarmed';
+        }
+        return;
+      }
+      const gueltig = waffen.some((waffe) => waffe.id === this.ausgewaehlteWaffeId);
+      if (!gueltig && this.ausgewaehlteWaffeId !== 'fallback-unarmed') {
+        this.ausgewaehlteWaffeId = waffen[0].id;
+      }
     },
   },
   methods: {

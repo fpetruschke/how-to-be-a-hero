@@ -782,6 +782,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         if (!teilnehmer || teilnehmer.fehlt) {
           return;
         }
+        if (typeof window.HTBAH.schliesseGlobaleInteraktiveWeltModal === 'function') {
+          window.HTBAH.schliesseGlobaleInteraktiveWeltModal();
+        }
         const payload = {
           entityType: teilnehmer.typ,
           entityId: teilnehmer.entityId,
@@ -1349,8 +1352,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           wissen: false,
           soziales: false,
         },
-        kampfBlockOffen: false,
-        inventarBlockOffen: false,
+        inventarBlockOffen: true,
       };
     },
     computed: {
@@ -1388,7 +1390,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const u = this.slUebersicht;
         return !!(
           (u.kategorien && u.kategorien.length) ||
-          (u.kampfZeilen && u.kampfZeilen.length) ||
           (u.inventarZeilen && u.inventarZeilen.length)
         );
       },
@@ -1426,9 +1427,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       kategorieIstOffen(id) {
         return !!this.kategorieOffen[id];
-      },
-      toggleKampfBlock() {
-        this.kampfBlockOffen = !this.kampfBlockOffen;
       },
       toggleInventarBlock() {
         this.inventarBlockOffen = !this.inventarBlockOffen;
@@ -1699,26 +1697,6 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   </div>
                 </div>
               </div>
-              </div>
-            </div>
-            <div v-if="slUebersicht.kampfZeilen.length" class="card htbah-konflikt-kat-card shadow-sm mb-2">
-              <button
-                type="button"
-                class="card-header py-1 px-2 htbah-konflikt-kat-kopf-btn d-flex align-items-center justify-content-between"
-                :aria-expanded="kampfBlockOffen ? 'true' : 'false'"
-                @click="toggleKampfBlock">
-                <span class="fw-semibold small">Kampf</span>
-                <span class="material-symbols-outlined htbah-konflikt-collapse-ico" aria-hidden="true">
-                  {{ kampfBlockOffen ? 'expand_less' : 'expand_more' }}
-                </span>
-              </button>
-              <div v-show="kampfBlockOffen" class="card-body py-2 px-2">
-                <dl class="htbah-konflikt-sl-dl mb-0">
-                  <template v-for="(z, ki) in slUebersicht.kampfZeilen" :key="teilnehmer.refKey + '-kz-' + ki">
-                    <dt>{{ z.label }}</dt>
-                    <dd>{{ z.wert }}</dd>
-                  </template>
-                </dl>
               </div>
             </div>
             <div v-if="slUebersicht.inventarZeilen.length" class="card htbah-konflikt-kat-card shadow-sm mb-0">

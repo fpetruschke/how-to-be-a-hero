@@ -200,6 +200,23 @@ window.HTBAH_SEITEN.Startseite = {
         </div>
       </div>
 
+      <div class="card text-start mb-3">
+        <div class="d-flex align-items-center gap-2">
+          <div class="htbah-start-card-avatar flex-shrink-0">
+            <span class="htbah-start-card-avatar-emoji" aria-hidden="true">💡</span>
+          </div>
+          <div class="min-w-0 flex-grow-1">
+            <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
+              Hinweis
+            </p>
+            <h5 class="mb-1 text-truncate htbah-start-card-charaktername">Dein Spiel</h5>
+            <p class="mb-0 small text-body-secondary">
+              Alle Vorlagen, Settings und Beispiele dienen nur als Starthilfe. Lass deiner Kreativität freien Lauf – es ist dein Spiel.
+            </p>
+          </div>
+        </div>
+      </div>
+      <hr>
       <div class="row g-3 mb-3">
         <div class="col-12 col-md-6">
           <div
@@ -250,7 +267,7 @@ window.HTBAH_SEITEN.Startseite = {
           </div>
         </div>
       </div>
-
+      <hr>
       <div v-if="hatGespeicherteCharaktere" class="mb-3">
         <h5 class="text-start mb-2">Gespeicherte Charaktere</h5>
         <div class="row g-3">
