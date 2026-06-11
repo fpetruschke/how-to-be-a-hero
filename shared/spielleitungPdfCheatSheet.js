@@ -94,10 +94,13 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         inhaltHtml: `<ol>
   <li><strong>Initiative:</strong> 1W10 + Begabung Handeln je Teilnehmer (Spielleitung: pro NPC oder gemeinsam)</li>
   <li><strong>Überraschungsrunde:</strong> Überraschte setzen Runde 1 aus (unabhängig von Initiative)</li>
-  <li><strong>Kampfrunden:</strong> Reihenfolge absteigend Initiative — vor jedem Kampf neu würfeln</li>
-  <li><strong>Angriff:</strong> Probe auf passende Kampf-Fähigkeit — bei Erfolg Schaden</li>
-  <li><strong>Parade</strong> (1× pro Runde): Probe auf Handeln; bei Erfolg kein Schaden. Kritische Angriffe nicht parierbar. Schusswaffen nicht parierbar. Parieren mit bloßen Fäusten: halber Schaden (gerundet)</li>
-  <li><strong>Schaden:</strong> X×W10 laut Waffe; kritischer Treffer verdoppelt den Schaden</li>
+  <li><strong>Kampfrunden:</strong> Reihenfolge absteigend Initiative — vor jedem Kampf neu würfeln
+    <ol>
+      <li><strong>Angriff:</strong> Probe auf passende Kampf-Fähigkeit — bei Erfolg Schaden</li>
+      <li><strong>Parade</strong> (1× pro Runde): Probe auf Handeln; bei Erfolg kein Schaden. Kritische Angriffe nicht parierbar. Schusswaffen nicht parierbar. Parieren mit bloßen Fäusten: halber Schaden (gerundet)</li>
+      <li><strong>Schaden:</strong> X×W10 laut Waffe; kritischer Treffer verdoppelt den Schaden</li>
+    </ol>
+  </li>
   <li><strong>Ende:</strong> Eine Seite ohne LP, Flucht außer Reichweite oder Kapitulation</li>
 </ol>`,
       },

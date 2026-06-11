@@ -4,6 +4,7 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
   components: {
     InventarEditorPanel: window.HTBAH_KOMPONENTEN.InventarEditorPanel,
   },
+  emits: ['remove'],
   props: {
     charakter: { type: Object, required: true },
   },
@@ -154,7 +155,8 @@ window.HTBAH_KOMPONENTEN.InventarModal = {
           <inventar-editor-panel
             v-if="charakter"
             ref="inventarPanel"
-            :inventar="charakter.inventar" />
+            :inventar="charakter.inventar"
+            @remove="$emit('remove', $event)" />
         </div>
         <div class="border-top px-3 py-2 d-flex justify-content-end flex-shrink-0">
           <button type="button" class="btn btn-secondary" @click="schliessen">

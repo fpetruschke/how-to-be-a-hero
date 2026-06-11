@@ -2364,6 +2364,130 @@ input::placeholder {
   overflow: hidden;
 }
 
+.htbah-initiative-badge {
+  position: fixed;
+  z-index: 1039;
+  top: calc(var(--htbah-top-nav-reserve, 0px) + env(safe-area-inset-top, 0px) + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  max-width: min(20rem, calc(100vw - 1.25rem));
+  padding: 0.4rem 0.55rem 0.4rem 0.75rem;
+  border-radius: 2rem;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.18),
+    0 0 0 1px color-mix(in srgb, var(--bs-info) 40%, transparent);
+  background: color-mix(in srgb, var(--bs-body-bg) 90%, var(--bs-info) 10%);
+  touch-action: manipulation;
+}
+
+.htbah-initiative-badge__emoji,
+.htbah-initiative-badge__label,
+.htbah-initiative-badge__wert,
+.htbah-initiative-badge__close {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+}
+
+.htbah-initiative-badge__emoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.htbah-initiative-badge__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--secondary-color);
+  line-height: 1;
+}
+
+.htbah-initiative-badge__wert {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.htbah-initiative-badge__close {
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-left: 0.1rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bs-info) 16%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+
+.htbah-initiative-badge__close:hover {
+  background: color-mix(in srgb, var(--bs-info) 28%, transparent);
+}
+
+.htbah-initiative-badge__close .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.inventar-filter-leiste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.inventar-filter-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.inventar-filter-badge {
+  cursor: pointer;
+  border-width: 1px;
+  border-style: solid;
+  font-weight: 600;
+  padding: 0.35em 0.65em;
+}
+
+.inventar-filter-badge--inaktiv {
+  background: transparent !important;
+  color: var(--secondary-color) !important;
+  border-color: color-mix(in srgb, var(--secondary-color) 45%, transparent) !important;
+}
+
+.inventar-filter-badge--inaktiv.text-bg-warning {
+  border-color: color-mix(in srgb, var(--bs-warning) 55%, var(--border-color)) !important;
+  color: color-mix(in srgb, var(--bs-warning) 78%, var(--text-color)) !important;
+}
+
+.inventar-filter-badge--inaktiv.text-bg-info {
+  border-color: color-mix(in srgb, var(--bs-info) 55%, var(--border-color)) !important;
+  color: color-mix(in srgb, var(--bs-info) 78%, var(--text-color)) !important;
+}
+
+.inventar-filter-badge--inaktiv.text-bg-primary {
+  border-color: color-mix(in srgb, var(--primary-color) 55%, var(--border-color)) !important;
+  color: var(--primary-color) !important;
+}
+
+.htbah-kampagne-mobile-card .btn-link {
+  text-align: start;
+}
+
+.inventar-filter-suche {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  max-width: 18rem;
+}
+
 .htbah-zeitmessung-badge {
   position: fixed;
   z-index: 1038;
@@ -4313,6 +4437,15 @@ input::placeholder {
 
 .inventar-mobile-editor-block .inventar-beschreibung-quill .ql-container.ql-snow {
   min-height: 6rem;
+}
+
+.inventar-mobile-editor-block .inventar-beschreibung-quill .ql-toolbar.ql-snow {
+  display: block !important;
+}
+
+.inventar-mobile-editor-block .inventar-beschreibung-quill .ql-editor {
+  min-height: 5.5rem;
+  max-height: 14rem;
 }
 
 .inventar-waffen-referenz {

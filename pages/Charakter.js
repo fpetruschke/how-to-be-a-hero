@@ -67,6 +67,7 @@ window.HTBAH_SEITEN.Charakter = {
       _autosaveInitialisiert: false,
       _autosaveTemporarAussetzen: false,
       charakterbildDropAktiv: false,
+      initiativeBadgeGeschlossen: false,
     };
   },
   computed: {
@@ -218,6 +219,17 @@ window.HTBAH_SEITEN.Charakter = {
         { id: 'tot', label: 'Tot', emoji: '💀' },
       ];
     },
+    initiativeBadgeWert() {
+      return String(this.charakter?.initiative || '').trim();
+    },
+    zeigeInitiativeBadge() {
+      return (
+        !this.spielleitungMitglied &&
+        this.istSpielTabAktiv &&
+        !!this.initiativeBadgeWert &&
+        !this.initiativeBadgeGeschlossen
+      );
+    },
   },
   created() {
     this.initialisiereCharakterAusRoute();
@@ -233,6 +245,7 @@ window.HTBAH_SEITEN.Charakter = {
   },
   mounted() {
     this.aktualisiereAktivenCharakterKontext();
+    this.initiativeBadgeZustandLaden();
   },
   beforeUnmount() {
     if (window.HTBAH._aktiverCharakterKontextQuelle === this) {
@@ -307,7 +320,29 @@ window.HTBAH_SEITEN.Charakter = {
     charakterId() {
       if (!this.spielleitungMitglied) {
         this.aktualisiereAktivenCharakterKontext();
+        this.initiativeBadgeZustandLaden();
       }
+    },
+    istSpielTabAktiv(aktiv) {
+      if (aktiv) {
+        this.initiativeBadgeZustandLaden();
+      }
+    },
+    'charakter.initiative'(neu, alt) {
+      if (this.spielleitungMitglied || !this.istSpielTabAktiv) {
+        return;
+      }
+      const n = String(neu || '').trim();
+      const a = String(alt || '').trim();
+      if (!n) {
+        this.initiativeBadgeGeschlossen = false;
+        this.initiativeBadgeSpeicherEntfernen();
+        return;
+      }
+      if (n !== a) {
+        this.initiativeBadgeGeschlossen = false;
+      }
+      this.initiativeBadgeSpeicherSchreiben(n, this.initiativeBadgeGeschlossen);
     },
   },
   methods: {
@@ -1298,6 +1333,48 @@ window.HTBAH_SEITEN.Charakter = {
     initiativeModalOeffnen() {
       this.$refs.initiativeModal.oeffnen();
     },
+    initiativeBadgeZustandLaden() {
+      const S = window.HTBAH_INITIATIVE_BADGE_SPEICHER;
+      if (!S || !this.charakterId || this.spielleitungMitglied) {
+        this.initiativeBadgeGeschlossen = false;
+        return;
+      }
+      const eintrag = S.lade(this.charakterId);
+      if (!eintrag) {
+        this.initiativeBadgeGeschlossen = false;
+        return;
+      }
+      this.initiativeBadgeGeschlossen = !!eintrag.geschlossen;
+      if (eintrag.wert && !this.initiativeBadgeWert) {
+        this.charakter.initiative = eintrag.wert;
+      }
+    },
+    initiativeBadgeSpeicherSchreiben(wert, geschlossen) {
+      const S = window.HTBAH_INITIATIVE_BADGE_SPEICHER;
+      if (!S || !this.charakterId) {
+        return;
+      }
+      S.speichere(this.charakterId, wert, geschlossen);
+    },
+    initiativeBadgeSpeicherEntfernen() {
+      const S = window.HTBAH_INITIATIVE_BADGE_SPEICHER;
+      if (!S || !this.charakterId) {
+        return;
+      }
+      S.entferne(this.charakterId);
+    },
+    initiativeBadgeSchliessen() {
+      this.initiativeBadgeGeschlossen = true;
+      if (this.initiativeBadgeWert) {
+        this.initiativeBadgeSpeicherSchreiben(this.initiativeBadgeWert, true);
+      }
+    },
+    onInitiativeGewuerfelt() {
+      this.initiativeBadgeGeschlossen = false;
+      if (this.initiativeBadgeWert) {
+        this.initiativeBadgeSpeicherSchreiben(this.initiativeBadgeWert, false);
+      }
+    },
     schadenModalOeffnen() {
       this.$refs.schadenModal.oeffnen({ charakter: this.charakter });
     },
@@ -2235,7 +2312,7 @@ window.HTBAH_SEITEN.Charakter = {
 
       <div v-if="spielleitungMitglied || istSpielTabAktiv || istNeuModus" class="card p-3 mb-2">
         <div class="row g-2">
-          <div v-if="spielleitungMitglied || istSpielTabAktiv" class="col-12">
+          <div v-if="spielleitungMitglied" class="col-12">
             <div v-if="zeigtKampfZustandToggle" class="mb-2">
               <label class="form-label small text-secondary mb-1">Zustand</label>
               <div class="btn-group w-100 htbah-kampf-zustand-toggle" role="group" aria-label="Kampfzustand">
@@ -2257,20 +2334,42 @@ window.HTBAH_SEITEN.Charakter = {
                 Wird bei LP-Änderung automatisch gesetzt (0 = tot, 1–10 oder −60+ auf einmal = bewusstlos).
               </p>
             </div>
-            <div class="row g-2">
-              <div class="col-12 col-md-4">
-                <icon-text-button
-                  v-if="spielleitungMitglied || (istSpielTabAktiv && !istNeuModus)"
+            <div class="mb-2">
+              <label class="form-label small text-secondary mb-1">Initiative</label>
+              <div class="input-group">
+                <input
+                  class="form-control"
+                  type="number"
+                  min="1"
+                  :max="spielleitungInitiativeMax"
+                  v-model="charakter.initiative"
+                  placeholder="z. B. 12"
+                  inputmode="numeric"
+                  autocomplete="off" />
+                <button
                   type="button"
-                  class="btn btn-outline-primary btn-lg w-100"
-                  symbol="🎲"
-                  @click="initiativeModalOeffnen">
-                  Initiative würfeln
-                </icon-text-button>
+                  class="btn btn-outline-primary"
+                  title="1W10 + Begabung Handeln"
+                  @click="spielleitungInitiativeWuerfeln">
+                  🎲
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline-danger htbah-input-icon-btn"
+                  title="Initiative leeren"
+                  aria-label="Initiative leeren"
+                  :disabled="!String(charakter.initiative || '').trim()"
+                  @click="spielleitungInitiativeZuruecksetzen">
+                  <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
               </div>
-              <div class="col-12 col-md-4">
+              <div class="form-text">
+                Gültig: 1 bis {{ spielleitungInitiativeMax }} (1W10 + Begabung Handeln).
+              </div>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-12 col-md-6">
                 <icon-text-button
-                  v-if="spielleitungMitglied || (istSpielTabAktiv && !istNeuModus)"
                   type="button"
                   class="btn btn-outline-primary btn-lg w-100"
                   symbol="🛡️"
@@ -2278,9 +2377,8 @@ window.HTBAH_SEITEN.Charakter = {
                   Parieren
                 </icon-text-button>
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-6">
                 <icon-text-button
-                  v-if="spielleitungMitglied || (istSpielTabAktiv && !istNeuModus)"
                   type="button"
                   class="btn btn-outline-primary btn-lg w-100"
                   symbol="💥"
@@ -2289,58 +2387,101 @@ window.HTBAH_SEITEN.Charakter = {
                 </icon-text-button>
               </div>
             </div>
-          </div>
-          <div v-if="spielleitungMitglied" class="col-12">
-            <label class="form-label small text-secondary mb-1">Initiative</label>
-            <div class="input-group">
-              <input
-                class="form-control"
-                type="number"
-                min="1"
-                :max="spielleitungInitiativeMax"
-                v-model="charakter.initiative"
-                placeholder="z. B. 12"
-                inputmode="numeric"
-                autocomplete="off" />
-              <button
-                type="button"
-                class="btn btn-outline-primary"
-                title="1W10 + Begabung Handeln"
-                @click="spielleitungInitiativeWuerfeln">
-                🎲
-              </button>
-              <button
-                type="button"
-                class="btn btn-outline-danger htbah-input-icon-btn"
-                title="Initiative leeren"
-                aria-label="Initiative leeren"
-                :disabled="!String(charakter.initiative || '').trim()"
-                @click="spielleitungInitiativeZuruecksetzen">
-                <span class="material-symbols-outlined" aria-hidden="true">close</span>
-              </button>
-            </div>
-            <div class="form-text">
-              Gültig: 1 bis {{ spielleitungInitiativeMax }} (1W10 + Begabung Handeln).
+            <div class="row g-2">
+              <div class="col-12 col-md-6">
+                <icon-text-button
+                  class="btn btn-outline-primary btn-lg w-100"
+                  type="button"
+                  symbol="🎒"
+                  @click="inventarDialogOeffnen">
+                  Inventar
+                </icon-text-button>
+              </div>
+              <div class="col-12 col-md-6">
+                <icon-text-button
+                  class="btn btn-outline-primary btn-lg w-100"
+                  type="button"
+                  symbol="📝"
+                  @click="notizenDialogOeffnen">
+                  Notizen
+                </icon-text-button>
+              </div>
             </div>
           </div>
-          <div class="col-12 col-md-6">
-            <icon-text-button
-              class="btn btn-outline-primary btn-lg w-100"
-              type="button"
-              symbol="🎒"
-              @click="inventarDialogOeffnen">
-              Inventar
-            </icon-text-button>
-          </div>
-          <div class="col-12 col-md-6">
-            <icon-text-button
-              class="btn btn-outline-primary btn-lg w-100"
-              type="button"
-              symbol="📝"
-              @click="notizenDialogOeffnen">
-              Notizen
-            </icon-text-button>
-          </div>
+          <template v-else-if="istSpielTabAktiv">
+            <div class="col-12">
+              <div class="row g-2">
+                <div class="col-12 col-md-4">
+                  <icon-text-button
+                    v-if="!istNeuModus"
+                    type="button"
+                    class="btn btn-outline-primary btn-lg w-100"
+                    symbol="🎲"
+                    @click="initiativeModalOeffnen">
+                    Initiative würfeln
+                  </icon-text-button>
+                </div>
+                <div class="col-12 col-md-4">
+                  <icon-text-button
+                    v-if="!istNeuModus"
+                    type="button"
+                    class="btn btn-outline-primary btn-lg w-100"
+                    symbol="🛡️"
+                    @click="paradeModalOeffnen">
+                    Parieren
+                  </icon-text-button>
+                </div>
+                <div class="col-12 col-md-4">
+                  <icon-text-button
+                    v-if="!istNeuModus"
+                    type="button"
+                    class="btn btn-outline-primary btn-lg w-100"
+                    symbol="💥"
+                    @click="schadenModalOeffnen">
+                    Schaden erwürfeln
+                  </icon-text-button>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <icon-text-button
+                class="btn btn-outline-primary btn-lg w-100"
+                type="button"
+                symbol="🎒"
+                @click="inventarDialogOeffnen">
+                Inventar
+              </icon-text-button>
+            </div>
+            <div class="col-12 col-md-6">
+              <icon-text-button
+                class="btn btn-outline-primary btn-lg w-100"
+                type="button"
+                symbol="📝"
+                @click="notizenDialogOeffnen">
+                Notizen
+              </icon-text-button>
+            </div>
+          </template>
+          <template v-else-if="istNeuModus">
+            <div class="col-12 col-md-6">
+              <icon-text-button
+                class="btn btn-outline-primary btn-lg w-100"
+                type="button"
+                symbol="🎒"
+                @click="inventarDialogOeffnen">
+                Inventar
+              </icon-text-button>
+            </div>
+            <div class="col-12 col-md-6">
+              <icon-text-button
+                class="btn btn-outline-primary btn-lg w-100"
+                type="button"
+                symbol="📝"
+                @click="notizenDialogOeffnen">
+                Notizen
+              </icon-text-button>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -2561,7 +2702,31 @@ window.HTBAH_SEITEN.Charakter = {
         accept="image/*"
         @change="charakterbildDateiAusgewaehlt" />
       <vor-nachteile-modal ref="vorNachteileModal" :charakter="charakter" />
-      <initiative-modal ref="initiativeModal" :charakter="charakter" />
+      <initiative-modal
+        v-if="!spielleitungMitglied"
+        ref="initiativeModal"
+        :charakter="charakter"
+        @gewuerfelt="onInitiativeGewuerfelt" />
+      <teleport to="body">
+        <div
+          v-if="zeigeInitiativeBadge"
+          class="htbah-initiative-badge"
+          role="status"
+          aria-live="polite"
+          aria-label="Gewürfelte Initiative">
+          <span class="htbah-initiative-badge__emoji" aria-hidden="true">⚔️</span>
+          <span class="htbah-initiative-badge__label">Initiative</span>
+          <span class="htbah-initiative-badge__wert">{{ initiativeBadgeWert }}</span>
+          <button
+            type="button"
+            class="htbah-initiative-badge__close"
+            title="Badge schließen"
+            aria-label="Initiative-Badge schließen"
+            @click="initiativeBadgeSchliessen">
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
+        </div>
+      </teleport>
       <div v-if="spielleitungMitglied" class="d-none" aria-hidden="true">
         <wuerfelbecher-wurf ref="spielleitungInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
       </div>

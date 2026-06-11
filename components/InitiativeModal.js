@@ -5,6 +5,7 @@ window.HTBAH_KOMPONENTEN.InitiativeModal = {
   components: {
     WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
   },
+  emits: ['gewuerfelt'],
   props: {
     charakter: { type: Object, required: true },
   },
@@ -54,7 +55,14 @@ window.HTBAH_KOMPONENTEN.InitiativeModal = {
         if (gen !== this.wurfGeneration) {
           return;
         }
-        this.letzterW10 = Array.isArray(werte) && werte.length ? Number(werte[0]) || null : null;
+        const w10 = Array.isArray(werte) && werte.length ? Number(werte[0]) || null : null;
+        this.letzterW10 = w10;
+        if (w10 === null) {
+          return;
+        }
+        const ergebnis = w10 + this.begabungHandeln;
+        this.charakter.initiative = String(ergebnis);
+        this.$emit('gewuerfelt', ergebnis);
       });
     },
     ergebnisZuruecksetzen() {

@@ -98,6 +98,7 @@ var HTBAH_REFACTOR_UTILS =
       SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
       ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
       FaehigkeitenKompaktPanel: window.HTBAH_KOMPONENTEN.FaehigkeitenKompaktPanel,
+      InventarEditorPanel: window.HTBAH_KOMPONENTEN.InventarEditorPanel,
     },
     props: {
       offen: { type: Boolean, default: false },
@@ -908,6 +909,7 @@ var HTBAH_REFACTOR_UTILS =
         if (!this.charakterModal.charakter) {
           return null;
         }
+        this.charakterModalInventarSpeichern();
         this.uebernehmeCharakterInventarQuillInModel();
         if (this.charakterQuillInstanz) {
           this.charakterModal.charakter.journalHtml = this.charakterQuillInstanz.root.innerHTML;
@@ -3706,6 +3708,27 @@ var HTBAH_REFACTOR_UTILS =
           charakter,
         });
       },
+      charakterModalInventarEntfernen(payload) {
+        const gegenstandId =
+          payload && typeof payload === 'object' ? String(payload.gegenstandId || '').trim() : '';
+        if (!gegenstandId || !this.charakterModal.charakter) {
+          return;
+        }
+        const inventar = Array.isArray(this.charakterModal.charakter.inventar)
+          ? this.charakterModal.charakter.inventar
+          : [];
+        this.charakterModal.charakter.inventar = inventar.filter(
+          (item) => item && String(item.gegenstandId || '').trim() !== gegenstandId,
+        );
+        this.befreieGegenstandBesitzer(gegenstandId);
+        this.$nextTick(() => this.refreshGraph());
+      },
+      charakterModalInventarSpeichern() {
+        const panel = this.$refs.charakterInventarPanel;
+        if (panel && panel.inventarEditId && typeof panel.inventarSpeichernZeile === 'function') {
+          panel.inventarSpeichernZeile();
+        }
+      },
       charakterModalParadeOeffnen() {
         const charakter = this.charakterModal.charakter;
         if (!charakter) {
@@ -3928,6 +3951,7 @@ var HTBAH_REFACTOR_UTILS =
       },
       schliesseCharakterModalOhnePruefung(skipParentSchliessen) {
         const warAllein = this.charakterModalAllein;
+        this.charakterModalInventarSpeichern();
         this.charakterQuillAufraeumen();
         this.uebernehmeCharakterInventarQuillInModel();
         this.beendeCharakterInventarEditoren();
@@ -4542,6 +4566,7 @@ var HTBAH_REFACTOR_UTILS =
         if (idx < 0) {
           return false;
         }
+        this.charakterModalInventarSpeichern();
         const charakter = JSON.parse(JSON.stringify(this.charakterModal.charakter));
         this.uebernehmeCharakterInventarQuillInModel();
         if (this.charakterQuillInstanz) {
@@ -7986,40 +8011,15 @@ var HTBAH_REFACTOR_UTILS =
               zeige-geistesblitz
               :geistesblitz-verbleibend="charakterModal.charakter.geistesblitzVerbleibend"
               @probe="charakterModalFaehigkeitenProbe" />
-            <label class="form-label mt-3 mb-1">Inventar</label>
-            <div class="d-flex justify-content-end mb-2">
-              <button type="button" class="btn btn-sm btn-outline-secondary" @click="inventarEintragHinzufuegen">Eintrag hinzufügen</button>
-            </div>
-            <div v-if="!charakterModal.charakter.inventar.length" class="text-secondary small mb-2">Kein Inventar.</div>
-            <div v-else class="d-flex flex-column gap-2 mb-2">
-              <div
-                v-for="(item, idx) in charakterModal.charakter.inventar"
-                :key="item.id || idx"
-                class="border rounded p-2 htbah-charakter-inventar-karte">
-                <div class="row g-2">
-                  <div class="col-md-4"><input class="form-control form-control-sm" v-model="item.name" placeholder="Name" /></div>
-                  <div class="col-md-4">
-                    <select class="form-select form-select-sm" v-model="item.typ">
-                      <option value="gegenstand">Gegenstand</option>
-                      <option value="waffe">Waffe</option>
-                      <option value="rustung">Rüstung</option>
-                    </select>
-                  </div>
-                  <div class="col-md-4 d-flex justify-content-end">
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="inventarEintragEntfernen(idx)">Entfernen</button>
-                  </div>
-                  <div class="col-md-6" v-if="item.typ === 'waffe'"><input class="form-control form-control-sm" v-model="item.schadenswertNahkampf" placeholder="Schadenswert Nahkampf" /></div>
-                  <div class="col-md-6" v-if="item.typ === 'waffe'"><input class="form-control form-control-sm" v-model="item.schadenswertFernkampf" placeholder="Schadenswert Fernkampf" /></div>
-                  <div class="col-md-6" v-if="item.typ === 'rustung'"><input class="form-control form-control-sm" v-model="item.rustwert" placeholder="Rüstwert" /></div>
-                  <div class="col-12">
-                    <div
-                      :ref="charakterInventarBeschreibungRefFn(item)"
-                      class="quill-editor-host inventar-beschreibung-quill"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <label class="form-label mt-2 mb-1">Notizen</label>
+            <section class="htbah-entitaet-bereich mt-3">
+              <h6 class="htbah-entitaet-bereich-titel">🎒 Inventar</h6>
+              <inventar-editor-panel
+                v-if="charakterModal.charakter"
+                ref="charakterInventarPanel"
+                :inventar="charakterModal.charakter.inventar"
+                @remove="charakterModalInventarEntfernen" />
+            </section>
+            <label class="form-label mt-3 mb-1">Notizen</label>
             <div class="zufallstabellen-quill-wrap" :key="'wb-char-q-' + charakterQuillSession">
               <div :ref="charakterQuillHostRefFn" class="quill-editor-host zufallstabellen-quill-host htbah-charakter-journal-host"></div>
             </div>

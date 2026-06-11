@@ -24,7 +24,45 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
       waffenReferenzRegelwerk: SHARED.INVENTAR_WAFFEN_REFERENZ_REGELWERK || [],
       waffenReferenzWiki: SHARED.INVENTAR_WAFFEN_REFERENZ_WIKI || [],
       waffenVorschlaege: SHARED.INVENTAR_WAFFEN_VORSCHLAEGE || [],
+      inventarFilterTyp: '',
+      inventarSuche: '',
     };
+  },
+  computed: {
+    inventarGefiltert() {
+      let liste = this.inventar;
+      if (this.inventarFilterTyp) {
+        liste = liste.filter((e) => (e.typ || 'gegenstand') === this.inventarFilterTyp);
+      }
+      const suche = this.inventarNormalisiereSuchtext(this.inventarSuche);
+      if (!suche) {
+        return liste;
+      }
+      return liste.filter((e) => {
+        const name = this.inventarNormalisiereSuchtext(e.name);
+        const beschreibung = this.inventarNormalisiereSuchtext(
+          String(e.beschreibungHtml || '').replace(/<[^>]*>/g, ' '),
+        );
+        const werte = this.inventarNormalisiereSuchtext(this.inventarWerteText(e));
+        return (
+          name.includes(suche) || beschreibung.includes(suche) || werte.includes(suche)
+        );
+      });
+    },
+    inventarMobileAnzeige() {
+      const liste = this.inventarGefiltert;
+      if (!liste.length || !this.inventarEditId) {
+        return liste;
+      }
+      const index = liste.findIndex((e) => e.id === this.inventarEditId);
+      if (index <= 0) {
+        return liste;
+      }
+      const kopie = liste.slice();
+      const [bearbeitet] = kopie.splice(index, 1);
+      kopie.unshift(bearbeitet);
+      return kopie;
+    },
   },
   methods: {
     inventarModel() {
@@ -38,6 +76,19 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
         return 'Waffe';
       }
       return 'Gegenstand';
+    },
+    inventarFilterSetzen(typ) {
+      this.inventarFilterTyp = typ;
+    },
+    inventarFilterAktiv(typ) {
+      return this.inventarFilterTyp === typ;
+    },
+    inventarFilterBadgeKlasse(typ, aktivKlasse) {
+      const basis = 'inventar-filter-badge inventar-typ-badge';
+      if (this.inventarFilterAktiv(typ)) {
+        return `${basis} ${aktivKlasse}`;
+      }
+      return `${basis} inventar-filter-badge--inaktiv ${aktivKlasse}`;
     },
     inventarTypBadgeClass(typ) {
       if (typ === 'rustung') {
@@ -186,9 +237,21 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
           });
         }
 
-        el.classList.add('inventar-quill-toolbar--hidden');
+        const mobil =
+          typeof window !== 'undefined' &&
+          window.matchMedia &&
+          window.matchMedia('(max-width: 767.98px)').matches;
+        if (mobil) {
+          el.classList.add('inventar-beschreibung-quill--mobil');
+        } else {
+          el.classList.add('inventar-quill-toolbar--hidden');
+        }
         const showToolbar = () => el.classList.remove('inventar-quill-toolbar--hidden');
-        const hideToolbar = () => el.classList.add('inventar-quill-toolbar--hidden');
+        const hideToolbar = () => {
+          if (!mobil) {
+            el.classList.add('inventar-quill-toolbar--hidden');
+          }
+        };
 
         const onFocusIn = (e) => {
           if (
@@ -210,17 +273,22 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
           }
         };
 
-        quill.on('selection-change', onSelectionChange);
-        el.addEventListener('focusin', onFocusIn);
-        el.addEventListener('focusout', onFocusOut);
+        if (!mobil) {
+          quill.on('selection-change', onSelectionChange);
+          el.addEventListener('focusin', onFocusIn);
+          el.addEventListener('focusout', onFocusOut);
+        }
 
         this.inventarQuillToolbarCleanup[id] = () => {
-          quill.off('selection-change', onSelectionChange);
-          el.removeEventListener('focusin', onFocusIn);
-          el.removeEventListener('focusout', onFocusOut);
+          if (!mobil) {
+            quill.off('selection-change', onSelectionChange);
+            el.removeEventListener('focusin', onFocusIn);
+            el.removeEventListener('focusout', onFocusOut);
+          }
           if (el && el.parentNode) {
             el.innerHTML = '';
             el.classList.add('inventar-quill-toolbar--hidden');
+            el.classList.remove('inventar-beschreibung-quill--mobil');
           }
         };
       });
@@ -394,6 +462,45 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
                 Hinzufügen
               </icon-text-button>
             </div>
+            <div class="inventar-filter-leiste">
+              <div class="inventar-filter-badges" role="group" aria-label="Inventar nach Art filtern">
+                <button
+                  type="button"
+                  class="badge rounded-pill"
+                  :class="inventarFilterBadgeKlasse('', 'text-bg-primary')"
+                  @click="inventarFilterSetzen('')">
+                  Alle
+                </button>
+                <button
+                  type="button"
+                  class="badge rounded-pill"
+                  :class="inventarFilterBadgeKlasse('gegenstand', 'text-bg-secondary')"
+                  @click="inventarFilterSetzen('gegenstand')">
+                  Gegenstand
+                </button>
+                <button
+                  type="button"
+                  class="badge rounded-pill"
+                  :class="inventarFilterBadgeKlasse('waffe', 'text-bg-warning')"
+                  @click="inventarFilterSetzen('waffe')">
+                  Waffe
+                </button>
+                <button
+                  type="button"
+                  class="badge rounded-pill"
+                  :class="inventarFilterBadgeKlasse('rustung', 'text-bg-info')"
+                  @click="inventarFilterSetzen('rustung')">
+                  Rüstung
+                </button>
+              </div>
+              <input
+                v-model="inventarSuche"
+                type="search"
+                class="form-control form-control-sm inventar-filter-suche"
+                placeholder="Inventar durchsuchen…"
+                autocomplete="off"
+                aria-label="Inventar durchsuchen" />
+            </div>
             <div class="table-responsive inventar-tabelle-wrap d-none d-md-block">
               <table class="table table-sm align-middle mb-0 inventar-tabelle">
                 <thead>
@@ -411,7 +518,12 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
                       Noch keine Gegenstände — „Hinzufügen“ nutzen.
                     </td>
                   </tr>
-                  <tr v-for="eintrag in inventar" :key="eintrag.id">
+                  <tr v-else-if="!inventarGefiltert.length">
+                    <td colspan="5" class="text-body-secondary small py-2">
+                      Keine Einträge für Filter oder Suche.
+                    </td>
+                  </tr>
+                  <tr v-for="eintrag in inventarGefiltert" :key="eintrag.id">
                     <td class="inventar-col-art">
                       <span
                         v-if="inventarEditId !== eintrag.id"
@@ -440,13 +552,13 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
                         autocomplete="off" />
                     </td>
                     <td class="inventar-col-werte small">
-                      <template v-if="inventarEditId !== eintrag.id">
-                        <span class="text-body-secondary">{{ inventarWerteText(eintrag) }}</span>
-                      </template>
-                      <template v-else>
-                        <span v-if="eintrag.typ === 'gegenstand'" class="text-body-secondary">—</span>
+                      <template v-if="(eintrag.typ || 'gegenstand') !== 'gegenstand'">
+                        <template v-if="inventarEditId !== eintrag.id">
+                          <span class="text-body-secondary">{{ inventarWerteText(eintrag) }}</span>
+                        </template>
+                        <template v-else>
                         <input
-                          v-else-if="eintrag.typ === 'rustung'"
+                          v-if="eintrag.typ === 'rustung'"
                           class="form-control form-control-sm"
                           v-model="eintrag.rustwert"
                           placeholder="Rüstwert"
@@ -504,6 +616,7 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
                             </div>
                           </div>
                         </div>
+                        </template>
                       </template>
                     </td>
                     <td class="inventar-col-beschreibung">
@@ -557,8 +670,11 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
               <div v-if="!inventar.length" class="text-body-secondary small py-2">
                 Noch keine Gegenstände — „Hinzufügen“ nutzen.
               </div>
+              <div v-else-if="!inventarGefiltert.length" class="text-body-secondary small py-2">
+                Keine Einträge für Filter oder Suche.
+              </div>
               <div
-                v-for="eintrag in inventar"
+                v-for="eintrag in inventarMobileAnzeige"
                 :key="'inventar-card-' + eintrag.id"
                 class="card inventar-mobile-card mb-2">
                 <div class="card-body p-2">
@@ -628,16 +744,15 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
                       </ul>
                     </div>
                   </div>
-                  <div class="small mb-2">
+                  <div v-if="(eintrag.typ || 'gegenstand') !== 'gegenstand'" class="small mb-2">
                     <template v-if="inventarEditId !== eintrag.id">
                       <span class="text-body-secondary">Werte:</span>
                       <span class="text-body-secondary">{{ inventarWerteText(eintrag) }}</span>
                     </template>
                     <template v-else>
                       <label class="form-label small text-body-secondary mb-1">Werte</label>
-                      <span v-if="eintrag.typ === 'gegenstand'" class="text-body-secondary">—</span>
                       <input
-                        v-else-if="eintrag.typ === 'rustung'"
+                        v-if="eintrag.typ === 'rustung'"
                         class="form-control form-control-sm mt-1"
                         v-model="eintrag.rustwert"
                         placeholder="Rüstwert"
@@ -706,6 +821,7 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
                   <div v-else class="inventar-mobile-editor-block">
                     <label class="form-label small text-body-secondary mb-1">Beschreibung</label>
                     <div
+                      :key="'inv-mob-quill-' + eintrag.id"
                       :ref="inventarBeschreibungRefFn(eintrag)"
                       class="quill-editor-host inventar-beschreibung-quill"></div>
                   </div>

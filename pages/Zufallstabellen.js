@@ -128,11 +128,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       bildImportTimeoutId: null,
       galerieModalInstanz: null,
       galerieModalZeile: null,
-      /** { typ, zeile } — Zeile als Deep-Kopie, nur Anzeige */
-      detailAnsicht: null,
-      detailAnsichtModalInstanz: null,
-      /** Einmal-Listener auf hidden.bs.modal — bei Route-Wechsel entfernen, sonst Leak */
-      detailAnsichtModalHiddenKetteHandler: null,
       entitaetenAuswahlModus: false,
       /** Schlüssel `${typ}:${id}` → true */
       entitaetenAuswahl: {},
@@ -205,35 +200,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     },
     entitaetenAuswahlAnzahl() {
       return this.entitaetenAuswahlSchluesselListe.length;
-    },
-    detailAnsichtTitel() {
-      if (!this.detailAnsicht) {
-        return '';
-      }
-      const cfg = TABLE_TYPE_CONFIG[this.detailAnsicht.typ] || TABLE_TYPE_CONFIG.gegenstand;
-      return cfg.detail;
-    },
-    detailAnsichtKannInWeltOeffnen() {
-      if (!this.detailAnsicht || !this.detailAnsicht.zeile) {
-        return false;
-      }
-      const typ = this.detailAnsicht.typ;
-      if (!['npc', 'bestie', 'ort', 'raetsel', 'gegenstand'].includes(typ)) {
-        return false;
-      }
-      const id = this.detailAnsicht.zeile.id;
-      return !!(id && String(id).trim());
-    },
-    detailAnsichtFelder() {
-      if (!this.detailAnsicht) {
-        return [];
-      }
-      const E = window.HTBAH_SHARED && window.HTBAH_SHARED.EntitaetDetailFelder;
-      if (!E || typeof E.detailFelderFuerZeile !== 'function') {
-        return [];
-      }
-      const paket = E.detailFelderFuerZeile(this.detailAnsicht.typ, this.detailAnsicht.zeile);
-      return Array.isArray(paket.felder) ? paket.felder : [];
     },
     /** Fraktionen mit auswählbarem Namen (NPC-Dropdown) */
     fraktionenMitNamen() {
@@ -1461,67 +1427,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     onGalerieModalHidden() {
       this.galerieModalZeile = null;
     },
-    detailRichTextAnzeige(html) {
-      const inhalt = typeof html === 'string' ? html : '';
-      return inhalt.trim() ? inhalt : '';
-    },
-    detailAnsichtOeffnen(typ, row) {
+    zeileBearbeitenAusListe(typ, row) {
       if (!row) {
         return;
       }
-      this.entferneDetailAnsichtModalHiddenKette();
-      const zeileKopie = JSON.parse(JSON.stringify(row));
-      if (!Array.isArray(zeileKopie.medien)) {
-        zeileKopie.medien = [];
-      }
-      this.detailAnsicht = { typ, zeile: zeileKopie };
-      this.$nextTick(() => {
-        const el = this.$refs.detailAnsichtModalElement;
-        if (!el || !window.bootstrap) {
-          return;
-        }
-        this.detailAnsichtModalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
-        this.detailAnsichtModalInstanz.show();
-      });
-    },
-    onDetailAnsichtModalHidden() {
-      this.detailAnsicht = null;
-      this.detailAnsichtModalInstanz = null;
-    },
-    entferneDetailAnsichtModalHiddenKette() {
-      const el = this.$refs.detailAnsichtModalElement;
-      if (el && this.detailAnsichtModalHiddenKetteHandler) {
-        el.removeEventListener('hidden.bs.modal', this.detailAnsichtModalHiddenKetteHandler);
-      }
-      this.detailAnsichtModalHiddenKetteHandler = null;
-    },
-    fuehreNachDetailAnsichtModalAusgeblendetAus(callback) {
-      this.entferneDetailAnsichtModalHiddenKette();
-      const el = this.$refs.detailAnsichtModalElement;
-      if (!this.detailAnsichtModalInstanz || !el || typeof callback !== 'function') {
-        if (typeof callback === 'function') {
-          callback();
-        }
-        return;
-      }
-      const handler = () => {
-        el.removeEventListener('hidden.bs.modal', handler);
-        if (this.detailAnsichtModalHiddenKetteHandler === handler) {
-          this.detailAnsichtModalHiddenKetteHandler = null;
-        }
-        callback();
-      };
-      this.detailAnsichtModalHiddenKetteHandler = handler;
-      el.addEventListener('hidden.bs.modal', handler);
-      this.detailAnsichtModalInstanz.hide();
-    },
-    detailAnsichtBearbeiten() {
-      const d = this.detailAnsicht;
-      if (!d) {
-        return;
-      }
-      const { typ, zeile } = d;
-      const id = zeile && zeile.id;
       let liste;
       if (typ === 'npc') {
         liste = this.zustand.npcs;
@@ -1538,58 +1447,21 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       } else {
         liste = this.zustand.gegenstaende;
       }
-      const idx = this.indexNachId(liste, id);
-      const row = idx >= 0 ? liste[idx] : zeile;
-      const oeffneBearbeiten = () => {
-        if (typ === 'npc') {
-          this.npcBearbeiten(row, idx);
-        } else if (typ === 'ort') {
-          this.ortBearbeiten(row, idx);
-        } else if (typ === 'fraktion') {
-          this.fraktionBearbeiten(row, idx);
-        } else if (typ === 'pantheon') {
-          this.pantheonBearbeiten(row, idx);
-        } else if (typ === 'raetsel') {
-          this.raetselBearbeiten(row, idx);
-        } else if (typ === 'bestie') {
-          this.bestieBearbeiten(row, idx);
-        } else {
-          this.gegenstandBearbeiten(row, idx);
-        }
-      };
-      if (this.detailAnsichtModalInstanz && this.$refs.detailAnsichtModalElement) {
-        this.fuehreNachDetailAnsichtModalAusgeblendetAus(oeffneBearbeiten);
+      const idx = this.indexNachId(liste, row.id);
+      if (typ === 'npc') {
+        this.npcBearbeiten(row, idx);
+      } else if (typ === 'ort') {
+        this.ortBearbeiten(row, idx);
+      } else if (typ === 'fraktion') {
+        this.fraktionBearbeiten(row, idx);
+      } else if (typ === 'pantheon') {
+        this.pantheonBearbeiten(row, idx);
+      } else if (typ === 'raetsel') {
+        this.raetselBearbeiten(row, idx);
+      } else if (typ === 'bestie') {
+        this.bestieBearbeiten(row, idx);
       } else {
-        oeffneBearbeiten();
-      }
-    },
-    detailAnsichtInWeltOeffnen() {
-      if (!this.detailAnsichtKannInWeltOeffnen) {
-        return;
-      }
-      const d = this.detailAnsicht;
-      const typ = d.typ;
-      const id = String(d.zeile.id || '').trim();
-      const mentionApi = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillEntityMentions;
-      const oeffneEntitaet =
-        mentionApi && typeof mentionApi.oeffneEntitaetGlobal === 'function'
-          ? mentionApi.oeffneEntitaetGlobal
-          : null;
-      if (!oeffneEntitaet) {
-        window.HTBAH.ui.alert({
-          titel: 'Interaktive Welt nicht verfügbar',
-          beschreibung: 'Die Verknüpfung zur Interaktiven Welt ist aktuell nicht geladen.',
-        });
-        return;
-      }
-      const fokussiereUndNavigiere = () => {
-        oeffneEntitaet({ entityType: typ, entityId: id, openMode: 'focus' });
-        this.navigiereZuInteraktiverWelt();
-      };
-      if (this.detailAnsichtModalInstanz && this.$refs.detailAnsichtModalElement) {
-        this.fuehreNachDetailAnsichtModalAusgeblendetAus(fokussiereUndNavigiere);
-      } else {
-        fokussiereUndNavigiere();
+        this.gegenstandBearbeiten(row, idx);
       }
     },
     npcWaffenWerteText(row) {
@@ -2719,7 +2591,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
   },
   beforeUnmount() {
     this.abbrecheMedienImportWarteschlange();
-    this.entferneDetailAnsichtModalHiddenKette();
     window.removeEventListener('htbah:open-entity-request', this.onGlobalOpenEntityRequest);
     this.zeileQuillSession += 1;
     this.overlayZeileQuillSession += 1;
@@ -2883,7 +2754,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-for="row in anzeigeOrte"
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
-                  @click="detailAnsichtOeffnen('ort', row)">
+                  @click="zeileBearbeitenAusListe('ort', row)">
                   <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
                     <input
                       class="form-check-input m-0"
@@ -2941,7 +2812,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               v-for="row in anzeigeOrte"
               :key="'ort-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
-              <div class="card-body p-2" @click="detailAnsichtOeffnen('ort', row)">
+              <div class="card-body p-2" @click="zeileBearbeitenAusListe('ort', row)">
                 <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
                   <input
                     :id="'zst-ort-sel-' + row.id"
@@ -3052,7 +2923,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-for="row in anzeigeFraktionen"
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
-                  @click="detailAnsichtOeffnen('fraktion', row)">
+                  @click="zeileBearbeitenAusListe('fraktion', row)">
                   <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
                     <input
                       class="form-check-input m-0"
@@ -3106,7 +2977,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               v-for="row in anzeigeFraktionen"
               :key="'fraktion-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
-              <div class="card-body p-2" @click="detailAnsichtOeffnen('fraktion', row)">
+              <div class="card-body p-2" @click="zeileBearbeitenAusListe('fraktion', row)">
                 <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
                   <input
                     :id="'zst-fraktion-sel-' + row.id"
@@ -3237,7 +3108,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
                   :class="statusZeilenKlasse(row)"
-                  @click="detailAnsichtOeffnen('npc', row)">
+                  @click="zeileBearbeitenAusListe('npc', row)">
                   <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
                     <input
                       class="form-check-input m-0"
@@ -3311,7 +3182,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               :key="'npc-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2"
               :class="statusCardKlasse(row)">
-              <div class="card-body p-2" @click="detailAnsichtOeffnen('npc', row)">
+              <div class="card-body p-2" @click="zeileBearbeitenAusListe('npc', row)">
                 <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
                   <input
                     :id="'zst-npc-sel-' + row.id"
@@ -3429,7 +3300,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-for="row in anzeigeGegenstaende"
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
-                  @click="detailAnsichtOeffnen('gegenstand', row)">
+                  @click="zeileBearbeitenAusListe('gegenstand', row)">
                   <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
                     <input
                       class="form-check-input m-0"
@@ -3480,7 +3351,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               v-for="row in anzeigeGegenstaende"
               :key="'gegenstand-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
-              <div class="card-body p-2" @click="detailAnsichtOeffnen('gegenstand', row)">
+              <div class="card-body p-2" @click="zeileBearbeitenAusListe('gegenstand', row)">
                 <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
                   <input
                     :id="'zst-gegenstand-sel-' + row.id"
@@ -3595,7 +3466,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-for="row in anzeigePantheon"
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
-                  @click="detailAnsichtOeffnen('pantheon', row)">
+                  @click="zeileBearbeitenAusListe('pantheon', row)">
                   <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
                     <input
                       class="form-check-input m-0"
@@ -3648,7 +3519,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               v-for="row in anzeigePantheon"
               :key="'pantheon-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
-              <div class="card-body p-2" @click="detailAnsichtOeffnen('pantheon', row)">
+              <div class="card-body p-2" @click="zeileBearbeitenAusListe('pantheon', row)">
                 <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
                   <input
                     :id="'zst-pantheon-sel-' + row.id"
@@ -3758,7 +3629,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   v-for="row in anzeigeRaetsel"
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
-                  @click="detailAnsichtOeffnen('raetsel', row)">
+                  @click="zeileBearbeitenAusListe('raetsel', row)">
                   <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
                     <input
                       class="form-check-input m-0"
@@ -3819,7 +3690,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               v-for="row in anzeigeRaetsel"
               :key="'raetsel-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
-              <div class="card-body p-2" @click="detailAnsichtOeffnen('raetsel', row)">
+              <div class="card-body p-2" @click="zeileBearbeitenAusListe('raetsel', row)">
                 <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
                   <input
                     :id="'zst-raetsel-sel-' + row.id"
@@ -3954,7 +3825,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                   :key="row.id"
                   class="zufallstabellen-tabellenzeile-klickbar"
                   :class="statusZeilenKlasse(row)"
-                  @click="detailAnsichtOeffnen('bestie', row)">
+                  @click="zeileBearbeitenAusListe('bestie', row)">
                   <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
                     <input
                       class="form-check-input m-0"
@@ -4021,7 +3892,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               :key="'bestie-card-' + row.id"
               class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2"
               :class="statusCardKlasse(row)">
-              <div class="card-body p-2" @click="detailAnsichtOeffnen('bestie', row)">
+              <div class="card-body p-2" @click="zeileBearbeitenAusListe('bestie', row)">
                 <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
                   <input
                     :id="'zst-bestie-sel-' + row.id"
@@ -4100,97 +3971,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       </div>
 
       <div class="abstandshalter" aria-hidden="true"></div>
-
-      <div
-        class="modal fade"
-        id="htbahZufallstabellenDetailModal"
-        ref="detailAnsichtModalElement"
-        tabindex="-1"
-        aria-labelledby="htbahZufallstabellenDetailModalLabel"
-        aria-hidden="true"
-        @hidden.bs.modal="onDetailAnsichtModalHidden">
-        <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-md-down modal-xl">
-          <div class="modal-content shadow-lg border-0">
-            <div class="modal-header py-2 py-md-3 border-0 border-bottom">
-              <div class="me-auto pe-2">
-                <div class="small text-secondary text-uppercase mb-0">Nur Lesen</div>
-                <h5 class="modal-title h6 mb-0" id="htbahZufallstabellenDetailModalLabel">{{ detailAnsichtTitel }}</h5>
-              </div>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
-            </div>
-            <div class="modal-body text-start pt-2 pt-md-3" v-if="detailAnsicht">
-              <dl class="zufallstabellen-detail-sheet mb-0">
-                <template v-for="(p, i) in detailAnsichtFelder" :key="'zfd-' + i">
-                  <dt>{{ p.label }}</dt>
-                  <dd v-if="p.html != null">
-                    <div
-                      v-if="detailRichTextAnzeige(p.html)"
-                      class="zufallstabellen-detail-richtext"
-                      v-html="detailRichTextAnzeige(p.html)"></div>
-                    <span v-else class="text-secondary">—</span>
-                  </dd>
-                  <dd v-else class="zufallstabellen-detail-dd-plain">{{ karteWert(p.text) }}</dd>
-                </template>
-              </dl>
-              <div class="mt-3 pt-3 border-top" v-if="medienAnzahl(detailAnsicht.zeile)">
-                <h6 class="small text-secondary text-uppercase mb-2">Medien</h6>
-                <div v-if="medienBilderAusZeile(detailAnsicht.zeile).length" class="row g-2 mb-2">
-                  <div
-                    v-for="bild in medienBilderAusZeile(detailAnsicht.zeile)"
-                    :key="'detail-bild-' + bild.id"
-                    class="col-6 col-sm-4 col-lg-3">
-                    <button
-                      type="button"
-                      class="zufallstabellen-galerie-thumb"
-                      @click="mediumImBildbetrachterOeffnen(bild)">
-                      <img :src="bild.dataUrl" :alt="mediumDateiname(bild)" loading="lazy" />
-                    </button>
-                    <div class="small mt-1 text-break">{{ mediumDateiname(bild) }}</div>
-                  </div>
-                </div>
-                <div v-if="medienDateienAusZeile(detailAnsicht.zeile).length" class="list-group list-group-flush">
-                  <div
-                    v-for="datei in medienDateienAusZeile(detailAnsicht.zeile)"
-                    :key="'detail-datei-' + datei.id"
-                    class="list-group-item px-0 py-2">
-                    <div class="d-flex justify-content-between align-items-start gap-2">
-                      <div class="small text-break">
-                        <div class="fw-semibold">{{ mediumDateiname(datei) }}</div>
-                        <div class="text-secondary">{{ mediumDateiTypLabel(datei) }}</div>
-                        <div v-if="mediumDateigroesseLabel(datei)" class="text-secondary">
-                          {{ mediumDateigroesseLabel(datei) }}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-secondary flex-shrink-0"
-                        @click="mediumHerunterladen(datei)">
-                        Download
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="mt-3 pt-3 border-top small text-secondary">Keine Medien hinterlegt.</div>
-            </div>
-            <div class="modal-footer py-2 border-0 border-top flex-wrap gap-2">
-              <button
-                v-if="detailAnsichtKannInWeltOeffnen"
-                type="button"
-                class="btn btn-outline-secondary"
-                title="In interaktiver Welt öffnen"
-                aria-label="In interaktiver Welt öffnen"
-                @click="detailAnsichtInWeltOeffnen">
-                🌍 In Welt öffnen
-              </button>
-              <button type="button" class="btn btn-outline-primary" @click="detailAnsichtBearbeiten">
-                Bearbeiten
-              </button>
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <zufallstabellen-zeile-modal
         :anlage="{ offen: !!bearbeitung, typ: bearbeitung ? bearbeitung.typ : '', zeile: bearbeitung ? bearbeitung.zeile : null }"

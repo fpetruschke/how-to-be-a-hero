@@ -728,7 +728,7 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
             :key="'grp-card-' + g.id"
             class="card zufallstabellen-mobile-card mb-2 p-3 htbah-kampagne-mobile-card">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-              <button type="button" class="btn btn-link p-0 fw-semibold text-decoration-none" @click="kampagneBearbeiten(g)">
+              <button type="button" class="btn btn-link p-0 fw-semibold text-decoration-none text-start" @click="kampagneBearbeiten(g)">
                 {{ g.name }}
               </button>
               <div class="dropdown">
