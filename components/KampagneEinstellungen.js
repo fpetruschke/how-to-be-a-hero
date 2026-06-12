@@ -21,6 +21,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         zustand: window.HTBAH.ladeSpielleitungZustand(),
         nameEntwurf: '',
         nameSpeichernAktiv: false,
+        loeschenAktiv: false,
       };
     },
     computed: {
@@ -131,6 +132,46 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         this.$refs.spielleitungPdfExportModal.oeffnen();
       },
+      async kampagneLoeschen() {
+        const k = this.kampagne;
+        if (!k || this.loeschenAktiv) {
+          return;
+        }
+        const bestaetigt = await window.HTBAH.ui.confirm({
+          titel: 'Kampagne unwiderruflich löschen?',
+          beschreibung:
+            `Alle Inhalte der Kampagne „${k.name}“ werden unwiderruflich gelöscht — einschließlich Zufallstabellen, Weltenbau, Gruppendaten und verknüpfter lokaler Charaktere, sofern vorhanden.`,
+          bestaetigenText: 'Endgültig löschen',
+          bestaetigenButtonClass: 'btn-danger',
+          warnhinweisAnzeigen: true,
+        });
+        if (!bestaetigt) {
+          return;
+        }
+        const gid = k.id;
+        const name = k.name || 'Kampagne';
+        this.loeschenAktiv = true;
+        let ergebnis = null;
+        try {
+          ergebnis = await window.HTBAH.ui.mitFortschritt({
+            titel: `Kampagne „${name}“ wird gelöscht …`,
+            aufgabe: (report) =>
+              window.HTBAH.loescheSpielleitungKampagneKomplettAsync(gid, report),
+          });
+        } finally {
+          this.loeschenAktiv = false;
+        }
+        if (!ergebnis || !ergebnis.ok) {
+          this.zeigeStatus('Die Kampagne konnte nicht gelöscht werden.', 'danger');
+          return;
+        }
+        if (window.HTBAH?.ui?.bereinigeModalBackdrop) {
+          window.HTBAH.ui.bereinigeModalBackdrop();
+        }
+        if (this.$router && typeof this.$router.push === 'function') {
+          await this.$router.push('/kampagnen');
+        }
+      },
     },
     template: `
       <div class="htbah-kampagne-einstellungen text-start">
@@ -185,7 +226,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           <p v-else class="small text-body-secondary mb-0">Keine Kampagne ausgewählt.</p>
         </div>
 
-        <div class="card p-3 mb-0">
+        <div class="card p-3 mb-3">
           <h6 class="mb-2">Kampagnen-PDF</h6>
           <p class="small text-body-secondary mb-2">
             Gruppe, Weltenbau-Inhalte, Abenteuerbuch und interaktive Welt als PDF — Inhalte, Theme und Vorschau vor dem Download wählbar.
@@ -196,6 +237,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             :disabled="!kampagneId"
             @click="pdfExportModalOeffnen">
             PDF erstellen …
+          </button>
+        </div>
+
+        <div class="card p-3 mb-0 border border-danger">
+          <h6 class="mb-2 text-danger">Kampagne löschen</h6>
+          <p class="small text-body-secondary mb-2">
+            Entfernt diese Kampagne unwiderruflich — inklusive aller Inhalte und verknüpfter lokaler Charaktere in der Bibliothek.
+          </p>
+          <button
+            type="button"
+            class="btn btn-danger"
+            :disabled="!kampagne || loeschenAktiv"
+            @click="kampagneLoeschen">
+            {{ loeschenAktiv ? 'Wird gelöscht …' : 'Kampagne löschen …' }}
           </button>
         </div>
 

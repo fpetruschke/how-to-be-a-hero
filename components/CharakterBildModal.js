@@ -41,16 +41,53 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
   data() {
     return {
       bildVerwaltungModal: null,
+      verwaltungWarVorCropSichtbar: false,
     };
   },
   methods: {
+    verwaltungModalInstanz() {
+      const modalElement = this.$refs.bildVerwaltungModalElement;
+      if (!modalElement) {
+        return null;
+      }
+      if (!this.bildVerwaltungModal) {
+        this.bildVerwaltungModal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
+      }
+      return this.bildVerwaltungModal;
+    },
+    verwaltungModalVorCropAusblenden() {
+      const modalElement = this.$refs.bildVerwaltungModalElement;
+      const instanz = this.verwaltungModalInstanz();
+      this.verwaltungWarVorCropSichtbar = !!(modalElement && modalElement.classList.contains('show'));
+      if (instanz && this.verwaltungWarVorCropSichtbar) {
+        instanz.hide();
+      }
+    },
+    verwaltungModalNachCropWiederherstellen() {
+      if (!this.verwaltungWarVorCropSichtbar) {
+        return;
+      }
+      this.verwaltungWarVorCropSichtbar = false;
+      this.$nextTick(() => {
+        const instanz = this.verwaltungModalInstanz();
+        if (instanz) {
+          instanz.show();
+        }
+      });
+    },
+    cropperOeffnen(fn) {
+      this.verwaltungModalVorCropAusblenden();
+      fn();
+    },
     oeffnen() {
       const modalElement = this.$refs.bildVerwaltungModalElement;
       if (!modalElement) {
         return;
       }
-      this.bildVerwaltungModal = window.bootstrap.Modal.getOrCreateInstance(modalElement);
-      this.bildVerwaltungModal.show();
+      const instanz = this.verwaltungModalInstanz();
+      if (instanz) {
+        instanz.show();
+      }
     },
     async bildDateiAusgewaehlt(event) {
       const datei = event.target.files && event.target.files[0];
@@ -76,7 +113,7 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
       if (!cropperModal || typeof cropperModal.oeffnenMitDatei !== 'function') {
         return false;
       }
-      cropperModal.oeffnenMitDatei(datei);
+      this.cropperOeffnen(() => cropperModal.oeffnenMitDatei(datei));
       return true;
     },
     zuschnittMitAktuellemBildStarten() {
@@ -87,7 +124,10 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
       if (!cropperModal || typeof cropperModal.oeffnenMitQuelle !== 'function') {
         return;
       }
-      cropperModal.oeffnenMitQuelle({ src: this.charakterBild });
+      this.cropperOeffnen(() => cropperModal.oeffnenMitQuelle({ src: this.charakterBild }));
+    },
+    cropperAbgebrochen() {
+      this.verwaltungModalNachCropWiederherstellen();
     },
     async zugeschnittenesBildSpeichern(canvas) {
       const dataUrl = charakterCanvasZuDataUrl(canvas);
@@ -99,6 +139,7 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
         return false;
       }
       this.$emit('update:charakterBild', dataUrl);
+      this.verwaltungModalNachCropWiederherstellen();
       return true;
     },
     async charakterBildEntfernen() {
@@ -196,7 +237,8 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
         speichern-text="Zuschnitt speichern"
         bild-alt-text="Bild zuschneiden"
         dialog-class="modal-lg"
-        :on-speichern="zugeschnittenesBildSpeichern" />
+        :on-speichern="zugeschnittenesBildSpeichern"
+        @abgebrochen="cropperAbgebrochen" />
     </div>
   `,
 };

@@ -250,7 +250,8 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
       }
       const bestaetigt = await window.HTBAH.ui.confirm({
         titel: 'Kampagne löschen?',
-        beschreibung: `Kampagne „${g.name}“ inklusive aller importierten Charaktere löschen?`,
+        beschreibung:
+          `Kampagne „${g.name}“ unwiderruflich löschen? Alle Inhalte und verknüpfte lokale Charaktere werden entfernt.`,
         bestaetigenText: 'Löschen',
         bestaetigenButtonClass: 'btn-danger',
         warnhinweisAnzeigen: true,
@@ -775,7 +776,6 @@ window.HTBAH_SEITEN.KampagnenUebersicht = {
               <span v-if="!g.mitglieder.length" class="small text-body-secondary">Noch keine Charaktere in der Gruppe</span>
             </div>
             <div v-if="kampagneLabelsBadges(g).length" class="mt-2 pt-2 border-top">
-              <div class="small fw-semibold mb-1">Labels</div>
               <div class="d-flex flex-wrap gap-1" role="list" :aria-label="'Labels für ' + (g.name || 'Kampagne')">
                 <span
                   v-for="lab in kampagneLabelsBadges(g)"

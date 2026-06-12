@@ -56,6 +56,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     'bestien-wizard',
     'welt-open',
     'inventar-remove',
+    'inventar-save',
     'karten-icon-change',
   ],
   data() {
@@ -810,6 +811,9 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         this.$emit('inventar-remove', { gegenstandId });
       }
     },
+    inventarZeileGespeichert() {
+      this.$emit('inventar-save');
+    },
   },
   template: `
     <div v-if="anlage.offen && anlage.zeile" class="regelwerk-modal-layer">
@@ -1521,7 +1525,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           <inventar-editor-panel
             v-if="anlage.zeile"
             :inventar="inventarListeModel"
-            @remove="inventarEintragEntfernenEvent" />
+            @remove="inventarEintragEntfernenEvent"
+            @change="inventarZeileGespeichert" />
         </section>
 
         <div v-if="zeigtDatenTab">

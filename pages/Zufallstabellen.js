@@ -135,6 +135,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       duplizierenNeueKampagneName: '',
       /** Panel „Inhalte duplizieren“ (Ziel-Kampagne, Auswahlmodus) */
       duplizierenPanelOffen: false,
+      /** Kategorie für Zufallseintrag: beliebig | orte | npcs | … */
+      zufallKategorie: 'beliebig',
     };
   },
   created() {
@@ -370,6 +372,32 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     globaleSucheAktiv() {
       return !!this.normSucheText(this.sucheGlobal);
     },
+    zufallKategorienDef() {
+      return [
+        { id: 'orte', zustandKey: 'orte', bearbeiten: 'ortBearbeiten', label: 'Ort', emoji: '🗺️' },
+        { id: 'npcs', zustandKey: 'npcs', bearbeiten: 'npcBearbeiten', label: 'NPC', emoji: '👤' },
+        { id: 'fraktionen', zustandKey: 'fraktionen', bearbeiten: 'fraktionBearbeiten', label: 'Fraktion', emoji: '⚔️' },
+        { id: 'pantheon', zustandKey: 'pantheon', bearbeiten: 'pantheonBearbeiten', label: 'Pantheon', emoji: '🏛️' },
+        { id: 'raetsel', zustandKey: 'raetsel', bearbeiten: 'raetselBearbeiten', label: 'Rätsel', emoji: '❓' },
+        { id: 'bestien', zustandKey: 'bestien', bearbeiten: 'bestieBearbeiten', label: 'Bestie', emoji: '🐾' },
+        {
+          id: 'gegenstaende',
+          zustandKey: 'gegenstaende',
+          bearbeiten: 'gegenstandBearbeiten',
+          label: 'Gegenstand',
+          emoji: '🎒',
+        },
+      ];
+    },
+    zufallKategorienMitEintraegen() {
+      return this.zufallKategorienDef.filter((k) => {
+        const liste = this.zustand && Array.isArray(this.zustand[k.zustandKey]) ? this.zustand[k.zustandKey] : [];
+        return liste.length > 0;
+      });
+    },
+    kannZufallseintragZiehen() {
+      return this.zufallKategorienMitEintraegen.length > 0;
+    },
     anzeigeOrte() {
       const gq = this.normSucheText(this.sucheGlobal);
       const base = this.gefilterteOrte;
@@ -502,6 +530,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.duplizierenZielKampagneId = neu || '';
       this.entitaetenAuswahl = {};
       this.entitaetenAuswahlModus = false;
+      this.zufallKategorie = 'beliebig';
+    },
+    zufallKategorienMitEintraegen(kategorien) {
+      if (
+        this.zufallKategorie !== 'beliebig' &&
+        !kategorien.some((k) => k.id === this.zufallKategorie)
+      ) {
+        this.zufallKategorie = 'beliebig';
+      }
     },
   },
   methods: {
@@ -741,6 +778,10 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     onGlobalOpenEntityRequest(event) {
       const detail = event && event.detail ? event.detail : null;
       if (!detail || !detail.entityType || !detail.entityId) {
+        return;
+      }
+      if (detail.openMode === 'focus') {
+        event.preventDefault();
         return;
       }
       const erfolg = this.oeffneEntitaetAusMention(detail);
@@ -2367,6 +2408,37 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       this.zeileSpeichernIntern({ schliessenNachSpeichern: false });
     },
+    onInventarZeileGespeichert() {
+      this.zeileBearbeitungBeiBlurSpeichern();
+    },
+    onOverlayInventarZeileGespeichert() {
+      this.overlayZeileBearbeitungBeiBlurSpeichern();
+    },
+    zufallseintragZiehen() {
+      const kategorien = this.zufallKategorienMitEintraegen;
+      if (!kategorien.length) {
+        return;
+      }
+      let kat = null;
+      if (this.zufallKategorie === 'beliebig') {
+        kat = kategorien[Math.floor(Math.random() * kategorien.length)];
+      } else {
+        kat = kategorien.find((k) => k.id === this.zufallKategorie) || null;
+      }
+      if (!kat) {
+        return;
+      }
+      const liste =
+        this.zustand && Array.isArray(this.zustand[kat.zustandKey]) ? this.zustand[kat.zustandKey] : [];
+      if (!liste.length) {
+        return;
+      }
+      const index = Math.floor(Math.random() * liste.length);
+      const row = liste[index];
+      if (row && typeof this[kat.bearbeiten] === 'function') {
+        this[kat.bearbeiten](row, index);
+      }
+    },
     zeileSpeichernIntern({ schliessenNachSpeichern }) {
       if (!this.bearbeitung) {
         return;
@@ -2606,35 +2678,76 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @abgebrochen="onZufallstabellenBildImportAbgebrochen"
         @datei-import-fehler="onZufallstabellenBildImportFehler" />
 
-      <div class="mb-4">
-        <div class="input-group">
-          <span class="input-group-text text-secondary" aria-hidden="true">
-            <span class="material-symbols-outlined" style="font-size: 1.25rem; line-height: 1;">search</span>
-          </span>
-          <input
-            id="zufallstabellen-suche-global"
-            v-model.trim="sucheGlobal"
-            type="search"
-            class="form-control"
-            placeholder="Alle Tabellen durchsuchen …"
-            autocomplete="off"
-            aria-label="Alle Tabellen durchsuchen" />
-          <button
-            type="button"
-            class="btn btn-outline-secondary htbah-input-icon-btn"
-            :class="{ active: duplizierenPanelOffen }"
-            :aria-expanded="duplizierenPanelOffen ? 'true' : 'false'"
-            aria-controls="zst-inhalte-duplizieren-panel"
-            title="Inhalte duplizieren"
-            @click="duplizierenPanelOffen = !duplizierenPanelOffen">
-            <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
-            <span class="visually-hidden">Inhalte duplizieren</span>
-          </button>
+      <div class="card mb-4 text-start">
+        <div class="card-body py-3">
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-lg">
+              <label for="zufallstabellen-suche-global" class="form-label small text-secondary mb-1">Suche</label>
+              <div class="input-group">
+                <span class="input-group-text text-secondary" aria-hidden="true">
+                  <span class="material-symbols-outlined" style="font-size: 1.25rem; line-height: 1;">search</span>
+                </span>
+                <input
+                  id="zufallstabellen-suche-global"
+                  v-model.trim="sucheGlobal"
+                  type="search"
+                  class="form-control"
+                  placeholder="Alle Tabellen durchsuchen …"
+                  autocomplete="off"
+                  aria-label="Alle Tabellen durchsuchen" />
+              </div>
+            </div>
+            <div class="col-12 col-md-7 col-lg-auto">
+              <label for="zst-zufall-kategorie" class="form-label small text-secondary mb-1">Zufallseintrag</label>
+              <div class="input-group">
+                <select
+                  id="zst-zufall-kategorie"
+                  v-model="zufallKategorie"
+                  class="form-select"
+                  :disabled="!kannZufallseintragZiehen"
+                  aria-label="Kategorie für Zufallseintrag">
+                  <option v-if="kannZufallseintragZiehen" value="beliebig">🎲 Beliebig</option>
+                  <option
+                    v-for="k in zufallKategorienMitEintraegen"
+                    :key="'zst-zk-' + k.id"
+                    :value="k.id">
+                    {{ k.emoji }} {{ k.label }}
+                  </option>
+                </select>
+                <button
+                  type="button"
+                  class="btn btn-outline-primary"
+                  :disabled="!kannZufallseintragZiehen"
+                  title="Zufälligen Eintrag öffnen"
+                  @click="zufallseintragZiehen">
+                  🎲 Zufallseintrag
+                </button>
+              </div>
+            </div>
+            <div class="col-12 col-md-5 col-lg-auto">
+              <button
+                type="button"
+                class="btn w-100"
+                :class="duplizierenPanelOffen ? 'btn-primary' : 'btn-outline-secondary'"
+                :aria-expanded="duplizierenPanelOffen ? 'true' : 'false'"
+                aria-controls="zst-inhalte-duplizieren-panel"
+                @click="duplizierenPanelOffen = !duplizierenPanelOffen">
+                <span class="material-symbols-outlined align-middle me-1" style="font-size: 1.1rem; line-height: 1;" aria-hidden="true">content_copy</span>
+                Inhalte duplizieren
+              </button>
+            </div>
+          </div>
+          <p v-if="!kannZufallseintragZiehen" class="small text-secondary mb-0 mt-2">
+            Noch keine Einträge in den Tabellen — Zufallseintrag ist erst verfügbar, wenn mindestens eine Kategorie befüllt ist.
+          </p>
+          <p v-else-if="globaleSucheAktiv" class="small text-secondary mb-0 mt-2">
+            Pro Kategorie siehst du die Treffer oder den Hinweis, dass es dort keine gibt.
+          </p>
         </div>
         <div
           v-show="duplizierenPanelOffen"
           id="zst-inhalte-duplizieren-panel"
-          class="card mt-2 text-start">
+          class="card border-top-0 rounded-0 rounded-bottom text-start">
           <div class="card-body py-3">
             <h6 class="h6 mb-3 fw-semibold">Inhalte duplizieren</h6>
             <div class="row g-2 align-items-end">
@@ -2699,9 +2812,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
             </p>
           </div>
         </div>
-        <p v-if="globaleSucheAktiv" class="small text-secondary mb-0 mt-2">
-          Pro Kategorie siehst du die Treffer oder den Hinweis, dass es dort keine gibt.
-        </p>
       </div>
 
       <div class="card mb-3 text-start">
@@ -4002,6 +4112,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @media-download="mediumHerunterladen"
         @duplicate="onHauptZeileModalDuplicate"
         @inventar-remove="onInventarEintragEntfernen"
+        @inventar-save="onInventarZeileGespeichert"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"
         @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
         @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
@@ -4038,6 +4149,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @media-download="overlayMediaDownload"
         @duplicate="onOverlayZeileModalDuplicate"
         @inventar-remove="onInventarEintragEntfernen"
+        @inventar-save="onOverlayInventarZeileGespeichert"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"
         @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
         @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"

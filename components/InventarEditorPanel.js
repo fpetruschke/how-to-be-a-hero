@@ -342,6 +342,7 @@ window.HTBAH_KOMPONENTEN.InventarEditorPanel = {
       this.inventarQuillRefFnEntfernen(id);
       this.inventarEditId = null;
       this.inventarBackup = null;
+      this.$emit('change');
     },
     inventarIstInhaltLeer(eintrag) {
       const html = eintrag.beschreibungHtml || '';

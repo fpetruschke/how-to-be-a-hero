@@ -5628,6 +5628,17 @@ var HTBAH_REFACTOR_UTILS =
       onInventarEintragEntfernenOverlay(payload) {
         this.withAnlageKontext('overlay', () => this.onInventarEintragEntfernenFuerAnlage(this.anlage, payload));
       },
+      onInventarZeileGespeichert() {
+        this.speichereAnlageIntern({ schliessenNachSpeichern: false });
+      },
+      onInventarZeileGespeichertOverlay() {
+        this.withAnlageKontext('overlay', () =>
+          this.speichereAnlageIntern({ schliessenNachSpeichern: false }),
+        );
+      },
+      charakterModalInventarZeileGespeichert() {
+        this.speichereCharakterModal({ schliessenNachSpeichern: false });
+      },
       kartenIconVonAnlageInZustandUebernehmen() {
         if (!this.anlage || !this.anlage.offen || !this.anlage.zeile || !this.anlage.typ) {
           return;
@@ -7737,6 +7748,7 @@ var HTBAH_REFACTOR_UTILS =
           @delete="loescheAnlageMitBestaetigung"
           @duplicate="dupliziereAnlageAusModal"
           @inventar-remove="onInventarEintragEntfernen"
+          @inventar-save="onInventarZeileGespeichert"
           @karten-icon-change="onKartenIconGeaendert"
           @update:zufallNpcEpoche="zufallNpcEpoche = $event"
           @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
@@ -7773,6 +7785,7 @@ var HTBAH_REFACTOR_UTILS =
           @delete="loescheAnlageMitBestaetigung"
           @duplicate="dupliziereAnlageAusModal"
           @inventar-remove="onInventarEintragEntfernenOverlay"
+          @inventar-save="onInventarZeileGespeichertOverlay"
           @karten-icon-change="onKartenIconGeaendert"
           @update:zufallNpcEpoche="zufallNpcEpoche = $event"
           @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
@@ -8017,7 +8030,8 @@ var HTBAH_REFACTOR_UTILS =
                 v-if="charakterModal.charakter"
                 ref="charakterInventarPanel"
                 :inventar="charakterModal.charakter.inventar"
-                @remove="charakterModalInventarEntfernen" />
+                @remove="charakterModalInventarEntfernen"
+                @change="charakterModalInventarZeileGespeichert" />
             </section>
             <label class="form-label mt-3 mb-1">Notizen</label>
             <div class="zufallstabellen-quill-wrap" :key="'wb-char-q-' + charakterQuillSession">

@@ -1183,12 +1183,13 @@ window.HTBAH_SEITEN.Charakter = {
     },
     charakterbildDateiauswahlOeffnen() {
       if (!this.charakterBildFehlt) {
+        this.bildVerwaltungOeffnen();
         return;
       }
       this.$refs.charakterbildDropInput?.click();
     },
     charakterbildDropZoneAktivieren(event) {
-      if (!this.charakterBildFehlt || !event?.dataTransfer) {
+      if (!event?.dataTransfer) {
         return;
       }
       event.preventDefault();
@@ -1196,16 +1197,10 @@ window.HTBAH_SEITEN.Charakter = {
       event.dataTransfer.dropEffect = 'copy';
     },
     charakterbildDropZoneVerlassen(event) {
-      if (!this.charakterBildFehlt) {
-        return;
-      }
       event?.preventDefault?.();
       this.charakterbildDropAktiv = false;
     },
     async charakterbildDropVerarbeiten(event) {
-      if (!this.charakterBildFehlt) {
-        return;
-      }
       event?.preventDefault?.();
       this.charakterbildDropAktiv = false;
       const datei = event?.dataTransfer?.files?.[0];
@@ -1229,10 +1224,13 @@ window.HTBAH_SEITEN.Charakter = {
       const dataUrl = typeof url === 'string' ? url : '';
       if (this.spielleitungMitglied) {
         this.spielleitungMitglied.charakterBild = dataUrl;
-      } else {
-        this.charakterBildLokal = dataUrl;
+        this.onSpielleitungPersist?.();
+        return;
       }
-      this.onSpielleitungPersist?.();
+      this.charakterBildLokal = dataUrl;
+      if (this.istEditModus && this.charakterId) {
+        this.autosaveEinplanen();
+      }
     },
     charakterJsonExportieren() {
       const paket = window.HTBAH.erstelleCharakterExportPaket(this.charakter, this.charakterBild);
@@ -1672,9 +1670,9 @@ window.HTBAH_SEITEN.Charakter = {
                     'htbah-charakterbild-status-wrap--leer': charakterBildFehlt,
                     'htbah-charakterbild-status-wrap--drop-aktiv': charakterBildFehlt && charakterbildDropAktiv,
                   }"
-                  :role="charakterBildFehlt ? 'button' : null"
-                  :tabindex="charakterBildFehlt ? 0 : null"
-                  :aria-label="charakterBildFehlt ? 'Charakterbild hinzufügen' : null"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="charakterBildFehlt ? 'Charakterbild hinzufügen' : 'Charakterbild verwalten'"
                   @click="charakterbildDateiauswahlOeffnen"
                   @keydown.enter.prevent="charakterbildDateiauswahlOeffnen"
                   @keydown.space.prevent="charakterbildDateiauswahlOeffnen"
@@ -1699,6 +1697,12 @@ window.HTBAH_SEITEN.Charakter = {
                   </span>
                 </div>
               </div>
+              <button
+                type="button"
+                class="btn btn-outline-primary w-100 mt-2"
+                @click="bildVerwaltungOeffnen">
+                Bild verwalten
+              </button>
             </div>
           </div>
           <div class="col-12 col-lg order-lg-2">

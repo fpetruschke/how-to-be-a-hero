@@ -1533,6 +1533,27 @@ function loescheSpielleitungKampagneKomplett(kampagneId) {
   return htbahMitBulkSpeicherModus(() => loescheSpielleitungKampagneKomplettIntern(gid));
 }
 
+function loescheVerknuepfteCharaktereDerKampagne(gid) {
+  const roh = leseSpielleitungZustandRoh();
+  const kampagnen = roh && Array.isArray(roh.kampagnen) ? roh.kampagnen : [];
+  const kampagne = kampagnen.find((k) => k && k.id === gid);
+  if (!kampagne) {
+    return;
+  }
+  const mitglieder = Array.isArray(kampagne.mitglieder) ? kampagne.mitglieder : [];
+  const storageIds = new Set();
+  mitglieder.forEach((m) => {
+    const sid =
+      m && typeof m.charakterStorageId === 'string' ? m.charakterStorageId.trim() : '';
+    if (sid) {
+      storageIds.add(sid);
+    }
+  });
+  storageIds.forEach((charakterId) => {
+    loescheCharakterById(charakterId);
+  });
+}
+
 function loescheSpielleitungKampagneKomplettIntern(gid, opts) {
   const o = opts && typeof opts === 'object' ? opts : {};
   const eventsMelden = o.eventsMelden !== false;
@@ -1541,6 +1562,7 @@ function loescheSpielleitungKampagneKomplettIntern(gid, opts) {
   if (!kampagnen.some((k) => k && k.id === gid)) {
     return { ok: false, grund: 'Kampagne nicht gefunden.', aktivKampagneId: null };
   }
+  loescheVerknuepfteCharaktereDerKampagne(gid);
   loescheZufallstabellenUndWeltenbauFuerKampagne(gid);
   roh.kampagnen = kampagnen.filter((x) => !x || x.id !== gid);
   if (!roh.mitgliedWahlProKampagne || typeof roh.mitgliedWahlProKampagne !== 'object') {
@@ -1580,6 +1602,12 @@ async function loescheSpielleitungKampagneKomplettAsync(kampagneId, report) {
   htbahDiagLog('loeschen', 'kampagne-start', gid);
   return htbahMitBulkSpeicherModusAsync(async () => {
     const schritte = [
+      {
+        label: 'Verknüpfte Charaktere werden entfernt …',
+        fn: async () => {
+          loescheVerknuepfteCharaktereDerKampagne(gid);
+        },
+      },
       {
         label: 'Zufallstabellen und Weltenbau werden entfernt …',
         fn: async () => {
@@ -6596,10 +6624,14 @@ window.HTBAH.oeffneInteraktiveWeltModal = function oeffneInteraktiveWeltModal(pa
   }
   uiZustand.weltenbauUebersichtModalGruppeId = kampagneId;
   uiZustand.weltenbauUebersichtModalOffen = true;
+  const openMode =
+    typeof payload?.openMode === 'string' && payload.openMode.trim().toLowerCase() === 'open'
+      ? 'open'
+      : 'focus';
   Vue.nextTick(() => {
     window.dispatchEvent(
       new CustomEvent('htbah:open-entity-request', {
-        detail: { entityType, entityId, kampagneId },
+        detail: { entityType, entityId, kampagneId, openMode },
       }),
     );
   });

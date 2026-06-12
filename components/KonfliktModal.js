@@ -765,6 +765,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             kampagneId: this.kampagneIdEffektiv,
             entityType: teilnehmer.typ,
             entityId: teilnehmer.entityId,
+            openMode: 'focus',
           });
           return;
         }
@@ -774,6 +775,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
               entityType: teilnehmer.typ,
               entityId: teilnehmer.entityId,
               kampagneId: this.kampagneIdEffektiv,
+              openMode: 'focus',
             },
           }),
         );
