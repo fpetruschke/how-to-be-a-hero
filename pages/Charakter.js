@@ -1661,7 +1661,7 @@ window.HTBAH_SEITEN.Charakter = {
         aria-label="Charakter-Übersicht für aktives Spiel">
         <h6 class="mb-2">Charakter-Übersicht (read-only)</h6>
         <div class="row g-3 htbah-charakter-stammdaten-row">
-          <div class="col-12 col-lg-auto order-lg-1 htbah-charakterbild-spalte">
+          <div class="col-12 col-md-auto order-md-1 htbah-charakterbild-spalte">
             <div class="htbah-charakterbild-einheit">
               <div class="text-center mb-2 htbah-charakterbild-vorschau-wrap">
                 <div
@@ -1705,7 +1705,7 @@ window.HTBAH_SEITEN.Charakter = {
               </button>
             </div>
           </div>
-          <div class="col-12 col-lg order-lg-2">
+          <div class="col-12 col-md order-md-2">
             <div class="row g-2">
               <div class="col-12 col-md-6">
                 <p class="small text-body-secondary mb-1">Name</p>
@@ -1772,7 +1772,7 @@ window.HTBAH_SEITEN.Charakter = {
 
       <div v-if="spielleitungMitglied || istNeuModus || istSetupTabAktiv" class="card p-3 mb-2">
         <div class="row g-3 htbah-charakter-stammdaten-row">
-          <div class="col-12 col-lg order-lg-2">
+          <div class="col-12 col-md order-md-2">
             <div class="mb-3">
               <label for="ce-char-name" class="form-label text-body-secondary small mb-1">Name</label>
               <div class="input-group">
@@ -1904,7 +1904,7 @@ window.HTBAH_SEITEN.Charakter = {
             </div>
           </div>
 
-          <div class="col-12 col-lg-auto order-lg-1 htbah-charakterbild-spalte">
+          <div class="col-12 col-md-auto order-md-1 htbah-charakterbild-spalte">
             <div class="htbah-charakterbild-einheit">
               <div class="text-center mb-2 htbah-charakterbild-vorschau-wrap">
                 <div

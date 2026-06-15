@@ -138,6 +138,12 @@ window.HTBAH_KOMPONENTEN.BildCropperModal = {
       this.schliessenOhneAbgebrochenEvent = true;
       this.schliessen();
     },
+    cropperGroesseAktualisieren() {
+      if (!this.cropper || typeof this.cropper.resize !== 'function') {
+        return;
+      }
+      this.cropper.resize();
+    },
     cropperInitialisieren() {
       if (this.cropper) {
         this.cropper.destroy();
@@ -157,6 +163,12 @@ window.HTBAH_KOMPONENTEN.BildCropperModal = {
       this.cropper.rotateTo(this.drehungGrad);
       this.cropper.scaleX(this.spiegelX);
       this.cropper.scaleY(this.spiegelY);
+      this.$nextTick(() => {
+        window.requestAnimationFrame(() => this.cropperGroesseAktualisieren());
+      });
+    },
+    beimModalGezeigt() {
+      this.cropperGroesseAktualisieren();
     },
     setzeModalEbeneNachOben() {
       const modalElement = this.$refs.modalElement;
@@ -257,6 +269,7 @@ window.HTBAH_KOMPONENTEN.BildCropperModal = {
       if (HTBAH_BILD_BOOTSTRAP_MODAL) {
         HTBAH_BILD_BOOTSTRAP_MODAL.bindHiddenEvent(el, this.beimModalVersteckt);
       }
+      el.addEventListener('shown.bs.modal', this.beimModalGezeigt);
     }
   },
   beforeUnmount() {
@@ -269,6 +282,7 @@ window.HTBAH_KOMPONENTEN.BildCropperModal = {
       if (HTBAH_BILD_BOOTSTRAP_MODAL) {
         HTBAH_BILD_BOOTSTRAP_MODAL.unbindHiddenEvent(el, this.beimModalVersteckt);
       }
+      el.removeEventListener('shown.bs.modal', this.beimModalGezeigt);
       if (this.urspruenglicherElternKnoten) {
         if (this.urspruenglichesNaechstesGeschwister && this.urspruenglichesNaechstesGeschwister.parentNode === this.urspruenglicherElternKnoten) {
           this.urspruenglicherElternKnoten.insertBefore(el, this.urspruenglichesNaechstesGeschwister);

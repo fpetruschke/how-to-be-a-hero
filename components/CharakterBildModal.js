@@ -98,7 +98,6 @@ window.HTBAH_KOMPONENTEN.CharakterBildModal = {
       event.target.value = '';
     },
     async oeffnenMitDatei(datei) {
-      this.oeffnen();
       await this.oeffnenCropperMitDatei(datei);
     },
     async oeffnenCropperMitDatei(datei) {
