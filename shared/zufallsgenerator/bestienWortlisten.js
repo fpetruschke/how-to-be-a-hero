@@ -351,4 +351,28 @@ window.HTBAH.ZufallsgeneratorBestienListen = {
     'war ursprünglich ein gezähmtes Versuchstier',
     'verhält sich nur in der Paarungszeit extrem aggressiv',
   ],
+
+  BESCHREIBUNG_ATMOSPHAERE_MITTELALTER: [
+    'Spuren im Schlamm erzählen von nächtlichen Jagden.',
+    'Die Einheimischen meiden den Ort nach Sonnenuntergang.',
+    'Alte Jagdgeschichten ranken sich um diese Kreatur.',
+    'Federn, Knochen oder Schuppen liegen am Wegesrand.',
+    'Hunde verstummen, wenn es nahe ist.',
+  ],
+
+  BESCHREIBUNG_ATMOSPHAERE_GEGENWART: [
+    'Überwachungskameras zeigen regelmäßig leere Aufnahmen — als wäre etwas da.',
+    'Tiere meiden bestimmte Straßenzüge.',
+    'In Foren kursieren verschwommene Handyvideos.',
+    'Die Polizei hat den Fall „nicht priorisiert“.',
+    'Nachts hört man Geräusche aus Industriearealen.',
+  ],
+
+  BESCHREIBUNG_ATMOSPHAERE_ZUKUNFT: [
+    'Sensoren schlagen ohne sichtbare Ursache an.',
+    'Kolonisten sprechen nur flüsternd über Begegnungen.',
+    'Energiesignaturen tauchen kurz auf und verschwinden.',
+    'Alte Warnschilder wurden übersprungen — niemand erinnert sich warum.',
+    'Drohnen weichen einem unsichtbaren Korridor aus.',
+  ],
 };

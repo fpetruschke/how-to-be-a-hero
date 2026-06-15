@@ -1,5 +1,5 @@
 /**
- * Fraktions-Zufallsgenerator (epochenabhängige Namen).
+ * Fraktions-Zufallsgenerator (epochenabhängige Namen und Beschreibungen).
  */
 window.HTBAH = window.HTBAH || {};
 
@@ -51,38 +51,69 @@ window.HTBAH = window.HTBAH || {};
     return nameMittelalter();
   }
 
+  function listeFuerEpoche(epoche, basis, gegenwart, zukunft) {
+    if (epoche === E.GEGENWART) {
+      return gegenwart;
+    }
+    if (epoche === E.ZUKUNFT) {
+      return zukunft;
+    }
+    return basis;
+  }
+
+  function beschreibungHtmlFuerEpoche(epoche) {
+    const oeffentlich = U.zufaellig(
+      listeFuerEpoche(
+        epoche,
+        L.OEFFENTLICHES_BILD,
+        L.OEFFENTLICHES_BILD_GEGENWART,
+        L.OEFFENTLICHES_BILD_ZUKUNFT,
+      ),
+    );
+    const intern = U.zufaellig(
+      listeFuerEpoche(
+        epoche,
+        L.INTERNE_DYNAMIK,
+        L.INTERNE_DYNAMIK_GEGENWART,
+        L.INTERNE_DYNAMIK_ZUKUNFT,
+      ),
+    );
+    const atmosphaere = U.zufaellig(
+      listeFuerEpoche(epoche, L.ATMOSPHAERE, L.ATMOSPHAERE_GEGENWART, L.ATMOSPHAERE_ZUKUNFT),
+    );
+    return [
+      `<p>${U.htmlEsc(atmosphaere)}</p>`,
+      `<p><strong>Öffentliches Bild:</strong> ${U.htmlEsc(oeffentlich)}</p>`,
+      `<p><strong>Interne Dynamik:</strong> ${U.htmlEsc(intern)}</p>`,
+    ].join('');
+  }
+
+  function wertAusListeOderZufaellig(wert, liste) {
+    const fix = typeof wert === 'string' ? wert.trim() : '';
+    if (fix && liste.includes(fix)) {
+      return fix;
+    }
+    if (fix) {
+      return fix;
+    }
+    return U.zufaellig(liste);
+  }
+
   window.HTBAH.ZufallsgeneratorFraktionModul = {
+    artenOptionen() {
+      return L.ARTEN.slice();
+    },
+
     /**
-     * @param {{ epoche?: string }} opts
+     * @param {{ epoche?: string, art?: string }} opts
      */
     generiere(opts) {
       const epoche = (opts && opts.epoche) || E.MITTELALTER;
-      const art = U.zufaellig(L.ARTEN);
+      const art = wertAusListeOderZufaellig(opts && opts.art, L.ARTEN);
       const name = nameFuerEpoche(epoche);
       const ziel = U.zufaellig(L.ZIELE);
       const gesinnungVerhalten = U.zufaellig(L.GESINNUNG_VERHALTEN);
-
-      const beschreibungHtml = [
-        `<p><strong>Öffentliches Bild:</strong> ${U.htmlEsc(
-          U.zufaellig([
-            'wird als unnahbar beschrieben',
-            'gilt als „praktisch“ und lästig für Behörden',
-            'hat Sympathien in der Bevölkerung',
-            'wird gefürchtet, aber kaum verstanden',
-            'tritt als Wohltäter auf, Hintergrund unklar',
-            'ist in Gerüchten allgegenwärtig',
-          ]),
-        )}</p>`,
-        `<p><strong>Interne Dynamik:</strong> ${U.htmlEsc(
-          U.zufaellig([
-            'Führungsstreit zwischen Alten und Jungen',
-            'Spitzelverdacht lastet auf mehreren Mitgliedern',
-            'starker Mentor-Kult um eine Figur',
-            'Rituale halten die Gruppe zusammen',
-            'knappes Budget zwingt zu riskanten Jobs',
-          ]),
-        )}</p>`,
-      ].join('');
+      const beschreibungHtml = beschreibungHtmlFuerEpoche(epoche);
 
       return {
         art,

@@ -38,23 +38,86 @@ window.HTBAH = window.HTBAH || {};
     return arr.map((s) => String(s || '').trim()).filter(Boolean);
   }
 
-  function ergebnisText(epoche, orteNamen, npcNamen) {
+  function artFuerFamilie(familie, epoche) {
+    const k = epocheKey(epoche);
+    const map = L.ART_FAMILIE && L.ART_FAMILIE[familie];
+    if (map && map[k]) {
+      return map[k];
+    }
+    return zufaelligListe(Ls('ARTIKEL', epoche));
+  }
+
+  function slTippFuerFamilie(familie) {
+    const tipps = L.SL_TIPPS_FAMILIE && L.SL_TIPPS_FAMILIE[familie];
+    if (Array.isArray(tipps) && tipps.length) {
+      return U.zufaellig(tipps);
+    }
+    return U.zufaellig(L.SL_TIPPS_ALLGEMEIN || L.SL_TIPPS || []);
+  }
+
+  function ideeBasisFuerFamilie(familie) {
+    const basis = L.IDEE_BASIS && L.IDEE_BASIS[familie];
+    return typeof basis === 'string' ? basis.trim() : '';
+  }
+
+  /** SL-Hinweise unter einem Block „Idee“ — ohne Dubletten. */
+  function ideeAbsatz(familie, zusaetzlichePunkte) {
+    const punkte = [];
+    const seen = new Set();
+
+    function hinzufuegen(text) {
+      const t = String(text || '').trim();
+      if (!t) {
+        return;
+      }
+      const key = t
+        .toLowerCase()
+        .replace(/[„“"']/g, '')
+        .replace(/\s+/g, ' ');
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      punkte.push(t);
+    }
+
+    hinzufuegen(ideeBasisFuerFamilie(familie));
+    if (Array.isArray(zusaetzlichePunkte)) {
+      zusaetzlichePunkte.forEach(hinzufuegen);
+    }
+    hinzufuegen(slTippFuerFamilie(familie));
+
+    if (!punkte.length) {
+      return '';
+    }
+    if (punkte.length === 1) {
+      return `<p><strong>Idee:</strong> ${U.htmlEsc(punkte[0])}</p>`;
+    }
+    return `<p><strong>Idee:</strong></p><ul class="mb-0 ps-3">${punkte
+      .map((p) => `<li>${U.htmlEsc(p)}</li>`)
+      .join('')}</ul>`;
+  }
+
+  function ergebnisText(epoche, orteNamen, npcNamen, familie) {
     const ortListe = bereinigteNamen(orteNamen);
     const npcListe = bereinigteNamen(npcNamen);
-    const typ = U.gewichtet([
+
+    const gewichte = [
       { wert: 'richtung', gewicht: 14 },
       { wert: 'tageszeit', gewicht: 10 },
       { wert: 'ort_eintrag', gewicht: ortListe.length ? 12 : 0 },
       { wert: 'ort_abstrakt', gewicht: 10 },
       { wert: 'person_eintrag', gewicht: npcListe.length ? 10 : 0 },
       { wert: 'person_abstrakt', gewicht: 8 },
-      { wert: 'zahl', gewicht: 8 },
-      { wert: 'symbol', gewicht: 8 },
-    ]);
+      { wert: 'zahl', gewicht: familie === 'code' || familie === 'muster' ? 14 : 8 },
+      { wert: 'symbol', gewicht: familie === 'code' || familie === 'muster' ? 16 : 8 },
+    ];
+
+    const typ = U.gewichtet(gewichte);
 
     if (typ === 'richtung') {
       const r = U.zufaellig(L.HIMMELSRICHTUNGEN);
-      return `Die Lösung weist klar auf die Himmelsrichtung „${r}“ hin (wörtlich oder symbolisch).`;
+      return `Die Lösung weist auf die Himmelsrichtung „${r}“ hin — wörtlich oder als Symbol (z. B. Pfeil, Windrose).`;
     }
     if (typ === 'tageszeit') {
       const t = U.zufaellig(L.TAGESZEITEN);
@@ -70,7 +133,7 @@ window.HTBAH = window.HTBAH || {};
     }
     if (typ === 'person_eintrag') {
       const n = U.zufaellig(npcListe);
-      return `Die Antwort bezieht sich auf die Person „${n}“ (Name oder Rolle).`;
+      return `Die Antwort bezieht sich auf „${n}“ (Name oder Rolle in der Szene).`;
     }
     if (typ === 'person_abstrakt') {
       const p = zufaelligListe(Ls('PERSON_ROLLE', epoche));
@@ -78,10 +141,10 @@ window.HTBAH = window.HTBAH || {};
     }
     if (typ === 'zahl') {
       const n = U.zufallsInt(2, 19);
-      return `Die entscheidende Zahl ist ${n} (Ziffernfolge, Umdrehen oder Quersumme möglich).`;
+      return `Die entscheidende Zahl ist ${n} (als Ziffer, Quersumme oder Anzahl von Betätigungen).`;
     }
-    const sym = U.zufaellig(['ein Kreis', 'ein Dreieck', 'eine Spirale', 'ein Stern', 'zwei parallele Linien']);
-    return `Das Symbol der Lösung ist ${sym} — es kann später erneut auftauchen.`;
+    const sym = U.zufaellig(['ein Kreis', 'ein Dreieck', 'ein Quadrat', 'eine Spirale', 'ein Stern']);
+    return `Das Lösungssymbol ist ${sym} — es kann später erneut in der Kampagne auftauchen.`;
   }
 
   function wortRaetselKern(epoche) {
@@ -90,128 +153,134 @@ window.HTBAH = window.HTBAH || {};
     const buchstaben = wort.split('');
     const perm = buchstaben.slice().sort(() => Math.random() - 0.5);
     const anagramm = perm.join(' · ');
-    const aufgabenstellung = `„Vor euch liegt eine Inschrift aus losen Buchstaben: ${anagramm}. Ordnet sie so, dass ein Wort entsteht, das hier Sinn ergibt.“`;
+    const kontext = zufaelligListe(Ls('WORT_RAETSEL_KONTEXT', epoche));
+    const aufgabenstellung = `„Auf einer Tafel stehen lose Buchstaben: ${anagramm}. Ordnet sie zu einem Wort, das hier einen Sinn ergibt.“`;
     const html = [
-      `<p><strong>Aufgabe:</strong> Aus den Buchstaben soll ein sinnvolles Wort gebildet werden: <em>${U.htmlEsc(
-        anagramm,
-      )}</em> (Buchstaben dürfen neu angeordnet werden).</p>`,
-      `<p><strong>Hinweis für die Gruppe:</strong> Es hat mit dem Ort oder dem Thema der Szene zu tun.</p>`,
+      `<p><strong>Aufgabe:</strong> Aus den Buchstaben <em>${U.htmlEsc(anagramm)}</em> ein sinnvolles Wort bilden (Anagramm).</p>`,
+      `<p><strong>Kontext:</strong> ${U.htmlEsc(kontext)}</p>`,
       `<p><strong>Lösung (nur SL):</strong> ${U.htmlEsc(wort)}</p>`,
     ].join('');
-    return { html, aufgabenstellung };
+    return { html, aufgabenstellung, idee: [] };
   }
 
   function ratespielKern(epoche) {
     const ziel = zufaelligListe(Ls('RATEZIEL_SACHLICH', epoche));
-    const a = U.zufaellig([
-      'Es riecht nach Metall und Regen.',
-      'Es ist kleiner als eine Schuhsohle, aber schwerer als es aussieht.',
-      'Nur eine Person im Raum hat es schon einmal gesehen — aber sie erinnert sich nicht wann.',
-      'Es wurde absichtlich „vergessen“, aber nicht versteckt.',
-    ]);
+    const hinweise = Ls('RATEZIEL_HINWEISE', epoche);
+    const a = hinweise.length
+      ? U.zufaellig(hinweise)
+      : 'Es ist schwerer oder leichter, als es auf den ersten Blick wirkt.';
     const b = U.zufaellig([
-      'Es hängt mit einem Versprechen zusammen.',
-      'Es wurde von jemandem mit linkshändiger Schrift beschriftet.',
-      'Es passt zu einem Lied, das in der Schenke gesungen wurde.',
+      'Es hängt mit einem Versprechen oder Vertrag zusammen.',
+      'Jemand hat es absichtlich sichtbar hinterlassen — aber nicht beschriftet.',
+      'Es passt zu etwas, das in der Szene schon erwähnt wurde.',
+      'Nur unter bestimmten Lichtverhältnissen fällt ein Detail auf.',
     ]);
-    const aufgabenstellung = `„Ihr entdeckt Folgendes: ${ziel}. Was fällt euch dazu ein? Ich gebe euch zwei weitere Eindrücke: (1) ${a} (2) ${b} — Was macht das mit euch?“`;
+    const aufgabenstellung = `„Ihr findet: ${ziel}. Was ist das — und was bedeutet es für euch? Ich gebe euch zwei Hinweise: (1) ${a} (2) ${b}.“`;
     const html = [
-      `<p><strong>Aufgabe:</strong> Die Helden finden <em>${U.htmlEsc(ziel)}</em>. Was ist es — oder was bedeutet es?</p>`,
-      `<p><strong>Clue 1:</strong> ${U.htmlEsc(a)}</p>`,
-      `<p><strong>Clue 2:</strong> ${U.htmlEsc(b)}</p>`,
+      `<p><strong>Aufgabe:</strong> Die Gruppe entdeckt <em>${U.htmlEsc(ziel)}</em>. Was ist es, wozu dient es, wer könnte es hinterlassen haben?</p>`,
+      `<p><strong>Hinweis 1:</strong> ${U.htmlEsc(a)}</p>`,
+      `<p><strong>Hinweis 2:</strong> ${U.htmlEsc(b)}</p>`,
     ].join('');
-    return { html, aufgabenstellung };
+    return { html, aufgabenstellung, idee: [] };
   }
 
   function schlossKern(epoche) {
     const k = epocheKey(epoche);
-    const variant =
-      k === 'mittelalter'
-        ? 'Ein eiserner Ring mit drei Kerben muss in der richtigen Tiefe gesteckt werden; daneben liegt ein falscher Schlüssel, der eine Falle scharf macht.'
+    const varianten = Ls('SCHLOSS_VARIANTEN', epoche);
+    const variant = varianten.length
+      ? U.zufaellig(varianten)
+      : k === 'mittelalter'
+        ? 'Ein Schlüssel passt nicht — aber drei Markierungen am Türstock deuten auf eine verborgene Öffnung.'
         : k === 'gegenwart'
-          ? 'Ein elektronisches Schloss akzeptiert nur die richtige PIN — Teile der Ziffern stehen auf Post-its, Visitenkarten und einem Kalenderblatt im Raum.'
-          : 'Ein Schlüsselchip muss in drei Lesegeräte nacheinander — die Reihenfolge steht in einem Störsignal als Rhythmus.';
-    const aufgabenstellung = `„Die Tür (oder der Behälter) weigert sich. ${variant} Findet einen Weg hinein — aber Vorsicht: ein Fehlversuch hat Folgen.“`;
+          ? 'Ein Zahlenschloss verlangt eine PIN; Hinweise liegen auf Zetteln im Raum verteilt.'
+          : 'Ein Chip muss in mehreren Lesegeräten nacheinander gelesen werden — die Reihenfolge ist verschlüsselt.';
+    const aufgabenstellung = `„Der Zugang ist gesperrt. ${variant} Findet einen Weg hinein — ein Fehlversuch soll spürbar sein, muss aber nicht sofort tödlich enden.“`;
     const html = [
-      `<p><strong>Aufgabe:</strong> Zugang verschaffen, ohne Alarm oder Fluch auszulösen.</p>`,
+      `<p><strong>Aufgabe:</strong> Tür, Truhe oder Schrank öffnen, ohne Alarm oder Fluch auszulösen.</p>`,
       `<p>${U.htmlEsc(variant)}</p>`,
-      `<p><strong>Spielleitung:</strong> Misserfolg = Lärm, Rufschaden, oder Zeitverlust — kein sofortiger Tod nötig.</p>`,
     ].join('');
-    return { html, aufgabenstellung };
+    return { html, aufgabenstellung, idee: [] };
   }
 
   function mechanikLichtKern(epoche) {
     const szene = zufaelligListe(Ls('MECHANIK_SZENE', epoche));
-    const aufgabenstellung = `„${szene} Was tut ihr? Beschreibt genau, wie ihr vorgeht — ich sage euch, was sich verändert.“`;
+    const aufgabenstellung = `„${szene} Beschreibt, wie ihr vorgeht — ich sage euch, was sich jeweils verändert.“`;
     const html = [
       `<p><strong>Aufgabe:</strong> ${U.htmlEsc(szene)}</p>`,
-      `<p><strong>Spielleitung:</strong> Jede falsche Drehung kann ein kleines Geräusch auslösen (Patrouille rollt würfeln). Bei Erfolg: ein Klick, ein Lichtfleck, ein sich öffnender Spalt.</p>`,
     ].join('');
-    return { html, aufgabenstellung };
+    return { html, aufgabenstellung, idee: [] };
   }
 
-  function codefolgeKern() {
+  function codefolgeKern(epoche) {
     const sym = ['◯', '△', '□', '◇', '✦'];
-    const n = U.zufallsInt(3, 5);
-    const folge = [];
+    const n = U.zufallsInt(3, 4);
+    const symbole = [];
     for (let i = 0; i < n; i += 1) {
-      folge.push(U.zufaellig(sym));
+      symbole.push(U.zufaellig(sym));
     }
-    const folgeStr = folge.join(' → ');
-    const falsch = U.zufaellig([
-      'Eine der Inschriften ist absichtlich ein „Roter Hering“.',
-      'Zwei Symbole sehen fast gleich aus — nur die Spitze unterscheidet sich.',
-    ]);
-    const aufgabenstellung = `„An der Wand leuchtet (oder ist eingraviert): ${folgeStr}. Ihr habt dieselben Symbole als Druckfelder oder Hebel. Was tut ihr?“`;
+    const anzeige = symbole.join('   ');
+    const regel = U.zufaellig(Ls('CODEFOLGE_REGELN', epoche));
+    const aufgabenstellung = `„An der Wand sind Symbole eingraviert: ${anzeige}. Am Boden (oder an Hebeln) findet ihr dieselben Zeichen noch einmal — aber in anderer Anordnung. Welche Reihenfolge ist richtig?“`;
     const html = [
-      `<p><strong>Aufgabe:</strong> Die richtige Symbolfolge eingeben: die Wand zeigt <em>${U.htmlEsc(
-        folgeStr,
-      )}</em> — aber in welcher Reihenfolge müssen sie <strong>betätigt</strong> werden?</p>`,
-      `<p><strong>Knackpunkt:</strong> ${U.htmlEsc(falsch)}</p>`,
-      `<p><strong>Lösung (Vorschlag):</strong> Reihenfolge wie angezeigt <em>rückwärts</em> oder nach Größe der eingravierten Punkte sortieren.</p>`,
+      `<p><strong>Aufgabe:</strong> Die Symbole <em>${U.htmlEsc(anzeige)}</em> erscheinen an der Wand. Hebel, Druckplatten oder Leuchtfelder im Raum tragen dieselben Zeichen — die Gruppe muss die richtige Betätigungsreihenfolge finden.</p>`,
+      `<p><strong>Regel (nur SL):</strong> ${U.htmlEsc(regel)}</p>`,
+      `<p><strong>Lösung (Vorschlag):</strong> Reihenfolge gemäß Regel — z. B. ${U.htmlEsc(
+        symbole.slice().reverse().join(' → '),
+      )} wenn „rückwärts lesen“ gemeint ist.</p>`,
     ].join('');
-    return { html, aufgabenstellung };
+    return { html, aufgabenstellung, idee: [] };
   }
 
   function musterKern(epoche) {
-    const k = epocheKey(epoche);
-    const beispiel =
-      k === 'mittelalter'
-        ? 'Glocken schlagen in der Reihenfolge tief — mittel — hoch — tief. Welche Glocke darf als Letzte?'
-        : k === 'gegenwart'
-          ? 'Drei Lichtschalter: jeder verändert den Zustand der anderen. Start: alle AUS. Ziel: nur die Mitte AN.'
-          : 'Drei Energieknoten müssen gleichzeitig den gleichen „Phasenwinkel“ haben — die Konsole zeigt nur Relativwerte.';
-    const aufgabenstellung = `„${beispiel} Ihr könnt in Ruhe kombinieren — oder ich starte eine Uhr. Was macht ihr als Erstes?“`;
+    const beispiel = zufaelligListe(Ls('MUSTER_BEISPIELE', epoche));
+    const aufgabenstellung = `„${beispiel} Probiert in Ruhe — oder ich setze optional Zeitdruck.“`;
     const html = [
       `<p><strong>Aufgabe:</strong> ${U.htmlEsc(beispiel)}</p>`,
-      `<p><strong>Spielleitung:</strong> Notiere dir eine gültige Endkonfiguration; Spielende dürfen probieren, zähle Versuche oder setze eine Belastungs-Uhr.</p>`,
     ].join('');
-    return { html, aufgabenstellung };
+    return { html, aufgabenstellung, idee: [] };
   }
 
   window.HTBAH.ZufallsgeneratorRaetselModul = {
+    schwierigkeitOptionen() {
+      return L.SCHWIERIGKEIT.slice();
+    },
+    familieOptionen() {
+      return [
+        { wert: 'wort', label: 'Worträtsel', icon: '🔤' },
+        { wert: 'rate', label: 'Ratespiel', icon: '❓' },
+        { wert: 'schloss', label: 'Schloss / Zugang', icon: '🔐' },
+        { wert: 'mechanik', label: 'Mechanik / Licht', icon: '⚙️' },
+        { wert: 'code', label: 'Symbolfolge', icon: '🔣' },
+        { wert: 'muster', label: 'Muster / Reihenfolge', icon: '🔁' },
+      ];
+    },
     /**
-     * @param {{ epoche?: string, orteNamen?: string[], npcNamen?: string[] }} opts
+     * @param {{ epoche?: string, familie?: string, schwierigkeit?: string, orteNamen?: string[], npcNamen?: string[] }} opts
      */
     generiere(opts) {
       opts = opts || {};
       const epoche = opts.epoche || E.MITTELALTER;
-      const orteNamen = opts.orteNamen;
-      const npcNamen = opts.npcNamen;
 
-      const art = zufaelligListe(Ls('ARTIKEL', epoche));
+      const familieVorgabe = typeof opts.familie === 'string' ? opts.familie.trim() : '';
+      const familie = familieVorgabe
+        ? familieVorgabe
+        : U.gewichtet([
+            { wert: 'wort', gewicht: 12 },
+            { wert: 'rate', gewicht: 12 },
+            { wert: 'schloss', gewicht: 10 },
+            { wert: 'mechanik', gewicht: 14 },
+            { wert: 'code', gewicht: 12 },
+            { wert: 'muster', gewicht: 10 },
+          ]);
+
+      const art = artFuerFamilie(familie, epoche);
       const titel = zufaelligListe(Ls('TITEL_HOOK', epoche));
-      const schwierigkeit = U.zufaellig(L.SCHWIERIGKEIT);
-      const ergebnis = ergebnisText(epoche, orteNamen, npcNamen);
-
-      const familie = U.gewichtet([
-        { wert: 'wort', gewicht: 12 },
-        { wert: 'rate', gewicht: 12 },
-        { wert: 'schloss', gewicht: 10 },
-        { wert: 'mechanik', gewicht: 14 },
-        { wert: 'code', gewicht: 12 },
-        { wert: 'muster', gewicht: 10 },
-      ]);
+      const schwierigkeitVorgabe =
+        opts.schwierigkeit && L.SCHWIERIGKEIT.includes(opts.schwierigkeit)
+          ? opts.schwierigkeit
+          : '';
+      const schwierigkeit = schwierigkeitVorgabe || U.zufaellig(L.SCHWIERIGKEIT);
+      const ergebnis = ergebnisText(epoche, opts.orteNamen, opts.npcNamen, familie);
 
       let kern;
       if (familie === 'wort') {
@@ -223,19 +292,20 @@ window.HTBAH = window.HTBAH || {};
       } else if (familie === 'mechanik') {
         kern = mechanikLichtKern(epoche);
       } else if (familie === 'code') {
-        kern = codefolgeKern();
+        kern = codefolgeKern(epoche);
       } else {
         kern = musterKern(epoche);
       }
 
-      const { html: kernHtml, aufgabenstellung } = kern;
+      const { html: kernHtml, aufgabenstellung, idee } = kern;
 
-      const slTipp = U.zufaellig(L.SL_TIPPS);
+      const atmoListe = L.ATMOSPHAERE && L.ATMOSPHAERE[epocheKey(epoche)];
+      const atmosphaere = Array.isArray(atmoListe) && atmoListe.length ? U.zufaellig(atmoListe) : '';
+      const ideeHtml = ideeAbsatz(familie, idee);
       const notizenHtml = [
-        `<p><strong>Schwierigkeit:</strong> ${U.htmlEsc(schwierigkeit)}</p>`,
+        atmosphaere ? `<p>${U.htmlEsc(atmosphaere)}</p>` : '',
         kernHtml,
-        `<p><strong>Ergebnis bei gelöstem Rätsel (Vorschlag):</strong> ${U.htmlEsc(ergebnis)}</p>`,
-        `<p><strong>Tipp für die Spielleitung:</strong> ${U.htmlEsc(slTipp)}</p>`,
+        ideeHtml,
       ].join('');
 
       return {

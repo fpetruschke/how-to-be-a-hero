@@ -30,6 +30,16 @@ function htbahHtmlText(html) {
 }
 
 const ZUFALLSTABELLEN_MAX_ROH_DATEI_BYTES = 40 * 1024 * 1024;
+const DUPLIKAT_ZIEL_NEUE_KAMPAGNE = '__neu__';
+const ZUFALLSTABELLEN_SEKTION_SUCHE = {
+  orte: { sucheKey: 'sucheOrte', anzeigeKey: 'anzeigeOrte' },
+  fraktionen: { sucheKey: 'sucheFraktionen', anzeigeKey: 'anzeigeFraktionen' },
+  npcs: { sucheKey: 'sucheNpcs', anzeigeKey: 'anzeigeNpcs' },
+  gegenstaende: { sucheKey: 'sucheGegenstaende', anzeigeKey: 'anzeigeGegenstaende' },
+  pantheon: { sucheKey: 'suchePantheon', anzeigeKey: 'anzeigePantheon' },
+  raetsel: { sucheKey: 'sucheRaetsel', anzeigeKey: 'anzeigeRaetsel' },
+  bestien: { sucheKey: 'sucheBestien', anzeigeKey: 'anzeigeBestien' },
+};
 
 function zufallstabellenFormatBytes(n) {
   if (!HTBAH_REFACTOR_UTILS || !Number.isFinite(n) || n <= 0) {
@@ -75,9 +85,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
   components: {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
     ZufallstabellenReihenfolgeSplit: window.HTBAH_KOMPONENTEN.ZufallstabellenReihenfolgeSplit,
+    ZufallstabellenSektion: window.HTBAH_KOMPONENTEN.ZufallstabellenSektion,
     ZufallstabellenZeileModal: window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal,
     NpcWizardModal: window.HTBAH_KOMPONENTEN.NpcWizardModal,
     BestienWizardModal: window.HTBAH_KOMPONENTEN.BestienWizardModal,
+    OrtWizardModal: window.HTBAH_KOMPONENTEN.OrtWizardModal,
+    FraktionWizardModal: window.HTBAH_KOMPONENTEN.FraktionWizardModal,
+    RaetselWizardModal: window.HTBAH_KOMPONENTEN.RaetselWizardModal,
+    PantheonWizardModal: window.HTBAH_KOMPONENTEN.PantheonWizardModal,
+    GegenstandWizardModal: window.HTBAH_KOMPONENTEN.GegenstandWizardModal,
     ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
   },
@@ -102,12 +118,19 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       zuLoeschendeZeile: null,
       zufallNpcEpoche: 'mittelalter',
       zufallGegenstandEpoche: 'mittelalter',
-      zufallGegenstandKleidung: true,
       zufallFraktionEpoche: 'mittelalter',
       zufallRaetselEpoche: 'mittelalter',
+      zufallOrtEpoche: 'mittelalter',
+      zufallPantheonEpoche: 'mittelalter',
+      zufallBestieEpoche: 'mittelalter',
       /** Ziel des aktuell geöffneten NPC-Wizards: 'haupt' | 'overlay' | null */
       npcWizardZiel: null,
       bestienWizardZiel: null,
+      ortWizardZiel: null,
+      fraktionWizardZiel: null,
+      raetselWizardZiel: null,
+      pantheonWizardZiel: null,
+      gegenstandWizardZiel: null,
       /** Stabile Funktion für :ref (wie InventarModal), kein String-ref im Modal */
       zeileQuillHostRefFn: null,
       overlayZeileQuillHostRefFn: null,
@@ -133,6 +156,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       entitaetenAuswahl: {},
       duplizierenZielKampagneId: '',
       duplizierenNeueKampagneName: '',
+      duplikatZielNeueKampagne: DUPLIKAT_ZIEL_NEUE_KAMPAGNE,
       /** Panel „Inhalte duplizieren“ (Ziel-Kampagne, Auswahlmodus) */
       duplizierenPanelOffen: false,
       /** Kategorie für Zufallseintrag: beliebig | orte | npcs | … */
@@ -196,6 +220,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     spielleitungKampagnenFuerDuplikat() {
       const sl = window.HTBAH.ladeSpielleitungZustand();
       return Array.isArray(sl.kampagnen) ? sl.kampagnen.filter((k) => k && k.id) : [];
+    },
+    duplizierenNeueKampagneModus() {
+      return this.duplizierenZielKampagneId === DUPLIKAT_ZIEL_NEUE_KAMPAGNE;
     },
     entitaetenAuswahlSchluesselListe() {
       return Object.keys(this.entitaetenAuswahl || {}).filter((k) => this.entitaetenAuswahl[k]);
@@ -540,6 +567,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         this.zufallKategorie = 'beliebig';
       }
     },
+    duplizierenZielKampagneId(neu) {
+      if (neu !== DUPLIKAT_ZIEL_NEUE_KAMPAGNE) {
+        this.duplizierenNeueKampagneName = '';
+      }
+    },
   },
   methods: {
     entitaetTypLabelFuerMentions(typ) {
@@ -760,8 +792,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     overlayZeileBearbeitungBeiBlurSpeichern() {
       this.withModalKontext('overlay', () => this.zeileBearbeitungBeiBlurSpeichern());
     },
-    overlayZufallsvorschlagUebernehmen() {
-      this.withModalKontext('overlay', () => this.zufallsvorschlagUebernehmen());
+    overlayZufallsvorschlagUebernehmen(payload) {
+      this.withModalKontext('overlay', () => this.zufallsvorschlagUebernehmen(payload));
     },
     overlayMediaUpload(event) {
       this.withModalKontext('overlay', () => this.onBearbeitungsMedienDateienGewaehlt(event));
@@ -944,7 +976,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (typeof api !== 'function') {
         return;
       }
-      const ziel = (this.duplizierenZielKampagneId || '').trim() || this.kampagneIdEffektiv;
+      const zielRoh = (this.duplizierenZielKampagneId || '').trim();
+      if (zielRoh === DUPLIKAT_ZIEL_NEUE_KAMPAGNE) {
+        window.HTBAH.ui.notify({
+          text: 'Bitte zuerst eine neue Kampagne anlegen oder eine bestehende wählen.',
+          typ: 'warning',
+        });
+        return;
+      }
+      const ziel = zielRoh || this.kampagneIdEffektiv;
       if (!ziel) {
         window.HTBAH.ui.notify({ text: 'Bitte eine Ziel-Kampagne wählen.', typ: 'warning' });
         return;
@@ -1047,6 +1087,23 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       return String(wert || '')
         .toLocaleLowerCase('de-DE')
         .trim();
+    },
+    sektionSucheAktiv(sectionId) {
+      const cfg = ZUFALLSTABELLEN_SEKTION_SUCHE[sectionId];
+      if (!cfg) {
+        return false;
+      }
+      const gq = this.normSucheText(this.sucheGlobal);
+      const lq = this.normSucheText(this[cfg.sucheKey]);
+      return !!gq || !!lq;
+    },
+    sektionSucheHatTreffer(sectionId) {
+      const cfg = ZUFALLSTABELLEN_SEKTION_SUCHE[sectionId];
+      if (!cfg) {
+        return false;
+      }
+      const liste = this[cfg.anzeigeKey];
+      return Array.isArray(liste) && liste.length > 0;
     },
     /** Leer-Zelle in Tabellen: unterscheidet „noch keine Zeilen“ und „Suche ohne Treffer“ */
     zufallstabellenLeerNachricht(anzahlRoh, lokaleSuche) {
@@ -1640,15 +1697,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       return {
         id: window.HTBAH.neueEntropieId(),
         name: '',
+        kategorie: '',
         beschreibungHtml: '',
         aufenthaltsort: '',
         inGegenstandId: '',
         besitzerTyp: '',
         besitzerId: '',
+        istWaffe: false,
+        schadenswertNahkampf: '',
+        schadenswertFernkampf: '',
         handeln: 16,
         wissen: 8,
         soziales: 16,
-        initiative: '',
         lpBewusstlosAusgeblendet: false,
         lpMassenschadenBewusstlos: false,
         medien: [],
@@ -2034,7 +2094,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       this.zeileQuillInstanz.root.innerHTML = this.htmlFuerQuillAusBearbeitung();
     },
-    zufallsvorschlagUebernehmen() {
+    zufallsvorschlagUebernehmen(payload) {
       if (!this.bearbeitung || this.bearbeitungIndex >= 0) {
         return;
       }
@@ -2044,6 +2104,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       const z = this.bearbeitung.zeile;
       const typ = this.bearbeitung.typ;
+      const epocheAusEvent =
+        payload && payload.epoche ? String(payload.epoche).trim() : '';
       let felder;
       if (typ === 'npc') {
         const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
@@ -2054,34 +2116,32 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           p && p.name ? String(p.name) : '',
         );
         felder = G.npc({
-          epoche: this.zufallNpcEpoche,
+          epoche: epocheAusEvent || this.zufallNpcEpoche,
           orteNamen,
           fraktionNamen,
           pantheonNamen,
         });
       } else if (typ === 'ort') {
-        felder = G.ort();
+        felder = G.ort({ epoche: epocheAusEvent || this.zufallOrtEpoche });
       } else if (typ === 'fraktion') {
-        felder = G.fraktion({ epoche: this.zufallFraktionEpoche });
+        felder = G.fraktion({ epoche: epocheAusEvent || this.zufallFraktionEpoche });
       } else if (typ === 'pantheon') {
-        felder = G.pantheon();
+        felder = G.pantheon({ epoche: epocheAusEvent || this.zufallPantheonEpoche });
       } else if (typ === 'raetsel') {
         const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
         const npcNamen = (this.zustand.npcs || []).map((n) => (n && n.name ? String(n.name) : ''));
         felder = G.raetsel({
-          epoche: this.zufallRaetselEpoche,
+          epoche: epocheAusEvent || this.zufallRaetselEpoche,
           orteNamen,
           npcNamen,
         });
       } else if (typ === 'bestie') {
-        const ep = z && z.epoche ? String(z.epoche) : 'mittelalter';
         const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
-        felder = G.bestie({ epoche: ep, orteNamen });
+        felder = G.bestie({ epoche: epocheAusEvent || this.zufallBestieEpoche, orteNamen });
       } else {
         const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
         felder = G.gegenstand({
-          epoche: this.zufallGegenstandEpoche,
-          mitKleidung: this.zufallGegenstandKleidung,
+          epoche: epocheAusEvent || this.zufallGegenstandEpoche,
           orteNamen,
         });
       }
@@ -2247,6 +2307,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
       const epoche = payload && payload.epoche ? String(payload.epoche) : 'mittelalter';
+      this.zufallBestieEpoche = epoche;
       const felder = G.bestie({
         epoche,
         kategorie: payload && payload.kategorie ? String(payload.kategorie) : '',
@@ -2275,6 +2336,189 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       } else {
         this.bestienWizardUebernehmenIntern(payload);
       }
+    },
+    ortWizardOeffnen() {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'ort' || this.bearbeitungIndex >= 0) {
+        return;
+      }
+      this.ortWizardZiel = 'haupt';
+      const ref = this.$refs.ortWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') {
+        ref.oeffnen();
+      }
+    },
+    overlayOrtWizardOeffnen() {
+      if (
+        !this.bearbeitungOverlay ||
+        this.bearbeitungOverlay.typ !== 'ort' ||
+        this.bearbeitungOverlayIndex >= 0
+      ) {
+        return;
+      }
+      this.ortWizardZiel = 'overlay';
+      const ref = this.$refs.ortWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') {
+        ref.oeffnen();
+      }
+    },
+    ortWizardUebernehmenIntern(payload) {
+      if (
+        !this.bearbeitung ||
+        this.bearbeitung.typ !== 'ort' ||
+        !this.bearbeitung.zeile ||
+        this.bearbeitungIndex >= 0
+      ) {
+        return;
+      }
+      const G = window.HTBAH && window.HTBAH.Zufallsgenerator;
+      if (!G || typeof G.ort !== 'function') {
+        return;
+      }
+      const epoche = payload && payload.epoche ? String(payload.epoche) : 'mittelalter';
+      this.zufallOrtEpoche = epoche;
+      const felder = G.ort({
+        epoche,
+        groesse: payload && payload.groesse ? String(payload.groesse) : '',
+        lage: payload && payload.lage ? String(payload.lage) : '',
+      });
+      Object.assign(this.bearbeitung.zeile, felder);
+      this.$nextTick(() => this.quillAusBearbeitungSetzen());
+    },
+    ortWizardUebernehmen(payload) {
+      const ziel = this.ortWizardZiel;
+      this.ortWizardZiel = null;
+      if (ziel === 'overlay') {
+        this.withModalKontext('overlay', () => this.ortWizardUebernehmenIntern(payload));
+      } else {
+        this.ortWizardUebernehmenIntern(payload);
+      }
+    },
+    fraktionWizardOeffnen() {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'fraktion' || this.bearbeitungIndex >= 0) return;
+      this.fraktionWizardZiel = 'haupt';
+      const ref = this.$refs.fraktionWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') ref.oeffnen();
+    },
+    overlayFraktionWizardOeffnen() {
+      if (!this.bearbeitungOverlay || this.bearbeitungOverlay.typ !== 'fraktion' || this.bearbeitungOverlayIndex >= 0) return;
+      this.fraktionWizardZiel = 'overlay';
+      const ref = this.$refs.fraktionWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') ref.oeffnen();
+    },
+    fraktionWizardUebernehmenIntern(payload) {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'fraktion' || !this.bearbeitung.zeile || this.bearbeitungIndex >= 0) return;
+      const G = window.HTBAH && window.HTBAH.Zufallsgenerator;
+      if (!G || typeof G.fraktion !== 'function') return;
+      const epoche = payload && payload.epoche ? String(payload.epoche) : 'mittelalter';
+      this.zufallFraktionEpoche = epoche;
+      Object.assign(this.bearbeitung.zeile, G.fraktion({
+        epoche,
+        art: payload && payload.art ? String(payload.art) : '',
+      }));
+      this.$nextTick(() => this.quillAusBearbeitungSetzen());
+    },
+    fraktionWizardUebernehmen(payload) {
+      const ziel = this.fraktionWizardZiel;
+      this.fraktionWizardZiel = null;
+      if (ziel === 'overlay') this.withModalKontext('overlay', () => this.fraktionWizardUebernehmenIntern(payload));
+      else this.fraktionWizardUebernehmenIntern(payload);
+    },
+    raetselWizardOeffnen() {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'raetsel' || this.bearbeitungIndex >= 0) return;
+      this.raetselWizardZiel = 'haupt';
+      const ref = this.$refs.raetselWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') ref.oeffnen();
+    },
+    overlayRaetselWizardOeffnen() {
+      if (!this.bearbeitungOverlay || this.bearbeitungOverlay.typ !== 'raetsel' || this.bearbeitungOverlayIndex >= 0) return;
+      this.raetselWizardZiel = 'overlay';
+      const ref = this.$refs.raetselWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') ref.oeffnen();
+    },
+    raetselWizardUebernehmenIntern(payload) {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'raetsel' || !this.bearbeitung.zeile || this.bearbeitungIndex >= 0) return;
+      const G = window.HTBAH && window.HTBAH.Zufallsgenerator;
+      if (!G || typeof G.raetsel !== 'function') return;
+      const epoche = payload && payload.epoche ? String(payload.epoche) : 'mittelalter';
+      this.zufallRaetselEpoche = epoche;
+      const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
+      const npcNamen = (this.zustand.npcs || []).map((n) => (n && n.name ? String(n.name) : ''));
+      Object.assign(this.bearbeitung.zeile, G.raetsel({
+        epoche,
+        familie: payload && payload.familie ? String(payload.familie) : '',
+        schwierigkeit: payload && payload.schwierigkeit ? String(payload.schwierigkeit) : '',
+        orteNamen,
+        npcNamen,
+      }));
+      this.$nextTick(() => this.quillAusBearbeitungSetzen());
+    },
+    raetselWizardUebernehmen(payload) {
+      const ziel = this.raetselWizardZiel;
+      this.raetselWizardZiel = null;
+      if (ziel === 'overlay') this.withModalKontext('overlay', () => this.raetselWizardUebernehmenIntern(payload));
+      else this.raetselWizardUebernehmenIntern(payload);
+    },
+    pantheonWizardOeffnen() {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'pantheon' || this.bearbeitungIndex >= 0) return;
+      this.pantheonWizardZiel = 'haupt';
+      const ref = this.$refs.pantheonWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') ref.oeffnen();
+    },
+    overlayPantheonWizardOeffnen() {
+      if (!this.bearbeitungOverlay || this.bearbeitungOverlay.typ !== 'pantheon' || this.bearbeitungOverlayIndex >= 0) return;
+      this.pantheonWizardZiel = 'overlay';
+      const ref = this.$refs.pantheonWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') ref.oeffnen();
+    },
+    pantheonWizardUebernehmenIntern(payload) {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'pantheon' || !this.bearbeitung.zeile || this.bearbeitungIndex >= 0) return;
+      const G = window.HTBAH && window.HTBAH.Zufallsgenerator;
+      if (!G || typeof G.pantheon !== 'function') return;
+      const epoche = payload && payload.epoche ? String(payload.epoche) : 'mittelalter';
+      this.zufallPantheonEpoche = epoche;
+      Object.assign(this.bearbeitung.zeile, G.pantheon({
+        epoche,
+        domaene: payload && payload.domaene ? String(payload.domaene) : '',
+      }));
+      this.$nextTick(() => this.quillAusBearbeitungSetzen());
+    },
+    pantheonWizardUebernehmen(payload) {
+      const ziel = this.pantheonWizardZiel;
+      this.pantheonWizardZiel = null;
+      if (ziel === 'overlay') this.withModalKontext('overlay', () => this.pantheonWizardUebernehmenIntern(payload));
+      else this.pantheonWizardUebernehmenIntern(payload);
+    },
+    gegenstandWizardOeffnen() {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'gegenstand' || this.bearbeitungIndex >= 0) return;
+      this.gegenstandWizardZiel = 'haupt';
+      const ref = this.$refs.gegenstandWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') ref.oeffnen();
+    },
+    overlayGegenstandWizardOeffnen() {
+      if (!this.bearbeitungOverlay || this.bearbeitungOverlay.typ !== 'gegenstand' || this.bearbeitungOverlayIndex >= 0) return;
+      this.gegenstandWizardZiel = 'overlay';
+      const ref = this.$refs.gegenstandWizardModal;
+      if (ref && typeof ref.oeffnen === 'function') ref.oeffnen();
+    },
+    gegenstandWizardUebernehmenIntern(payload) {
+      if (!this.bearbeitung || this.bearbeitung.typ !== 'gegenstand' || !this.bearbeitung.zeile || this.bearbeitungIndex >= 0) return;
+      const G = window.HTBAH && window.HTBAH.Zufallsgenerator;
+      if (!G || typeof G.gegenstand !== 'function') return;
+      const epoche = payload && payload.epoche ? String(payload.epoche) : 'mittelalter';
+      this.zufallGegenstandEpoche = epoche;
+      const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
+      Object.assign(this.bearbeitung.zeile, G.gegenstand({
+        epoche,
+        kategorie: payload && payload.kategorie ? String(payload.kategorie) : '',
+        orteNamen,
+      }));
+      this.$nextTick(() => this.quillAusBearbeitungSetzen());
+    },
+    gegenstandWizardUebernehmen(payload) {
+      const ziel = this.gegenstandWizardZiel;
+      this.gegenstandWizardZiel = null;
+      if (ziel === 'overlay') this.withModalKontext('overlay', () => this.gegenstandWizardUebernehmenIntern(payload));
+      else this.gegenstandWizardUebernehmenIntern(payload);
     },
     inInteraktiverWeltOeffnenIntern() {
       if (!this.bearbeitung || !this.bearbeitung.zeile) {
@@ -2470,8 +2714,6 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           z.soziales = this.normalisiereBegabungswert(z.soziales);
         }
         z.initiative = this.normalisiereInitiativeWert(z.initiative, this.begabungHandelnAusEntitaetZeile(z));
-      } else if (typ === 'gegenstand' && z) {
-        z.initiative = this.normalisiereInitiativeWert(z.initiative, 40);
       } else if (typ === 'fraktion' && z) {
         z.orte = this.fraktionOrteListe(z);
       }
@@ -2751,40 +2993,45 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           <div class="card-body py-3">
             <h6 class="h6 mb-3 fw-semibold">Inhalte duplizieren</h6>
             <div class="row g-2 align-items-end">
-              <div class="col-12 col-md-4">
+              <div class="col-12">
                 <label class="form-label small text-secondary mb-0" for="zst-duplikat-ziel-kampagne">Ziel-Kampagne</label>
-                <select
-                  id="zst-duplikat-ziel-kampagne"
-                  v-model="duplizierenZielKampagneId"
-                  class="form-select form-select-sm"
-                  aria-label="Ziel-Kampagne für Duplikate">
-                  <option v-for="k in spielleitungKampagnenFuerDuplikat" :key="'zst-dup-k-' + k.id" :value="k.id">
-                    {{ k.name }}
-                  </option>
-                </select>
-              </div>
-              <div class="col-12 col-md-5">
-                <label class="form-label small text-secondary mb-0" for="zst-duplikat-neue-kampagne-name">Neue Kampagne</label>
-                <div class="input-group input-group-sm">
-                  <input
-                    id="zst-duplikat-neue-kampagne-name"
-                    v-model.trim="duplizierenNeueKampagneName"
-                    type="text"
-                    class="form-control"
-                    placeholder="Name …"
-                    autocomplete="off"
-                    @keydown.enter.prevent="duplizierenNeueKampagneAnlegen" />
-                  <button
-                    type="button"
-                    class="btn btn-outline-primary htbah-input-icon-btn"
-                    title="Kampagne erstellen und als Ziel wählen"
-                    aria-label="Kampagne erstellen und als Ziel wählen"
-                    @click="duplizierenNeueKampagneAnlegen">
-                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                  </button>
+                <div
+                  class="input-group input-group-sm w-100 htbah-duplikat-ziel-input-group"
+                  :class="{ 'htbah-duplikat-ziel-input-group--neu': duplizierenNeueKampagneModus }">
+                  <select
+                    id="zst-duplikat-ziel-kampagne"
+                    v-model="duplizierenZielKampagneId"
+                    class="form-select htbah-duplikat-ziel-select"
+                    aria-label="Ziel-Kampagne für Duplikate">
+                    <option v-for="k in spielleitungKampagnenFuerDuplikat" :key="'zst-dup-k-' + k.id" :value="k.id">
+                      {{ k.name }}
+                    </option>
+                    <option :value="duplikatZielNeueKampagne">Neue Kampagne …</option>
+                  </select>
+                  <div
+                    v-if="duplizierenNeueKampagneModus"
+                    class="input-group htbah-duplikat-neue-kampagne-teil">
+                    <input
+                      id="zst-duplikat-neue-kampagne-name"
+                      v-model.trim="duplizierenNeueKampagneName"
+                      type="text"
+                      class="form-control"
+                      placeholder="Kampagnenname …"
+                      autocomplete="off"
+                      aria-label="Name der neuen Kampagne"
+                      @keydown.enter.prevent="duplizierenNeueKampagneAnlegen" />
+                    <button
+                      type="button"
+                      class="btn btn-outline-primary htbah-input-icon-btn"
+                      title="Kampagne erstellen und als Ziel wählen"
+                      aria-label="Kampagne erstellen und als Ziel wählen"
+                      @click="duplizierenNeueKampagneAnlegen">
+                      <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div class="col-12 col-md-3 d-flex flex-wrap gap-2 align-items-center justify-content-md-end">
+              <div class="col-12 d-flex flex-wrap gap-2 align-items-center justify-content-md-end">
                 <button
                   type="button"
                   class="btn btn-sm"
@@ -2814,10 +3061,13 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         </div>
       </div>
 
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">🗺️ Orte</span>
-          <div class="d-flex flex-wrap gap-2">
+      <zufallstabellen-sektion
+        section-id="orte"
+        aria-titel="Orte"
+        :suche-steuerung-aktiv="sektionSucheAktiv('orte')"
+        :suche-hat-treffer="sektionSucheHatTreffer('orte')">
+        <template #titel><span class="fw-semibold">🗺️ Orte</span></template>
+        <template #aktionen>
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('orte')">
               Leeren
             </button>
@@ -2829,9 +3079,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               aria-label="Eintrag hinzufügen">
               Hinzufügen
             </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
+        </template>
           <div class="p-2 border-bottom">
             <input
               v-model.trim="sucheOrte"
@@ -2979,13 +3227,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+      </zufallstabellen-sektion>
 
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">🏛️ Fraktionen</span>
-          <div class="d-flex flex-wrap gap-2">
+      <zufallstabellen-sektion
+        section-id="fraktionen"
+        aria-titel="Fraktionen"
+        :suche-steuerung-aktiv="sektionSucheAktiv('fraktionen')"
+        :suche-hat-treffer="sektionSucheHatTreffer('fraktionen')">
+        <template #titel><span class="fw-semibold">🏛️ Fraktionen</span></template>
+        <template #aktionen>
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('fraktionen')">
               Leeren
             </button>
@@ -2997,9 +3247,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               aria-label="Eintrag hinzufügen">
               Hinzufügen
             </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
+        </template>
           <div class="p-2 border-bottom">
             <input
               v-model.trim="sucheFraktionen"
@@ -3142,13 +3390,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+      </zufallstabellen-sektion>
 
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">👤 NPCs</span>
-          <div class="d-flex flex-wrap gap-2">
+      <zufallstabellen-sektion
+        section-id="npcs"
+        aria-titel="NPCs"
+        :suche-steuerung-aktiv="sektionSucheAktiv('npcs')"
+        :suche-hat-treffer="sektionSucheHatTreffer('npcs')">
+        <template #titel><span class="fw-semibold">👤 NPCs</span></template>
+        <template #aktionen>
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('npcs')">
               Leeren
             </button>
@@ -3160,9 +3410,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               aria-label="Eintrag hinzufügen">
               Hinzufügen
             </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
+        </template>
           <div class="p-2 border-bottom">
             <input
               v-model.trim="sucheNpcs"
@@ -3356,16 +3604,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+      </zufallstabellen-sektion>
 
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <zufallstabellen-sektion
+        section-id="gegenstaende"
+        aria-titel="Gegenstände"
+        :suche-steuerung-aktiv="sektionSucheAktiv('gegenstaende')"
+        :suche-hat-treffer="sektionSucheHatTreffer('gegenstaende')">
+        <template #titel>
           <span class="fw-semibold htbah-zufall-karten-titel">
             <span class="material-symbols-outlined" aria-hidden="true">deployed_code</span>
             Gegenstände
           </span>
-          <div class="d-flex flex-wrap gap-2">
+        </template>
+        <template #aktionen>
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('gegenstaende')">
               Leeren
             </button>
@@ -3377,9 +3629,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               aria-label="Eintrag hinzufügen">
               Hinzufügen
             </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
+        </template>
           <div class="p-2 border-bottom">
             <input
               v-model.trim="sucheGegenstaende"
@@ -3512,13 +3762,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+      </zufallstabellen-sektion>
 
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">✨ Pantheon</span>
-          <div class="d-flex flex-wrap gap-2 align-items-center">
+      <zufallstabellen-sektion
+        section-id="pantheon"
+        aria-titel="Pantheon"
+        :suche-steuerung-aktiv="sektionSucheAktiv('pantheon')"
+        :suche-hat-treffer="sektionSucheHatTreffer('pantheon')">
+        <template #titel><span class="fw-semibold">✨ Pantheon</span></template>
+        <template #aktionen>
             <button type="button" class="btn btn-sm btn-outline-secondary" @click="pantheonExportieren" title="Nur Pantheon als JSON">
               Export
             </button>
@@ -3541,9 +3793,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               aria-label="Eintrag hinzufügen">
               Hinzufügen
             </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
+        </template>
           <div class="p-2 border-bottom">
             <input
               v-model.trim="suchePantheon"
@@ -3683,13 +3933,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+      </zufallstabellen-sektion>
 
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span class="fw-semibold">🧩 Rätsel</span>
-          <div class="d-flex flex-wrap gap-2">
+      <zufallstabellen-sektion
+        section-id="raetsel"
+        aria-titel="Rätsel"
+        :suche-steuerung-aktiv="sektionSucheAktiv('raetsel')"
+        :suche-hat-treffer="sektionSucheHatTreffer('raetsel')">
+        <template #titel><span class="fw-semibold">🧩 Rätsel</span></template>
+        <template #aktionen>
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('raetsel')">
               Leeren
             </button>
@@ -3701,9 +3953,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               aria-label="Eintrag hinzufügen">
               Hinzufügen
             </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
+        </template>
           <div class="p-2 border-bottom">
             <input
               v-model.trim="sucheRaetsel"
@@ -3863,16 +4113,20 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+      </zufallstabellen-sektion>
 
-      <div class="card mb-3 text-start">
-        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <zufallstabellen-sektion
+        section-id="bestien"
+        aria-titel="Bestarium"
+        :suche-steuerung-aktiv="sektionSucheAktiv('bestien')"
+        :suche-hat-treffer="sektionSucheHatTreffer('bestien')">
+        <template #titel>
           <span class="fw-semibold htbah-zufall-karten-titel">
             <span class="material-symbols-outlined" aria-hidden="true">pets</span>
             Bestarium
           </span>
-          <div class="d-flex flex-wrap gap-2">
+        </template>
+        <template #aktionen>
             <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('bestien')">
               Leeren
             </button>
@@ -3884,9 +4138,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               aria-label="Eintrag hinzufügen">
               Hinzufügen
             </icon-text-button>
-          </div>
-        </div>
-        <div class="card-body p-0">
+        </template>
           <div class="p-2 border-bottom">
             <input
               v-model.trim="sucheBestien"
@@ -4077,8 +4329,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+      </zufallstabellen-sektion>
 
       <div class="abstandshalter" aria-hidden="true"></div>
 
@@ -4089,9 +4340,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         :zufallsgenerator-bereit="zufallsgeneratorBereit"
         :zufall-npc-epoche="zufallNpcEpoche"
         :zufall-gegenstand-epoche="zufallGegenstandEpoche"
-        :zufall-gegenstand-kleidung="zufallGegenstandKleidung"
         :zufall-fraktion-epoche="zufallFraktionEpoche"
         :zufall-raetsel-epoche="zufallRaetselEpoche"
+        :zufall-ort-epoche="zufallOrtEpoche"
+        :zufall-pantheon-epoche="zufallPantheonEpoche"
+        :zufall-bestie-epoche="zufallBestieEpoche"
         :pantheon-namen-liste="pantheonNamenListe"
         :fraktionen-mit-namen="fraktionenMitNamen"
         :orte-namen-liste="orteNamenListe"
@@ -4104,6 +4357,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @npc-refresh-field="npcFeldNeuWuerfeln"
         @npc-wizard="npcWizardOeffnen"
         @bestien-wizard="bestienWizardOeffnen"
+        @ort-wizard="ortWizardOeffnen"
+        @fraktion-wizard="fraktionWizardOeffnen"
+        @raetsel-wizard="raetselWizardOeffnen"
+        @pantheon-wizard="pantheonWizardOeffnen"
+        @gegenstand-wizard="gegenstandWizardOeffnen"
         @welt-open="zeileInWeltOeffnen"
         @media-upload="onBearbeitungsMedienDateienGewaehlt"
         @media-remove="mediumAusBearbeitungEntfernen"
@@ -4115,9 +4373,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @inventar-save="onInventarZeileGespeichert"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"
         @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
-        @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
         @update:zufallFraktionEpoche="zufallFraktionEpoche = $event"
-        @update:zufallRaetselEpoche="zufallRaetselEpoche = $event" />
+        @update:zufallRaetselEpoche="zufallRaetselEpoche = $event"
+        @update:zufallOrtEpoche="zufallOrtEpoche = $event"
+        @update:zufallPantheonEpoche="zufallPantheonEpoche = $event"
+        @update:zufallBestieEpoche="zufallBestieEpoche = $event" />
 
       <zufallstabellen-zeile-modal
         :anlage="{ offen: !!bearbeitungOverlay, typ: bearbeitungOverlay ? bearbeitungOverlay.typ : '', zeile: bearbeitungOverlay ? bearbeitungOverlay.zeile : null }"
@@ -4126,9 +4386,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         :zufallsgenerator-bereit="zufallsgeneratorBereit"
         :zufall-npc-epoche="zufallNpcEpoche"
         :zufall-gegenstand-epoche="zufallGegenstandEpoche"
-        :zufall-gegenstand-kleidung="zufallGegenstandKleidung"
         :zufall-fraktion-epoche="zufallFraktionEpoche"
         :zufall-raetsel-epoche="zufallRaetselEpoche"
+        :zufall-ort-epoche="zufallOrtEpoche"
+        :zufall-pantheon-epoche="zufallPantheonEpoche"
+        :zufall-bestie-epoche="zufallBestieEpoche"
         :pantheon-namen-liste="pantheonNamenListe"
         :fraktionen-mit-namen="fraktionenMitNamen"
         :orte-namen-liste="orteNamenListe"
@@ -4141,6 +4403,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @npc-refresh-field="overlayNpcFeldNeuWuerfeln"
         @npc-wizard="overlayNpcWizardOeffnen"
         @bestien-wizard="overlayBestienWizardOeffnen"
+        @ort-wizard="overlayOrtWizardOeffnen"
+        @fraktion-wizard="overlayFraktionWizardOeffnen"
+        @raetsel-wizard="overlayRaetselWizardOeffnen"
+        @pantheon-wizard="overlayPantheonWizardOeffnen"
+        @gegenstand-wizard="overlayGegenstandWizardOeffnen"
         @welt-open="overlayZeileInWeltOeffnen"
         @media-upload="overlayMediaUpload"
         @media-remove="overlayMediaRemove"
@@ -4152,9 +4419,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         @inventar-save="onOverlayInventarZeileGespeichert"
         @update:zufallNpcEpoche="zufallNpcEpoche = $event"
         @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
-        @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
         @update:zufallFraktionEpoche="zufallFraktionEpoche = $event"
-        @update:zufallRaetselEpoche="zufallRaetselEpoche = $event" />
+        @update:zufallRaetselEpoche="zufallRaetselEpoche = $event"
+        @update:zufallOrtEpoche="zufallOrtEpoche = $event"
+        @update:zufallPantheonEpoche="zufallPantheonEpoche = $event"
+        @update:zufallBestieEpoche="zufallBestieEpoche = $event" />
       <parade-modal ref="paradeModal" />
       <schaden-modal ref="schadenModal" />
 
@@ -4239,6 +4508,31 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         ref="bestienWizardModal"
         modal-id="htbahZufallstabellenBestienWizard"
         @generieren="bestienWizardUebernehmen" />
+
+      <ort-wizard-modal
+        ref="ortWizardModal"
+        modal-id="htbahZufallstabellenOrtWizard"
+        @generieren="ortWizardUebernehmen" />
+
+      <fraktion-wizard-modal
+        ref="fraktionWizardModal"
+        modal-id="htbahZufallstabellenFraktionWizard"
+        @generieren="fraktionWizardUebernehmen" />
+
+      <raetsel-wizard-modal
+        ref="raetselWizardModal"
+        modal-id="htbahZufallstabellenRaetselWizard"
+        @generieren="raetselWizardUebernehmen" />
+
+      <pantheon-wizard-modal
+        ref="pantheonWizardModal"
+        modal-id="htbahZufallstabellenPantheonWizard"
+        @generieren="pantheonWizardUebernehmen" />
+
+      <gegenstand-wizard-modal
+        ref="gegenstandWizardModal"
+        modal-id="htbahZufallstabellenGegenstandWizard"
+        @generieren="gegenstandWizardUebernehmen" />
     </div>
   `,
 };

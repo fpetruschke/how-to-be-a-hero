@@ -1030,12 +1030,15 @@ function normalisiereZufallstabellenGegenstandZeile(z) {
   return {
     id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
     name: typeof z.name === 'string' ? z.name : '',
+    kategorie: ['waffe', 'kleidung', 'sonstiges'].includes(z.kategorie) ? z.kategorie : '',
     beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
     aufenthaltsort: typeof z.aufenthaltsort === 'string' ? z.aufenthaltsort : '',
     inGegenstandId: typeof z.inGegenstandId === 'string' ? z.inGegenstandId.trim() : '',
     besitzerTyp: typeof z.besitzerTyp === 'string' ? z.besitzerTyp.trim() : '',
     besitzerId: typeof z.besitzerId === 'string' ? z.besitzerId.trim() : '',
-    initiative: typeof z.initiative === 'string' ? z.initiative : '',
+    istWaffe: Boolean(z.istWaffe),
+    schadenswertNahkampf: typeof z.schadenswertNahkampf === 'string' ? z.schadenswertNahkampf : '',
+    schadenswertFernkampf: typeof z.schadenswertFernkampf === 'string' ? z.schadenswertFernkampf : '',
     fraktionen: Array.isArray(z.fraktionen)
       ? z.fraktionen.map((f) => (typeof f === 'string' ? f.trim() : '')).filter(Boolean)
       : [],

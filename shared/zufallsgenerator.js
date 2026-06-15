@@ -22,10 +22,10 @@ window.HTBAH = window.HTBAH || {};
   window.HTBAH.Zufallsgenerator = {
     EPOCHE: U ? U.EPOCHE : {},
     npc: (opts) => npc.generiere(opts || {}),
-    ort: () => ort.generiere(),
+    ort: (opts) => ort.generiere(opts || {}),
     gegenstand: (opts) => gegenstand.generiere(opts || {}),
     fraktion: (opts) => fraktion.generiere(opts || {}),
-    pantheon: () => pantheon.generiere(),
+    pantheon: (opts) => pantheon.generiere(opts || {}),
     raetsel: (opts) => raetsel.generiere(opts || {}),
     bestie: (opts) => bestie.generiere(opts || {}),
   };

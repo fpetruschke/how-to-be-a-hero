@@ -7,6 +7,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
     InventarEditorPanel: window.HTBAH_KOMPONENTEN.InventarEditorPanel,
+    HtmlFeldQuillEditor: window.HTBAH_KOMPONENTEN.HtmlFeldQuillEditor,
     FaehigkeitenEditorPanel: window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel,
     FaehigkeitenKompaktPanel: window.HTBAH_KOMPONENTEN.FaehigkeitenKompaktPanel,
     EntityKartenIconFeld: window.HTBAH_KOMPONENTEN.EntityKartenIconFeld,
@@ -21,9 +22,11 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     zufallsgeneratorBereit: { type: Boolean, default: false },
     zufallNpcEpoche: { type: String, default: 'mittelalter' },
     zufallGegenstandEpoche: { type: String, default: 'mittelalter' },
-    zufallGegenstandKleidung: { type: Boolean, default: true },
     zufallFraktionEpoche: { type: String, default: 'mittelalter' },
     zufallRaetselEpoche: { type: String, default: 'mittelalter' },
+    zufallOrtEpoche: { type: String, default: 'mittelalter' },
+    zufallPantheonEpoche: { type: String, default: 'mittelalter' },
+    zufallBestieEpoche: { type: String, default: 'mittelalter' },
     pantheonNamenListe: { type: Array, default: () => [] },
     fraktionenMitNamen: { type: Array, default: () => [] },
     orteNamenListe: { type: Array, default: () => [] },
@@ -48,12 +51,19 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     'duplicate',
     'update:zufallNpcEpoche',
     'update:zufallGegenstandEpoche',
-    'update:zufallGegenstandKleidung',
     'update:zufallFraktionEpoche',
     'update:zufallRaetselEpoche',
+    'update:zufallOrtEpoche',
+    'update:zufallPantheonEpoche',
+    'update:zufallBestieEpoche',
     'npc-refresh-field',
     'npc-wizard',
     'bestien-wizard',
+    'ort-wizard',
+    'fraktion-wizard',
+    'raetsel-wizard',
+    'pantheon-wizard',
+    'gegenstand-wizard',
     'welt-open',
     'inventar-remove',
     'inventar-save',
@@ -72,6 +82,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       probeModalGeneration: 0,
       paradeModalGeneration: 0,
       schadenModalGeneration: 0,
+      zufallEpocheSelect: 'mittelalter',
     };
   },
   computed: {
@@ -173,14 +184,19 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       return window.HTBAH.berechneLebenspunkteStatus(zeile);
     },
-    zeigtRandomAlsDropdown() {
+    zeigtWizardMenue() {
+      if (!this.randomSichtbar || !this.randomWizardVerfuegbar) {
+        return false;
+      }
+      const typ = this.anlage && this.anlage.typ;
+      return ['npc', 'bestie', 'ort', 'fraktion', 'raetsel', 'pantheon', 'gegenstand'].includes(typ);
+    },
+    zeigtZufallEpochenAuswahl() {
       if (!this.randomSichtbar) {
         return false;
       }
       const typ = this.anlage && this.anlage.typ;
-      return (
-        this.randomWizardVerfuegbar && (typ === 'npc' || typ === 'bestie')
-      );
+      return ['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand'].includes(typ);
     },
     kampfZustandOptionen() {
       return [
@@ -195,6 +211,63 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     },
     kartenIconModalSuffix() {
       return this.interaktiveWeltBearbeitung ? 'iw' : 'zst';
+    },
+    notizenBereichTitel() {
+      const typ = this.anlage && this.anlage.typ;
+      if (typ === 'npc') {
+        return '📝 Notizen';
+      }
+      if (typ === 'pantheon') {
+        return '📝 Notizen & Mythos';
+      }
+      if (typ === 'raetsel') {
+        return '📝 Notizen';
+      }
+      if (typ === 'bestie') {
+        return '📝 Lebensraum, Lebensweise und Legende';
+      }
+      if (typ === 'ort') {
+        return '📝 Beschreibung / Notizen';
+      }
+      return '📝 Beschreibung';
+    },
+    gegenstandArtKategorie() {
+      const z = this.anlage && this.anlage.zeile;
+      if (!z) {
+        return 'sonstiges';
+      }
+      const kat = typeof z.kategorie === 'string' ? z.kategorie.trim() : '';
+      if (kat === 'waffe' || kat === 'kleidung' || kat === 'sonstiges') {
+        return kat;
+      }
+      if (z.istWaffe) {
+        return 'waffe';
+      }
+      return 'sonstiges';
+    },
+    gegenstandArtLabel() {
+      const k = this.gegenstandArtKategorie;
+      if (k === 'waffe') {
+        return 'Waffe';
+      }
+      if (k === 'kleidung') {
+        return 'Kleidung';
+      }
+      return 'Gegenstand';
+    },
+    gegenstandArtBadgeClass() {
+      const k = this.gegenstandArtKategorie;
+      if (k === 'waffe') {
+        return 'inventar-typ-badge text-bg-warning';
+      }
+      if (k === 'kleidung') {
+        return 'inventar-typ-badge text-bg-info';
+      }
+      return 'inventar-typ-badge text-bg-secondary';
+    },
+    pantheonQuillEditorKey() {
+      const id = this.anlage && this.anlage.zeile && this.anlage.zeile.id ? this.anlage.zeile.id : 'neu';
+      return String(id);
     },
   },
   watch: {
@@ -254,6 +327,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       this.fraktionOrtEingabe = '';
       if (offen) {
+        this.synchronisiereZufallEpocheSelect();
         this.aktiverBearbeitungsTab = 'daten';
         this.kampfZustandSyncAusLpAktiv = false;
         this.initialisiereKampfZustandBeiOeffnen();
@@ -757,6 +831,68 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       }
       this.$emit('edit-blur');
     },
+    zufallEpochePropNameFuerTyp(typ) {
+      const map = {
+        npc: 'zufallNpcEpoche',
+        ort: 'zufallOrtEpoche',
+        fraktion: 'zufallFraktionEpoche',
+        pantheon: 'zufallPantheonEpoche',
+        raetsel: 'zufallRaetselEpoche',
+        bestie: 'zufallBestieEpoche',
+        gegenstand: 'zufallGegenstandEpoche',
+      };
+      return map[typ] || '';
+    },
+    zufallEpocheEmitFuerTyp(typ) {
+      const map = {
+        npc: 'update:zufallNpcEpoche',
+        ort: 'update:zufallOrtEpoche',
+        fraktion: 'update:zufallFraktionEpoche',
+        pantheon: 'update:zufallPantheonEpoche',
+        raetsel: 'update:zufallRaetselEpoche',
+        bestie: 'update:zufallBestieEpoche',
+        gegenstand: 'update:zufallGegenstandEpoche',
+      };
+      return map[typ] || '';
+    },
+    synchronisiereZufallEpocheSelect() {
+      const typ = this.anlage && this.anlage.typ;
+      const prop = this.zufallEpochePropNameFuerTyp(typ);
+      if (!prop || this.zufallEpocheSelect === 'zufaellig') {
+        return;
+      }
+      const ep = this[prop];
+      if (typeof ep === 'string' && ep.trim()) {
+        this.zufallEpocheSelect = ep.trim();
+      }
+    },
+    aufgeloesteZufallEpoche() {
+      if (this.zufallEpocheSelect === 'zufaellig') {
+        const optionen = ['mittelalter', 'gegenwart', 'zukunft'];
+        return optionen[Math.floor(Math.random() * optionen.length)];
+      }
+      return this.zufallEpocheSelect;
+    },
+    zufallEpochePropAktualisieren(epoche) {
+      const typ = this.anlage && this.anlage.typ;
+      const emitKey = this.zufallEpocheEmitFuerTyp(typ);
+      if (emitKey && epoche) {
+        this.$emit(emitKey, epoche);
+      }
+    },
+    onZufallEpocheSelectAendern() {
+      if (this.zufallEpocheSelect !== 'zufaellig') {
+        this.zufallEpochePropAktualisieren(this.zufallEpocheSelect);
+      }
+    },
+    zufallsvorschlagAusloesen() {
+      if (!this.zufallsgeneratorBereit) {
+        return;
+      }
+      const epoche = this.aufgeloesteZufallEpoche();
+      this.zufallEpochePropAktualisieren(epoche);
+      this.$emit('random', { epoche });
+    },
     npcAbhaengigkeitsLabel(feld) {
       if (feld === 'alter') {
         return 'mit Statur + LP + Inventar-Waffen';
@@ -840,44 +976,107 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <strong>{{ zeileModalTitel }}</strong>
           </span>
           <div class="d-flex align-items-center gap-2">
-            <div v-if="randomSichtbar && zeigtRandomAlsDropdown" class="dropdown">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary dropdown-toggle"
-                :disabled="!zufallsgeneratorBereit"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-                aria-label="Aktionen">
-                ⚙️
-              </button>
-              <ul class="dropdown-menu dropdown-menu-end">
-                <li>
-                  <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('random')">
-                    🎲 Zufallsvorschlag
-                  </button>
-                </li>
-                <li v-if="anlage.typ === 'npc'">
-                  <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('npc-wizard')">
-                    🧙 Wizard …
-                  </button>
-                </li>
-                <li v-if="anlage.typ === 'bestie'">
-                  <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('bestien-wizard')">
-                    🧙 Wizard …
-                  </button>
-                </li>
-              </ul>
-            </div>
-            <button
-              v-else-if="randomSichtbar"
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              :disabled="!zufallsgeneratorBereit"
-              title="Zufallsvorschlag"
-              aria-label="Zufallsvorschlag"
-              @click="$emit('random')">
-              🎲
-            </button>
+            <template v-if="randomSichtbar && zeigtZufallEpochenAuswahl">
+              <div v-if="zeigtWizardMenue" class="dropdown">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                  :disabled="!zufallsgeneratorBereit"
+                  data-bs-toggle="dropdown"
+                  data-bs-auto-close="true"
+                  aria-expanded="false"
+                  aria-label="Zufall und Wizard">
+                  <span aria-hidden="true">🎲</span>
+                  <span class="d-none d-md-inline ms-1">Zufall</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end htbah-zufallsvorschlag-dropdown-menu">
+                  <li class="px-2 py-2 htbah-zufallsvorschlag-dropdown-panel" @click.stop>
+                    <label class="form-label small text-secondary mb-1">Epoche</label>
+                    <div class="input-group input-group-sm htbah-zufallsvorschlag-gruppe">
+                      <select
+                        class="form-select"
+                        v-model="zufallEpocheSelect"
+                        :disabled="!zufallsgeneratorBereit"
+                        aria-label="Epoche für Zufallsvorschlag"
+                        @change="onZufallEpocheSelectAendern">
+                        <option value="zufaellig">Zufällig</option>
+                        <option value="mittelalter">Mittelalter</option>
+                        <option value="gegenwart">Gegenwart</option>
+                        <option value="zukunft">Zukunft</option>
+                      </select>
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary text-nowrap"
+                        :disabled="!zufallsgeneratorBereit"
+                        title="Zufallsvorschlag"
+                        @click="zufallsvorschlagAusloesen">
+                        <span aria-hidden="true">🎲</span>
+                        <span class="d-none d-md-inline ms-1">Vorschlag</span>
+                      </button>
+                    </div>
+                  </li>
+                  <li><hr class="dropdown-divider my-1" /></li>
+                  <li v-if="anlage.typ === 'npc'">
+                    <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('npc-wizard')">
+                      🧙 Wizard …
+                    </button>
+                  </li>
+                  <li v-if="anlage.typ === 'bestie'">
+                    <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('bestien-wizard')">
+                      🧙 Wizard …
+                    </button>
+                  </li>
+                  <li v-if="anlage.typ === 'ort'">
+                    <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('ort-wizard')">
+                      🧙 Wizard …
+                    </button>
+                  </li>
+                  <li v-if="anlage.typ === 'fraktion'">
+                    <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('fraktion-wizard')">
+                      🧙 Wizard …
+                    </button>
+                  </li>
+                  <li v-if="anlage.typ === 'raetsel'">
+                    <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('raetsel-wizard')">
+                      🧙 Wizard …
+                    </button>
+                  </li>
+                  <li v-if="anlage.typ === 'pantheon'">
+                    <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('pantheon-wizard')">
+                      🧙 Wizard …
+                    </button>
+                  </li>
+                  <li v-if="anlage.typ === 'gegenstand'">
+                    <button type="button" class="dropdown-item" :disabled="!zufallsgeneratorBereit" @click="$emit('gegenstand-wizard')">
+                      🧙 Wizard …
+                    </button>
+                  </li>
+                </ul>
+              </div>
+              <div v-else class="input-group input-group-sm htbah-zufallsvorschlag-gruppe">
+                <select
+                  class="form-select"
+                  v-model="zufallEpocheSelect"
+                  :disabled="!zufallsgeneratorBereit"
+                  aria-label="Epoche für Zufallsvorschlag"
+                  @change="onZufallEpocheSelectAendern">
+                  <option value="zufaellig">Zufällig</option>
+                  <option value="mittelalter">Mittelalter</option>
+                  <option value="gegenwart">Gegenwart</option>
+                  <option value="zukunft">Zukunft</option>
+                </select>
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary text-nowrap"
+                  :disabled="!zufallsgeneratorBereit"
+                  title="Zufallsvorschlag"
+                  aria-label="Zufallsvorschlag"
+                  @click="zufallsvorschlagAusloesen">
+                  <span aria-hidden="true">🎲</span>
+                  <span class="d-none d-md-inline ms-1">Zufallsvorschlag</span>
+                </button>
+              </div>
+            </template>
             <button
               type="button"
               class="regelwerk-icon-button"
@@ -1201,16 +1400,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         <template v-else-if="anlage.typ === 'fraktion'">
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
-            <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
-              <div class="col-md-6">
-                <label class="form-label small text-secondary mb-1">Epoche für Namensvorschlag</label>
-                <select class="form-select form-select-sm" :value="zufallFraktionEpoche" @change="$emit('update:zufallFraktionEpoche', $event.target.value)">
-                  <option value="mittelalter">Mittelalter</option>
-                  <option value="gegenwart">Gegenwart</option>
-                  <option value="zukunft">Zukunft</option>
-                </select>
-              </div>
-            </div>
             <div class="row g-2">
               <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.art" placeholder=" " /><label>Art (z. B. Gilde, Partei, Bande)</label></div></div>
               <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div></div>
@@ -1272,37 +1461,81 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
           </section>
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🕯️ Wesen & Lehre</h6>
-            <div class="row g-2">
-              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.charakter" placeholder=" "></textarea><label>Charakter (z. B. rachsüchtig, gütig)</label></div></div>
-              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.staerke" placeholder=" "></textarea><label>Stärken</label></div></div>
-              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.schwaeche" placeholder=" "></textarea><label>Schwächen</label></div></div>
+            <div class="row g-2 mb-2">
+              <div class="col-12">
+                <label class="form-label small text-secondary mb-1">Charakter (z. B. rachsüchtig, gütig)</label>
+                <html-feld-quill-editor
+                  :key="'pantheon-charakter-' + pantheonQuillEditorKey"
+                  v-model="anlage.zeile.charakter"
+                  :editor-key="'pantheon-charakter-' + pantheonQuillEditorKey"
+                  placeholder="Charakter der Gottheit beschreiben …" />
+              </div>
+            </div>
+            <div class="table-responsive rounded border border-secondary border-opacity-25 vor-nachteile-karte-wrap">
+              <table class="table table-sm mb-0 inventar-tabelle vor-nachteile-tabelle vor-nachteile-karte-tabelle pantheon-staerken-tabelle">
+                <thead>
+                  <tr>
+                    <th scope="col" class="vn-col-vorteil">Stärken</th>
+                    <th scope="col" class="vn-col-nachteil">Schwächen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="vn-col-vorteil align-top">
+                      <textarea
+                        class="form-control form-control-sm pantheon-staerken-feld"
+                        rows="4"
+                        v-model="anlage.zeile.staerke"
+                        placeholder="Stärken der Gottheit …"></textarea>
+                    </td>
+                    <td class="vn-col-nachteil align-top">
+                      <textarea
+                        class="form-control form-control-sm pantheon-staerken-feld"
+                        rows="4"
+                        v-model="anlage.zeile.schwaeche"
+                        placeholder="Schwächen der Gottheit …"></textarea>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </section>
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🙏 Kultbezug</h6>
-            <div class="row g-2">
-              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.schutzpatronat" placeholder=" "></textarea><label>Schutzpatronat (wer / was)</label></div></div>
-              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.verlangen" placeholder=" "></textarea><label>Was verlangt sie (Opfer, Gebote)</label></div></div>
-              <div class="col-md-6"><div class="form-floating"><textarea class="form-control" style="height:4.5rem" v-model="anlage.zeile.mythosGaben" placeholder=" "></textarea><label>Mythos: Was wird erzählt, dass sie geben würde</label></div></div>
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label small text-secondary mb-1">Schutzpatronat (wer / was)</label>
+                <html-feld-quill-editor
+                  :key="'pantheon-schutz-' + pantheonQuillEditorKey"
+                  v-model="anlage.zeile.schutzpatronat"
+                  :editor-key="'pantheon-schutz-' + pantheonQuillEditorKey"
+                  placeholder="Schutzpatronat …" />
+              </div>
+              <div class="col-12">
+                <label class="form-label small text-secondary mb-1">Was verlangt sie (Opfer, Gebote)</label>
+                <html-feld-quill-editor
+                  :key="'pantheon-verlangen-' + pantheonQuillEditorKey"
+                  v-model="anlage.zeile.verlangen"
+                  :editor-key="'pantheon-verlangen-' + pantheonQuillEditorKey"
+                  placeholder="Opfer, Gebote, Erwartungen …" />
+              </div>
+              <div class="col-12">
+                <label class="form-label small text-secondary mb-1">Mythos: Was wird erzählt, dass sie geben würde</label>
+                <html-feld-quill-editor
+                  :key="'pantheon-mythos-' + pantheonQuillEditorKey"
+                  v-model="anlage.zeile.mythosGaben"
+                  :editor-key="'pantheon-mythos-' + pantheonQuillEditorKey"
+                  placeholder="Mythische Gaben und Legenden …" />
+              </div>
             </div>
           </section>
         </template>
         <template v-else-if="anlage.typ === 'raetsel'">
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
-            <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
-              <div class="col-md-6">
-                <label class="form-label small text-secondary mb-1">Epoche für Zufallsvorschlag</label>
-                <select class="form-select form-select-sm" :value="zufallRaetselEpoche" @change="$emit('update:zufallRaetselEpoche', $event.target.value)">
-                  <option value="mittelalter">Mittelalter</option>
-                  <option value="gegenwart">Gegenwart</option>
-                  <option value="zukunft">Zukunft</option>
-                </select>
-              </div>
-              <div class="col-md-6 small text-secondary align-self-end">
-                Namen aus den Tabellen „Orte“ und „NPCs“ können im Ergebnistext vorkommen, wenn Einträge existieren.
-              </div>
-            </div>
+            <p v-if="randomSichtbar" class="small text-secondary mb-2">
+              Namen aus den Tabellen „Orte“ und „NPCs“ können im Ergebnistext vorkommen, wenn Einträge existieren.
+            </p>
             <div class="row g-2">
               <div class="col-md-6"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.art" placeholder=" " /><label>Art (z. B. Licht- & Spiegelpuzzle)</label></div></div>
               <div class="col-md-6"><div class="input-group"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.titel" placeholder=" " /><label>Titel / Stichwort</label></div><button v-if="kannInWeltOeffnen" type="button" class="btn btn-outline-secondary htbah-input-icon-btn" title="In interaktiver Welt öffnen" aria-label="In interaktiver Welt öffnen" @click="inWeltOeffnen">🌍</button></div></div>
@@ -1416,16 +1649,8 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         <template v-else-if="anlage.typ === 'gegenstand'">
           <section class="htbah-entitaet-bereich">
             <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
-            <div class="row g-2 mb-2 align-items-end" v-if="randomSichtbar">
-              <div class="col-md-6">
-                <label class="form-label small text-secondary mb-1">Epoche für Zufallsvorschlag</label>
-                <select class="form-select form-select-sm" :value="zufallGegenstandEpoche" @change="$emit('update:zufallGegenstandEpoche', $event.target.value)">
-                  <option value="mittelalter">Mittelalter</option>
-                  <option value="gegenwart">Gegenwart</option>
-                  <option value="zukunft">Zukunft</option>
-                </select>
-              </div>
-              <div class="col-md-6"><div class="form-check mt-3"><input class="form-check-input" type="checkbox" :checked="zufallGegenstandKleidung" @change="$emit('update:zufallGegenstandKleidung', $event.target.checked)" id="wb-zg-kleid" /><label class="form-check-label small" for="wb-zg-kleid">Kleidung als Kategorie zulassen</label></div></div>
+            <div class="mb-2">
+              <span class="badge rounded-pill" :class="gegenstandArtBadgeClass">{{ gegenstandArtLabel }}</span>
             </div>
             <div class="row g-2">
               <div class="col-12"><div class="input-group"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.name" placeholder=" " /><label>Name</label></div><button v-if="kannInWeltOeffnen" type="button" class="btn btn-outline-secondary htbah-input-icon-btn" title="In interaktiver Welt öffnen" aria-label="In interaktiver Welt öffnen" @click="inWeltOeffnen">🌍</button></div></div>
@@ -1436,7 +1661,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <label class="form-label small text-secondary mb-1" for="wb-zg-ort">Aufenthaltsort</label>
             <input
               id="wb-zg-ort"
-              class="form-control mb-3"
+              class="form-control"
               v-model="anlage.zeile.aufenthaltsort"
               :list="orteNamenListe.length ? 'wb-zg-ort-datalist' : undefined"
               placeholder="Ort wählen oder Freitext"
@@ -1444,25 +1669,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <datalist v-if="orteNamenListe.length" id="wb-zg-ort-datalist">
               <option v-for="ort in orteNamenListe" :key="'wb-zg-ort-' + ort" :value="ort"></option>
             </datalist>
-            <label class="form-label small text-secondary mb-1">Initiative</label>
-            <div class="input-group mb-1">
-              <input
-                class="form-control"
-                type="number"
-                min="1"
-                max="50"
-                v-model="anlage.zeile.initiative"
-                placeholder="z. B. 9"
-                inputmode="numeric"
-                autocomplete="off" />
-              <button
-                type="button"
-                class="btn btn-outline-secondary"
-                :disabled="!String(anlage.zeile.initiative || '').trim()"
-                @click="anlage.zeile.initiative = ''">
-                Leeren
-              </button>
-            </div>
           </section>
         </template>
         </div>
@@ -1529,17 +1735,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             @change="inventarZeileGespeichert" />
         </section>
 
-        <div v-if="zeigtDatenTab">
-        <label class="form-label mt-3 mb-1" v-if="anlage.typ === 'npc'">Notizen</label>
-        <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'pantheon'">Notizen & Mythos</label>
-        <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'raetsel'">Notizen</label>
-        <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'bestie'">Lebensraum, Lebensweise und Legende</label>
-        <label class="form-label mt-3 mb-1" v-else-if="anlage.typ === 'ort'">Beschreibung / Notizen</label>
-        <label class="form-label mt-3 mb-1" v-else>Beschreibung</label>
-        <div class="zufallstabellen-quill-wrap" :key="'wb-zeile-q-' + zeileQuillSession">
-          <div :ref="zeileQuillHostRefFn" class="quill-editor-host zufallstabellen-quill-host entitaet-quill-editor-host"></div>
-        </div>
-        </div>
+        <section v-if="zeigtDatenTab" class="htbah-entitaet-bereich mt-3">
+          <h6 class="htbah-entitaet-bereich-titel">{{ notizenBereichTitel }}</h6>
+          <div class="zufallstabellen-quill-wrap" :key="'wb-zeile-q-' + zeileQuillSession">
+            <div :ref="zeileQuillHostRefFn" class="quill-editor-host zufallstabellen-quill-host entitaet-quill-editor-host"></div>
+          </div>
+        </section>
         <div class="d-flex justify-content-between align-items-center gap-2 mt-3">
           <div class="d-flex gap-2">
             <button v-if="kannDuplizieren" type="button" class="btn btn-sm btn-outline-primary" @click="$emit('duplicate')">Duplizieren</button>

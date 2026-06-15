@@ -233,9 +233,11 @@ var HTBAH_REFACTOR_UTILS =
             : false,
         zufallNpcEpoche: 'mittelalter',
         zufallGegenstandEpoche: 'mittelalter',
-        zufallGegenstandKleidung: true,
         zufallFraktionEpoche: 'mittelalter',
         zufallRaetselEpoche: 'mittelalter',
+        zufallOrtEpoche: 'mittelalter',
+        zufallPantheonEpoche: 'mittelalter',
+        zufallBestieEpoche: 'mittelalter',
         zeileQuillInstanz: null,
         zeileMentionController: null,
         zeileQuillSelectionHandler: null,
@@ -5609,11 +5611,14 @@ var HTBAH_REFACTOR_UTILS =
         const zeile = {
           id: window.HTBAH.neueEntropieId(),
           name: '',
+          kategorie: '',
           aufenthaltsort: ortDefault,
           inGegenstandId: '',
           besitzerTyp: '',
           besitzerId: '',
-          initiative: '',
+          istWaffe: false,
+          schadenswertNahkampf: '',
+          schadenswertFernkampf: '',
           beschreibungHtml: '',
           medien: [],
           primaryMediumId: '',
@@ -5710,40 +5715,47 @@ var HTBAH_REFACTOR_UTILS =
         this.zeileQuillSession += 1;
         this.$nextTick(() => this.setzeAnlageBearbeitungSnapshot('anlage'));
       },
-      zufallsvorschlagUebernehmen() {
+      zufallsvorschlagUebernehmen(payload) {
         if (!this.anlage.zeile || !this.anlage.typ || !this.zufallsgeneratorBereit) {
           return;
         }
         const G = window.HTBAH && window.HTBAH.Zufallsgenerator;
         const typ = this.anlage.typ;
         const z = this.anlage.zeile;
+        const epocheAusEvent =
+          payload && payload.epoche ? String(payload.epoche).trim() : '';
         let felder = {};
         if (typ === 'npc') {
           const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
           const fraktionNamen = (this.zustand.fraktionen || []).map((f) => (f && f.name ? String(f.name) : ''));
           const pantheonNamen = (this.zustand.pantheon || []).map((p) => (p && p.name ? String(p.name) : ''));
-          felder = G.npc({ epoche: this.zufallNpcEpoche, orteNamen, fraktionNamen, pantheonNamen });
+          felder = G.npc({
+            epoche: epocheAusEvent || this.zufallNpcEpoche,
+            orteNamen,
+            fraktionNamen,
+            pantheonNamen,
+          });
         } else if (typ === 'ort') {
-          felder = G.ort();
+          felder = G.ort({ epoche: epocheAusEvent || this.zufallOrtEpoche });
         } else if (typ === 'fraktion') {
-          felder = G.fraktion({ epoche: this.zufallFraktionEpoche });
+          felder = G.fraktion({ epoche: epocheAusEvent || this.zufallFraktionEpoche });
+        } else if (typ === 'pantheon') {
+          felder = G.pantheon({ epoche: epocheAusEvent || this.zufallPantheonEpoche });
         } else if (typ === 'bestie') {
-          const ep = z && z.epoche ? String(z.epoche) : 'mittelalter';
           const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
-          felder = G.bestie({ epoche: ep, orteNamen });
+          felder = G.bestie({ epoche: epocheAusEvent || this.zufallBestieEpoche, orteNamen });
         } else if (typ === 'raetsel') {
           const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
           const npcNamen = (this.zustand.npcs || []).map((n) => (n && n.name ? String(n.name) : ''));
           felder = G.raetsel({
-            epoche: this.zufallRaetselEpoche,
+            epoche: epocheAusEvent || this.zufallRaetselEpoche,
             orteNamen,
             npcNamen,
           });
         } else if (typ === 'gegenstand') {
           const orteNamen = (this.zustand.orte || []).map((o) => (o && o.name ? String(o.name) : ''));
           felder = G.gegenstand({
-            epoche: this.zufallGegenstandEpoche,
-            mitKleidung: this.zufallGegenstandKleidung,
+            epoche: epocheAusEvent || this.zufallGegenstandEpoche,
             orteNamen,
           });
         }
@@ -6263,8 +6275,8 @@ var HTBAH_REFACTOR_UTILS =
           this.$nextTick(() => this.refreshGraph());
         }
       },
-      zufallsvorschlagOverlayUebernehmen() {
-        this.withAnlageKontext('overlay', () => this.zufallsvorschlagUebernehmen());
+      zufallsvorschlagOverlayUebernehmen(payload) {
+        this.withAnlageKontext('overlay', () => this.zufallsvorschlagUebernehmen(payload));
       },
       onBearbeitungsMedienDateienOverlayGewaehlt(ev) {
         this.withAnlageKontext('overlay', () => this.onBearbeitungsMedienDateienGewaehlt(ev));
@@ -6836,8 +6848,6 @@ var HTBAH_REFACTOR_UTILS =
               : this.normalisiereBegabungswert(z.handeln);
           z.initiative = this.normalisiereInitiativeWert(z.initiative, handelnBeg);
           z.fraktionen = this.normalisiereFraktionenArray(z.fraktionen);
-        } else if (typ === 'gegenstand') {
-          z.initiative = this.normalisiereInitiativeWert(z.initiative, 40);
         }
         if (typ === 'ort') {
           if (index >= 0) {
@@ -7724,9 +7734,11 @@ var HTBAH_REFACTOR_UTILS =
           :zufallsgenerator-bereit="zufallsgeneratorBereit"
           :zufall-npc-epoche="zufallNpcEpoche"
           :zufall-gegenstand-epoche="zufallGegenstandEpoche"
-          :zufall-gegenstand-kleidung="zufallGegenstandKleidung"
           :zufall-fraktion-epoche="zufallFraktionEpoche"
           :zufall-raetsel-epoche="zufallRaetselEpoche"
+          :zufall-ort-epoche="zufallOrtEpoche"
+          :zufall-pantheon-epoche="zufallPantheonEpoche"
+          :zufall-bestie-epoche="zufallBestieEpoche"
           :pantheon-namen-liste="pantheonNamenListe"
           :fraktionen-mit-namen="fraktionenMitNamen"
           :orte-namen-liste="orteNamenListe"
@@ -7752,18 +7764,22 @@ var HTBAH_REFACTOR_UTILS =
           @karten-icon-change="onKartenIconGeaendert"
           @update:zufallNpcEpoche="zufallNpcEpoche = $event"
           @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
-          @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
           @update:zufallFraktionEpoche="zufallFraktionEpoche = $event"
-          @update:zufallRaetselEpoche="zufallRaetselEpoche = $event" />
+          @update:zufallRaetselEpoche="zufallRaetselEpoche = $event"
+          @update:zufallOrtEpoche="zufallOrtEpoche = $event"
+          @update:zufallPantheonEpoche="zufallPantheonEpoche = $event"
+          @update:zufallBestieEpoche="zufallBestieEpoche = $event" />
         <zufallstabellen-zeile-modal
           :anlage="anlageOverlay"
           :zeile-modal-titel="zeileModalTitelOverlay"
           :zufallsgenerator-bereit="zufallsgeneratorBereit"
           :zufall-npc-epoche="zufallNpcEpoche"
           :zufall-gegenstand-epoche="zufallGegenstandEpoche"
-          :zufall-gegenstand-kleidung="zufallGegenstandKleidung"
           :zufall-fraktion-epoche="zufallFraktionEpoche"
           :zufall-raetsel-epoche="zufallRaetselEpoche"
+          :zufall-ort-epoche="zufallOrtEpoche"
+          :zufall-pantheon-epoche="zufallPantheonEpoche"
+          :zufall-bestie-epoche="zufallBestieEpoche"
           :pantheon-namen-liste="pantheonNamenListe"
           :fraktionen-mit-namen="fraktionenMitNamen"
           :orte-namen-liste="orteNamenListe"
@@ -7789,9 +7805,11 @@ var HTBAH_REFACTOR_UTILS =
           @karten-icon-change="onKartenIconGeaendert"
           @update:zufallNpcEpoche="zufallNpcEpoche = $event"
           @update:zufallGegenstandEpoche="zufallGegenstandEpoche = $event"
-          @update:zufallGegenstandKleidung="zufallGegenstandKleidung = $event"
           @update:zufallFraktionEpoche="zufallFraktionEpoche = $event"
-          @update:zufallRaetselEpoche="zufallRaetselEpoche = $event" />
+          @update:zufallRaetselEpoche="zufallRaetselEpoche = $event"
+          @update:zufallOrtEpoche="zufallOrtEpoche = $event"
+          @update:zufallPantheonEpoche="zufallPantheonEpoche = $event"
+          @update:zufallBestieEpoche="zufallBestieEpoche = $event" />
         <weltenbau-bild-import-modal
           ref="weltenbauHintergrundImportModal"
           @fertig="onMapHintergrundImportFertig"

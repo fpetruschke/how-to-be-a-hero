@@ -48,6 +48,38 @@ window.HTBAH = window.HTBAH || {};
     return U.zufaellig(L.GEHEIMNIS_MITTELALTER);
   }
 
+  function listeFuerEpoche(epoche, basis, gegenwart, zukunft) {
+    if (epoche === E.GEGENWART) {
+      return gegenwart;
+    }
+    if (epoche === E.ZUKUNFT) {
+      return zukunft;
+    }
+    return basis;
+  }
+
+  function notizenHtmlFuerEpoche(epoche) {
+    const atmosphaere = U.zufaellig(
+      listeFuerEpoche(
+        epoche,
+        L.ATMOSPHAERE_NPC,
+        L.ATMOSPHAERE_NPC_GEGENWART,
+        L.ATMOSPHAERE_NPC_ZUKUNFT,
+      ),
+    );
+    const eindruck = U.zufaellig(
+      listeFuerEpoche(epoche, L.EINDRUCK, L.EINDRUCK_GEGENWART, L.EINDRUCK_ZUKUNFT),
+    );
+    const merkmal = U.zufaellig(
+      listeFuerEpoche(epoche, L.MERKMAL, L.MERKMAL_GEGENWART, L.MERKMAL_ZUKUNFT),
+    );
+    return [
+      `<p>${U.htmlEsc(atmosphaere)}</p>`,
+      `<p><strong>Eindruck:</strong> ${U.htmlEsc(eindruck)}.</p>`,
+      `<p><strong>Merkmal:</strong> ${U.htmlEsc(merkmal)}.</p>`,
+    ].join('');
+  }
+
   function berufsProfil(beruf) {
     const b = String(beruf || '').toLowerCase();
     const istWissen = ['gelehrter', 'bibliothekar', 'archivarin', 'wissenschaftler', 'it-administrator', 'programmierer', 'nanomediziner', 'heiler', 'schreiber'].some((s) => b.includes(s));
@@ -611,10 +643,7 @@ window.HTBAH = window.HTBAH || {};
       const fraktion = fraktionAusFraktionenListe(opts.fraktionNamen);
       const glaube = fraktionAusFraktionenListe(opts.pantheonNamen);
 
-      const notizenHtml = [
-        `<p><strong>Eindruck:</strong> ${U.htmlEsc(U.zufaellig(L.EINDRUCK))}.</p>`,
-        `<p><strong>Merkmal:</strong> ${U.htmlEsc(U.zufaellig(L.MERKMAL))}.</p>`,
-      ].join('');
+      const notizenHtml = notizenHtmlFuerEpoche(epoche);
 
       const faehigkeiten = faehigkeitenPatchAusKontext({
         epoche,

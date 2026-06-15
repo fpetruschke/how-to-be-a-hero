@@ -156,4 +156,116 @@ window.HTBAH.ZufallsgeneratorPantheonListen = {
     'Kinder sagen, sie lasse kleine Gaben unter Kissen — wenn man brav war.',
     'Skeptiker meinen, der Segen sei nur Disziplin — Gläubige lachen.',
   ],
+
+  KULT_STIMMUNG: [
+    'öffentlich geduldet, privat geliebt',
+    'nur in einer Region wirklich präsent',
+    'verboten — aber überall',
+    'elitär, teure Einweihung',
+    'volksnah, laut, farbenfroh',
+    'ritualisiert und streng hierarchisch',
+    'in den Adelshäusern präsent, im Dorf versteckt',
+    'von Wanderpredigern getragen',
+  ],
+
+  KULT_STIMMUNG_GEGENWART: [
+    'als Verein registriert — Glaube optional',
+    'online präsent, offline fragmentiert',
+    'nur noch ältere Generation aktiv',
+    'im Trend bei Jugendlichen',
+    'von Behörden toleriert, von Medien belächelt',
+    'mit Esoterik-Szene vermischt',
+    'streng abgeschottet, kaum öffentlich',
+    'spendet sichtbar — wirkt wohltätig',
+  ],
+
+  KULT_STIMMUNG_ZUKUNFT: [
+    'als KI-Kult offiziell anerkannt',
+    'nur in einer Kolonie präsent',
+    'verboten — aber in Datennetzen lebendig',
+    'elitär, nur mit Implantat-Zugang',
+    'volksnah über Holo-Predigten',
+    'von Söldnern und Piloten verehrt',
+    'ritualisiert in Druckkammern',
+    'von Wissenschaftlern als „Metapher“ abgetan',
+  ],
+
+  RIVALE: [
+    'eine Wassergottheit, mit der sie ewige Fehde hat',
+    'ein abtrünniger Heiliger, der als Dämon läuft',
+    'ein sterblicher Held, den sie neidisch macht',
+    'niemand — sie ist isoliert und seltsam',
+    'ein Schatten-Zwilling im Mythos',
+    'eine vergessene Schwestergottheit',
+    'ein sterblicher König, der sie einst betrog',
+    'ein Naturgeist ohne Namen',
+  ],
+
+  RIVALE_GEGENWART: [
+    'eine NGO, die den Kult „entzaubert“',
+    'ein Influencer-Priester einer Konkurrenz',
+    'ein skeptischer Wissenschaftler mit großer Reichweite',
+    'eine andere Glaubensgemeinschaft im selben Viertel',
+    'niemand Sichtbares — nur innere Spaltung',
+    'ein Skandal um alte Führungsfiguren',
+    'ein Medienbericht, der alles ins Wanken bringt',
+    'ein anonymes Online-Forum voller Häresie',
+  ],
+
+  RIVALE_ZUKUNFT: [
+    'eine KI-Gottheit aus einem anderen Sektor',
+    'ein abtrünniger Kult mit ähnlicher Domäne',
+    'ein sterblicher Admiral, der Segen verweigert',
+    'niemand — sie ist in Archiven fast gelöscht',
+    'ein Datenvirus, der Gebete verfälscht',
+    'eine Terraform-KI mit konkurrierender Agenda',
+    'ein Prophet, der behauptet, die Gottheit sei tot',
+    'ein Schwarzmarkt-Kult mit billigeren Wundern',
+  ],
+
+  ATMOSPHAERE: [
+    'Weihrauch und alte Lieder prägen den Tempel.',
+    'Pilger hinterlassen kleine Opfer am Rand des Weges.',
+    'Priester sprechen in Formeln, die niemand mehr versteht.',
+    'Das Symbol der Gottheit ist überall — diskret oder prunkvoll.',
+    'Gerüchte über Wunder halten den Glauben am Leben.',
+  ],
+
+  ATMOSPHAERE_GEGENWART: [
+    'Kerzen und LED-Lichter mischen sich in einem Hinterzimmer.',
+    'Ein Podcast zitiert die Gottheit — ironisch oder ernst?',
+    'Sticker und Schmuck tragen das heilige Zeichen.',
+    'Der Kult trifft sich samstags in einem Gemeindesaal.',
+    'Soziale Medien verbreiten Gebete schneller als Predigten.',
+  ],
+
+  ATMOSPHAERE_ZUKUNFT: [
+    'Holo-Altäre flackern in der Schwerelosigkeit.',
+    'Gebete werden als Datenpakete übertragen.',
+    'Das Symbol leuchtet auf Kuppeln ganzer Sektoren.',
+    'Pilger reisen per Shuttle — nicht zu Fuß.',
+    'Rituale mischen Archaik und Nanotechnologie.',
+  ],
+
+  SCHUTZPATRONAT_GEGENWART: [
+    'Programmierer und IT-Techniker',
+    'Kurierfahrer und Lieferdienste',
+    'Pflegekräfte und Sanitäter',
+    'Journalisten und Whistleblower',
+    'Startup-Gründer',
+    'Nachtschicht-Arbeiter',
+    'Straßenmusiker und Künstler',
+    'Ermittler und Detektive',
+  ],
+
+  SCHUTZPATRONAT_ZUKUNFT: [
+    'Frachterpiloten und Dockarbeiter',
+    'Terraform-Ingenieure',
+    'Kybernetik-Chirurgen',
+    'Schmuggler und Grenzgänger',
+    'KI-Moderatoren',
+    'Exo-Biologen',
+    'Kolonie-Gründer',
+    'Söldner vor dem Sprung',
+  ],
 };

@@ -626,4 +626,80 @@ window.HTBAH.ZufallsgeneratorNpcListen = {
     'spricht mit leisem Lispeln',
     'hat ein kleines Muttermal',
   ],
+
+  EINDRUCK_GEGENWART: [
+    'wirkt gestresst',
+    'wirkt professionell distanziert',
+    'wirkt influencer-haft selbstsicher',
+    'wirkt ständig auf dem Handy',
+    'wirkt müde vom Schichtdienst',
+    'wirkt freundlich, aber gehetzt',
+    'wirkt misstrauisch gegenüber Fremden',
+    'wirkt wie jemand mit Termindruck',
+    'wirkt cool und abgeklärt',
+    'wirkt leicht genervt',
+  ],
+
+  EINDRUCK_ZUKUNFT: [
+    'wirkt kybernetisch verstimmt',
+    'wirkt wie ein Veteran vieler Sektoren',
+    'wirkt distanziert durch Implantate',
+    'wirkt wachsam wie ein Sicherheitsoffizier',
+    'wirkt müde von Langzeitflügen',
+    'wirkt fremdartig ruhig',
+    'wirkt paranoid gegenüber KI',
+    'wirkt wie ein Schmuggler mit Manieren',
+    'wirkt fanatisch überzeugt',
+    'wirkt wie jemand unter Beobachtung',
+  ],
+
+  MERKMAL_GEGENWART: [
+    'AirPods immer im Ohr',
+    'auffällige Sneakers',
+    'Logo-Jacke einer Firma',
+    'Kaffeebecher in der Hand',
+    'Smartwatch am Handgelenk',
+    'Tattoo am Unterarm',
+    'Piercing in der Nase',
+    'Rucksack voller Kabel',
+    'leicht zittrige Hände vom Bildschirm',
+    'Markenbrille mit dicken Bügeln',
+  ],
+
+  MERKMAL_ZUKUNFT: [
+    'leuchtende Implantatlinie am Schläfe',
+    'synthetisches Auge',
+    'Atemfilter am Hals',
+    'Hologramm-Uhr am Handgelenk',
+    'Narbe von Druckkammer-Unfall',
+    'leise summende Prothese',
+    'fremdartige Hautimplantate',
+    'Uniformfetzen eines alten Korps',
+    'Datenport hinter dem Ohr',
+    'leicht schwebender Gang in Null-g',
+  ],
+
+  ATMOSPHAERE_NPC: [
+    'Man erinnert sich eher an die Stimme als an das Gesicht.',
+    'Die Kleidung verrät mehr als die Worte.',
+    'Um diese Person ranken sich kleine Gerüchte.',
+    'Sie wirkt, als kenne sie jeden in der Gegend.',
+    'Ein kurzer Blick genügt — man fühlt sich beobachtet.',
+  ],
+
+  ATMOSPHAERE_NPC_GEGENWART: [
+    'Sie riecht nach Kaffee und kaltem Rauch.',
+    'Das Handy vibriert ständig — auch im Gespräch.',
+    'Ihr Akzent verrät eine andere Stadt.',
+    'Sie spricht in kurzen, effizienten Sätzen.',
+    'Man hat das Gefühl, alles wird später gegoogelt.',
+  ],
+
+  ATMOSPHAERE_NPC_ZUKUNFT: [
+    'Ein leises Summen umgibt sie — Implantate im Standby.',
+    'Ihre Kleidung passt sich der Temperatur an.',
+    'Sie weicht automatisch Schwerkraftfeldern aus.',
+    'Ihr Blick scannt kurz die Umgebung — Gewohnheit.',
+    'Sie spricht mit Akzent aus einem anderen Sektor.',
+  ],
 };

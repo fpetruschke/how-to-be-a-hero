@@ -141,11 +141,24 @@ window.HTBAH = window.HTBAH || {};
     return Math.min(10, Math.max(1, basis + jitter));
   }
 
-  function beschreibungHtmlBauen({ name, lebensraum, kategorieLabel }) {
+  function beschreibungHtmlBauen({ name, lebensraum, kategorieLabel, epoche }) {
+    const ep =
+      epoche === E.GEGENWART ? 'GEGENWART' : epoche === E.ZUKUNFT ? 'ZUKUNFT' : 'MITTELALTER';
+    const atmoKey = `BESCHREIBUNG_ATMOSPHAERE_${ep}`;
+    const atmoArr = L[atmoKey];
+    const atmo = Array.isArray(atmoArr) && atmoArr.length ? U.zufaellig(atmoArr) : '';
     const n = U.htmlEsc(name);
     const lr = U.htmlEsc(lebensraum);
     const kl = U.htmlEsc(kategorieLabel);
-    return `<p><strong>${n}</strong> (${kl}) lebt typischerweise in oder nahe: ${lr}.</p><p>Verhalten und Jagdweise können je nach Beute, Jahreszeit und Nahrungsdruck stark variieren.</p>`;
+    const teile = [];
+    if (atmo) {
+      teile.push(`<p>${U.htmlEsc(atmo)}</p>`);
+    }
+    teile.push(
+      `<p><strong>${n}</strong> (${kl}) lebt typischerweise in oder nahe: ${lr}.</p>`,
+      '<p>Verhalten und Jagdweise können je nach Beute, Jahreszeit und Nahrungsdruck stark variieren.</p>',
+    );
+    return teile.join('');
   }
 
   function aufenthaltsortAusOrteListe(orteNamen) {
@@ -245,6 +258,7 @@ window.HTBAH = window.HTBAH || {};
         name,
         lebensraum,
         kategorieLabel: KATEGORIE_LABELS[kategorie] || 'Bestie',
+        epoche,
       });
       const M = window.HTBAH_CHARAKTER_MODEL;
       const waffeName = U.zufaellig(['Klauen', 'Biss', 'Stachel', 'Magischer Stoß', 'Schweifhieb']);

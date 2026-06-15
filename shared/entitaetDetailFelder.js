@@ -141,10 +141,24 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   function bereinigeRaetselNotizenHtml(html) {
     const inhalt = typeof html === 'string' ? html : '';
     return inhalt
+      .replace(/<p><strong>Schwierigkeit:<\/strong>[\s\S]*?<\/p>/gi, '')
+      .replace(/<p><strong>Ergebnis bei gelöstem Rätsel \(Vorschlag\):<\/strong>[\s\S]*?<\/p>/gi, '')
       .replace(/<p><strong>Schwierigkeit:<\/strong>[\s\S]*?Epoche-Stimmung:[\s\S]*?<\/p>/gi, '')
       .replace(/<p><strong>Was könnte die Aufgabe sein\?<\/strong>[\s\S]*?<\/p>/gi, '')
       .replace(/<p><strong>Wie könnte die Aufgabenstellung lauten\?<\/strong>[\s\S]*?<\/p>/gi, '')
+      .replace(/<p><strong>Spielleitung:<\/strong>[\s\S]*?<\/p>/gi, '')
+      .replace(/<p><strong>Tipp für die Spielleitung:<\/strong>[\s\S]*?<\/p>/gi, '')
       .trim();
+  }
+
+  function gegenstandKategorieLabel(kategorie, istWaffe) {
+    if (kategorie === 'waffe' || istWaffe) {
+      return 'Waffe';
+    }
+    if (kategorie === 'kleidung') {
+      return 'Kleidung';
+    }
+    return 'Gegenstand';
   }
 
   function bestieKategorieLabel(kategorie) {
@@ -405,8 +419,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     } else if (typ === 'gegenstand') {
       felder = [
         plain('Name', z.name),
+        plain('Art', gegenstandKategorieLabel(z.kategorie, z.istWaffe)),
         plain('Aufenthaltsort', z.aufenthaltsort),
-        plain('Initiative', z.initiative),
         rich('Beschreibung', z.beschreibungHtml),
       ];
     } else if (typ === 'pantheon') {
@@ -414,12 +428,12 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         plain('Name', z.name),
         plain('Geschlecht / Darstellung', z.geschlecht),
         plain('Domäne', z.domaene),
-        plain('Charakter', z.charakter),
+        rich('Charakter', z.charakter),
         plain('Stärken', z.staerke),
         plain('Schwächen', z.schwaeche),
-        plain('Schutzpatronat', z.schutzpatronat),
-        plain('Verlangen / Opfer / Gebote', z.verlangen),
-        plain('Mythos: Gaben (Erzähltes)', z.mythosGaben),
+        rich('Schutzpatronat', z.schutzpatronat),
+        rich('Verlangen / Opfer / Gebote', z.verlangen),
+        rich('Mythos: Gaben (Erzähltes)', z.mythosGaben),
         rich('Notizen & Mythos (formatiert)', z.notizenHtml),
       ];
     } else if (typ === 'raetsel') {

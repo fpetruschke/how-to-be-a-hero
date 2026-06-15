@@ -6077,9 +6077,75 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   vertical-align: middle;
 }
 
+.htbah-duplikat-ziel-input-group {
+  flex-wrap: nowrap;
+}
+
+.htbah-duplikat-ziel-input-group .htbah-duplikat-ziel-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.htbah-duplikat-ziel-input-group--neu .htbah-duplikat-ziel-select {
+  flex: 0 0 50%;
+  max-width: 50%;
+}
+
+.htbah-duplikat-ziel-input-group--neu .htbah-duplikat-neue-kampagne-teil {
+  flex: 0 0 50%;
+  max-width: 50%;
+  min-width: 0;
+}
+
+.htbah-duplikat-neue-kampagne-teil .form-control {
+  min-width: 0;
+}
+
 .htbah-reihenfolge-split .btn-group > .btn {
   flex: 1 1 0;
   min-width: 0;
+}
+
+.htbah-zufallstabellen-sektion-kopfzeile {
+  padding-inline-end: 0.65rem;
+}
+
+.htbah-zufallstabellen-sektion-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  color: var(--bs-body-color);
+  line-height: 1;
+}
+
+.htbah-zufallstabellen-sektion-toggle:hover {
+  opacity: 0.78;
+}
+
+.htbah-zufallstabellen-sektion-toggle:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+.htbah-zufallstabellen-sektion-ico {
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--bs-secondary-color);
+}
+
+.htbah-zufallstabellen-sektion--offen .htbah-zufallstabellen-sektion-ico {
+  color: var(--bs-body-color);
+}
+
+.htbah-zufallstabellen-sektion-titel {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
 /* Wizard-Modal liegt über dem schwebenden ZufallstabellenZeileModal (z-index 2000). */
@@ -6090,8 +6156,58 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
 
 /* Bootstrap fügt das Backdrop frisch zum body hinzu; wir heben dynamisch via Body-Klasse das letzte an. */
 body.htbah-npc-wizard-offen .modal-backdrop,
-body.htbah-bestien-wizard-offen .modal-backdrop {
+body.htbah-bestien-wizard-offen .modal-backdrop,
+body.htbah-ort-wizard-offen .modal-backdrop,
+body.htbah-fraktion-wizard-offen .modal-backdrop,
+body.htbah-raetsel-wizard-offen .modal-backdrop,
+body.htbah-pantheon-wizard-offen .modal-backdrop,
+body.htbah-gegenstand-wizard-offen .modal-backdrop {
   z-index: 2070;
+}
+
+.html-feld-quill-wrap {
+  --html-feld-quill-min-h: 5rem;
+}
+
+.html-feld-quill-host.quill-editor-host {
+  min-height: var(--html-feld-quill-min-h);
+}
+
+.html-feld-quill-host.html-feld-quill-toolbar--hidden .ql-toolbar.ql-snow {
+  display: none;
+}
+
+.html-feld-quill-host.html-feld-quill-toolbar--hidden .ql-container.ql-snow {
+  border-top: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 0.375rem;
+}
+
+.pantheon-staerken-feld {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.pantheon-staerken-tabelle textarea.pantheon-staerken-feld {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pantheon-staerken-tabelle textarea.pantheon-staerken-feld:focus {
+  box-shadow: none;
+  background: color-mix(in srgb, var(--bs-body-bg) 92%, var(--bs-secondary-color));
+}
+
+.htbah-zufallsvorschlag-gruppe {
+  min-width: min(18rem, 100%);
+}
+
+.htbah-zufallsvorschlag-dropdown-menu {
+  min-width: 16rem;
+}
+
+.htbah-zufallsvorschlag-dropdown-panel {
+  min-width: 14rem;
 }
 
 /* Karten-Icon-Modal: an body teleportiert, über Zeile-Modal und Interaktive Welt */

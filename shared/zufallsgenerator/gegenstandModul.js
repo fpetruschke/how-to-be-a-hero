@@ -60,24 +60,62 @@ window.HTBAH = window.HTBAH || {};
     return U.zufaellig(namen);
   }
 
+  function listeFuerEpoche(epoche, basis, gegenwart, zukunft) {
+    if (epoche === E.GEGENWART) {
+      return gegenwart;
+    }
+    if (epoche === E.ZUKUNFT) {
+      return zukunft;
+    }
+    return basis;
+  }
+
+  function materialFuerEpoche(epoche) {
+    return U.zufaellig(
+      listeFuerEpoche(epoche, L.MATERIAL, L.MATERIAL_GEGENWART, L.MATERIAL_ZUKUNFT),
+    );
+  }
+
+  function zustandFuerEpoche(epoche) {
+    return U.zufaellig(
+      listeFuerEpoche(epoche, L.ZUSTAND_ITEM, L.ZUSTAND_GEGENWART, L.ZUSTAND_ZUKUNFT),
+    );
+  }
+
+  function flavorFuerEpoche(epoche) {
+    return U.zufaellig(listeFuerEpoche(epoche, L.FLAVOR, L.FLAVOR_GEGENWART, L.FLAVOR_ZUKUNFT));
+  }
+
   window.HTBAH.ZufallsgeneratorGegenstandModul = {
     EPOCHE: E,
+    kategorienOptionen() {
+      return [
+        { wert: 'waffe', label: 'Waffe', icon: '⚔️' },
+        { wert: 'kleidung', label: 'Kleidung', icon: '👕' },
+        { wert: 'sonstiges', label: 'Sonstiges', icon: '📦' },
+      ];
+    },
     /**
-     * @param {{ epoche?: string, mitKleidung?: boolean, orteNamen?: string[] }} opts
+     * @param {{ epoche?: string, kategorie?: string, orteNamen?: string[] }} opts
      */
     generiere(opts) {
       const epoche = (opts && opts.epoche) || E.MITTELALTER;
-      const mitKleidung = opts && opts.mitKleidung !== false;
+      const kategorieVorgabe =
+        opts && opts.kategorie === 'waffe'
+          ? 'waffe'
+          : opts && opts.kategorie === 'kleidung'
+            ? 'kleidung'
+            : opts && opts.kategorie === 'sonstiges'
+              ? 'sonstiges'
+              : '';
 
-      let kategorie = U.gewichtet([
-        { wert: 'waffe', gewicht: mitKleidung ? 40 : 55 },
-        { wert: 'kleidung', gewicht: mitKleidung ? 35 : 0 },
-        { wert: 'sonstiges', gewicht: mitKleidung ? 25 : 45 },
-      ]);
-
-      if (!mitKleidung && kategorie === 'kleidung') {
-        kategorie = Math.random() < 0.55 ? 'waffe' : 'sonstiges';
-      }
+      const kategorie = kategorieVorgabe
+        ? kategorieVorgabe
+        : U.gewichtet([
+            { wert: 'waffe', gewicht: 40 },
+            { wert: 'kleidung', gewicht: 35 },
+            { wert: 'sonstiges', gewicht: 25 },
+          ]);
 
       let basisName;
       let typLabel;
@@ -99,11 +137,12 @@ window.HTBAH = window.HTBAH || {};
         basisName = sonstigesFuerEpoche(epoche);
       }
 
-      const material = U.zufaellig(L.MATERIAL);
-      const zust = U.zufaellig(L.ZUSTAND_ITEM);
+      const material = materialFuerEpoche(epoche);
+      const zust = zustandFuerEpoche(epoche);
       const farbe = U.zufaellig(L.FARBE);
 
       const kopfzeilen = [
+        `<p>${U.htmlEsc(flavorFuerEpoche(epoche))}</p>`,
         `<p><strong>Art:</strong> ${U.htmlEsc(typLabel)} (${U.htmlEsc(epoche)})</p>`,
         `<p><strong>Details:</strong> ${U.htmlEsc(material)}, ${U.htmlEsc(farbe)}, ${U.htmlEsc(zust)}.</p>`,
       ];
@@ -114,11 +153,11 @@ window.HTBAH = window.HTBAH || {};
           )}</p>`,
         );
       }
-      kopfzeilen.push(`<p>${U.htmlEsc(U.zufaellig(L.FLAVOR))}</p>`);
       const beschreibungHtml = kopfzeilen.join('');
 
       return {
         name: basisName,
+        kategorie,
         beschreibungHtml,
         istWaffe,
         schadenswertNahkampf,
