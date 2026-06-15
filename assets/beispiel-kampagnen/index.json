@@ -21,5 +21,13 @@
     "untertitel": "Einstiegs-One-Shot für Spielleitung",
     "beschreibung": "Dauer etwas 60 Minuten - überschaubarer Umfang.Küstendorf, Alchemielabor unter den Klippen und Leckgift ins Grundwasser — klares Ziel, wenige NPCs, mehrere Lösungswege in etwa 60 Minuten.",
     "autoren": "Florian Petruschke"
+  },
+  {
+    "datei": "4-xenolidium-notfall.json",
+    "titel": "Xenolidium-Notfall (Solo-Tutorial)",
+    "untertitel": "Sci-Fi-One-Shot am Weltraumhandels-Hangar",
+    "beschreibung": "Solo-Tutorial in drei Situationen: klemmende Luke (Handeln/Wissen), schaulustige Aliens (Soziales — oder Handeln), Xenolidium-Kauf mit Folgen aus Szene 2. Ca. 45–60 Minuten.",
+    "autoren": "Florian Petruschke",
+    "kontext": "Tutorial / Solo / Sci-Fi"
   }
 ]

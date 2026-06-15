@@ -1,0 +1,105 @@
+{
+  "htbahExportVersion": 1,
+  "typ": "lokaler-speicher",
+  "exportiertAm": "2026-06-15T21:20:54.000Z",
+  "beispiel": {
+    "titel": "Xenolidium-Notfall (Solo-Tutorial)",
+    "untertitel": "Sci-Fi-One-Shot am Weltraumhandels-Hangar",
+    "beschreibung": "Solo-Tutorial in drei Situationen: klemmende Luke (Handeln/Wissen), schaulustige Aliens (Soziales — oder Handeln), Xenolidium-Kauf mit Folgen aus Szene 2. Ca. 45–60 Minuten.",
+    "autoren": "Florian Petruschke",
+    "kontext": "Tutorial / Solo / Sci-Fi"
+  },
+  "daten": [
+    {
+      "id": "ex:sl:teil:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:spielleitung_teil:demo-xenolidium-notfall",
+      "label": "Kampagne (Name & Labels)",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-spielleitung-kampagne-teil\", \"kampagneId\": \"demo-xenolidium-notfall\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"kampagne\": {\"id\": \"demo-xenolidium-notfall\", \"name\": \"Xenolidium-Notfall (Solo-Tutorial)\", \"mitglieder\": [], \"labels\": [{\"id\": \"lbl-setting-scifi\", \"name\": \"Sci-Fi\", \"kategorie\": \"setting\", \"bg\": \"info\", \"text\": \"dark\"}, {\"id\": \"lbl-format-one-shot\", \"name\": \"One-Shot\", \"kategorie\": \"format\", \"bg\": \"primary\", \"text\": \"light\"}, {\"id\": \"lbl-format-tutorial\", \"name\": \"Tutorial\", \"kategorie\": \"format\", \"bg\": \"primary\", \"text\": \"light\"}, {\"id\": \"lbl-gruppengroesse-solo\", \"name\": \"Solo\", \"kategorie\": \"gruppengroesse\", \"bg\": \"secondary\", \"text\": \"light\"}]}, \"mitgliedWahlMitgliedId\": \"\"}"
+    },
+    {
+      "id": "ex:sl:ab:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:sl_abenteuerbuch:demo-xenolidium-notfall",
+      "label": "Abenteuerbuch",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-spielleitung-abenteuerbuch-teil\", \"kampagneId\": \"demo-xenolidium-notfall\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"abenteuerbuch\": {\"reiter\": [{\"id\": \"xnl-ab-gesamt\", \"name\": \"Abenteuer\", \"html\": \"<h1>Xenolidium-Notfall</h1>\\n<p><strong>Sci-Fi-Solo-Tutorial</strong> · 1 Charakter · ca. 45–60 Min · Autor: Florian Petruschke</p>\\n<p>Regelschwerpunkte: W100-Proben, Begabungen Handeln / Wissen / Soziales, Geistesblitzpunkte, verzweigende Konsequenzen.</p>\\n<p><strong>Kern:</strong> Dein Raumschiff ist am <a href=\\\"https://htbah.local/entity/ort/xnl-ort-hangar\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Handels-Hangar K-7</a> angedockt (<a href=\\\"https://htbah.local/entity/ort/xnl-ort-schiff\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Andockplatz C-14</a>). Der Hypersprungantrieb meldet kritischen Brennstoffmangel — ohne <a href=\\\"https://htbah.local/entity/gegenstand/xnl-item-xenolidium\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Xenolidium</a> bleibst du in diesem Sektor fest. Drei kurze Situationen führen dich vom Schiff zum Händler und zurück.</p>\\n<p><strong>Charakter:</strong> Wähle eine Sci-Fi-Charaktervorlage (Pilot, Ingenieur oder Diplomat passen besonders gut). Beschreibe kurz, wie du aussiehst und warum du unter Zeitdruck bist.</p>\\n<p><strong>Ende,</strong> wenn du Xenolidium hast und wieder am Schiff bist — oder wenn du die Konsequenzen eines klaren Scheiterns spielst.</p>\"}, {\"id\": \"xnl-ab-einstieg\", \"name\": \"Einstieg\", \"html\": \"<h1>Einstieg</h1>\\n<p>Die Andockklammern vibrieren leise. Draußen: das Summen eines belebten Weltraumhandels-Hangars — Werbehologramme, fremde Sprachen, das Klatschen von Servodroiden auf Metallboden.</p>\\n<p>Dein Schiffscomputer meldet nüchtern:</p>\\n<p><em>„Hypersprung inaktiv. Xenolidium-Kern leer. Geschätzte Zeit bis Reaktorkühlung kritisch: 4 Standardstunden.“</em></p>\\n<p>Am Terminal blinkt die Route zum nächsten Xenolidium-Händler: Schalter 7-B, Etage Gamma. Der Weg führt durch die Hangarhalle.</p>\"}, {\"id\": \"xnl-ab-sit1\", \"name\": \"Situation 1\", \"html\": \"<h1>Situation 1 — Die klemmende Luke</h1>\\n<p>Die innere Schleusenluke zur Gangway klemmt. Das Display zeigt <em>DRUCKAUSGLEICH UNVOLLSTÄNDIG</em>. Du musst raus.</p>\\n<p><strong>Lernziel:</strong> Proben auf <strong>Handeln</strong> oder <strong>Wissen</strong> — Spieler:in wählt den passenden Ansatz.</p>\\n<p><strong>Mögliche Fähigkeiten:</strong></p>\\n<ul>\\n<li><strong>Handeln:</strong> Heben &amp; Tragen, Schwerelosigkeits-Manöver, Mechanik, Schleichen (Hebel finden) …</li>\\n<li><strong>Wissen:</strong> Raumschifftechnik, Elektronik, Xenotechnologie, Wahrnehmung (Schaden lokalisieren) …</li>\\n</ul>\\n<p><strong>Erfolg:</strong> Luke öffnet sich knarrend — du stehst auf der Gangway zum Hangar.</p>\\n<p><strong>Misserfolg:</strong> Die Luke bleibt zu. Geistesblitz erlaubt einen neuen Wurf; alternativ kreative Lösung (Notentriegelung, Hilferuf an <a href=\\\"https://htbah.local/entity/npc/xnl-npc-korvex\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Korvex-9</a>, Rettungskapsel-Nebenausgang — SL belohnt gute Ideen).</p>\\n<p><strong>SL-Hinweis:</strong> Hier erklärst du W100, Fähigkeitswert, Begabung und kritische Erfolge/Misserfolge.</p>\"}, {\"id\": \"xnl-ab-sit2\", \"name\": \"Situation 2\", \"html\": \"<h1>Situation 2 — Schaulustige Aliens</h1>\\n<p>Du betrittst die Hangarhalle. Zwischen Frachtcontainern und Imbissständen sammelt sich eine Menschenmenge — nein: <em>Aliens</em>menge. <a href=\\\"https://htbah.local/entity/npc/xnl-npc-schaulustige\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Die Schaulustigen</a> haben dich entdeckt.</p>\\n<p>Sie starren, flüstern, zücken Holo-Kameras. Einer ruft: <em>„Schau mal — ein echter Solosektor-Pilot!“</em> (oder passend zu deinem Charakter). Du wirst langsamer, weil du im Weg bist.</p>\\n<p><strong>Lernziel:</strong> Soziale Probe — oder bei schlechtem Ausgang <strong>Handeln</strong> unter Druck.</p>\\n<p><strong>Primär — Soziales:</strong> Auftreten, Diplomatie, Menschenkenntnis, Begeistern, Etikette &amp; Anstand (xeno), Verhandeln …</p>\\n<p><strong>Erfolg / kritischer Erfolg:</strong> Du bahnst dir respektvoll den Weg; einige Aliens machen sogar Platz. Gerüchte bleiben freundlich. Merke dir: <strong>Szene 3 = Soziales</strong>.</p>\\n<p><strong>Normaler Misserfolg:</strong> Du stolperst metaphorisch — die Menge wird lauter, jemand postet ein peinliches Holo. <a href=\\\"https://htbah.local/entity/npc/xnl-npc-lux\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Lux Vexara</a> hat davon gehört. Merke dir: <strong>Szene 3 = Handeln</strong> (Feilschen unter schlechtem Ruf).</p>\\n<p><strong>Kritischer Misserfolg:</strong> Die Schaulustigen blockieren dich. Du musst <strong>Handeln</strong> probieren (Durchdrängen, Schleichen, Schwerelosigkeits-Manöver), um überhaupt weiterzukommen. Szene 3 wird <strong>Handeln</strong>; der Preis steigt um 20&nbsp;%. SL: erkläre, wie Konsequenzen aus früheren Szenen wirken.</p>\\n<p><strong>SL-Hinweis:</strong> Nicht jede Interaktion braucht einen Wurf — gutes Rollenspiel darf reichen.</p>\"}, {\"id\": \"xnl-ab-sit3\", \"name\": \"Situation 3\", \"html\": \"<h1>Situation 3 — Xenolidium kaufen</h1>\\n<p>Schalter 7-B: ein bunter Markstand voller schwebender Ampullen. Hinter der Theke: <a href=\\\"https://htbah.local/entity/npc/xnl-npc-lux\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Lux Vexara</a>, Xenolidium-Spezialistin mit drei Augen und einem Lächeln, das zu viele Zähne zeigt.</p>\\n<p>&gt; „Ah. Du bist die Person mit dem klemmenden Schiff, oder? Xenolidium hab ich. Premium. Frisch destilliert. Nicht billig.“</p>\\n<p>Listenpreis: <strong>800 Credits</strong>. Du hast <strong>650 Credits</strong> (SL kann anpassen).</p>\\n<p><strong>Abhängig von Situation 2:</strong></p>\\n<ul>\\n<li><strong>Szene 2 gut (Soziales):</strong> Lux ist wohlwollend. Probe auf <strong>Soziales</strong> (Verhandeln, Diplomatie, Menschenkenntnis). Erfolg: Rabatt oder Ratenzahlung. Kritischer Erfolg: 650 Credits reichen + Gratis Andock-Gutschein.</li>\\n<li><strong>Szene 2 schlecht (Handeln):</strong> Lux hat die Holo-Clips gesehen. Probe auf <strong>Handeln</strong> (Feilschen, Einschüchtern, Lügen). Erfolg: 650 Credits reichen trotzdem. Misserfolg: du brauchst einen Kollateral-Gegenstand aus dem Inventar oder musst eine „Gefallen“-Quest akzeptieren (SL-Folgehook optional).</li>\\n</ul>\\n<p><strong>Alternativen:</strong> Wissen-Probe (Xenotechnologie): Lux respektiert Fachwissen und senkt den Preis. Kreative Lösungen (Tausch, Reparatur ihres Geräts) sind immer erlaubt.</p>\\n<p><strong>Erfolg:</strong> Du erhältst <a href=\\\"https://htbah.local/entity/gegenstand/xnl-item-xenolidium\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Xenolidium</a> (1 Kern, ausreichend für einen Sprung). Rückweg zum Schiff — optional kurze Wiederholungs-Probe, wenn Szene 1 knapp war.</p>\"}, {\"id\": \"xnl-ab-finale\", \"name\": \"Finale\", \"html\": \"<h1>Finale — Zurück am Schiff</h1>\\n<p>Du lädst das Xenolidium in den Antriebskern. Das Display wechselt von Rot auf Grün:</p>\\n<p><em>„Hypersprung bereit. Zielkoordinaten?“</em></p>\\n<p>Der Hangar wird kleiner im Heckfenster. Irgendwo posten <a href=\\\"https://htbah.local/entity/npc/xnl-npc-schaulustige\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Die Schaulustigen</a> vielleicht noch dein Holo — aber du bist frei.</p>\\n<p><strong>Ende.</strong> Optional: Kurz reflektieren, welche Begabung am häufigsten half und was sich bei kritischeren Würfen änderte.</p>\"}], \"aktiverReiterId\": \"xnl-ab-gesamt\"}, \"abenteuerbuchHtml\": \"<h1>Xenolidium-Notfall</h1>\\n<p><strong>Sci-Fi-Solo-Tutorial</strong> · 1 Charakter · ca. 45–60 Min · Autor: Florian Petruschke</p>\\n<p>Regelschwerpunkte: W100-Proben, Begabungen Handeln / Wissen / Soziales, Geistesblitzpunkte, verzweigende Konsequenzen.</p>\\n<p><strong>Kern:</strong> Dein Raumschiff ist am <a href=\\\"https://htbah.local/entity/ort/xnl-ort-hangar\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Handels-Hangar K-7</a> angedockt (<a href=\\\"https://htbah.local/entity/ort/xnl-ort-schiff\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Andockplatz C-14</a>). Der Hypersprungantrieb meldet kritischen Brennstoffmangel — ohne <a href=\\\"https://htbah.local/entity/gegenstand/xnl-item-xenolidium\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Xenolidium</a> bleibst du in diesem Sektor fest. Drei kurze Situationen führen dich vom Schiff zum Händler und zurück.</p>\\n<p><strong>Charakter:</strong> Wähle eine Sci-Fi-Charaktervorlage (Pilot, Ingenieur oder Diplomat passen besonders gut). Beschreibe kurz, wie du aussiehst und warum du unter Zeitdruck bist.</p>\\n<p><strong>Ende,</strong> wenn du Xenolidium hast und wieder am Schiff bist — oder wenn du die Konsequenzen eines klaren Scheiterns spielst.</p>\"}"
+    },
+    {
+      "id": "ex:sl:atm:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:sl_atmosphaere:demo-xenolidium-notfall",
+      "label": "Wetter, Jahr- und Tageszeit",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-spielleitung-atmosphaere-teil\", \"kampagneId\": \"demo-xenolidium-notfall\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"atmosphaere\": {\"version\": 1, \"jahreszeitId\": \"neutral\", \"jahreszeitLabel\": \"Orbitale Station\", \"jahreszeitEmoji\": \"🛸\", \"jahreszeitFarbe\": \"#6366f1\", \"tageszeitId\": \"zyklus\", \"tageszeitLabel\": \"Künstlicher Tagzyklus\", \"tageszeitEmoji\": \"💡\", \"tageszeitFarbe\": \"#94a3b8\", \"temperatur\": \"klimatisiert, leicht kühl\", \"bewoelkung\": \"keine — Blick auf Sternenfeld durch Panoramafenster\", \"niederschlagKey\": \"keiner\", \"niederschlagLabel\": \"Kein Niederschlag\", \"niederschlagEmoji\": \"✨\", \"wind\": \"Kein Wind — nur Lüftungsstrom\", \"windStaerke\": \"schwach\", \"windBeaufort\": \"—\", \"wetterAkzentFarbe\": \"#6366f1\"}, \"atmosphaereBadgePos\": null, \"mitgliedWahlMitgliedId\": \"\"}"
+    },
+    {
+      "id": "ex:ztf:ort:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:ztf_kategorie:demo-xenolidium-notfall:orte",
+      "label": "Orte",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-zufallstabellen-kategorie\", \"kampagneId\": \"demo-xenolidium-notfall\", \"kategorie\": \"orte\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"zeilen\": [{\"id\": \"xnl-ort-hangar\", \"name\": \"Handels-Hangar K-7\", \"groesse\": \"Große orbitaler Handelsring\", \"lage\": \"Neutralzone Sektor 12\", \"zustand\": \"Belebt, multikulturell, laut\", \"notizenHtml\": \"<p>Zentraler Marktplatz mit Andockbuchten, Imbissständen und Xenohändlern. Schalter 7-B (Xenolidium) liegt in Etage Gamma.</p>\"}, {\"id\": \"xnl-ort-schiff\", \"name\": \"Andockplatz C-14\", \"groesse\": \"Mittlere Frachtbucht\", \"lage\": \"Hangar K-7, Außenring\", \"zustand\": \"Dein Schiff angedockt, Luke klemmt zu Beginn\", \"notizenHtml\": \"<p>Dein Schiff. Hypersprungantrieb ohne <a href=\\\"https://htbah.local/entity/gegenstand/xnl-item-xenolidium\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Xenolidium</a>.</p>\"}]}"
+    },
+    {
+      "id": "ex:ztf:npc:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:ztf_kategorie:demo-xenolidium-notfall:npcs",
+      "label": "NPCs",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-zufallstabellen-kategorie\", \"kampagneId\": \"demo-xenolidium-notfall\", \"kategorie\": \"npcs\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"zeilen\": [{\"id\": \"xnl-npc-lux\", \"name\": \"Lux Vexara\", \"spitzname\": \"\", \"geschlecht\": \"weiblich\", \"alter\": \"Unbekannt (Trioculianerin)\", \"familienstand\": \"\", \"statur\": \"Schlank, drei Augen, viele Zähne\", \"gesinnung\": \"Geschäftstüchtig, charmant, opportunistisch\", \"beruf\": \"Xenolidium-Händlerin\", \"ziel\": \"Guter Deal, gute Stories für Kundschaft\", \"geheimnis\": \"Verdünnt Xenolidium bei schlecht verhandelnden Kunden — Wissen-Probe kann das entlarven.\", \"stimme\": \"singend, schnell, freundlich\", \"lebenspunkte\": \"45\", \"lpBewusstlosAusgeblendet\": false, \"lpMassenschadenBewusstlos\": false, \"aufenthaltsort\": \"Schalter 7-B, Etage Gamma\", \"handeln\": [{\"name\": \"Feilschen\", \"value\": 72}], \"wissen\": [{\"name\": \"Xenotechnologie\", \"value\": 85}], \"soziales\": [{\"name\": \"Verhandeln\", \"value\": 78}, {\"name\": \"Menschenkenntnis\", \"value\": 65}], \"fraktion\": \"\", \"glaube\": \"\", \"initiative\": \"9\", \"inventar\": [], \"notizenHtml\": \"<p>Verkauft <a href=\\\"https://htbah.local/entity/gegenstand/xnl-item-xenolidium\\\" rel=\\\"noopener noreferrer\\\" target=\\\"_blank\\\">@Xenolidium</a>. Reagiert auf Gerüchte aus Szene 2.</p>\"}, {\"id\": \"xnl-npc-korvex\", \"name\": \"Korvex-9\", \"spitzname\": \"Korvex\", \"geschlecht\": \"keine Angabe\", \"alter\": \"Serie 9\", \"familienstand\": \"\", \"statur\": \"Servodroide, rollend, mehrere Greifarme\", \"gesinnung\": \"Hilfsbereit, pedantisch\", \"beruf\": \"Hangar-Wartungsdroide\", \"ziel\": \"Ordnung im Docking-Bereich\", \"geheimnis\": \"Kann die Luke per Fernfreigabe öffnen — verlangt aber gültigen Andock-Schein.\", \"stimme\": \"monoton, leise piepend\", \"lebenspunkte\": \"60\", \"lpBewusstlosAusgeblendet\": false, \"lpMassenschadenBewusstlos\": false, \"aufenthaltsort\": \"Gangway C-14\", \"handeln\": [{\"name\": \"Mechanik\", \"value\": 80}], \"wissen\": [{\"name\": \"Raumschifftechnik\", \"value\": 90}, {\"name\": \"Elektronik\", \"value\": 75}], \"soziales\": [{\"name\": \"Etikette & Anstand\", \"value\": 40}], \"fraktion\": \"\", \"glaube\": \"\", \"initiative\": \"6\", \"inventar\": [], \"notizenHtml\": \"<p>Optionale Hilfe bei klemmender Luke (Situation 1).</p>\"}, {\"id\": \"xnl-npc-schaulustige\", \"name\": \"Die Schaulustigen\", \"spitzname\": \"\", \"geschlecht\": \"gemischt\", \"alter\": \"verschieden\", \"familienstand\": \"\", \"statur\": \"Bunte Mischung aus humanoiden und nichtmenschlichen Touristen\", \"gesinnung\": \"Neugierig, aufdringlich, harmlos\", \"beruf\": \"Reisende / Marktbesucher\", \"ziel\": \"Unterhaltung, seltene Selfies\", \"geheimnis\": \"Einer ist heimlich Holo-Blogger mit 50.000 Followern.\", \"stimme\": \"durcheinander, viele Sprachen\", \"lebenspunkte\": \"30\", \"lpBewusstlosAusgeblendet\": false, \"lpMassenschadenBewusstlos\": false, \"aufenthaltsort\": \"Hangarhalle, Hauptrasse\", \"handeln\": [{\"name\": \"Athletik\", \"value\": 35}], \"wissen\": [{\"name\": \"Wahrnehmung\", \"value\": 55}], \"soziales\": [{\"name\": \"Auftreten\", \"value\": 45}, {\"name\": \"Begeistern\", \"value\": 50}], \"fraktion\": \"\", \"glaube\": \"\", \"initiative\": \"8\", \"inventar\": [], \"notizenHtml\": \"<p>Blockieren den Weg in Situation 2. Erfolg in Soziales = freundlicher Durchgang.</p>\"}]}"
+    },
+    {
+      "id": "ex:ztf:item:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:ztf_kategorie:demo-xenolidium-notfall:gegenstaende",
+      "label": "Gegenstände",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-zufallstabellen-kategorie\", \"kampagneId\": \"demo-xenolidium-notfall\", \"kategorie\": \"gegenstaende\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"zeilen\": [{\"id\": \"xnl-item-xenolidium\", \"name\": \"Xenolidium\", \"beschreibungHtml\": \"<p>Leuchtend violetter Hyperantriebs-Kristall. Ein Kern reicht für einen Sprung in den nächsten Sektor. Extrem selten, extrem teuer.</p>\"}]}"
+    },
+    {
+      "id": "ex:ztf:fr:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:ztf_kategorie:demo-xenolidium-notfall:fraktionen",
+      "label": "Fraktionen",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-zufallstabellen-kategorie\", \"kampagneId\": \"demo-xenolidium-notfall\", \"kategorie\": \"fraktionen\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"zeilen\": []}"
+    },
+    {
+      "id": "ex:ztf:rae:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:ztf_kategorie:demo-xenolidium-notfall:raetsel",
+      "label": "Rätsel",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-zufallstabellen-kategorie\", \"kampagneId\": \"demo-xenolidium-notfall\", \"kategorie\": \"raetsel\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"zeilen\": []}"
+    },
+    {
+      "id": "ex:ztf:bes:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:ztf_kategorie:demo-xenolidium-notfall:bestien",
+      "label": "Bestien",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-zufallstabellen-kategorie\", \"kampagneId\": \"demo-xenolidium-notfall\", \"kategorie\": \"bestien\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"zeilen\": []}"
+    },
+    {
+      "id": "ex:ztf:pan:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:ztf_kategorie:demo-xenolidium-notfall:pantheon",
+      "label": "Pantheon",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-zufallstabellen-kategorie\", \"kampagneId\": \"demo-xenolidium-notfall\", \"kategorie\": \"pantheon\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"zeilen\": []}"
+    },
+    {
+      "id": "ex:wb:gal:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:wb_bereich:demo-xenolidium-notfall:galerie",
+      "label": "Galerie",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-weltenbau-bereich\", \"kampagneId\": \"demo-xenolidium-notfall\", \"bereich\": \"galerie\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"daten\": {\"eintraege\": []}}"
+    },
+    {
+      "id": "ex:wb:iw:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:wb_bereich:demo-xenolidium-notfall:interaktive_welt",
+      "label": "Interaktive Welt / Karten",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-weltenbau-bereich\", \"kampagneId\": \"demo-xenolidium-notfall\", \"bereich\": \"interaktive_welt\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"daten\": {\"mapLayouts\": {\"demo-xenolidium-notfall\": {\"ort:xnl-ort-schiff\": {\"x\": -200, \"y\": 0}, \"ort:xnl-ort-hangar\": {\"x\": 280, \"y\": 120}, \"npc:xnl-npc-korvex\": {\"x\": -80, \"y\": 40}, \"npc:xnl-npc-schaulustige\": {\"x\": 120, \"y\": 200}, \"npc:xnl-npc-lux\": {\"x\": 420, \"y\": 80}, \"gegenstand:xnl-item-xenolidium\": {\"x\": 400, \"y\": 160}}}, \"mapViewport\": {\"demo-xenolidium-notfall\": {\"x\": 0, \"y\": 0, \"scale\": 1}}}}"
+    },
+    {
+      "id": "ex:wb:gen:demo-xenolidium-notfall",
+      "key": "htbah_export_ls:wb_bereich:demo-xenolidium-notfall:generatoren",
+      "label": "Generatoren",
+      "vorhanden": true,
+      "wert": "{\"htbahExportVersion\": 1, \"typ\": \"htbah-weltenbau-bereich\", \"kampagneId\": \"demo-xenolidium-notfall\", \"bereich\": \"generatoren\", \"exportiertAm\": \"2026-06-15T21:20:54.000Z\", \"daten\": {\"generatorUrls\": {}, \"generatorAufrufe\": {}}}"
+    }
+  ]
+}

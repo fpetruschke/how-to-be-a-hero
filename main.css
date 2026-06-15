@@ -6495,25 +6495,6 @@ body.htbah-entity-karten-icon-offen .htbah-entity-karten-icon-modal.modal.show {
   white-space: nowrap;
 }
 
-@media (min-width: 992px) {
-  .htbah-klv-neu-form {
-    flex-wrap: nowrap;
-  }
-
-  .htbah-klv-neu-form .htbah-klv-neu-name .form-control {
-    width: 8.5rem;
-    max-width: 8.5rem;
-  }
-
-  .htbah-klv-neu-hintergrund-swatches {
-    flex-wrap: nowrap;
-  }
-
-  .htbah-klv-neu-aktion {
-    margin-left: auto;
-  }
-}
-
 /* 404 / Nicht gefunden (Pen-&-Paper-Stil) */
 .htbah-404-page {
   max-width: 36rem;

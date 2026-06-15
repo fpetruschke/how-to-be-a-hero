@@ -6,11 +6,13 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 (function registerKampagnenLabelsModel(globalObj) {
   const KATEGORIE_SETTING = 'setting';
   const KATEGORIE_FORMAT = 'format';
+  const KATEGORIE_GRUPPENGROESSE = 'gruppengroesse';
   const KATEGORIE_INHALT = 'inhalt';
 
   const KATEGORIEN = [
     { id: KATEGORIE_SETTING, label: 'Setting / Epoche', emoji: '🏰' },
     { id: KATEGORIE_FORMAT, label: 'Format', emoji: '📋' },
+    { id: KATEGORIE_GRUPPENGROESSE, label: 'Gruppengröße', emoji: '👥' },
     { id: KATEGORIE_INHALT, label: 'Inhaltshinweis', emoji: '🎭' },
   ];
 
@@ -63,6 +65,34 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       text: 'light',
     },
     {
+      id: 'lbl-format-tutorial',
+      name: 'Tutorial',
+      kategorie: KATEGORIE_FORMAT,
+      bg: 'primary',
+      text: 'light',
+    },
+    {
+      id: 'lbl-gruppengroesse-solo',
+      name: 'Solo',
+      kategorie: KATEGORIE_GRUPPENGROESSE,
+      bg: 'secondary',
+      text: 'light',
+    },
+    {
+      id: 'lbl-gruppengroesse-2-4',
+      name: '2-4',
+      kategorie: KATEGORIE_GRUPPENGROESSE,
+      bg: 'secondary',
+      text: 'light',
+    },
+    {
+      id: 'lbl-gruppengroesse-mehr-4',
+      name: '>4',
+      kategorie: KATEGORIE_GRUPPENGROESSE,
+      bg: 'secondary',
+      text: 'light',
+    },
+    {
       id: 'lbl-inhalt-gewalt',
       name: 'Gewalt',
       kategorie: KATEGORIE_INHALT,
@@ -101,6 +131,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     if (kategorie === KATEGORIE_FORMAT) {
       return '📋';
     }
+    if (kategorie === KATEGORIE_GRUPPENGROESSE) {
+      return '👥';
+    }
     return '🏰';
   }
 
@@ -111,11 +144,18 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     if (kategorie === KATEGORIE_FORMAT) {
       return 'primary';
     }
+    if (kategorie === KATEGORIE_GRUPPENGROESSE) {
+      return 'secondary';
+    }
     return 'info';
   }
 
   function defaultTextFuerKategorie(kategorie) {
-    if (kategorie === KATEGORIE_INHALT || kategorie === KATEGORIE_FORMAT) {
+    if (
+      kategorie === KATEGORIE_INHALT ||
+      kategorie === KATEGORIE_FORMAT ||
+      kategorie === KATEGORIE_GRUPPENGROESSE
+    ) {
       return 'light';
     }
     return 'dark';
@@ -138,6 +178,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     }
     if (raw === KATEGORIE_FORMAT) {
       return KATEGORIE_FORMAT;
+    }
+    if (raw === KATEGORIE_GRUPPENGROESSE) {
+      return KATEGORIE_GRUPPENGROESSE;
     }
     return KATEGORIE_SETTING;
   }
@@ -209,7 +252,10 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       if (kat === KATEGORIE_FORMAT) {
         return 1;
       }
-      return 2;
+      if (kat === KATEGORIE_GRUPPENGROESSE) {
+        return 2;
+      }
+      return 3;
     };
     eintraege.sort((a, b) => {
       const ordA = kategorieReihenfolge(a.kategorie);
@@ -257,6 +303,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     }
     if (kategorie === KATEGORIE_FORMAT) {
       return 'Format';
+    }
+    if (kategorie === KATEGORIE_GRUPPENGROESSE) {
+      return 'Gruppengröße';
     }
     return 'Setting';
   }
@@ -411,6 +460,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     SPEICHER_KEY: 'htbah_kampagnen_labels_katalog',
     KATEGORIE_SETTING,
     KATEGORIE_FORMAT,
+    KATEGORIE_GRUPPENGROESSE,
     KATEGORIE_INHALT,
     KATEGORIEN,
     BOOTSTRAP_HINTERGRUND_FARBEN,

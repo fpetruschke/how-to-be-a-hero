@@ -2,11 +2,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
 (function () {
   const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
+  const HTBAH_BOOTSTRAP_MODAL =
+    (window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper) || null;
 
   const LABEL_GRUPPEN = KL
     ? [
         { kategorie: KL.KATEGORIE_SETTING, titel: 'Setting / Epoche' },
         { kategorie: KL.KATEGORIE_FORMAT, titel: 'Format' },
+        { kategorie: KL.KATEGORIE_GRUPPENGROESSE, titel: 'Gruppengröße' },
         { kategorie: KL.KATEGORIE_INHALT, titel: 'Inhaltshinweis' },
       ]
     : [];
@@ -22,6 +25,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         bearbeitungId: '',
         bearbeitungPatch: null,
         labelGruppen: LABEL_GRUPPEN,
+        neuesLabelModalInstanz: null,
+        _neuesLabelFokusVorModal: null,
       };
     },
     computed: {
@@ -34,6 +39,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     },
     mounted() {
       this.neuLaden();
+      const el = this.$refs.neuesLabelModalElement;
+      if (el && HTBAH_BOOTSTRAP_MODAL) {
+        HTBAH_BOOTSTRAP_MODAL.bindHiddenEvent(el, this.neuesLabelModalGeschlossen);
+      }
+    },
+    beforeUnmount() {
+      const el = this.$refs.neuesLabelModalElement;
+      if (el && HTBAH_BOOTSTRAP_MODAL) {
+        HTBAH_BOOTSTRAP_MODAL.unbindHiddenEvent(el, this.neuesLabelModalGeschlossen);
+      }
     },
     methods: {
       neuLaden() {
@@ -85,6 +100,43 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           this.neuerText = KL.defaultTextFuerKategorie(kategorie);
         }
       },
+      neuesLabelFormZuruecksetzen() {
+        this.neuerName = '';
+        this.neueKategorie = KL ? KL.KATEGORIE_SETTING : 'setting';
+        this.neuerBg = KL ? KL.defaultBgFuerKategorie(this.neueKategorie) : 'info';
+        this.neuerText = KL ? KL.defaultTextFuerKategorie(this.neueKategorie) : 'dark';
+      },
+      neuesLabelModalOeffnen() {
+        this._neuesLabelFokusVorModal =
+          document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        this.neuesLabelFormZuruecksetzen();
+        this.$nextTick(() => {
+          const el = this.$refs.neuesLabelModalElement;
+          if (!el || !HTBAH_BOOTSTRAP_MODAL) {
+            return;
+          }
+          this.neuesLabelModalInstanz = HTBAH_BOOTSTRAP_MODAL.ensureModalInstance(el);
+          this.neuesLabelModalInstanz.show();
+          this.$nextTick(() => {
+            const nameInput = this.$refs.neuesLabelNameInput;
+            if (nameInput && typeof nameInput.focus === 'function') {
+              nameInput.focus();
+            }
+          });
+        });
+      },
+      neuesLabelModalSchliessen() {
+        if (this.neuesLabelModalInstanz) {
+          this.neuesLabelModalInstanz.hide();
+        }
+      },
+      neuesLabelModalGeschlossen() {
+        if (this._neuesLabelFokusVorModal && this._neuesLabelFokusVorModal.isConnected) {
+          this._neuesLabelFokusVorModal.focus();
+        }
+        this._neuesLabelFokusVorModal = null;
+        this.neuesLabelFormZuruecksetzen();
+      },
       labelHinzufuegen() {
         const name = KL ? KL.normalisiereLabelName(this.neuerName) : this.neuerName.trim();
         if (!name || !window.HTBAH || typeof window.HTBAH.erstelleKampagnenLabelImKatalog !== 'function') {
@@ -97,10 +149,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           text: this.neuerText,
         });
         if (ergebnis && ergebnis.eintrag) {
-          this.neuerName = '';
           this.neuLaden();
           if (ergebnis.neu) {
             window.HTBAH.ui.notify({ text: 'Label angelegt.', typ: 'success' });
+            this.neuesLabelModalSchliessen();
           } else {
             window.HTBAH.ui.notify({ text: 'Label existiert bereits im Katalog.', typ: 'warning' });
           }
@@ -171,11 +223,21 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     },
     template: `
       <div class="htbah-kampagnen-labels-verwaltung text-start">
-        <p class="small text-body-secondary mb-3">
-          Labels für Kampagnen: 🏰 Setting/Epoche, 📋 Format (z. B. One-Shot) oder 🎭 Inhaltshinweis (z. B. Gewalt). Auf Kampagnen
-          werden Kopien inkl. Farben gespeichert. Beim Import fehlende Labels werden global ergänzt; vorhandene bleiben
-          unverändert.
-        </p>
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+          <p class="small text-body-secondary mb-0 flex-grow-1 min-w-0">
+            Labels für Kampagnen: 🏰 Setting/Epoche, 📋 Format (z. B. One-Shot), 👥 Gruppengröße (z. B. Solo) oder 🎭 Inhaltshinweis (z. B. Gewalt). Auf Kampagnen
+            werden Kopien inkl. Farben gespeichert. Beim Import fehlende Labels werden global ergänzt; vorhandene bleiben
+            unverändert.
+          </p>
+          <icon-text-button
+            type="button"
+            class="btn btn-sm btn-outline-primary flex-shrink-0"
+            icon="add"
+            aria-label="Label hinzufügen"
+            @click="neuesLabelModalOeffnen">
+            Hinzufügen
+          </icon-text-button>
+        </div>
 
         <template v-if="eintraege.length">
           <section
@@ -212,6 +274,14 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                           title="Format"
                           @click="bearbeitungPatch.kategorie = 'format'; bearbeitungPatch.bg = 'primary'; bearbeitungPatch.text = 'light'">
                           📋
+                        </button>
+                        <button
+                          type="button"
+                          class="btn"
+                          :class="bearbeitungPatch.kategorie === 'gruppengroesse' ? 'btn-primary' : 'btn-outline-secondary'"
+                          title="Gruppengröße"
+                          @click="bearbeitungPatch.kategorie = 'gruppengroesse'; bearbeitungPatch.bg = 'secondary'; bearbeitungPatch.text = 'light'">
+                          👥
                         </button>
                         <button
                           type="button"
@@ -273,85 +343,117 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             </p>
           </section>
         </template>
-        <p v-else class="small text-body-secondary mb-3">Noch keine Labels im Katalog.</p>
+        <p v-else class="small text-body-secondary mb-0">Noch keine Labels im Katalog.</p>
 
-        <div class="border-top pt-3">
-          <div class="small fw-semibold mb-2">Neues Label</div>
-          <div class="row g-2 align-items-end htbah-klv-neu-form">
-            <div class="col-auto">
-              <span class="form-label small d-block mb-1">Typ</span>
-              <div class="btn-group btn-group-sm" role="group" aria-label="Typ für neues Label">
+        <div
+          ref="neuesLabelModalElement"
+          class="modal fade"
+          id="htbahKampagnenLabelsNeuModal"
+          tabindex="-1"
+          aria-labelledby="htbahKampagnenLabelsNeuModalLabel"
+          aria-hidden="true">
+          <div class="modal-dialog modal-dialog-scrollable modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+              <div class="modal-header">
+                <h5 class="modal-title" id="htbahKampagnenLabelsNeuModalLabel">Neues Label</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+              </div>
+              <div class="modal-body text-start">
+                <div class="row g-3">
+                  <div class="col-12">
+                    <span class="form-label small d-block mb-1">Typ</span>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Typ für neues Label">
+                      <button
+                        type="button"
+                        class="btn"
+                        :class="neueKategorie === 'setting' ? 'btn-primary' : 'btn-outline-secondary'"
+                        title="Setting / Epoche"
+                        @click="setzeNeueKategorie('setting')">
+                        🏰
+                      </button>
+                      <button
+                        type="button"
+                        class="btn"
+                        :class="neueKategorie === 'format' ? 'btn-primary' : 'btn-outline-secondary'"
+                        title="Format"
+                        @click="setzeNeueKategorie('format')">
+                        📋
+                      </button>
+                      <button
+                        type="button"
+                        class="btn"
+                        :class="neueKategorie === 'gruppengroesse' ? 'btn-primary' : 'btn-outline-secondary'"
+                        title="Gruppengröße"
+                        @click="setzeNeueKategorie('gruppengroesse')">
+                        👥
+                      </button>
+                      <button
+                        type="button"
+                        class="btn"
+                        :class="neueKategorie === 'inhalt' ? 'btn-primary' : 'btn-outline-secondary'"
+                        title="Inhaltshinweis"
+                        @click="setzeNeueKategorie('inhalt')">
+                        🎭
+                      </button>
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small mb-1" for="klv-neu-name">Name</label>
+                    <input
+                      id="klv-neu-name"
+                      ref="neuesLabelNameInput"
+                      v-model="neuerName"
+                      type="text"
+                      class="form-control form-control-sm"
+                      placeholder="z. B. Horror"
+                      autocomplete="off"
+                      @keydown.enter.prevent="labelHinzufuegen" />
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small mb-1" for="klv-neu-text">Text</label>
+                    <select id="klv-neu-text" v-model="neuerText" class="form-select form-select-sm">
+                      <option value="light">Hell</option>
+                      <option value="dark">Dunkel</option>
+                    </select>
+                  </div>
+                  <div class="col-12">
+                    <span class="form-label small d-block mb-1" id="klv-neu-bg-label">Hintergrund</span>
+                    <div class="d-flex flex-wrap gap-1" role="radiogroup" aria-labelledby="klv-neu-bg-label">
+                      <button
+                        v-for="f in hintergrundFarbenMeta"
+                        :key="'neu-farbe-' + f.id"
+                        type="button"
+                        class="htbah-label-farbe-swatch"
+                        :class="{ 'htbah-label-farbe-swatch--aktiv': farbeSwatchAktiv(neuerBg, f.id) }"
+                        :title="f.labelDe"
+                        :aria-label="f.labelDe"
+                        :aria-pressed="farbeSwatchAktiv(neuerBg, f.id) ? 'true' : 'false'"
+                        @click="neuerBg = f.id">
+                        <span class="htbah-label-farbe-swatch-flaeche" :style="{ backgroundColor: f.hex }"></span>
+                        <span class="htbah-label-farbe-swatch-label" :style="farbeSwatchLabelStil(f)">{{ f.labelDe }}</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <span class="form-label small d-block mb-1">Vorschau</span>
+                    <span
+                      class="badge"
+                      :class="badgeKlasse({ kategorie: neueKategorie, bg: neuerBg, text: neuerText, name: neuerName })">
+                      {{ neuerName || 'Vorschau' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
                 <button
                   type="button"
-                  class="btn"
-                  :class="neueKategorie === 'setting' ? 'btn-primary' : 'btn-outline-secondary'"
-                  title="Setting / Epoche"
-                  @click="setzeNeueKategorie('setting')">
-                  🏰
-                </button>
-                <button
-                  type="button"
-                  class="btn"
-                  :class="neueKategorie === 'format' ? 'btn-primary' : 'btn-outline-secondary'"
-                  title="Format"
-                  @click="setzeNeueKategorie('format')">
-                  📋
-                </button>
-                <button
-                  type="button"
-                  class="btn"
-                  :class="neueKategorie === 'inhalt' ? 'btn-primary' : 'btn-outline-secondary'"
-                  title="Inhaltshinweis"
-                  @click="setzeNeueKategorie('inhalt')">
-                  🎭
+                  class="btn btn-primary"
+                  :disabled="!neuerName.trim()"
+                  @click="labelHinzufuegen">
+                  Anlegen
                 </button>
               </div>
-            </div>
-            <div class="col-12 col-lg-auto htbah-klv-neu-name">
-              <label class="form-label small mb-0" for="klv-neu-name">Name</label>
-              <input
-                id="klv-neu-name"
-                v-model="neuerName"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="z. B. Horror"
-                autocomplete="off"
-                @keydown.enter.prevent="labelHinzufuegen" />
-            </div>
-            <div class="col-12 col-lg-auto htbah-klv-neu-hintergrund">
-              <span class="form-label small d-block mb-1" id="klv-neu-bg-label">Hintergrund</span>
-              <div class="d-flex flex-wrap gap-1 htbah-klv-neu-hintergrund-swatches" role="radiogroup" aria-labelledby="klv-neu-bg-label">
-                <button
-                  v-for="f in hintergrundFarbenMeta"
-                  :key="'neu-farbe-' + f.id"
-                  type="button"
-                  class="htbah-label-farbe-swatch"
-                  :class="{ 'htbah-label-farbe-swatch--aktiv': farbeSwatchAktiv(neuerBg, f.id) }"
-                  :title="f.labelDe"
-                  :aria-label="f.labelDe"
-                  :aria-pressed="farbeSwatchAktiv(neuerBg, f.id) ? 'true' : 'false'"
-                  @click="neuerBg = f.id">
-                  <span class="htbah-label-farbe-swatch-flaeche" :style="{ backgroundColor: f.hex }"></span>
-                  <span class="htbah-label-farbe-swatch-label" :style="farbeSwatchLabelStil(f)">{{ f.labelDe }}</span>
-                </button>
-              </div>
-            </div>
-            <div class="col-6 col-lg-auto">
-              <label class="form-label small mb-0" for="klv-neu-text">Text</label>
-              <select id="klv-neu-text" v-model="neuerText" class="form-select form-select-sm">
-                <option value="light">Hell</option>
-                <option value="dark">Dunkel</option>
-              </select>
-            </div>
-            <div class="col-12 col-lg-auto d-flex flex-wrap align-items-end gap-2 htbah-klv-neu-aktion">
-              <span
-                class="badge"
-                :class="badgeKlasse({ kategorie: neueKategorie, bg: neuerBg, text: neuerText, name: neuerName })">
-                {{ neuerName || 'Vorschau' }}
-              </span>
-              <button type="button" class="btn btn-sm btn-primary ms-auto ms-lg-0" :disabled="!neuerName.trim()" @click="labelHinzufuegen">
-                Anlegen
-              </button>
             </div>
           </div>
         </div>
