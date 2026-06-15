@@ -3443,6 +3443,15 @@ input::placeholder {
   min-height: 0;
 }
 
+.htbah-zeichen-ebenen-liste--menu-offen {
+  overflow: visible;
+}
+
+.htbah-zeichen-ebenen-panel:has(.htbah-zeichen-ebenen-liste--menu-offen),
+.htbah-zeichen-modal-body:has(.htbah-zeichen-ebenen-liste--menu-offen) {
+  overflow: visible;
+}
+
 .htbah-zeichen-ebene-eintrag {
   display: flex;
   align-items: center;
@@ -3457,11 +3466,13 @@ input::placeholder {
   background: rgba(37, 99, 235, 0.12);
 }
 
-.htbah-zeichen-ebene-eintrag--ausgeblendet {
+.htbah-zeichen-ebene-eintrag--ausgeblendet .htbah-zeichen-ebene-haupt,
+.htbah-zeichen-ebene-eintrag--ausgeblendet .htbah-zeichen-ebene-aktionen {
   opacity: 0.55;
 }
 
-.htbah-zeichen-ebene-eintrag--ausgeblendet.aktiv {
+.htbah-zeichen-ebene-eintrag--ausgeblendet.aktiv .htbah-zeichen-ebene-haupt,
+.htbah-zeichen-ebene-eintrag--ausgeblendet.aktiv .htbah-zeichen-ebene-aktionen {
   opacity: 0.72;
 }
 
@@ -3470,8 +3481,15 @@ input::placeholder {
   outline-offset: -2px;
 }
 
-.htbah-zeichen-ebene-eintrag.dragging {
+.htbah-zeichen-ebene-eintrag.dragging .htbah-zeichen-ebene-haupt,
+.htbah-zeichen-ebene-eintrag.dragging .htbah-zeichen-ebene-aktionen {
   opacity: 0.55;
+}
+
+.htbah-zeichen-ebene-eintrag--menu-offen {
+  position: relative;
+  z-index: 40;
+  overflow: visible;
 }
 
 .htbah-zeichen-ebene-falafel,
@@ -3515,16 +3533,17 @@ input::placeholder {
   position: absolute;
   top: calc(100% + 2px);
   right: 0;
-  z-index: 8;
+  z-index: 50;
   min-width: 10.5rem;
   padding: 0.3rem;
-  background: var(--modal-bg);
+  background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 0.4rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+  opacity: 1;
 }
 
 .htbah-zeichen-ebene-menu-item {

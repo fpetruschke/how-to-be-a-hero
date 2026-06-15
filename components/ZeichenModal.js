@@ -1100,8 +1100,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         return this.ebenen.length ? this.ebenen[this.ebenen.length - 1] : null;
       },
-      elemente() {
-        return this.aktiveEbene ? this.aktiveEbene.elemente : [];
+      elemente: {
+        get() {
+          return this.aktiveEbene ? this.aktiveEbene.elemente : [];
+        },
+        set(neu) {
+          const ebene = this.aktiveEbene;
+          if (ebene) {
+            ebene.elemente = neu;
+          }
+        },
       },
       ebenenUiListe() {
         return this.ebenen
@@ -3644,7 +3652,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   <button type="button" class="btn btn-sm btn-outline-success flex-grow-1" @click="ebeneNeuErstellen">Erstellen</button>
                 </div>
               </div>
-              <ul class="htbah-zeichen-ebenen-liste list-unstyled mb-0 flex-grow-1 overflow-auto">
+              <ul
+                class="htbah-zeichen-ebenen-liste list-unstyled mb-0 flex-grow-1 overflow-auto"
+                :class="{ 'htbah-zeichen-ebenen-liste--menu-offen': ebeneMenuOffenId }">
                 <li
                   v-for="eintrag in ebenenUiListe"
                   :key="eintrag.eb.id"
@@ -3652,6 +3662,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                   :class="{
                     aktiv: aktiveEbeneId === eintrag.eb.id,
                     'htbah-zeichen-ebene-eintrag--ausgeblendet': !eintrag.eb.sichtbar,
+                    'htbah-zeichen-ebene-eintrag--menu-offen': ebeneMenuOffenId === eintrag.eb.id,
                     'drag-over': ebeneDropIndex === eintrag.index,
                     dragging: ebeneDragIndex === eintrag.index,
                   }"
