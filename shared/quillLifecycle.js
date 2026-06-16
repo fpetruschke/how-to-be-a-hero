@@ -39,6 +39,41 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     }
   }
 
+  /**
+   * Lädt HTML zuverlässig in Quill (Listen, Links, Formatierung).
+   * Direktes setzen von root.innerHTML lässt ul/li-Inhalte oft unsichtbar.
+   * @param {object|null|undefined} quill
+   * @param {string} [html]
+   */
+  function ladeHtmlInQuill(quill, html) {
+    if (!quill) {
+      return;
+    }
+    const roh = typeof html === 'string' ? html : '';
+    if (!roh.trim()) {
+      if (typeof quill.setText === 'function') {
+        quill.setText('', 'silent');
+      } else if (quill.root) {
+        quill.root.innerHTML = '';
+      }
+      return;
+    }
+    if (quill.clipboard && typeof quill.clipboard.convert === 'function') {
+      try {
+        const delta = quill.clipboard.convert(roh);
+        if (typeof quill.setContents === 'function') {
+          quill.setContents(delta, 'silent');
+          return;
+        }
+      } catch {
+        /* Fallback unten */
+      }
+    }
+    if (quill.root) {
+      quill.root.innerHTML = roh;
+    }
+  }
+
   function entferneVerwaisteQuillToolbars(container) {
     if (!container || typeof container.querySelectorAll !== 'function') {
       return;
@@ -102,6 +137,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     zerstoereMentionController,
     schliesseEmoticonPickerFuerQuill,
     leereQuillHost,
+    ladeHtmlInQuill,
     entferneVerwaisteQuillToolbars,
     zerstoereQuillInstanz,
   };

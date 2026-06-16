@@ -71,6 +71,7 @@ def abenteuerbuch_reiter() -> list[dict]:
     abenteuer_html = f"""<h1>Xenolidium-Notfall</h1>
 <p><strong>Sci-Fi-Solo-Tutorial</strong> · 1 Charakter · ca. 45–60 Min · Autor: Florian Petruschke</p>
 <p>Regelschwerpunkte: W100-Proben, Begabungen Handeln / Wissen / Soziales, Geistesblitzpunkte, verzweigende Konsequenzen.</p>
+<p><strong>Solo-Spiel:</strong> Du bist gleichzeitig die spielende Person und die Spielleitung. Lies die markierten Tutorial-Hinweise leise mit — sie erklären Regeln und helfen dir, Konsequenzen fair zu würdigen.</p>
 <p><strong>Kern:</strong> Dein Raumschiff ist am {hangar} angedockt ({schiff}). Der Hypersprungantrieb meldet kritischen Brennstoffmangel — ohne {xenolidium} bleibst du in diesem Sektor fest. Drei kurze Situationen führen dich vom Schiff zum Händler und zurück.</p>
 <p><strong>Charakter:</strong> Wähle eine Sci-Fi-Charaktervorlage (Pilot, Ingenieur oder Diplomat passen besonders gut). Beschreibe kurz, wie du aussiehst und warum du unter Zeitdruck bist.</p>
 <p><strong>Ende,</strong> wenn du Xenolidium hast und wieder am Schiff bist — oder wenn du die Konsequenzen eines klaren Scheiterns spielst.</p>"""
@@ -83,43 +84,46 @@ def abenteuerbuch_reiter() -> list[dict]:
 
     situation1_html = f"""<h1>Situation 1 — Die klemmende Luke</h1>
 <p>Die innere Schleusenluke zur Gangway klemmt. Das Display zeigt <em>DRUCKAUSGLEICH UNVOLLSTÄNDIG</em>. Du musst raus.</p>
-<p><strong>Lernziel:</strong> Proben auf <strong>Handeln</strong> oder <strong>Wissen</strong> — Spieler:in wählt den passenden Ansatz.</p>
+<p><strong>Lernziel:</strong> Proben auf <strong>Handeln</strong> oder <strong>Wissen</strong> — wähle den Ansatz, der zu deinem Charakter passt.</p>
 <p><strong>Mögliche Fähigkeiten:</strong></p>
-<ul>
-<li><strong>Handeln:</strong> Heben &amp; Tragen, Schwerelosigkeits-Manöver, Mechanik, Schleichen (Hebel finden) …</li>
-<li><strong>Wissen:</strong> Raumschifftechnik, Elektronik, Xenotechnologie, Wahrnehmung (Schaden lokalisieren) …</li>
-</ul>
+<p><strong>Handeln:</strong> Wartung &amp; Reparatur, Schwerelosigkeits-Manöver, Exoanzug-Einsatz, Schleichen (Hebel finden), Drohnensteuerung (kleine Wartungsdrohne) …</p>
+<p><strong>Wissen:</strong> Raumschifftechnik, KI-Systeme, Cybernetik, Wahrnehmung (Schaden lokalisieren) …</p>
 <p><strong>Erfolg:</strong> Luke öffnet sich knarrend — du stehst auf der Gangway zum Hangar.</p>
-<p><strong>Misserfolg:</strong> Die Luke bleibt zu. Geistesblitz erlaubt einen neuen Wurf; alternativ kreative Lösung (Notentriegelung, Hilferuf an {techniker}, Rettungskapsel-Nebenausgang — SL belohnt gute Ideen).</p>
-<p><strong>SL-Hinweis:</strong> Hier erklärst du W100, Fähigkeitswert, Begabung und kritische Erfolge/Misserfolge.</p>"""
+<p><strong>Misserfolg:</strong> Die Luke bleibt zu. Geistesblitz erlaubt dir einen neuen Wurf; alternativ eine kreative Lösung (Notentriegelung, Hilferuf an {techniker}, Rettungskapsel-Nebenausgang — belohne gute Ideen selbst).</p>
+<p><strong>Tutorial-Hinweis:</strong> Hier lernst du W100, Fähigkeitswert, Begabung und kritische Erfolge/Misserfolge. Würfle laut für dich selbst und beschreibe das Ergebnis in ein bis zwei Sätzen.</p>"""
 
     situation2_html = f"""<h1>Situation 2 — Schaulustige Aliens</h1>
 <p>Du betrittst die Hangarhalle. Zwischen Frachtcontainern und Imbissständen sammelt sich eine Menschenmenge — nein: <em>Aliens</em>menge. {schaulustige} haben dich entdeckt.</p>
 <p>Sie starren, flüstern, zücken Holo-Kameras. Einer ruft: <em>„Schau mal — ein echter Solosektor-Pilot!“</em> (oder passend zu deinem Charakter). Du wirst langsamer, weil du im Weg bist.</p>
 <p><strong>Lernziel:</strong> Soziale Probe — oder bei schlechtem Ausgang <strong>Handeln</strong> unter Druck.</p>
-<p><strong>Primär — Soziales:</strong> Auftreten, Diplomatie, Menschenkenntnis, Begeistern, Etikette &amp; Anstand (xeno), Verhandeln …</p>
-<p><strong>Erfolg / kritischer Erfolg:</strong> Du bahnst dir respektvoll den Weg; einige Aliens machen sogar Platz. Gerüchte bleiben freundlich. Merke dir: <strong>Szene 3 = Soziales</strong>.</p>
-<p><strong>Normaler Misserfolg:</strong> Du stolperst metaphorisch — die Menge wird lauter, jemand postet ein peinliches Holo. {lux} hat davon gehört. Merke dir: <strong>Szene 3 = Handeln</strong> (Feilschen unter schlechtem Ruf).</p>
-<p><strong>Kritischer Misserfolg:</strong> Die Schaulustigen blockieren dich. Du musst <strong>Handeln</strong> probieren (Durchdrängen, Schleichen, Schwerelosigkeits-Manöver), um überhaupt weiterzukommen. Szene 3 wird <strong>Handeln</strong>; der Preis steigt um 20&nbsp;%. SL: erkläre, wie Konsequenzen aus früheren Szenen wirken.</p>
-<p><strong>SL-Hinweis:</strong> Nicht jede Interaktion braucht einen Wurf — gutes Rollenspiel darf reichen.</p>"""
+<p><strong>Mögliche Fähigkeiten:</strong></p>
+<p><strong>Soziales:</strong> Diplomatie (interstellar), Verhandeln, Menschenkenntnis, Begeistern, Kulturelle Anpassung, Außerirdische Spezies deuten, Überzeugen …</p>
+<p><strong>Handeln (bei Misserfolg oder Blockade):</strong> Schwerelosigkeits-Manöver, Schleichen, Drohnensteuerung, Exoanzug-Einsatz …</p>
+<p><strong>Erfolg / kritischer Erfolg:</strong> Du bahnst dir respektvoll den Weg; einige Aliens machen sogar Platz. Gerüchte bleiben freundlich. Notiere dir: <strong>Situation 3 = Soziales</strong>.</p>
+<p><strong>Normaler Misserfolg:</strong> Du stolperst metaphorisch — die Menge wird lauter, jemand postet ein peinliches Holo. {lux} hat davon gehört. Notiere dir: <strong>Situation 3 = Handeln</strong> (härteres Feilschen unter schlechtem Ruf).</p>
+<p><strong>Kritischer Misserfolg:</strong> Die Schaulustigen blockieren dich. Du musst <strong>Handeln</strong> probieren (Schwerelosigkeits-Manöver, Schleichen, Drohnensteuerung), um überhaupt weiterzukommen. Situation 3 wird <strong>Handeln</strong>; der Xenolidium-Preis steigt um 20&nbsp;%. Notiere dir den Ausgang — er wirkt direkt in Situation 3.</p>
+<p><strong>Tutorial-Hinweis:</strong> Nicht jede Interaktion braucht einen Wurf. Wenn du eine Szene lebendig beschreibst, darfst du den Wurf weglassen. Als Solo-Spielleitung entscheidest du das fair für deinen Charakter.</p>"""
 
     situation3_html = f"""<h1>Situation 3 — Xenolidium kaufen</h1>
 <p>Schalter 7-B: ein bunter Markstand voller schwebender Ampullen. Hinter der Theke: {lux}, Xenolidium-Spezialistin mit drei Augen und einem Lächeln, das zu viele Zähne zeigt.</p>
 <p>&gt; „Ah. Du bist die Person mit dem klemmenden Schiff, oder? Xenolidium hab ich. Premium. Frisch destilliert. Nicht billig.“</p>
-<p>Listenpreis: <strong>800 Credits</strong>. Du hast <strong>650 Credits</strong> (SL kann anpassen).</p>
+<p>Listenpreis: <strong>800 Credits</strong>. Du hast <strong>650 Credits</strong> (passe die Summe bei Bedarf an dein Charakter-Inventar an).</p>
+<p><strong>Mögliche Fähigkeiten:</strong></p>
+<p><strong>Soziales (wenn Situation 2 gut lief):</strong> Verhandeln, Diplomatie (interstellar), Menschenkenntnis, Überzeugen, Begeistern …</p>
+<p><strong>Handeln (wenn Situation 2 schlecht lief):</strong> Schleichen, Drohnensteuerung, Nahkampf (Energiewaffen), Exoanzug-Einsatz … — oft kombiniert mit Lügen oder Einschüchtern aus Soziales</p>
+<p><strong>Wissen (Alternativweg):</strong> Raumschifftechnik, Xenobiologie, KI-Systeme, Wahrnehmung (Qualität der Ampullen prüfen) …</p>
 <p><strong>Abhängig von Situation 2:</strong></p>
-<ul>
-<li><strong>Szene 2 gut (Soziales):</strong> Lux ist wohlwollend. Probe auf <strong>Soziales</strong> (Verhandeln, Diplomatie, Menschenkenntnis). Erfolg: Rabatt oder Ratenzahlung. Kritischer Erfolg: 650 Credits reichen + Gratis Andock-Gutschein.</li>
-<li><strong>Szene 2 schlecht (Handeln):</strong> Lux hat die Holo-Clips gesehen. Probe auf <strong>Handeln</strong> (Feilschen, Einschüchtern, Lügen). Erfolg: 650 Credits reichen trotzdem. Misserfolg: du brauchst einen Kollateral-Gegenstand aus dem Inventar oder musst eine „Gefallen“-Quest akzeptieren (SL-Folgehook optional).</li>
-</ul>
-<p><strong>Alternativen:</strong> Wissen-Probe (Xenotechnologie): Lux respektiert Fachwissen und senkt den Preis. Kreative Lösungen (Tausch, Reparatur ihres Geräts) sind immer erlaubt.</p>
-<p><strong>Erfolg:</strong> Du erhältst {xenolidium} (1 Kern, ausreichend für einen Sprung). Rückweg zum Schiff — optional kurze Wiederholungs-Probe, wenn Szene 1 knapp war.</p>"""
+<p><strong>Situation 2 gut (Soziales):</strong> Lux kennt dich nur vom Hörensagen — freundlich, neugierig. Sie beginnt bei 750 Credits und ist gesprächsbereit. Probe auf <strong>Soziales</strong>. <em>Erfolg:</em> Rabatt auf 650 oder Ratenzahlung. <em>Kritischer Erfolg:</em> 650 Credits reichen sofort; Lux schenkt dir einen Andock-Gutschein für K-7. <em>Misserfolg:</em> Lux bleibt nett, verhandelt aber hart — du brauchst 700 Credits oder einen Gegenstand als Anzahlung.</p>
+<p><strong>Situation 2 normal schlecht (Handeln):</strong> Lux hat das peinliche Holo gesehen. Sie grinst: <em>„Berühmtheit kostet extra.“</em> Startpreis 850 Credits. Probe auf <strong>Handeln</strong> oder <strong>Soziales</strong> (Lügen, Einschüchtern, Verhandeln). <em>Erfolg:</em> 650 Credits reichen trotzdem. <em>Misserfolg:</em> Kollateral aus deinem Inventar oder eine kleine Gefälligkeits-Aufgabe (z. B. Holo löschen lassen).</p>
+<p><strong>Situation 2 kritisch schlecht (Handeln + Blockade):</strong> Lux hat die Clips <em>und</em> die Blockade mitbekommen. Startpreis 960 Credits (+20&nbsp;%). Sie ist misstrauisch. Probe auf <strong>Handeln</strong> — oder überzeuge sie mit <strong>Wissen</strong> (Xenobiologie: Qualität erkennen). <em>Erfolg:</em> 650 Credits + ein Inventar-Gegenstand als Pfand. <em>Misserfolg:</em> Lux bietet nur verdünntes Xenolidium an (Wissen-Probe zum Entlarven) oder du akzeptierst eine Follow-up-Aufgabe.</p>
+<p><strong>Alternativen:</strong> Repariere Lux' defekten Preisanzeiger (Wartung &amp; Reparatur) oder tausche gegen ein seltenes Inventarstück. Kreative Lösungen darfst du dir selbst genehmigen, solange sie zum Charakter passen.</p>
+<p><strong>Erfolg:</strong> Du erhältst {xenolidium} (1 Kern, ausreichend für einen Sprung). Rückweg zum Schiff — optional kurze Wiederholungs-Probe, wenn Situation 1 knapp war.</p>"""
 
     finale_html = f"""<h1>Finale — Zurück am Schiff</h1>
 <p>Du lädst das Xenolidium in den Antriebskern. Das Display wechselt von Rot auf Grün:</p>
 <p><em>„Hypersprung bereit. Zielkoordinaten?“</em></p>
 <p>Der Hangar wird kleiner im Heckfenster. Irgendwo posten {schaulustige} vielleicht noch dein Holo — aber du bist frei.</p>
-<p><strong>Ende.</strong> Optional: Kurz reflektieren, welche Begabung am häufigsten half und was sich bei kritischeren Würfen änderte.</p>"""
+<p><strong>Ende.</strong> Optional: Nimm dir eine Minute und überlege, welche Begabung dir am häufigsten half und was sich bei kritischen Würfen geändert hat. Damit hast du das Solo-Tutorial abgeschlossen.</p>"""
 
     return [
         {"id": "xnl-ab-gesamt", "name": "Abenteuer", "html": abenteuer_html},
@@ -260,15 +264,29 @@ def baue_kampagne() -> dict:
             "gesinnung": "Geschäftstüchtig, charmant, opportunistisch",
             "beruf": "Xenolidium-Händlerin",
             "ziel": "Guter Deal, gute Stories für Kundschaft",
-            "geheimnis": "Verdünnt Xenolidium bei schlecht verhandelnden Kunden — Wissen-Probe kann das entlarven.",
+            "geheimnis": "Verdünnt Xenolidium bei schlecht verhandelnden Kunden — Wissen-Probe (Xenobiologie) kann das entlarven.",
             "stimme": "singend, schnell, freundlich",
             "lebenspunkte": "45",
+            "kampfZustand": "vital",
             "lpBewusstlosAusgeblendet": False,
             "lpMassenschadenBewusstlos": False,
             "aufenthaltsort": "Schalter 7-B, Etage Gamma",
-            "handeln": [{"name": "Feilschen", "value": 72}],
-            "wissen": [{"name": "Xenotechnologie", "value": 85}],
-            "soziales": [{"name": "Verhandeln", "value": 78}, {"name": "Menschenkenntnis", "value": 65}],
+            "presetId": "htbah-scifi",
+            "handeln": [
+                {"name": "Schleichen", "value": 45},
+                {"name": "Wartung & Reparatur", "value": 55},
+            ],
+            "wissen": [
+                {"name": "Raumschifftechnik", "value": 82},
+                {"name": "Xenobiologie", "value": 70},
+                {"name": "Wahrnehmung", "value": 60},
+            ],
+            "soziales": [
+                {"name": "Verhandeln", "value": 78},
+                {"name": "Menschenkenntnis", "value": 65},
+                {"name": "Lügen", "value": 72},
+                {"name": "Begeistern", "value": 58},
+            ],
             "fraktion": "",
             "glaube": "",
             "initiative": "9",
@@ -277,7 +295,7 @@ def baue_kampagne() -> dict:
                 "<p>Verkauft "
                 '<a href="https://htbah.local/entity/gegenstand/xnl-item-xenolidium" '
                 'rel="noopener noreferrer" target="_blank">@Xenolidium</a>. '
-                "Reagiert auf Gerüchte aus Szene 2.</p>"
+                "Reagiert auf Gerüchte aus Situation 2.</p>"
             ),
         },
         {
@@ -294,12 +312,22 @@ def baue_kampagne() -> dict:
             "geheimnis": "Kann die Luke per Fernfreigabe öffnen — verlangt aber gültigen Andock-Schein.",
             "stimme": "monoton, leise piepend",
             "lebenspunkte": "60",
+            "kampfZustand": "vital",
             "lpBewusstlosAusgeblendet": False,
             "lpMassenschadenBewusstlos": False,
             "aufenthaltsort": "Gangway C-14",
-            "handeln": [{"name": "Mechanik", "value": 80}],
-            "wissen": [{"name": "Raumschifftechnik", "value": 90}, {"name": "Elektronik", "value": 75}],
-            "soziales": [{"name": "Etikette & Anstand", "value": 40}],
+            "presetId": "htbah-scifi",
+            "handeln": [
+                {"name": "Wartung & Reparatur", "value": 80},
+                {"name": "Schwerelosigkeits-Manöver", "value": 65},
+                {"name": "Drohnensteuerung", "value": 55},
+            ],
+            "wissen": [
+                {"name": "Raumschifftechnik", "value": 90},
+                {"name": "KI-Systeme", "value": 75},
+                {"name": "Wahrnehmung", "value": 50},
+            ],
+            "soziales": [{"name": "Kulturelle Anpassung", "value": 40}],
             "fraktion": "",
             "glaube": "",
             "initiative": "6",
@@ -320,12 +348,24 @@ def baue_kampagne() -> dict:
             "geheimnis": "Einer ist heimlich Holo-Blogger mit 50.000 Followern.",
             "stimme": "durcheinander, viele Sprachen",
             "lebenspunkte": "30",
+            "kampfZustand": "vital",
             "lpBewusstlosAusgeblendet": False,
             "lpMassenschadenBewusstlos": False,
             "aufenthaltsort": "Hangarhalle, Hauptrasse",
-            "handeln": [{"name": "Athletik", "value": 35}],
-            "wissen": [{"name": "Wahrnehmung", "value": 55}],
-            "soziales": [{"name": "Auftreten", "value": 45}, {"name": "Begeistern", "value": 50}],
+            "presetId": "htbah-scifi",
+            "handeln": [
+                {"name": "Schwerelosigkeits-Manöver", "value": 35},
+                {"name": "Schleichen", "value": 30},
+            ],
+            "wissen": [
+                {"name": "Wahrnehmung", "value": 55},
+                {"name": "Außerirdische Spezies deuten", "value": 40},
+            ],
+            "soziales": [
+                {"name": "Begeistern", "value": 50},
+                {"name": "Überzeugen", "value": 45},
+                {"name": "Menschenkenntnis", "value": 42},
+            ],
             "fraktion": "",
             "glaube": "",
             "initiative": "8",

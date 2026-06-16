@@ -262,7 +262,12 @@ window.HTBAH_KOMPONENTEN.AbenteuerbuchModal = {
       if (!this.quill || !this.aktiverReiter) {
         return;
       }
-      this.quill.root.innerHTML = this.aktiverReiter.html || '';
+      const api = window.HTBAH_SHARED && window.HTBAH_SHARED.QuillLifecycle;
+      if (api && typeof api.ladeHtmlInQuill === 'function') {
+        api.ladeHtmlInQuill(this.quill, this.aktiverReiter.html || '');
+      } else {
+        this.quill.root.innerHTML = this.aktiverReiter.html || '';
+      }
     },
     reiterIstAktiv(reiterId) {
       return reiterId === this.aktiverReiterId;
