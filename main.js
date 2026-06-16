@@ -5842,6 +5842,44 @@ function ladeThemeProfil() {
   return { mode, setting: 'gegenwart' };
 }
 
+function wendePwaChromeFarbenAn() {
+  if (typeof document === 'undefined' || !document.documentElement || !document.head) {
+    return;
+  }
+  const root = document.documentElement;
+  const styles = getComputedStyle(root);
+  const themeColor =
+    styles.getPropertyValue('--primary-color').trim() ||
+    styles.getPropertyValue('--navbar-bg').trim() ||
+    '#1d6a85';
+  const tileColor =
+    styles.getPropertyValue('--navbar-bg').trim() ||
+    styles.getPropertyValue('--bg-color').trim() ||
+    '#f8fafc';
+  const mode = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  root.style.colorScheme = mode;
+
+  function setMetaName(name, content) {
+    if (!name || !content) {
+      return;
+    }
+    let el = document.querySelector(`meta[name="${name}"]`);
+    if (!el) {
+      el = document.createElement('meta');
+      el.setAttribute('name', name);
+      document.head.appendChild(el);
+    }
+    el.setAttribute('content', content);
+  }
+
+  setMetaName('theme-color', themeColor);
+  setMetaName('msapplication-TileColor', tileColor);
+  setMetaName(
+    'apple-mobile-web-app-status-bar-style',
+    mode === 'dark' ? 'black-translucent' : 'default',
+  );
+}
+
 function wendeThemeProfilAufDom(profil) {
   const p =
     HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil === 'function'
@@ -5850,6 +5888,7 @@ function wendeThemeProfilAufDom(profil) {
   document.documentElement.setAttribute('data-theme', p.mode);
   document.documentElement.setAttribute('data-bs-theme', p.mode);
   document.documentElement.setAttribute('data-theme-setting', p.setting);
+  wendePwaChromeFarbenAn();
   return p;
 }
 
@@ -6233,6 +6272,7 @@ window.HTBAH = {
   ladeAktivesThemeProfil,
   setzeThemeProfil,
   wendeThemeProfilAn,
+  wendePwaChromeFarbenAn,
   wendeEffektivesThemeAn,
   wendeGlobalesThemeAn,
   speichereKampagneThemeSetting,

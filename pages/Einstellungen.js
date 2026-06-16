@@ -1120,6 +1120,9 @@ window.HTBAH_SEITEN.Einstellungen = {
           document.documentElement.setAttribute('data-theme', standard.mode);
           document.documentElement.setAttribute('data-bs-theme', standard.mode);
           document.documentElement.setAttribute('data-theme-setting', standard.setting);
+          if (typeof window.HTBAH !== 'undefined' && typeof window.HTBAH.wendePwaChromeFarbenAn === 'function') {
+            window.HTBAH.wendePwaChromeFarbenAn();
+          }
         }
         this.istHellesTheme = standard.mode === 'light';
         this.aktivesThemeSetting = standard.setting;
