@@ -267,14 +267,55 @@ function normalisiereSpielleitungKampagne(g) {
     ? ZU.normalisiereBadgePosition(g.zeitmessungBadgePos)
     : normalisiereAtmosphaereBadgePosition(g.zeitmessungBadgePos);
   const KL = window.HTBAH_SHARED && window.HTBAH_SHARED.KampagnenLabels;
-  const labels = KL ? KL.normalisiereKampagneLabels(g.labels) : [];
+  let labels = KL ? KL.normalisiereKampagneLabels(g.labels) : [];
   const KM = window.HTBAH_SHARED && window.HTBAH_SHARED.KonfliktModel;
   const konflikt = KM ? KM.normalisiereKonfliktZustand(g.konflikt) : null;
+  const TE = window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen;
+  let themeSetting =
+    TE && typeof TE.normalisiereKampagnenThemeSetting === 'function'
+      ? TE.normalisiereKampagnenThemeSetting(g.themeSetting)
+      : '';
+  const demoKampagne = {
+    id: typeof g.id === 'string' ? g.id : '',
+    name: typeof g.name === 'string' ? g.name : '',
+  };
+  if (
+    !themeSetting &&
+    TE &&
+    typeof TE.beispielDefaultThemeFuerKampagne === 'function' &&
+    typeof TE.normalisiereKampagnenThemeSetting === 'function'
+  ) {
+    themeSetting = TE.normalisiereKampagnenThemeSetting(TE.beispielDefaultThemeFuerKampagne(demoKampagne));
+  }
+  if (
+    KL &&
+    TE &&
+    typeof TE.beispielDefaultThemeFuerKampagne === 'function' &&
+    Array.isArray(KL.STANDARD_KATALOG_EINTRAGE)
+  ) {
+    const demoTheme = TE.beispielDefaultThemeFuerKampagne(demoKampagne);
+    const settingLabelId =
+      demoTheme === 'scifi'
+        ? 'lbl-setting-scifi'
+        : demoTheme === 'gegenwart'
+          ? 'lbl-setting-gegenwart'
+          : demoTheme === 'fantasy'
+            ? 'lbl-setting-mittelalter-fantasy'
+            : '';
+    const hatSettingLabel = labels.some((l) => l && l.kategorie === 'setting');
+    if (settingLabelId && !hatSettingLabel) {
+      const eintrag = KL.STANDARD_KATALOG_EINTRAGE.find((e) => e && e.id === settingLabelId);
+      if (eintrag) {
+        labels = KL.normalisiereKampagneLabels([eintrag, ...labels]);
+      }
+    }
+  }
   return {
     id: typeof g.id === 'string' && g.id ? g.id : neueEntropieId(),
     name: typeof g.name === 'string' && g.name.trim() ? g.name.trim() : 'Kampagne',
     mitglieder,
     labels,
+    themeSetting,
     abenteuerbuch,
     atmosphaere,
     atmosphaereBadgePos,
@@ -516,6 +557,42 @@ function ladeSpielleitungZustandLeichtAusRoh(roh) {
   };
 }
 
+function migriereFehlendeDemoKampagnenDefaultsInRoh(roh, kampagnenNorm) {
+  if (!roh || !Array.isArray(roh.kampagnen) || !Array.isArray(kampagnenNorm)) {
+    return false;
+  }
+  const normById = new Map(
+    kampagnenNorm
+      .filter((k) => k && typeof k.id === 'string' && k.id)
+      .map((k) => [k.id, k]),
+  );
+  let geaendert = false;
+  roh.kampagnen = roh.kampagnen.map((rohK) => {
+    if (!rohK || typeof rohK.id !== 'string' || !rohK.id) {
+      return rohK;
+    }
+    const norm = normById.get(rohK.id);
+    if (!norm) {
+      return rohK;
+    }
+    let next = rohK;
+    if (norm.themeSetting && !rohK.themeSetting) {
+      next = { ...next, themeSetting: norm.themeSetting };
+      geaendert = true;
+    }
+    const rohHatSetting =
+      Array.isArray(rohK.labels) && rohK.labels.some((l) => l && l.kategorie === 'setting');
+    const normHatSetting =
+      Array.isArray(norm.labels) && norm.labels.some((l) => l && l.kategorie === 'setting');
+    if (normHatSetting && !rohHatSetting) {
+      next = { ...next, labels: norm.labels };
+      geaendert = true;
+    }
+    return next;
+  });
+  return geaendert;
+}
+
 function ladeSpielleitungZustand() {
   const roh = leseSpielleitungZustandRoh();
   if (!roh) {
@@ -535,6 +612,9 @@ function ladeSpielleitungZustand() {
   const kampagnen = Array.isArray(roh.kampagnen)
     ? roh.kampagnen.map(normalisiereSpielleitungKampagne).filter(Boolean)
     : [];
+  if (migriereFehlendeDemoKampagnenDefaultsInRoh(roh, kampagnen)) {
+    speichereSpielleitungRoh(roh);
+  }
   let aktiveKampagneId = typeof roh.aktiveKampagneId === 'string' ? roh.aktiveKampagneId : null;
   if (aktiveKampagneId && !kampagnen.some((g) => g.id === aktiveKampagneId)) {
     aktiveKampagneId = kampagnen[0] ? kampagnen[0].id : null;
@@ -767,6 +847,25 @@ function speichereKampagnenTab(kampagneId, tab) {
   }
   roh.tabProKampagne[kid] = normal;
   return speichereSpielleitungRoh(roh);
+}
+
+function findeSpielleitungKampagneNachId(kampagneId) {
+  const kid = typeof kampagneId === 'string' ? kampagneId.trim() : '';
+  if (!kid) {
+    return null;
+  }
+  const zustand = ladeSpielleitungZustand();
+  const kampagnen = Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
+  return kampagnen.find((k) => k && k.id === kid) || null;
+}
+
+function kampagneIdAusPfad(pfad) {
+  const p = typeof pfad === 'string' ? pfad : '';
+  const parts = p.split('/').filter(Boolean);
+  if (parts.length >= 3 && parts[0] === 'kampagnen' && KAMPAGNEN_TAB_IDS.has(parts[2])) {
+    return kampagneIdAusSlug(parts[1]);
+  }
+  return null;
 }
 
 function kampagneIdAusSlug(slugRaw) {
@@ -3335,6 +3434,62 @@ function beispielKampagneNameAusPaket(paket, kampagneId) {
   return typeof kampagneId === 'string' && kampagneId ? kampagneId : 'Unbenannte Kampagne';
 }
 
+function beispielSpielleitungTeilAusPaket(paket, kampagneId) {
+  const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
+  if (!kid) {
+    return null;
+  }
+  const daten = Array.isArray(paket && paket.daten) ? paket.daten : [];
+  for (let i = 0; i < daten.length; i += 1) {
+    const bereich = daten[i];
+    if (!bereich || !bereich.vorhanden || typeof bereich.wert !== 'string') {
+      continue;
+    }
+    const meta = parseLsExportKeyMetaBeispiel(bereich.key);
+    if (
+      !meta ||
+      meta.kampagneId !== kid ||
+      (meta.lsTyp !== 'spielleitung_teil' && meta.lsTyp !== 'spielleitung_ohne_gruppe')
+    ) {
+      continue;
+    }
+    return beispielParsePaketBereichWert(bereich);
+  }
+  return null;
+}
+
+function beispielThemeSettingAusPaket(paket, kampagneId) {
+  const teil = beispielSpielleitungTeilAusPaket(paket, kampagneId);
+  const TE = HTBAH_THEMEN_EINSTELLUNGEN;
+  if (TE && typeof TE.normalisiereKampagnenThemeSetting === 'function') {
+    const ausTeil =
+      teil && teil.kampagne && teil.kampagne.themeSetting != null
+        ? TE.normalisiereKampagnenThemeSetting(teil.kampagne.themeSetting)
+        : '';
+    if (ausTeil) {
+      return ausTeil;
+    }
+    if (typeof TE.beispielDefaultThemeFuerKampagne === 'function') {
+      return TE.normalisiereKampagnenThemeSetting(
+        TE.beispielDefaultThemeFuerKampagne({ id: kampagneId }),
+      );
+    }
+  }
+  return '';
+}
+
+function beispielKampagneRohAusPaket(paket, kampagneId) {
+  const teil = beispielSpielleitungTeilAusPaket(paket, kampagneId);
+  if (!teil || !teil.kampagne || typeof teil.kampagne !== 'object') {
+    return null;
+  }
+  const themeSetting = beispielThemeSettingAusPaket(paket, kampagneId);
+  return {
+    ...teil.kampagne,
+    ...(themeSetting ? { themeSetting } : {}),
+  };
+}
+
 function sicherstelleSpielleitungKampagneFuerBeispielImport(kampagneId, opts) {
   const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
   if (!kid) {
@@ -3603,7 +3758,11 @@ function wendeBeispielLokalerSpeicherPaketAdditivAn(paket) {
       return;
     }
     const name = beispielKampagneNameAusPaket(paket, kid);
-    const sicher = sicherstelleSpielleitungKampagneFuerBeispielImport(kid, { name });
+    const kampagneRoh = beispielKampagneRohAusPaket(paket, kid);
+    const sicher = sicherstelleSpielleitungKampagneFuerBeispielImport(kid, {
+      name,
+      kampagneRoh,
+    });
     if (sicher.ok && sicher.status === 'neu') {
       neuAngelegteKampagnen.add(kid);
       if (!ergebnis.kampagneId) {
@@ -4282,12 +4441,14 @@ function wendeBeispielLokalerSpeicherPaketAlsNeueInstanzAn(paket) {
   });
   const teilPaket = beispielParsePaketBereichWert(teilBereich);
   if (teilPaket) {
+    const themeSetting = beispielThemeSettingAusPaket(paket, altKid);
     if (teilPaket.kampagne && typeof teilPaket.kampagne === 'object') {
       teilPaket.kampagne = {
         ...teilPaket.kampagne,
         id: neuKid,
         name: neuerName,
         mitglieder: [],
+        ...(themeSetting ? { themeSetting } : {}),
       };
     }
     teilPaket.kampagneId = neuKid;
@@ -5678,14 +5839,14 @@ function ladeThemeProfil() {
     return HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil(raw);
   }
   const mode = raw === 'dark' ? 'dark' : 'light';
-  return { mode, setting: 'fantasy' };
+  return { mode, setting: 'gegenwart' };
 }
 
 function wendeThemeProfilAufDom(profil) {
   const p =
     HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil === 'function'
       ? HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil(profil)
-      : { mode: profil && profil.mode === 'dark' ? 'dark' : 'light', setting: 'fantasy' };
+      : { mode: profil && profil.mode === 'dark' ? 'dark' : 'light', setting: 'gegenwart' };
   document.documentElement.setAttribute('data-theme', p.mode);
   document.documentElement.setAttribute('data-bs-theme', p.mode);
   document.documentElement.setAttribute('data-theme-setting', p.setting);
@@ -5704,6 +5865,66 @@ function wendeThemeProfilAn(profil) {
   return p;
 }
 
+function ladeAktivesThemeProfil(kampagneIdOptional) {
+  const global =
+    HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil === 'function'
+      ? HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil(ladeThemeProfil())
+      : ladeThemeProfil();
+  const kid =
+    (typeof kampagneIdOptional === 'string' && kampagneIdOptional.trim()
+      ? kampagneIdOptional.trim()
+      : null) || kampagneIdAusPfad(typeof window !== 'undefined' && window.location ? window.location.hash.replace(/^#/, '') || '/' : '/');
+  if (!kid) {
+    return { ...global };
+  }
+  const kampagne = findeSpielleitungKampagneNachId(kid);
+  const kampagnenSetting =
+    HTBAH_THEMEN_EINSTELLUNGEN &&
+    typeof HTBAH_THEMEN_EINSTELLUNGEN.normalisiereKampagnenThemeSetting === 'function'
+      ? HTBAH_THEMEN_EINSTELLUNGEN.normalisiereKampagnenThemeSetting(
+          kampagne && kampagne.themeSetting,
+        )
+      : '';
+  if (!kampagnenSetting) {
+    return { ...global };
+  }
+  return { mode: global.mode, setting: kampagnenSetting };
+}
+
+function wendeEffektivesThemeAn(kampagneIdOptional) {
+  return wendeThemeProfilAn(ladeAktivesThemeProfil(kampagneIdOptional));
+}
+
+function wendeGlobalesThemeAn() {
+  return wendeThemeProfilAn(ladeThemeProfil());
+}
+
+function speichereKampagneThemeSetting(kampagneId, rawSetting) {
+  const kid = typeof kampagneId === 'string' ? kampagneId.trim() : '';
+  if (!kid) {
+    return false;
+  }
+  const themeSetting =
+    HTBAH_THEMEN_EINSTELLUNGEN &&
+    typeof HTBAH_THEMEN_EINSTELLUNGEN.normalisiereKampagnenThemeSetting === 'function'
+      ? HTBAH_THEMEN_EINSTELLUNGEN.normalisiereKampagnenThemeSetting(rawSetting)
+      : '';
+  const zustand = ladeSpielleitungZustand();
+  const kampagnen = Array.isArray(zustand.kampagnen) ? zustand.kampagnen : [];
+  const idx = kampagnen.findIndex((k) => k && k.id === kid);
+  if (idx < 0) {
+    return false;
+  }
+  kampagnen[idx] = normalisiereSpielleitungKampagne({
+    ...kampagnen[idx],
+    themeSetting,
+  });
+  zustand.kampagnen = kampagnen;
+  speichereSpielleitungZustand(zustand);
+  wendeEffektivesThemeAn(kid);
+  return true;
+}
+
 function setzeThemeProfil(profil) {
   const norm = ladeThemeProfil();
   const eingabe = profil && typeof profil === 'object' ? profil : {};
@@ -5714,21 +5935,13 @@ function setzeThemeProfil(profil) {
   const gueltig =
     HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil === 'function'
       ? HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil(zusammengefuegt)
-      : { mode: zusammengefuegt.mode === 'dark' ? 'dark' : 'light', setting: 'fantasy' };
-  wendeThemeProfilAufDom(gueltig);
+      : { mode: zusammengefuegt.mode === 'dark' ? 'dark' : 'light', setting: 'gegenwart' };
   const serialisiert =
     HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.serialisiereThemeProfil === 'function'
       ? HTBAH_THEMEN_EINSTELLUNGEN.serialisiereThemeProfil(gueltig)
       : gueltig.mode;
   htbahSpeicher.schreibeText(SPEICHER_KEY_THEME, serialisiert);
-  try {
-    window.dispatchEvent(
-      new CustomEvent('htbah:theme-profil-geaendert', { detail: { ...gueltig } }),
-    );
-  } catch {
-    /* ignorieren */
-  }
-  return gueltig;
+  return wendeEffektivesThemeAn();
 }
 
 function ladeTheme() {
@@ -5748,7 +5961,7 @@ function setzeThemeSetting(setting) {
 }
 
 function standardZufallEpocheFuerAktivesTheme() {
-  const profil = ladeThemeProfil();
+  const profil = ladeAktivesThemeProfil();
   if (HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.standardZufallEpoche === 'function') {
     return HTBAH_THEMEN_EINSTELLUNGEN.standardZufallEpoche(profil.setting);
   }
@@ -5756,7 +5969,7 @@ function standardZufallEpocheFuerAktivesTheme() {
 }
 
 function standardCharakterEpocheFuerAktivesTheme() {
-  const profil = ladeThemeProfil();
+  const profil = ladeAktivesThemeProfil();
   if (
     HTBAH_THEMEN_EINSTELLUNGEN &&
     typeof HTBAH_THEMEN_EINSTELLUNGEN.standardCharakterEpoche === 'function'
@@ -5767,7 +5980,7 @@ function standardCharakterEpocheFuerAktivesTheme() {
 }
 
 function standardPdfStilFuerAktivesTheme() {
-  const profil = ladeThemeProfil();
+  const profil = ladeAktivesThemeProfil();
   if (HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.standardPdfStil === 'function') {
     return HTBAH_THEMEN_EINSTELLUNGEN.standardPdfStil(profil.setting);
   }
@@ -6017,8 +6230,12 @@ window.HTBAH = {
   ladeTheme,
   setzeTheme,
   ladeThemeProfil,
+  ladeAktivesThemeProfil,
   setzeThemeProfil,
   wendeThemeProfilAn,
+  wendeEffektivesThemeAn,
+  wendeGlobalesThemeAn,
+  speichereKampagneThemeSetting,
   ladeThemeSetting,
   setzeThemeSetting,
   standardZufallEpocheFuerAktivesTheme,
@@ -6794,6 +7011,12 @@ const app = Vue.createApp({
 
 app.use(router);
 router.afterEach((to) => {
+  const kampagnenKid = kampagneIdAusPfad(to.path);
+  if (kampagnenKid) {
+    wendeEffektivesThemeAn(kampagnenKid);
+  } else if (!to.path.startsWith('/kampagnen/') || to.path === '/kampagnen') {
+    wendeGlobalesThemeAn();
+  }
   if (to.path.startsWith('/kampagnen/')) {
     const parts = to.path.split('/').filter(Boolean);
     if (parts.length >= 3 && parts[0] === 'kampagnen' && KAMPAGNEN_TAB_IDS.has(parts[2])) {

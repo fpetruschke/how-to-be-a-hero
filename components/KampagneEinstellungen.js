@@ -44,6 +44,22 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       kannNameSpeichern() {
         return this.nameGeaendert && !!this.nameEntwurf.trim() && !this.nameSpeichernAktiv;
       },
+      kampagnenThemeOptionen() {
+        const TE = window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen;
+        return TE && Array.isArray(TE.KAMPAGNEN_THEME_OPTIONEN)
+          ? TE.KAMPAGNEN_THEME_OPTIONEN
+          : [];
+      },
+      aktivesKampagnenThemeSetting() {
+        const k = this.kampagne;
+        if (!k) {
+          return '';
+        }
+        const TE = window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen;
+        return TE && typeof TE.normalisiereKampagnenThemeSetting === 'function'
+          ? TE.normalisiereKampagnenThemeSetting(k.themeSetting)
+          : '';
+      },
     },
     watch: {
       kampagne: {
@@ -80,6 +96,28 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       labelsGeaendert() {
         this.zustand = window.HTBAH.ladeSpielleitungZustand();
+        this.$emit('geaendert');
+      },
+      setzeKampagnenTheme(settingId) {
+        if (!this.kampagneId || !window.HTBAH) {
+          return;
+        }
+        const TE = window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen;
+        const norm =
+          TE && typeof TE.normalisiereKampagnenThemeSetting === 'function'
+            ? TE.normalisiereKampagnenThemeSetting(settingId)
+            : '';
+        if (norm === this.aktivesKampagnenThemeSetting) {
+          return;
+        }
+        if (typeof window.HTBAH.speichereKampagneThemeSetting !== 'function') {
+          return;
+        }
+        window.HTBAH.speichereKampagneThemeSetting(this.kampagneId, norm);
+        this.zustand = window.HTBAH.ladeSpielleitungZustand();
+        const opt = this.kampagnenThemeOptionen.find((o) => o.id === norm);
+        const label = opt ? opt.label : 'Keine Vorgabe';
+        this.zeigeStatus(`Standard-Theme: ${label}`);
         this.$emit('geaendert');
       },
       async nameSpeichern() {
@@ -224,6 +262,32 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             :kampagne-id="kampagneId"
             @geaendert="labelsGeaendert" />
           <p v-else class="small text-body-secondary mb-0">Keine Kampagne ausgewählt.</p>
+        </div>
+
+        <div class="card p-3 mb-3">
+          <h6 class="mb-2">Standard-Theme</h6>
+          <p class="small text-body-secondary mb-2">
+            Optionales thematisches Setting für diese Kampagne. Bei „Keine Vorgabe“ gilt das Theme aus den
+            <router-link to="/einstellungen">Einstellungen</router-link> der Anwendung. Hell/Dunkel bleibt immer global.
+          </p>
+          <div
+            class="btn-group w-100 flex-wrap"
+            role="radiogroup"
+            aria-label="Standard-Theme der Kampagne wählen">
+            <button
+              v-for="opt in kampagnenThemeOptionen"
+              :key="'kampagne-theme-' + (opt.id || 'keine')"
+              type="button"
+              class="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1 flex-fill"
+              :class="aktivesKampagnenThemeSetting === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
+              role="radio"
+              :aria-checked="aktivesKampagnenThemeSetting === opt.id ? 'true' : 'false'"
+              :disabled="!kampagne"
+              @click="setzeKampagnenTheme(opt.id)">
+              <span aria-hidden="true">{{ opt.emoji }}</span>
+              <span>{{ opt.label }}</span>
+            </button>
+          </div>
         </div>
 
         <div class="card p-3 mb-3">

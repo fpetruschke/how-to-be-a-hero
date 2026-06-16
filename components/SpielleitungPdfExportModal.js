@@ -72,9 +72,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     }
     const TE = window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen;
     if (TE && typeof TE.standardPdfStil === 'function') {
-      return TE.standardPdfStil('fantasy');
+      return TE.standardPdfStil(TE.DEFAULT_PROFIL ? TE.DEFAULT_PROFIL.setting : 'gegenwart');
     }
-    return 'fantasy-mittelalter';
+    return 'gegenwart';
   }
 
   function standardAuswahlFuerVerfuegbar(verfuegbar) {

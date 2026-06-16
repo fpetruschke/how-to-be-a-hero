@@ -322,7 +322,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       aktivesThemeSetting:
         window.HTBAH && typeof window.HTBAH.ladeThemeSetting === 'function'
           ? window.HTBAH.ladeThemeSetting()
-          : 'fantasy',
+          : 'gegenwart',
       zuLoeschenderBereich: 'charakter',
       speicherBereiche: SPEICHER_BEREICHE,
       browserSpeicher: null,
@@ -1111,16 +1111,18 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
 
       if (this.zuLoeschenderBereich === 'theme' || this.zuLoeschenderBereich === 'alles') {
-        const standard = { mode: 'light', setting: 'fantasy' };
+        const TE = window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen;
+        const standard =
+          TE && TE.DEFAULT_PROFIL ? { ...TE.DEFAULT_PROFIL } : { mode: 'light', setting: 'gegenwart' };
         if (window.HTBAH && typeof window.HTBAH.wendeThemeProfilAn === 'function') {
           window.HTBAH.wendeThemeProfilAn(standard);
         } else {
-          document.documentElement.setAttribute('data-theme', 'light');
-          document.documentElement.setAttribute('data-bs-theme', 'light');
-          document.documentElement.setAttribute('data-theme-setting', 'fantasy');
+          document.documentElement.setAttribute('data-theme', standard.mode);
+          document.documentElement.setAttribute('data-bs-theme', standard.mode);
+          document.documentElement.setAttribute('data-theme-setting', standard.setting);
         }
-        this.istHellesTheme = true;
-        this.aktivesThemeSetting = 'fantasy';
+        this.istHellesTheme = standard.mode === 'light';
+        this.aktivesThemeSetting = standard.setting;
       }
       this.statusAnzeigen(bereich.erfolg, 'success');
 
@@ -1702,7 +1704,7 @@ window.HTBAH_SEITEN.Einstellungen = {
         const profil =
           window.HTBAH && typeof window.HTBAH.setzeThemeProfil === 'function'
             ? window.HTBAH.setzeThemeProfil(window.HTBAH.ladeThemeProfil())
-            : { mode: 'light', setting: 'fantasy' };
+            : { mode: 'light', setting: 'gegenwart' };
         this.istHellesTheme = profil.mode === 'light';
         this.aktivesThemeSetting = profil.setting;
       }
