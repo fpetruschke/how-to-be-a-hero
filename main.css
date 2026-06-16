@@ -59,9 +59,100 @@
 }
 
 /*
- * Palette pro Setting (später): eigene Farbvariablen je Setting und Hell/Dunkel ergänzen, z. B.:
- * [data-theme-setting='scifi'][data-theme='dark'] { --primary-color: …; }
+ * Thematisches Setting: Typografie, Formen und dezente Akzentfarben (zusätzlich zu hell/dunkel).
+ * Tokens werden über data-theme-setting gesteuert; Sci-Fi setzt Ecken konsequent auf 0.
  */
+:root,
+[data-theme-setting='fantasy'] {
+  --htbah-font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --htbah-font-heading: Georgia, 'Times New Roman', 'Palatino Linotype', serif;
+  --htbah-letter-spacing: normal;
+  --htbah-radius-sm: 0.25rem;
+  --htbah-radius: 0.375rem;
+  --htbah-radius-lg: 1rem;
+  --htbah-radius-pill: 999px;
+}
+
+[data-theme-setting='gegenwart'] {
+  --htbah-font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --htbah-font-heading: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --htbah-letter-spacing: -0.01em;
+  --htbah-radius-sm: 0.2rem;
+  --htbah-radius: 0.25rem;
+  --htbah-radius-lg: 0.5rem;
+  --htbah-radius-pill: 999px;
+}
+
+[data-theme-setting='scifi'] {
+  --htbah-font-body: ui-monospace, 'Cascadia Code', 'Cascadia Mono', 'SFMono-Regular', Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --htbah-font-heading: ui-monospace, 'Cascadia Code', 'Cascadia Mono', 'SFMono-Regular', Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --htbah-letter-spacing: 0.025em;
+  --htbah-radius-sm: 0;
+  --htbah-radius: 0;
+  --htbah-radius-lg: 0;
+  --htbah-radius-pill: 0;
+}
+
+/* Gegenwart: kühlerer, sachlicher Akzent */
+[data-theme-setting='gegenwart'][data-theme='dark'] {
+  --primary-color: #4a9bb8;
+  --border-color: #3d4f5c;
+}
+
+[data-theme-setting='gegenwart'][data-theme='light'] {
+  --primary-color: #1d6a85;
+  --border-color: #b8c5ce;
+}
+
+/* Sci-Fi: futuristischer Akzent, leicht kühlerer Rand */
+[data-theme-setting='scifi'][data-theme='dark'] {
+  --primary-color: #22d3ee;
+  --border-color: color-mix(in srgb, #22d3ee 14%, #334155);
+  --card-bg: color-mix(in srgb, #22d3ee 4%, #1e293b);
+}
+
+[data-theme-setting='scifi'][data-theme='light'] {
+  --primary-color: #0891b2;
+  --border-color: color-mix(in srgb, #0891b2 18%, #cbd5e1);
+  --card-bg: color-mix(in srgb, #0891b2 3%, #ffffff);
+}
+
+/* Bootstrap-Variablen an Setting-Tokens koppeln */
+:root,
+[data-theme-setting] {
+  --bs-body-font-family: var(--htbah-font-body);
+  --bs-border-radius: var(--htbah-radius);
+  --bs-border-radius-sm: var(--htbah-radius-sm);
+  --bs-border-radius-lg: var(--htbah-radius-lg);
+  --bs-border-radius-xl: var(--htbah-radius-lg);
+  --bs-border-radius-xxl: var(--htbah-radius-lg);
+  --bs-border-radius-pill: var(--htbah-radius-pill);
+}
+
+[data-theme-setting='scifi'] .btn,
+[data-theme-setting='scifi'] .card,
+[data-theme-setting='scifi'] .modal-content,
+[data-theme-setting='scifi'] .dropdown-menu,
+[data-theme-setting='scifi'] .form-control,
+[data-theme-setting='scifi'] .form-select,
+[data-theme-setting='scifi'] .input-group-text,
+[data-theme-setting='scifi'] .list-group-item,
+[data-theme-setting='scifi'] .alert,
+[data-theme-setting='scifi'] .navbar,
+[data-theme-setting='scifi'] .badge,
+[data-theme-setting='scifi'] .rounded,
+[data-theme-setting='scifi'] .rounded-pill,
+[data-theme-setting='scifi'] .htbah-lp-status-banner,
+[data-theme-setting='scifi'] .htbah-bottom-nav-inner,
+[data-theme-setting='scifi'] .ql-toolbar,
+[data-theme-setting='scifi'] .ql-container,
+[data-theme-setting='scifi'] .htbah-fab-stack .btn {
+  border-radius: 0 !important;
+}
 
 [data-theme='light'] {
   --bg-overlay-color: rgba(248, 250, 252, 0.25);
@@ -144,6 +235,8 @@ body {
   background-size: cover;
   background-attachment: fixed;
   color: var(--text-color);
+  font-family: var(--htbah-font-body);
+  letter-spacing: var(--htbah-letter-spacing);
   font-size: 16px;
 }
 
@@ -317,9 +410,19 @@ html.htbah-orient-erzwungen.htbah-orient-drehung-180 body {
 .card {
   background: var(--card-bg);
   color: var(--card-color);
-  border-radius: 16px;
+  border-radius: var(--htbah-radius-lg);
   padding: 12px;
   border: 1px solid var(--border-color);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.htbah-page-title {
+  font-family: var(--htbah-font-heading);
 }
 
 h2,
@@ -5039,6 +5142,16 @@ input::placeholder {
 .htbah-start-hero-subtitle {
   font-size: 0.95rem;
   line-height: 1.3;
+}
+
+/* Startseite: drei Info-Karten (Desktop nebeneinander, gleiche Höhe) */
+.htbah-start-infokarten > [class*='col-'] {
+  display: flex;
+}
+
+.htbah-start-infokarten > [class*='col-'] > .card {
+  flex: 1 1 auto;
+  width: 100%;
 }
 
 @media (max-width: 767.98px) {

@@ -66,6 +66,17 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     return { ...LEER_VERFUEGBAR, ...fn(kampagneId) };
   }
 
+  function standardPdfStilAusApp() {
+    if (window.HTBAH && typeof window.HTBAH.standardPdfStilFuerAktivesTheme === 'function') {
+      return window.HTBAH.standardPdfStilFuerAktivesTheme();
+    }
+    const TE = window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen;
+    if (TE && typeof TE.standardPdfStil === 'function') {
+      return TE.standardPdfStil('fantasy');
+    }
+    return 'fantasy-mittelalter';
+  }
+
   function standardAuswahlFuerVerfuegbar(verfuegbar) {
     const auswahl = { ...STANDARD };
     Object.keys(auswahl).forEach((key) => {
@@ -94,7 +105,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         charakterDarstellung: 'kompakt',
         weltSeiten: 1,
         weltQuerformat: true,
-        pdfStil: 'fantasy-mittelalter',
+        pdfStil: standardPdfStilAusApp(),
         kapitelSeitenumbruch: false,
         cheatSheet: false,
         sicherheitsmechanismen: false,
@@ -329,7 +340,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.charakterDarstellung = 'kompakt';
         this.weltSeiten = 1;
         this.weltQuerformat = true;
-        this.pdfStil = 'fantasy-mittelalter';
+        this.pdfStil = standardPdfStilAusApp();
         this.kapitelSeitenumbruch = false;
         this.cheatSheet = false;
         this.sicherheitsmechanismen = false;

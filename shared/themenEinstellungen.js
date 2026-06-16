@@ -26,6 +26,12 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     scifi: 'scifi',
   });
 
+  const PDF_STIL_PRO_SETTING = Object.freeze({
+    fantasy: 'fantasy-mittelalter',
+    gegenwart: 'gegenwart',
+    scifi: 'modern-futuristisch',
+  });
+
   function istGueltigerMode(mode) {
     return THEME_MODES.includes(mode);
   }
@@ -82,6 +88,11 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return CHARAKTER_EPOCHE_PRO_SETTING[s] || CHARAKTER_EPOCHE_PRO_SETTING.fantasy;
   }
 
+  function standardPdfStil(setting) {
+    const s = istGueltigesSetting(setting) ? setting : DEFAULT_PROFIL.setting;
+    return PDF_STIL_PRO_SETTING[s] || PDF_STIL_PRO_SETTING.fantasy;
+  }
+
   function bgImageDateiname(setting, variant) {
     const s = istGueltigesSetting(setting) ? setting : DEFAULT_PROFIL.setting;
     if (variant === 'mobile-portrait') {
@@ -95,12 +106,14 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   M.DEFAULT_PROFIL = DEFAULT_PROFIL;
   M.ZUFALL_EPOCHE_PRO_SETTING = ZUFALL_EPOCHE_PRO_SETTING;
   M.CHARAKTER_EPOCHE_PRO_SETTING = CHARAKTER_EPOCHE_PRO_SETTING;
+  M.PDF_STIL_PRO_SETTING = PDF_STIL_PRO_SETTING;
   M.istGueltigerMode = istGueltigerMode;
   M.istGueltigesSetting = istGueltigesSetting;
   M.normalisiereThemeProfil = normalisiereThemeProfil;
   M.serialisiereThemeProfil = serialisiereThemeProfil;
   M.standardZufallEpoche = standardZufallEpoche;
   M.standardCharakterEpoche = standardCharakterEpoche;
+  M.standardPdfStil = standardPdfStil;
   M.bgImageDateiname = bgImageDateiname;
 
   window.HTBAH_SHARED.ThemenEinstellungen = M;

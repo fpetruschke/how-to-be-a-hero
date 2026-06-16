@@ -5766,6 +5766,14 @@ function standardCharakterEpocheFuerAktivesTheme() {
   return 'mittelalter-fantasy';
 }
 
+function standardPdfStilFuerAktivesTheme() {
+  const profil = ladeThemeProfil();
+  if (HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.standardPdfStil === 'function') {
+    return HTBAH_THEMEN_EINSTELLUNGEN.standardPdfStil(profil.setting);
+  }
+  return 'fantasy-mittelalter';
+}
+
 function ladeInteraktiveWeltStatsAnzeigen() {
   const raw = String(htbahSpeicher.leseText(SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN, '') || '').trim();
   return raw === '1' || raw === 'true';
@@ -6015,6 +6023,7 @@ window.HTBAH = {
   setzeThemeSetting,
   standardZufallEpocheFuerAktivesTheme,
   standardCharakterEpocheFuerAktivesTheme,
+  standardPdfStilFuerAktivesTheme,
   ladeCharakterBild,
   speichereCharakterBild,
   loescheCharakterBild,

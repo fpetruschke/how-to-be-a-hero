@@ -150,69 +150,77 @@ window.HTBAH_SEITEN.Startseite = {
         </div>
       </div>
 
-      <div
-          class="card action-card text-start mb-3 cursor-pointer"
-          role="button"
-          tabindex="0"
-          aria-label="Pen und Paper Hilfe öffnen"
-          @click="penPaperInfoOeffnen"
-          @keydown.enter.prevent="penPaperInfoOeffnen"
-          @keydown.space.prevent="penPaperInfoOeffnen">
-        <div class="d-flex align-items-center justify-content-between gap-2">
-          <div class="htbah-start-card-avatar flex-shrink-0">
-            <span class="htbah-start-card-avatar-emoji" aria-hidden="true">📝</span>
+      <div class="row g-3 mb-3 htbah-start-infokarten">
+        <div class="col-12 col-lg-4">
+          <div
+            class="card action-card text-start h-100 cursor-pointer"
+            role="button"
+            tabindex="0"
+            aria-label="Was ist Pen und Paper – Hilfe öffnen"
+            @click="penPaperInfoOeffnen"
+            @keydown.enter.prevent="penPaperInfoOeffnen"
+            @keydown.space.prevent="penPaperInfoOeffnen">
+            <div class="d-flex align-items-center justify-content-between gap-2 h-100">
+              <div class="htbah-start-card-avatar flex-shrink-0">
+                <span class="htbah-start-card-avatar-emoji" aria-hidden="true">📝</span>
+              </div>
+              <div class="min-w-0 flex-grow-1">
+                <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
+                  Pen &amp; Paper
+                </p>
+                <h5 class="mb-1 text-truncate htbah-start-card-charaktername">Was ist Pen &amp; Paper?</h5>
+                <p class="mb-0 small text-body-secondary">Ein schneller Einstieg für Neulinge.</p>
+              </div>
+              <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
+                chevron_right
+              </span>
+            </div>
           </div>
-          <div class="min-w-0 flex-grow-1">
-            <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
-              Pen &amp; Paper
-            </p>
-            <h5 class="mb-1 text-truncate htbah-start-card-charaktername">Wie funktioniert eigentlich Pen &amp; Paper?</h5>
-            <p class="mb-0 small text-body-secondary">Ein schneller Einstieg für Neulinge.</p>
-          </div>
-          <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
-            chevron_right
-          </span>
         </div>
-      </div>
-      
-      <div
-        class="card action-card text-start mb-3 cursor-pointer"
-        role="button"
-        tabindex="0"
-        aria-label="Regelwerk öffnen"
-        @click="regelwerkOeffnen"
-        @keydown.enter.prevent="regelwerkOeffnen"
-        @keydown.space.prevent="regelwerkOeffnen">
-        <div class="d-flex align-items-center justify-content-between gap-2">
-          <div class="htbah-start-card-avatar flex-shrink-0">
-            <span class="htbah-start-card-avatar-emoji" aria-hidden="true">📜</span>
-          </div>
-          <div class="min-w-0 flex-grow-1">
-            <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
-              Regelwerk
-            </p>
-            <h5 class="mb-1 text-truncate htbah-start-card-charaktername">{{ projektTitel }}</h5>
-            <p class="mb-0 small text-body-secondary">{{ projektUntertitel }}</p>
-          </div>
-          <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
-            chevron_right
-          </span>
-        </div>
-      </div>
 
-      <div class="card text-start mb-3">
-        <div class="d-flex align-items-center gap-2">
-          <div class="htbah-start-card-avatar flex-shrink-0">
-            <span class="htbah-start-card-avatar-emoji" aria-hidden="true">💡</span>
+        <div class="col-12 col-lg-4">
+          <div
+            class="card action-card text-start h-100 cursor-pointer"
+            role="button"
+            tabindex="0"
+            aria-label="Regelwerk öffnen"
+            @click="regelwerkOeffnen"
+            @keydown.enter.prevent="regelwerkOeffnen"
+            @keydown.space.prevent="regelwerkOeffnen">
+            <div class="d-flex align-items-center justify-content-between gap-2 h-100">
+              <div class="htbah-start-card-avatar flex-shrink-0">
+                <span class="htbah-start-card-avatar-emoji" aria-hidden="true">📜</span>
+              </div>
+              <div class="min-w-0 flex-grow-1">
+                <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
+                  Regelwerk
+                </p>
+                <h5 class="mb-1 text-truncate htbah-start-card-charaktername">{{ projektTitel }}</h5>
+                <p class="mb-0 small text-body-secondary">{{ projektUntertitel }}</p>
+              </div>
+              <span class="material-symbols-outlined action-card-arrow" aria-hidden="true">
+                chevron_right
+              </span>
+            </div>
           </div>
-          <div class="min-w-0 flex-grow-1">
-            <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
-              Hinweis
-            </p>
-            <h5 class="mb-1 text-truncate htbah-start-card-charaktername">Dein Spiel</h5>
-            <p class="mb-0 small text-body-secondary">
-              Alle Vorlagen, Settings und Beispiele dienen nur als Starthilfe. Lass deiner Kreativität freien Lauf – es ist dein Spiel.
-            </p>
+        </div>
+
+        <div class="col-12 col-lg-4">
+          <div class="card text-start h-100">
+            <div class="d-flex align-items-center gap-2 h-100">
+              <div class="htbah-start-card-avatar flex-shrink-0">
+                <span class="htbah-start-card-avatar-emoji" aria-hidden="true">💡</span>
+              </div>
+              <div class="min-w-0 flex-grow-1">
+                <p class="mb-0 small text-body-secondary text-uppercase htbah-start-card-kicker">
+                  Hinweis
+                </p>
+                <h5 class="mb-1 text-truncate htbah-start-card-charaktername">Dein Spiel</h5>
+                <p class="mb-0 small text-body-secondary">
+                  Alle Vorlagen, Settings und Beispiele dienen nur als Starthilfe. Lass deiner Kreativität freien Lauf – es ist dein Spiel.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
