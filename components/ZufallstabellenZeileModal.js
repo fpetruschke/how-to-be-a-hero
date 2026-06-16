@@ -1,5 +1,12 @@
 window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
+function htbahStandardZufallEpocheZeileModal() {
+  if (window.HTBAH && typeof window.HTBAH.standardZufallEpocheFuerAktivesTheme === 'function') {
+    return window.HTBAH.standardZufallEpocheFuerAktivesTheme();
+  }
+  return 'mittelalter';
+}
+
 window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
   name: 'ZufallstabellenZeileModal',
   components: {
@@ -82,7 +89,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       probeModalGeneration: 0,
       paradeModalGeneration: 0,
       schadenModalGeneration: 0,
-      zufallEpocheSelect: 'mittelalter',
+      zufallEpocheSelect: htbahStandardZufallEpocheZeileModal(),
     };
   },
   computed: {
@@ -348,9 +355,16 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
   },
   mounted() {
     window.addEventListener('resize', this.onResize);
+    this._themeProfilGeaendertHandler = () => {
+      this.aktualisiereZufallEpocheAusTheme();
+    };
+    window.addEventListener('htbah:theme-profil-geaendert', this._themeProfilGeaendertHandler);
   },
   beforeUnmount() {
     window.removeEventListener('resize', this.onResize);
+    if (this._themeProfilGeaendertHandler) {
+      window.removeEventListener('htbah:theme-profil-geaendert', this._themeProfilGeaendertHandler);
+    }
     this.beendeZiehen();
     this.beendeResize();
     this.kampfWuerfelModalsSchliessenUndZuruecksetzen();
@@ -864,6 +878,13 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       const ep = this[prop];
       if (typeof ep === 'string' && ep.trim()) {
         this.zufallEpocheSelect = ep.trim();
+      }
+    },
+    aktualisiereZufallEpocheAusTheme() {
+      const epoche = htbahStandardZufallEpocheZeileModal();
+      if (this.zufallEpocheSelect !== 'zufaellig') {
+        this.zufallEpocheSelect = epoche;
+        this.zufallEpochePropAktualisieren(epoche);
       }
     },
     aufgeloesteZufallEpoche() {

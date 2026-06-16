@@ -2,6 +2,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 var HTBAH_BOOTSTRAP_MODAL_ORT_WIZARD =
   (window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper) || null;
 
+function htbahWizardStandardEpoche() {
+  if (window.HTBAH && typeof window.HTBAH.standardZufallEpocheFuerAktivesTheme === 'function') {
+    return window.HTBAH.standardZufallEpocheFuerAktivesTheme();
+  }
+  return 'mittelalter';
+}
+
 window.HTBAH_KOMPONENTEN.OrtWizardModal = {
   name: 'OrtWizardModal',
   props: {
@@ -10,7 +17,7 @@ window.HTBAH_KOMPONENTEN.OrtWizardModal = {
   emits: ['generieren'],
   data() {
     return {
-      epoche: 'mittelalter',
+      epoche: htbahWizardStandardEpoche(),
       groesse: '',
       lage: '',
       aktiverSchritt: 1,
@@ -58,7 +65,7 @@ window.HTBAH_KOMPONENTEN.OrtWizardModal = {
     oeffnen() {
       this._fokusVorModal =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      this.epoche = 'mittelalter';
+      this.epoche = htbahWizardStandardEpoche();
       this.groesse = '';
       this.lage = '';
       this.aktiverSchritt = 1;

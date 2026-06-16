@@ -2,6 +2,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 var HTBAH_REFACTOR_UTILS =
   (window.HTBAH_SHARED && window.HTBAH_SHARED.RefactorUtils) || null;
 
+function htbahStandardZufallEpocheWeltenbau() {
+  if (window.HTBAH && typeof window.HTBAH.standardZufallEpocheFuerAktivesTheme === 'function') {
+    return window.HTBAH.standardZufallEpocheFuerAktivesTheme();
+  }
+  return 'mittelalter';
+}
+
 (function () {
   const MAP_ZOOM_MIN = 0.01; // 1% (0% ist technisch nicht nutzbar)
   const MAP_ZOOM_MAX = 10; // 1000%
@@ -231,13 +238,13 @@ var HTBAH_REFACTOR_UTILS =
           window.HTBAH && typeof window.HTBAH.ladeInteraktiveWeltStatsAnzeigen === 'function'
             ? window.HTBAH.ladeInteraktiveWeltStatsAnzeigen()
             : false,
-        zufallNpcEpoche: 'mittelalter',
-        zufallGegenstandEpoche: 'mittelalter',
-        zufallFraktionEpoche: 'mittelalter',
-        zufallRaetselEpoche: 'mittelalter',
-        zufallOrtEpoche: 'mittelalter',
-        zufallPantheonEpoche: 'mittelalter',
-        zufallBestieEpoche: 'mittelalter',
+        zufallNpcEpoche: htbahStandardZufallEpocheWeltenbau(),
+        zufallGegenstandEpoche: htbahStandardZufallEpocheWeltenbau(),
+        zufallFraktionEpoche: htbahStandardZufallEpocheWeltenbau(),
+        zufallRaetselEpoche: htbahStandardZufallEpocheWeltenbau(),
+        zufallOrtEpoche: htbahStandardZufallEpocheWeltenbau(),
+        zufallPantheonEpoche: htbahStandardZufallEpocheWeltenbau(),
+        zufallBestieEpoche: htbahStandardZufallEpocheWeltenbau(),
         zeileQuillInstanz: null,
         zeileMentionController: null,
         zeileQuillSelectionHandler: null,
@@ -5551,7 +5558,7 @@ var HTBAH_REFACTOR_UTILS =
         if (typ === 'bestie') {
           return {
             id: window.HTBAH.neueEntropieId(),
-            epoche: 'mittelalter',
+            epoche: htbahStandardZufallEpocheWeltenbau(),
             kategorie: 'normales_tier',
             name: '',
             lebenspunkte: '60',

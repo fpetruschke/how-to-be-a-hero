@@ -4,6 +4,13 @@ var HTBAH_REFACTOR_UTILS =
 var HTBAH_WELTENBAU_IMPORT =
   (window.HTBAH_SHARED && window.HTBAH_SHARED.WeltenbauImport) || null;
 
+function htbahStandardZufallEpoche() {
+  if (window.HTBAH && typeof window.HTBAH.standardZufallEpocheFuerAktivesTheme === 'function') {
+    return window.HTBAH.standardZufallEpocheFuerAktivesTheme();
+  }
+  return 'mittelalter';
+}
+
 const TABLE_TYPE_CONFIG = {
   npc: { label: 'NPC', emoji: '👤', detail: '👤 NPC · Übersicht' },
   ort: { label: 'Ort', emoji: '🗺️', detail: '🗺️ Ort · Übersicht' },
@@ -116,13 +123,13 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       overlayZeileQuillHostElement: null,
       overlayZeileQuillSession: 0,
       zuLoeschendeZeile: null,
-      zufallNpcEpoche: 'mittelalter',
-      zufallGegenstandEpoche: 'mittelalter',
-      zufallFraktionEpoche: 'mittelalter',
-      zufallRaetselEpoche: 'mittelalter',
-      zufallOrtEpoche: 'mittelalter',
-      zufallPantheonEpoche: 'mittelalter',
-      zufallBestieEpoche: 'mittelalter',
+      zufallNpcEpoche: htbahStandardZufallEpoche(),
+      zufallGegenstandEpoche: htbahStandardZufallEpoche(),
+      zufallFraktionEpoche: htbahStandardZufallEpoche(),
+      zufallRaetselEpoche: htbahStandardZufallEpoche(),
+      zufallOrtEpoche: htbahStandardZufallEpoche(),
+      zufallPantheonEpoche: htbahStandardZufallEpoche(),
+      zufallBestieEpoche: htbahStandardZufallEpoche(),
       /** Ziel des aktuell geöffneten NPC-Wizards: 'haupt' | 'overlay' | null */
       npcWizardZiel: null,
       bestienWizardZiel: null,
@@ -1766,7 +1773,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     bestieLeer() {
       return {
         id: window.HTBAH.neueEntropieId(),
-        epoche: 'mittelalter',
+        epoche: htbahStandardZufallEpoche(),
         kategorie: 'normales_tier',
         name: '',
         lebenspunkte: '',

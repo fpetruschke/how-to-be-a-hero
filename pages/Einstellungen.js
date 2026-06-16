@@ -38,8 +38,8 @@ const SPEICHER_BEREICHE = {
     key: 'htbah_theme',
     titel: 'Darstellung zurücksetzen?',
     beschreibung:
-      'Deine gespeicherte Theme-Auswahl wird entfernt und die App nutzt wieder das helle Standard-Theme.',
-    erfolg: 'Darstellung wurde auf das Standard-Theme zurückgesetzt.',
+      'Deine gespeicherte Hell/Dunkel- und Setting-Auswahl (Fantasy, Gegenwart, Sci-Fi) wird entfernt. Die App nutzt wieder helles Fantasy als Standard.',
+    erfolg: 'Darstellung wurde auf helles Fantasy-Standard-Theme zurückgesetzt.',
     buttonSymbol: '🎨',
     buttonLabel: 'Theme-Einstellung löschen',
   },
@@ -319,6 +319,10 @@ window.HTBAH_SEITEN.Einstellungen = {
   data() {
     return {
       istHellesTheme: window.HTBAH.ladeTheme() === 'light',
+      aktivesThemeSetting:
+        window.HTBAH && typeof window.HTBAH.ladeThemeSetting === 'function'
+          ? window.HTBAH.ladeThemeSetting()
+          : 'fantasy',
       zuLoeschenderBereich: 'charakter',
       speicherBereiche: SPEICHER_BEREICHE,
       browserSpeicher: null,
@@ -363,6 +367,13 @@ window.HTBAH_SEITEN.Einstellungen = {
     },
     themeSymbol() {
       return this.istHellesTheme ? 'light_mode' : 'dark_mode';
+    },
+    themeSettingOptionen() {
+      return [
+        { id: 'fantasy', label: 'Fantasy', emoji: '🏰' },
+        { id: 'gegenwart', label: 'Gegenwart', emoji: '🏙️' },
+        { id: 'scifi', label: 'Sci-Fi', emoji: '🚀' },
+      ];
     },
     orientierungGruppe() {
       const m = this.orientierungModus;
@@ -856,8 +867,18 @@ window.HTBAH_SEITEN.Einstellungen = {
       this.statusAnzeigen(`„${name}“ wurde gelöscht.`);
     },
     themeUmschalten() {
-      const neuesTheme = this.istHellesTheme ? 'light' : 'dark';
-      window.HTBAH.setzeTheme(neuesTheme);
+      if (!window.HTBAH || typeof window.HTBAH.setzeThemeProfil !== 'function') {
+        return;
+      }
+      const mode = this.istHellesTheme ? 'light' : 'dark';
+      window.HTBAH.setzeThemeProfil({ mode });
+    },
+    setzeThemeSetting(setting) {
+      if (!window.HTBAH || typeof window.HTBAH.setzeThemeProfil !== 'function') {
+        return;
+      }
+      const profil = window.HTBAH.setzeThemeProfil({ setting });
+      this.aktivesThemeSetting = profil.setting;
     },
     speichereDiagLoggingEinstellung() {
       const DIAG = window.HTBAH_DIAG;
@@ -1090,9 +1111,16 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
 
       if (this.zuLoeschenderBereich === 'theme' || this.zuLoeschenderBereich === 'alles') {
+        const standard = { mode: 'light', setting: 'fantasy' };
+        if (window.HTBAH && typeof window.HTBAH.wendeThemeProfilAn === 'function') {
+          window.HTBAH.wendeThemeProfilAn(standard);
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.setAttribute('data-bs-theme', 'light');
+          document.documentElement.setAttribute('data-theme-setting', 'fantasy');
+        }
         this.istHellesTheme = true;
-        document.documentElement.setAttribute('data-theme', 'light');
-        document.documentElement.setAttribute('data-bs-theme', 'light');
+        this.aktivesThemeSetting = 'fantasy';
       }
       this.statusAnzeigen(bereich.erfolg, 'success');
 
@@ -1614,6 +1642,15 @@ window.HTBAH_SEITEN.Einstellungen = {
           }
           return;
         }
+        if (bereich.key === 'htbah_theme' && bereich.vorhanden && typeof bereich.wert === 'string') {
+          const TE = window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen;
+          const wert =
+            TE && typeof TE.serialisiereThemeProfil === 'function'
+              ? TE.serialisiereThemeProfil(TE.normalisiereThemeProfil(bereich.wert))
+              : bereich.wert;
+          window.HTBAH.speicher.schreibeText(bereich.key, wert);
+          return;
+        }
         if (bereich.vorhanden && typeof bereich.wert === 'string') {
           window.HTBAH.speicher.schreibeText(bereich.key, bereich.wert);
         } else {
@@ -1662,8 +1699,12 @@ window.HTBAH_SEITEN.Einstellungen = {
       }
 
       if (ausgewaehlteBereiche.some((b) => b.key === 'htbah_theme')) {
-        window.HTBAH.setzeTheme(window.HTBAH.ladeTheme());
-        this.istHellesTheme = window.HTBAH.ladeTheme() === 'light';
+        const profil =
+          window.HTBAH && typeof window.HTBAH.setzeThemeProfil === 'function'
+            ? window.HTBAH.setzeThemeProfil(window.HTBAH.ladeThemeProfil())
+            : { mode: 'light', setting: 'fantasy' };
+        this.istHellesTheme = profil.mode === 'light';
+        this.aktivesThemeSetting = profil.setting;
       }
       if (this.importModalInstanz) {
         this.importModalInstanz.hide();
@@ -1747,7 +1788,7 @@ window.HTBAH_SEITEN.Einstellungen = {
       </h4>
 
       <einstellungen-sektion titel="Theme" section-id="theme" emoji="🎨">
-        <div class="d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center justify-content-between mb-3">
           <label class="form-check-label d-flex align-items-center gap-2 mb-0" for="themeToggle">
             <span class="material-symbols-outlined" aria-hidden="true">
               {{ themeSymbol }}
@@ -1763,6 +1804,26 @@ window.HTBAH_SEITEN.Einstellungen = {
               v-model="istHellesTheme"
               @change="themeUmschalten" />
           </div>
+        </div>
+        <p class="small text-body-secondary mb-2">
+          Thematisches Setting: Hintergrundbild und Standard-Epoche für Zufallsgeneratoren.
+        </p>
+        <div
+          class="btn-group w-100"
+          role="radiogroup"
+          aria-label="Thematisches Setting wählen">
+          <button
+            v-for="opt in themeSettingOptionen"
+            :key="'theme-setting-' + opt.id"
+            type="button"
+            class="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1 flex-fill"
+            :class="aktivesThemeSetting === opt.id ? 'btn-primary' : 'btn-outline-secondary'"
+            role="radio"
+            :aria-checked="aktivesThemeSetting === opt.id ? 'true' : 'false'"
+            @click="setzeThemeSetting(opt.id)">
+            <span aria-hidden="true">{{ opt.emoji }}</span>
+            <span>{{ opt.label }}</span>
+          </button>
         </div>
       </einstellungen-sektion>
 

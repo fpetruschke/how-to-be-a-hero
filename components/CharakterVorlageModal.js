@@ -97,8 +97,17 @@ window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
         }
         if (!this.katalog.length) {
           this.fehler = 'Keine Charaktervorlagen gefunden.';
-        } else if (this.epochenOptionen.length) {
-          this.epoche = this.epochenOptionen[0].id;
+        } else {
+          const standardEpoche =
+            window.HTBAH && typeof window.HTBAH.standardCharakterEpocheFuerAktivesTheme === 'function'
+              ? window.HTBAH.standardCharakterEpocheFuerAktivesTheme()
+              : '';
+          const epochenIds = this.epochenOptionen.map((e) => e.id);
+          if (standardEpoche && epochenIds.includes(standardEpoche)) {
+            this.epoche = standardEpoche;
+          } else if (this.epochenOptionen.length) {
+            this.epoche = this.epochenOptionen[0].id;
+          }
         }
       } catch {
         this.fehler = 'Vorlagen konnten nicht geladen werden.';

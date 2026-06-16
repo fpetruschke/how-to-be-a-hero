@@ -2,12 +2,19 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 var HTBAH_BOOTSTRAP_MODAL_PANTHEON_WIZARD =
   (window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper) || null;
 
+function htbahWizardStandardEpoche() {
+  if (window.HTBAH && typeof window.HTBAH.standardZufallEpocheFuerAktivesTheme === 'function') {
+    return window.HTBAH.standardZufallEpocheFuerAktivesTheme();
+  }
+  return 'mittelalter';
+}
+
 window.HTBAH_KOMPONENTEN.PantheonWizardModal = {
   name: 'PantheonWizardModal',
   props: { modalId: { type: String, default: 'htbahPantheonWizardModal' } },
   emits: ['generieren'],
   data() {
-    return { epoche: 'mittelalter', domaene: '', aktiverSchritt: 1, modalInstanz: null, _fokusVorModal: null };
+    return { epoche: htbahWizardStandardEpoche(), domaene: '', aktiverSchritt: 1, modalInstanz: null, _fokusVorModal: null };
   },
   computed: {
     epochenOptionen() {
@@ -31,7 +38,7 @@ window.HTBAH_KOMPONENTEN.PantheonWizardModal = {
   methods: {
     oeffnen() {
       this._fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      this.epoche = 'mittelalter';
+      this.epoche = htbahWizardStandardEpoche();
       this.domaene = '';
       this.aktiverSchritt = 1;
       document.body.classList.add('htbah-pantheon-wizard-offen');

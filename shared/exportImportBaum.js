@@ -24,7 +24,7 @@ const GLOBAL_BLATT_DEFINITIONEN = [
   {
     id: 'theme',
     key: 'htbah_theme',
-    label: 'Theme-Einstellungen',
+    label: 'Theme (Hell/Dunkel & Setting)',
   },
   {
     id: 'wuerfelbecher',

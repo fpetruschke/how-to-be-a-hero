@@ -2,12 +2,19 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 var HTBAH_BOOTSTRAP_MODAL_RAETSEL_WIZARD =
   (window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper) || null;
 
+function htbahWizardStandardEpoche() {
+  if (window.HTBAH && typeof window.HTBAH.standardZufallEpocheFuerAktivesTheme === 'function') {
+    return window.HTBAH.standardZufallEpocheFuerAktivesTheme();
+  }
+  return 'mittelalter';
+}
+
 window.HTBAH_KOMPONENTEN.RaetselWizardModal = {
   name: 'RaetselWizardModal',
   props: { modalId: { type: String, default: 'htbahRaetselWizardModal' } },
   emits: ['generieren'],
   data() {
-    return { epoche: 'mittelalter', schwierigkeit: '', familie: '', aktiverSchritt: 1, modalInstanz: null, _fokusVorModal: null };
+    return { epoche: htbahWizardStandardEpoche(), schwierigkeit: '', familie: '', aktiverSchritt: 1, modalInstanz: null, _fokusVorModal: null };
   },
   computed: {
     epochenOptionen() {
@@ -38,7 +45,7 @@ window.HTBAH_KOMPONENTEN.RaetselWizardModal = {
   methods: {
     oeffnen() {
       this._fokusVorModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      this.epoche = 'mittelalter';
+      this.epoche = htbahWizardStandardEpoche();
       this.schwierigkeit = '';
       this.familie = '';
       this.aktiverSchritt = 1;

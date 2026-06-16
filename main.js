@@ -5669,17 +5669,101 @@ function ermittleRegelwerkQuelleUrl() {
   return ermittleAssetUrl('assets/pdf/how-to-be-a-hero-Regelwerk-hoschianer.pdf');
 }
 
+const HTBAH_THEMEN_EINSTELLUNGEN =
+  (window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen) || null;
+
+function ladeThemeProfil() {
+  const raw = htbahSpeicher.leseText(SPEICHER_KEY_THEME, null);
+  if (HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil === 'function') {
+    return HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil(raw);
+  }
+  const mode = raw === 'dark' ? 'dark' : 'light';
+  return { mode, setting: 'fantasy' };
+}
+
+function wendeThemeProfilAufDom(profil) {
+  const p =
+    HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil === 'function'
+      ? HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil(profil)
+      : { mode: profil && profil.mode === 'dark' ? 'dark' : 'light', setting: 'fantasy' };
+  document.documentElement.setAttribute('data-theme', p.mode);
+  document.documentElement.setAttribute('data-bs-theme', p.mode);
+  document.documentElement.setAttribute('data-theme-setting', p.setting);
+  return p;
+}
+
+function wendeThemeProfilAn(profil) {
+  const p = wendeThemeProfilAufDom(profil);
+  try {
+    window.dispatchEvent(
+      new CustomEvent('htbah:theme-profil-geaendert', { detail: { ...p } }),
+    );
+  } catch {
+    /* ignorieren */
+  }
+  return p;
+}
+
+function setzeThemeProfil(profil) {
+  const norm = ladeThemeProfil();
+  const eingabe = profil && typeof profil === 'object' ? profil : {};
+  const zusammengefuegt = {
+    mode: eingabe.mode != null ? eingabe.mode : norm.mode,
+    setting: eingabe.setting != null ? eingabe.setting : norm.setting,
+  };
+  const gueltig =
+    HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil === 'function'
+      ? HTBAH_THEMEN_EINSTELLUNGEN.normalisiereThemeProfil(zusammengefuegt)
+      : { mode: zusammengefuegt.mode === 'dark' ? 'dark' : 'light', setting: 'fantasy' };
+  wendeThemeProfilAufDom(gueltig);
+  const serialisiert =
+    HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.serialisiereThemeProfil === 'function'
+      ? HTBAH_THEMEN_EINSTELLUNGEN.serialisiereThemeProfil(gueltig)
+      : gueltig.mode;
+  htbahSpeicher.schreibeText(SPEICHER_KEY_THEME, serialisiert);
+  try {
+    window.dispatchEvent(
+      new CustomEvent('htbah:theme-profil-geaendert', { detail: { ...gueltig } }),
+    );
+  } catch {
+    /* ignorieren */
+  }
+  return gueltig;
+}
+
 function ladeTheme() {
-  const gespeichertesTheme = htbahSpeicher.leseText(SPEICHER_KEY_THEME, null);
-  return gespeichertesTheme === 'dark' ? 'dark' : 'light';
+  return ladeThemeProfil().mode;
 }
 
 function setzeTheme(theme) {
-  const gueltigesTheme = theme === 'light' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', gueltigesTheme);
-  document.documentElement.setAttribute('data-bs-theme', gueltigesTheme);
-  htbahSpeicher.schreibeText(SPEICHER_KEY_THEME, gueltigesTheme);
-  return gueltigesTheme;
+  return setzeThemeProfil({ mode: theme }).mode;
+}
+
+function ladeThemeSetting() {
+  return ladeThemeProfil().setting;
+}
+
+function setzeThemeSetting(setting) {
+  return setzeThemeProfil({ setting }).setting;
+}
+
+function standardZufallEpocheFuerAktivesTheme() {
+  const profil = ladeThemeProfil();
+  if (HTBAH_THEMEN_EINSTELLUNGEN && typeof HTBAH_THEMEN_EINSTELLUNGEN.standardZufallEpoche === 'function') {
+    return HTBAH_THEMEN_EINSTELLUNGEN.standardZufallEpoche(profil.setting);
+  }
+  return 'mittelalter';
+}
+
+function standardCharakterEpocheFuerAktivesTheme() {
+  const profil = ladeThemeProfil();
+  if (
+    HTBAH_THEMEN_EINSTELLUNGEN &&
+    typeof HTBAH_THEMEN_EINSTELLUNGEN.standardCharakterEpoche === 'function'
+  ) {
+    return HTBAH_THEMEN_EINSTELLUNGEN.standardCharakterEpoche(profil.setting);
+  }
+  return 'mittelalter-fantasy';
 }
 
 function ladeInteraktiveWeltStatsAnzeigen() {
@@ -5772,7 +5856,7 @@ function migriereLegacyCharakterSpeicherWennNoetig() {
   }
 }
 
-setzeTheme(ladeTheme());
+setzeThemeProfil(ladeThemeProfil());
 migriereLegacyCharakterSpeicherWennNoetig();
 
 /**
@@ -5924,6 +6008,13 @@ window.HTBAH = {
   ermittleRegelwerkQuelleUrl,
   ladeTheme,
   setzeTheme,
+  ladeThemeProfil,
+  setzeThemeProfil,
+  wendeThemeProfilAn,
+  ladeThemeSetting,
+  setzeThemeSetting,
+  standardZufallEpocheFuerAktivesTheme,
+  standardCharakterEpocheFuerAktivesTheme,
   ladeCharakterBild,
   speichereCharakterBild,
   loescheCharakterBild,

@@ -5,7 +5,6 @@
   --htbah-top-nav-reserve: 0px;
   /* Zusätzliche Luft unter dem letzten Inhalt (alle Seiten mit .content) */
   --htbah-content-ende-luft: 3.25rem;
-  --bg-image-url: url('assets/img/bg-desktop.png');
   --bg-overlay-color: rgba(2, 6, 23, 0.62);
   --bg-color: #0f172a;
   --text-color: #e5e7eb;
@@ -44,6 +43,25 @@
   --htbah-z-quill-overlay: calc(var(--htbah-z-modal-ui) + 10);
   --htbah-z-dropdown: 1090;
 }
+
+/* Hintergrundbilder pro thematischem Setting (Fallback: Fantasy) */
+:root,
+[data-theme-setting='fantasy'] {
+  --bg-image-url: url('assets/img/bg-desktop-fantasy.png');
+}
+
+[data-theme-setting='gegenwart'] {
+  --bg-image-url: url('assets/img/bg-desktop-gegenwart.png');
+}
+
+[data-theme-setting='scifi'] {
+  --bg-image-url: url('assets/img/bg-desktop-scifi.png');
+}
+
+/*
+ * Palette pro Setting (später): eigene Farbvariablen je Setting und Hell/Dunkel ergänzen, z. B.:
+ * [data-theme-setting='scifi'][data-theme='dark'] { --primary-color: …; }
+ */
 
 [data-theme='light'] {
   --bg-overlay-color: rgba(248, 250, 252, 0.25);
@@ -243,9 +261,16 @@ body.htbah-mit-lp-banner #app {
   }
 
   :root,
-  [data-theme='dark'],
-  [data-theme='light'] {
-    --bg-image-url: url('assets/img/bg-mobile-device-portrait.png');
+  [data-theme-setting='fantasy'] {
+    --bg-image-url: url('assets/img/bg-mobile-device-portrait-fantasy.png');
+  }
+
+  [data-theme-setting='gegenwart'] {
+    --bg-image-url: url('assets/img/bg-mobile-device-portrait-gegenwart.png');
+  }
+
+  [data-theme-setting='scifi'] {
+    --bg-image-url: url('assets/img/bg-mobile-device-portrait-scifi.png');
   }
 }
 

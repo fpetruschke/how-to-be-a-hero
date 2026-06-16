@@ -2,6 +2,13 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 var HTBAH_BOOTSTRAP_MODAL_NPC_WIZARD =
   (window.HTBAH_SHARED && window.HTBAH_SHARED.BootstrapModalHelper) || null;
 
+function htbahWizardStandardEpoche() {
+  if (window.HTBAH && typeof window.HTBAH.standardZufallEpocheFuerAktivesTheme === 'function') {
+    return window.HTBAH.standardZufallEpocheFuerAktivesTheme();
+  }
+  return 'mittelalter';
+}
+
 window.HTBAH_KOMPONENTEN.NpcWizardModal = {
   name: 'NpcWizardModal',
   props: {
@@ -10,7 +17,7 @@ window.HTBAH_KOMPONENTEN.NpcWizardModal = {
   emits: ['generieren'],
   data() {
     return {
-      epoche: 'mittelalter',
+      epoche: htbahWizardStandardEpoche(),
       geschlecht: '',
       alter: '',
       beruf: '',
@@ -59,7 +66,7 @@ window.HTBAH_KOMPONENTEN.NpcWizardModal = {
       this._fokusVorModal =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this._hatGeneriert = false;
-      this.epoche = 'mittelalter';
+      this.epoche = htbahWizardStandardEpoche();
       this.geschlecht = '';
       this.alter = '';
       this.beruf = '';
