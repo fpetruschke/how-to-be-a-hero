@@ -34,9 +34,6 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
     zielModifikator() {
       return this.$refs.zielModifikator || null;
     },
-    effektiverModifikator() {
-      return this.zielModifikator ? this.zielModifikator.effektiverModifikator : 0;
-    },
     zielwert() {
       return this.zielModifikator
         ? this.zielModifikator.zielwert
@@ -56,12 +53,6 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
         return '';
       }
       return 'probe-wurf-ergebnis--' + a.stufe.replace(/_/g, '-');
-    },
-    paradeAnzeigeGesamtwert() {
-      if (!this.zielModifikator) {
-        return this.letzterWurf;
-      }
-      return this.zielModifikator.gesamtwertFuerAnzeige(this.letzterWurf);
     },
     paradeModifikatorHatWert() {
       return this.zielModifikator ? this.zielModifikator.modifikatorHatWert : false;
@@ -226,32 +217,26 @@ window.HTBAH_KOMPONENTEN.ParadeModal = {
               ref="wuerfelbecher"
               class="mt-3"
               :auto-init="false"
-              :prozentwurf-modifikator="effektiverModifikator"
               modus="w100" />
             <div
               v-if="auswertung"
               class="mt-2 p-3 rounded border probe-wurf-ergebnis"
               :class="ergebnisKlasse">
               <div class="text-center">
-                <div class="small text-body-secondary mb-1">
-                  {{ effektiverModifikator === 0 ? 'W100' : 'W100 (Rohwurf)' }}
+                <div class="small text-body-secondary mb-1">W100-Wurf</div>
+                <div class="display-6 fw-bold mb-2">{{ letzterWurf }}</div>
+                <div class="small text-body-secondary mb-2">
+                  Zielwert
+                  <template v-if="paradeModifikatorHatWert">(inkl. SL-Modifikator)</template>:
+                  <strong>{{ zielwert }}</strong>
                 </div>
-                <div class="fs-5 fw-semibold mb-2">{{ letzterWurf }}</div>
-                <div class="small text-body-secondary mb-1">
-                  Zielwert inkl. Bonus/Malus: <strong>{{ zielwert }}</strong>
-                </div>
-                <div class="d-flex justify-content-center flex-wrap gap-2 mb-2">
-                  <span
-                    v-if="paradeModifikatorHatWert"
-                    class="badge rounded-pill"
-                    :class="paradeModifikatorBadgeKlasse">
+                <div
+                  v-if="paradeModifikatorHatWert"
+                  class="d-flex justify-content-center flex-wrap gap-2 mb-2">
+                  <span class="badge rounded-pill" :class="paradeModifikatorBadgeKlasse">
                     {{ paradeModifikatorBadgeText }}
                   </span>
-                  <span class="badge rounded-pill text-bg-primary">
-                    Summe: {{ paradeAnzeigeGesamtwert }}
-                  </span>
                 </div>
-                <div class="display-6 fw-bold mb-2">{{ paradeAnzeigeGesamtwert }}</div>
                 <div class="fw-semibold mb-1">{{ auswertung.label }}</div>
                 <div class="small probe-wurf-ergebnis-hinweis">{{ auswertung.kurztext }}</div>
                 <div

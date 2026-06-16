@@ -822,7 +822,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             modus: 'begabung',
             basiswert: zielwert,
             zielwert,
-            zeigtModifikator: false,
+            zeigtModifikator: true,
             basisLabel: `Begabung ${katLabel}`,
             titel: `Probe: Begabung ${katLabel}`,
             untertitel:
@@ -839,7 +839,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           modus: 'faehigkeit',
           basiswert: zielwert,
           zielwert,
-          zeigtModifikator: false,
+          zeigtModifikator: true,
           basisLabel: `Effektivwert ${name}`,
           titel: `Probe: ${name}`,
           untertitel,

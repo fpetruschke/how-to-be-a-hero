@@ -3,25 +3,32 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 (function (SHARED) {
   'use strict';
 
-  function berechneEffektiverModifikator(modifikatorArt, bonusWert, malusWert) {
-    if (modifikatorArt === 'kein') {
-      return 0;
-    }
-    if (modifikatorArt === 'bonus') {
-      const b = Math.round(Number(bonusWert) || 0);
-      return Math.max(1, Math.min(100, b));
-    }
-    const m = Math.round(Number(malusWert) || 0);
-    return Math.max(-100, Math.min(-1, m));
+  function normalisiereBasiswert(basiswert) {
+    return Math.max(0, Math.min(100, Math.round(Number(basiswert) || 0)));
   }
 
-  function berechneZielwert(basiswert, modifikatorArt, bonusWert, malusWert) {
-    const basis = Math.max(0, Math.round(Number(basiswert) || 0));
-    const mod = berechneEffektiverModifikator(modifikatorArt, bonusWert, malusWert);
-    return Math.max(0, Math.min(100, basis + mod));
+  function berechneModifikatorGrenzen(basiswert) {
+    const basis = normalisiereBasiswert(basiswert);
+    return {
+      min: -basis,
+      max: 100 - basis,
+    };
+  }
+
+  function berechneEffektiverModifikator(modifikatorWert, basiswert) {
+    const { min, max } = berechneModifikatorGrenzen(basiswert);
+    const m = Math.round(Number(modifikatorWert) || 0);
+    return Math.max(min, Math.min(max, m));
+  }
+
+  function berechneZielwert(basiswert, modifikatorWert) {
+    const basis = normalisiereBasiswert(basiswert);
+    const mod = berechneEffektiverModifikator(modifikatorWert, basiswert);
+    return basis + mod;
   }
 
   SHARED.ProbeZielModifikator = {
+    berechneModifikatorGrenzen,
     berechneEffektiverModifikator,
     berechneZielwert,
   };

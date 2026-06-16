@@ -4664,6 +4664,248 @@ input::placeholder {
   color: var(--card-color);
 }
 
+/* SL-Modifikator: Schieberegler Bonus/Malus (dynamisch an Basiswert gekoppelt) */
+.probe-mod-slider-wrap {
+  padding: 0.75rem 0.5rem 0.25rem;
+}
+
+.probe-mod-slider-label--malus {
+  color: color-mix(in srgb, var(--bs-danger) 78%, var(--body-color));
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  text-align: center;
+}
+
+.probe-mod-slider-label--bonus {
+  color: color-mix(in srgb, var(--bs-success) 78%, var(--body-color));
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  text-align: center;
+}
+
+.probe-mod-slider-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.probe-mod-slider-track-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.probe-wurf-slider {
+  --probe-mod-fill-start: 50;
+  --probe-mod-fill-width: 0;
+  --probe-mod-zero-pct: 50;
+  --probe-mod-thumb-pct: 50;
+  --probe-wurf-slider-handle-size: 0.85rem;
+  --probe-wurf-slider-track-bg: #e8eaed;
+  --probe-wurf-slider-track-border: #d1d5db;
+  --probe-wurf-slider-handle-body-bg: #4b5563;
+  --probe-wurf-slider-handle-body-border: #374151;
+  --probe-wurf-slider-handle-tip-bg: #4b5563;
+  position: relative;
+  height: 2.35rem;
+  width: 100%;
+}
+
+[data-theme='dark'] .probe-wurf-slider {
+  --probe-wurf-slider-track-bg: #5a6170;
+  --probe-wurf-slider-track-border: #6b7280;
+  --probe-wurf-slider-handle-body-bg: #e5e7eb;
+  --probe-wurf-slider-handle-body-border: #f3f4f6;
+  --probe-wurf-slider-handle-tip-bg: #e5e7eb;
+}
+
+.probe-wurf-slider-rail {
+  position: absolute;
+  left: calc(var(--probe-wurf-slider-handle-size) / 2);
+  right: calc(var(--probe-wurf-slider-handle-size) / 2);
+  top: 50%;
+  transform: translateY(-50%);
+  height: 0.55rem;
+  pointer-events: none;
+}
+
+.probe-wurf-slider-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--probe-wurf-slider-track-bg);
+  border: 1px solid var(--probe-wurf-slider-track-border);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--body-color) 8%, transparent);
+}
+
+.probe-wurf-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--probe-mod-fill-start) * 1%);
+  width: calc(var(--probe-mod-fill-width) * 1%);
+  border-radius: 999px;
+  z-index: 1;
+  transition:
+    left 0.1s ease,
+    width 0.1s ease,
+    background-color 0.12s ease;
+}
+
+.probe-wurf-slider-fill--malus {
+  background: color-mix(in srgb, var(--bs-danger) 72%, var(--probe-wurf-slider-track-bg));
+}
+
+.probe-wurf-slider-fill--bonus {
+  background: color-mix(in srgb, var(--bs-success) 72%, var(--probe-wurf-slider-track-bg));
+}
+
+.probe-wurf-slider-zero {
+  position: absolute;
+  top: 50%;
+  left: calc(
+    (var(--probe-wurf-slider-handle-size) / 2) +
+    ((100% - var(--probe-wurf-slider-handle-size)) * var(--probe-mod-zero-pct) / 100)
+  );
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 0.9rem;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--body-color) 55%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.probe-wurf-slider-handle {
+  position: absolute;
+  bottom: 50%;
+  left: calc(
+    (var(--probe-wurf-slider-handle-size) / 2) +
+    ((100% - var(--probe-wurf-slider-handle-size)) * var(--probe-mod-thumb-pct) / 100)
+  );
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  z-index: 4;
+  filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--body-color) 35%, transparent));
+  transition: left 0.1s ease;
+}
+
+.probe-wurf-slider-handle-body {
+  display: block;
+  box-sizing: border-box;
+  width: var(--probe-wurf-slider-handle-size);
+  height: 1.05rem;
+  border-radius: 3px 3px 1px 1px;
+  background: var(--probe-wurf-slider-handle-body-bg);
+  border: 1px solid var(--probe-wurf-slider-handle-body-border);
+}
+
+.probe-wurf-slider-handle-tip {
+  display: block;
+  width: 0;
+  height: 0;
+  margin-top: -1px;
+  border-left: calc(var(--probe-wurf-slider-handle-size) / 2) solid transparent;
+  border-right: calc(var(--probe-wurf-slider-handle-size) / 2) solid transparent;
+  border-top: 0.42rem solid var(--probe-wurf-slider-handle-tip-bg);
+}
+
+.probe-wurf-slider:has(.probe-wurf-slider-input:focus-visible) .probe-wurf-slider-handle-body {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 1px;
+}
+
+/* Native Range unsichtbar, liegt darüber für Maus/Touch – sichtbar sind Rail + Thumb */
+.probe-wurf-slider-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  cursor: grab;
+  background: transparent;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  opacity: 0;
+  z-index: 3;
+}
+
+.probe-wurf-slider-input:active {
+  cursor: grabbing;
+}
+
+.probe-wurf-slider-input:focus {
+  outline: none;
+}
+
+.probe-wurf-slider-input::-webkit-slider-runnable-track {
+  height: 2rem;
+  background: transparent;
+  border: none;
+}
+
+.probe-wurf-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--probe-wurf-slider-handle-size);
+  height: 1.6rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  cursor: grab;
+}
+
+.probe-wurf-slider-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+
+.probe-wurf-slider-input::-moz-range-track {
+  height: 2rem;
+  background: transparent;
+  border: none;
+}
+
+.probe-wurf-slider-input::-moz-range-thumb {
+  width: var(--probe-wurf-slider-handle-size);
+  height: 1.6rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  cursor: grab;
+}
+
+.probe-wurf-slider-input:active::-moz-range-thumb {
+  cursor: grabbing;
+}
+
+.probe-mod-slider-wert {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  opacity: 0.82;
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+}
+
+.probe-mod-slider-wert--bonus {
+  color: color-mix(in srgb, var(--bs-success) 88%, var(--body-color));
+}
+
+.probe-mod-slider-wert--malus {
+  color: color-mix(in srgb, var(--bs-danger) 88%, var(--body-color));
+}
+
+.probe-mod-slider-wert--neutral {
+  color: color-mix(in srgb, var(--body-color) 55%, transparent);
+  opacity: 0.62;
+}
+
 [data-theme='dark'] .htbah-kampagnen-tabelle thead {
   --bs-table-bg: var(--card-bg);
   --bs-table-color: var(--card-color);

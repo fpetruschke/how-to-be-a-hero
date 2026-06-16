@@ -38,11 +38,6 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
       }
       return Math.max(0, Math.min(100, Math.round(Number(this.kontext.zielwert) || 0)));
     },
-    effektiverModifikator() {
-      return this.kontext.zeigtModifikator && this.zielModifikator
-        ? this.zielModifikator.effektiverModifikator
-        : 0;
-    },
     auswertung() {
       if (this.letzterWurf === null) {
         return null;
@@ -76,12 +71,6 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
     },
     kritMissMin() {
       return Math.ceil(90 + this.effektiverZielwert * 0.1);
-    },
-    probeAnzeigeGesamtwert() {
-      if (!this.kontext.zeigtModifikator || !this.zielModifikator) {
-        return this.letzterWurf;
-      }
-      return this.zielModifikator.gesamtwertFuerAnzeige(this.letzterWurf);
     },
     probeModifikatorHatWert() {
       return this.kontext.zeigtModifikator && this.zielModifikator
@@ -236,31 +225,28 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
             <wuerfelbecher-wurf
               ref="wuerfelbecher"
               :auto-init="false"
-              :prozentwurf-modifikator="effektiverModifikator"
               modus="w100" />
             <div
               v-if="auswertung"
               class="mt-2 p-3 rounded border probe-wurf-ergebnis"
               :class="ergebnisKlasse">
               <div class="text-center">
-                <div class="small text-body-secondary mb-1">
-                  {{ kontext.zeigtModifikator && effektiverModifikator !== 0 ? 'W100 (Rohwurf)' : 'W100' }}
+                <div class="small text-body-secondary mb-1">W100-Wurf</div>
+                <div class="display-6 fw-bold mb-2">{{ letzterWurf }}</div>
+                <div class="small text-body-secondary mb-2">
+                  Zielwert
+                  <template v-if="kontext.zeigtModifikator && probeModifikatorHatWert">
+                    (inkl. SL-Modifikator)
+                  </template>:
+                  <strong>{{ effektiverZielwert }}</strong>
                 </div>
-                <div class="fs-5 fw-semibold mb-2">{{ letzterWurf }}</div>
-                <template v-if="kontext.zeigtModifikator">
-                  <div class="small text-body-secondary mb-1">
-                    Zielwert inkl. Bonus/Malus: <strong>{{ effektiverZielwert }}</strong>
-                  </div>
-                  <div class="d-flex justify-content-center flex-wrap gap-2 mb-2">
-                    <span
-                      v-if="probeModifikatorHatWert"
-                      class="badge rounded-pill"
-                      :class="probeModifikatorBadgeKlasse">
-                      {{ probeModifikatorBadgeText }}
-                    </span>
-                  </div>
-                </template>
-                <div class="display-6 fw-bold mb-2">{{ probeAnzeigeGesamtwert }}</div>
+                <div
+                  v-if="kontext.zeigtModifikator && probeModifikatorHatWert"
+                  class="d-flex justify-content-center flex-wrap gap-2 mb-2">
+                  <span class="badge rounded-pill" :class="probeModifikatorBadgeKlasse">
+                    {{ probeModifikatorBadgeText }}
+                  </span>
+                </div>
                 <div class="fw-semibold mb-1">{{ auswertung.label }}</div>
                 <div class="small probe-wurf-ergebnis-hinweis">{{ auswertung.kurztext }}</div>
               </div>

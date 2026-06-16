@@ -12,25 +12,36 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
   },
   data() {
     return {
-      modifikatorArt: 'kein',
-      bonusWert: 1,
-      malusWert: -1,
+      modifikatorWert: 0,
     };
   },
   computed: {
+    modifikatorApi() {
+      return window.HTBAH_SHARED && window.HTBAH_SHARED.ProbeZielModifikator;
+    },
+    modifikatorGrenzen() {
+      if (!this.modifikatorApi) {
+        return { min: 0, max: 100 };
+      }
+      return this.modifikatorApi.berechneModifikatorGrenzen(this.basiswert);
+    },
+    modifikatorMin() {
+      return this.modifikatorGrenzen.min;
+    },
+    modifikatorMax() {
+      return this.modifikatorGrenzen.max;
+    },
     effektiverModifikator() {
-      const api = window.HTBAH_SHARED && window.HTBAH_SHARED.ProbeZielModifikator;
-      if (!api) {
+      if (!this.modifikatorApi) {
         return 0;
       }
-      return api.berechneEffektiverModifikator(this.modifikatorArt, this.bonusWert, this.malusWert);
+      return this.modifikatorApi.berechneEffektiverModifikator(this.modifikatorWert, this.basiswert);
     },
     zielwert() {
-      const api = window.HTBAH_SHARED && window.HTBAH_SHARED.ProbeZielModifikator;
-      if (!api) {
+      if (!this.modifikatorApi) {
         return Math.max(0, Math.min(100, Math.round(Number(this.basiswert) || 0)));
       }
-      return api.berechneZielwert(this.basiswert, this.modifikatorArt, this.bonusWert, this.malusWert);
+      return this.modifikatorApi.berechneZielwert(this.basiswert, this.modifikatorWert);
     },
     kritMissMin() {
       return Math.ceil(90 + this.zielwert * 0.1);
@@ -52,18 +63,77 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
       }
       return this.effektiverModifikator > 0 ? 'text-bg-success' : 'text-bg-danger';
     },
+    modifikatorWertAnzeige() {
+      if (this.effektiverModifikator === 0) {
+        return '0';
+      }
+      return this.effektiverModifikator > 0
+        ? `+${this.effektiverModifikator}`
+        : String(this.effektiverModifikator);
+    },
+    modifikatorWertKlasse() {
+      if (this.effektiverModifikator > 0) {
+        return 'probe-mod-slider-wert--bonus';
+      }
+      if (this.effektiverModifikator < 0) {
+        return 'probe-mod-slider-wert--malus';
+      }
+      return 'probe-mod-slider-wert--neutral';
+    },
+    sliderFillKlasse() {
+      if (this.effektiverModifikator < 0) {
+        return 'probe-wurf-slider-fill--malus';
+      }
+      if (this.effektiverModifikator > 0) {
+        return 'probe-wurf-slider-fill--bonus';
+      }
+      return '';
+    },
+    sliderTrackStil() {
+      const min = this.modifikatorMin;
+      const max = this.modifikatorMax;
+      const val = this.effektiverModifikator;
+      const spanne = max - min;
+      if (spanne <= 0) {
+        return {
+          '--probe-mod-fill-start': 50,
+          '--probe-mod-fill-width': 0,
+          '--probe-mod-zero-pct': 50,
+          '--probe-mod-thumb-pct': 50,
+        };
+      }
+      const nullPct = ((0 - min) / spanne) * 100;
+      const thumbPct = ((val - min) / spanne) * 100;
+      const fillStart = Math.min(nullPct, thumbPct);
+      const fillEnd = Math.max(nullPct, thumbPct);
+      return {
+        '--probe-mod-zero-pct': nullPct,
+        '--probe-mod-fill-start': fillStart,
+        '--probe-mod-fill-width': fillEnd - fillStart,
+        '--probe-mod-thumb-pct': thumbPct,
+      };
+    },
+  },
+  watch: {
+    basiswert() {
+      this.modifikatorWert = this.eingeschraenkterModifikator(this.modifikatorWert);
+    },
+    modifikatorWert(neu) {
+      const eingeschraenkt = this.eingeschraenkterModifikator(neu);
+      if (eingeschraenkt !== neu) {
+        this.modifikatorWert = eingeschraenkt;
+      }
+    },
   },
   methods: {
-    zuruecksetzen() {
-      this.modifikatorArt = 'kein';
-      this.bonusWert = 1;
-      this.malusWert = -1;
-    },
-    gesamtwertFuerAnzeige(rohwurf) {
-      if (this.modifikatorArt === 'kein') {
-        return rohwurf;
+    eingeschraenkterModifikator(wert) {
+      if (!this.modifikatorApi) {
+        return 0;
       }
-      return this.zielwert;
+      return this.modifikatorApi.berechneEffektiverModifikator(wert, this.basiswert);
+    },
+    zuruecksetzen() {
+      this.modifikatorWert = 0;
     },
   },
   template: `
@@ -75,67 +145,49 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
         </div>
       </div>
 
-      <div class="mb-3">
-        <label class="form-label small text-secondary mb-1">SL-Modifikator</label>
-        <div class="d-flex flex-wrap gap-3">
-          <div class="form-check">
-            <input
-              :id="idPrefix + '-kein'"
-              class="form-check-input"
-              type="radio"
-              value="kein"
-              v-model="modifikatorArt" />
-            <label class="form-check-label" :for="idPrefix + '-kein'">Kein Modifikator</label>
+      <div class="probe-mod-slider-wrap mb-3">
+        <label class="form-label small text-secondary mb-2" :for="idPrefix + '-slider'">
+          SL-Modifikator (Zielwert)
+        </label>
+        <div class="probe-mod-slider-row d-flex align-items-center gap-2 gap-md-3">
+          <span class="probe-mod-slider-label probe-mod-slider-label--malus small fw-semibold">Malus</span>
+          <div class="probe-mod-slider-column flex-grow-1">
+            <div class="probe-mod-slider-track-wrap">
+              <div class="probe-wurf-slider" :style="sliderTrackStil">
+                <div class="probe-wurf-slider-rail" aria-hidden="true">
+                  <div class="probe-wurf-slider-track"></div>
+                  <div
+                    v-if="modifikatorHatWert"
+                    class="probe-wurf-slider-fill"
+                    :class="sliderFillKlasse"></div>
+                </div>
+                <div class="probe-wurf-slider-zero" aria-hidden="true"></div>
+                <div class="probe-wurf-slider-handle" aria-hidden="true">
+                  <span class="probe-wurf-slider-handle-body"></span>
+                  <span class="probe-wurf-slider-handle-tip"></span>
+                </div>
+                <input
+                  :id="idPrefix + '-slider'"
+                  type="range"
+                  class="probe-wurf-slider-input"
+                  v-model.number="modifikatorWert"
+                  :min="modifikatorMin"
+                  :max="modifikatorMax"
+                  step="1"
+                  :aria-valuenow="effektiverModifikator"
+                  :aria-valuemin="modifikatorMin"
+                  :aria-valuemax="modifikatorMax"
+                  :aria-valuetext="modifikatorWertAnzeige" />
+              </div>
+            </div>
+            <div
+              class="probe-mod-slider-wert text-center mt-2"
+              :class="modifikatorWertKlasse"
+              aria-live="polite">
+              {{ modifikatorWertAnzeige }}
+            </div>
           </div>
-          <div class="form-check">
-            <input
-              :id="idPrefix + '-bonus'"
-              class="form-check-input"
-              type="radio"
-              value="bonus"
-              v-model="modifikatorArt" />
-            <label class="form-check-label" :for="idPrefix + '-bonus'">Bonus</label>
-          </div>
-          <div class="form-check">
-            <input
-              :id="idPrefix + '-malus'"
-              class="form-check-input"
-              type="radio"
-              value="malus"
-              v-model="modifikatorArt" />
-            <label class="form-check-label" :for="idPrefix + '-malus'">Malus</label>
-          </div>
-        </div>
-      </div>
-
-      <div class="row g-2 mb-3">
-        <div class="col-12 col-md-6" v-if="modifikatorArt === 'bonus'">
-          <div class="form-floating">
-            <input
-              :id="idPrefix + '-bonus-input'"
-              type="number"
-              class="form-control"
-              v-model.number="bonusWert"
-              min="1"
-              max="100"
-              step="1"
-              placeholder=" " />
-            <label :for="idPrefix + '-bonus-input'">Bonus (1 bis 100)</label>
-          </div>
-        </div>
-        <div class="col-12 col-md-6" v-if="modifikatorArt === 'malus'">
-          <div class="form-floating">
-            <input
-              :id="idPrefix + '-malus-input'"
-              type="number"
-              class="form-control"
-              v-model.number="malusWert"
-              min="-100"
-              max="-1"
-              step="1"
-              placeholder=" " />
-            <label :for="idPrefix + '-malus-input'">Malus (-1 bis -100)</label>
-          </div>
+          <span class="probe-mod-slider-label probe-mod-slider-label--bonus small fw-semibold">Bonus</span>
         </div>
       </div>
 
@@ -143,6 +195,9 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
         <div class="d-flex justify-content-between align-items-center">
           <span>{{ zielLabel }}</span>
           <span class="fs-5 fw-bold">{{ zielwert }}</span>
+        </div>
+        <div v-if="modifikatorHatWert" class="small text-body-secondary mt-1">
+          {{ modifikatorBadgeText }} auf Basiswert {{ basiswert }}
         </div>
         <div v-if="showKritMiss" class="small text-body-secondary mt-1">
           Kritischer Misserfolg: {{ kritMissMin }} bis 100
