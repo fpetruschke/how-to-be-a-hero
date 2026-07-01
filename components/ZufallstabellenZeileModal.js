@@ -16,7 +16,6 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     InventarEditorPanel: window.HTBAH_KOMPONENTEN.InventarEditorPanel,
     HtmlFeldQuillEditor: window.HTBAH_KOMPONENTEN.HtmlFeldQuillEditor,
     FaehigkeitenEditorPanel: window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel,
-    FaehigkeitenKompaktPanel: window.HTBAH_KOMPONENTEN.FaehigkeitenKompaktPanel,
     EntityKartenIconFeld: window.HTBAH_KOMPONENTEN.EntityKartenIconFeld,
     EntitaetAnzeigeIcon: window.HTBAH_KOMPONENTEN.EntitaetAnzeigeIcon,
   },
@@ -1334,15 +1333,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <div v-if="!zeigtKampfSchnellaktionen" class="row g-2 mb-2">
               <div class="col-md-6"><label class="form-label small text-secondary mb-1">Lebenspunkte</label><div class="input-group"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder="Lebenspunkte" inputmode="numeric" autocomplete="off" @focus="onKampfLebenspunkteFocus" @blur="onKampfLebenspunkteBlur" /><button type="button" class="btn btn-outline-secondary htbah-input-icon-btn" :disabled="!zufallsgeneratorBereit || !randomSichtbar" title="Lebenspunkte neu würfeln" @click="npcFeldNeuWuerfeln('lebenspunkte', 'mitAbhaengigen')"><span class="material-symbols-outlined">refresh</span></button></div></div>
             </div>
-            <faehigkeiten-kompakt-panel
-              v-if="interaktiveWeltBearbeitung"
-              :entitaet="anlage.zeile"
-              @probe="faehigkeitenProbeOeffnen" />
             <faehigkeiten-editor-panel
-              v-else
               :entitaet="anlage.zeile"
               modus="sl"
               :preset-id="zeilePresetId"
+              :entitaet-typ="anlage.typ"
+              bearbeitung-nur-wert
               :id-prefix="'zfn-npc-' + (anlage.zeile.id || 'neu')"
               @probe="faehigkeitenProbeOeffnen" />
           </section>
@@ -1603,15 +1599,12 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <div v-if="!zeigtKampfSchnellaktionen" class="row g-2 mb-2">
               <div class="col-md-4"><div class="form-floating"><input class="form-control" v-model="anlage.zeile.lebenspunkte" placeholder=" " autocomplete="off" @focus="onKampfLebenspunkteFocus" @blur="onKampfLebenspunkteBlur" /><label>Lebenspunkte</label></div></div>
             </div>
-            <faehigkeiten-kompakt-panel
-              v-if="interaktiveWeltBearbeitung"
-              :entitaet="anlage.zeile"
-              @probe="faehigkeitenProbeOeffnen" />
             <faehigkeiten-editor-panel
-              v-else
               :entitaet="anlage.zeile"
               modus="sl"
               :preset-id="zeilePresetId"
+              :entitaet-typ="anlage.typ"
+              bearbeitung-nur-wert
               :id-prefix="'zfn-bestie-' + (anlage.zeile.id || 'neu')"
               @probe="faehigkeitenProbeOeffnen" />
           </section>

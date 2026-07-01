@@ -5489,6 +5489,30 @@ function htbahStandardZufallEpocheWeltenbau() {
         if (typ === 'fraktion') {
           zeile.orte = this.fraktionOrteListe(zeile);
         }
+        if (typ === 'npc' || typ === 'bestie') {
+          if (!Array.isArray(zeile.inventar)) {
+            zeile.inventar = [];
+          }
+          const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+          if (
+            EF &&
+            typeof EF.istFaehigkeitenArrayFormat === 'function' &&
+            typeof EF.normalisiereEntitaetFaehigkeiten === 'function' &&
+            !EF.istFaehigkeitenArrayFormat(zeile)
+          ) {
+            const norm = EF.normalisiereEntitaetFaehigkeiten(zeile, {
+              typ,
+              fallbackEpocheUi:
+                typ === 'bestie'
+                  ? String(zeile.epoche || this.zufallBestieEpoche || 'mittelalter').trim()
+                  : String(this.zufallNpcEpoche || 'mittelalter').trim(),
+            });
+            zeile.presetId = norm.presetId;
+            zeile.handeln = norm.handeln;
+            zeile.wissen = norm.wissen;
+            zeile.soziales = norm.soziales;
+          }
+        }
         if (alsOverlay) {
           this.anlageOverlay.typ = typ;
           this.anlageOverlay.index = index;
@@ -5527,6 +5551,9 @@ function htbahStandardZufallEpocheWeltenbau() {
           return zeile;
         }
         if (typ === 'npc') {
+          const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+          const presetId =
+            EF && typeof EF.DEFAULT_PRESET_ID === 'string' ? EF.DEFAULT_PRESET_ID : 'htbah-mittelalter-fantasy';
           return {
             id: window.HTBAH.neueEntropieId(),
             name: '',
@@ -5542,9 +5569,10 @@ function htbahStandardZufallEpocheWeltenbau() {
             stimme: '',
             lebenspunkte: '60',
             aufenthaltsort: ortDefault,
-            handeln: 12,
-            wissen: 14,
-            soziales: 14,
+            presetId,
+            handeln: [],
+            wissen: [],
+            soziales: [],
             initiative: '',
             fraktion: '',
             glaube: '',
@@ -5556,16 +5584,23 @@ function htbahStandardZufallEpocheWeltenbau() {
           };
         }
         if (typ === 'bestie') {
+          const epoche = htbahStandardZufallEpocheWeltenbau();
+          const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+          const presetId =
+            EF && typeof EF.presetIdFuerEpocheUi === 'function'
+              ? EF.presetIdFuerEpocheUi(epoche)
+              : 'htbah-mittelalter-fantasy';
           return {
             id: window.HTBAH.neueEntropieId(),
-            epoche: htbahStandardZufallEpocheWeltenbau(),
+            epoche,
             kategorie: 'normales_tier',
             name: '',
             lebenspunkte: '60',
             aufenthaltsort: ortDefault,
-            handeln: 16,
-            wissen: 8,
-            soziales: 16,
+            presetId,
+            handeln: [],
+            wissen: [],
+            soziales: [],
             initiative: '',
             fraktionen: [],
             staerke: '',
@@ -6832,7 +6867,11 @@ function htbahStandardZufallEpocheWeltenbau() {
         const z = JSON.parse(JSON.stringify(this.anlage.zeile));
         if (typ === 'npc') {
           const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
-          if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
+          if (EF && typeof EF.istFaehigkeitenArrayFormat === 'function' && EF.istFaehigkeitenArrayFormat(z)) {
+            z.handeln = EF.normalisiereFaehigkeitenListe(z.handeln, { slModus: true });
+            z.wissen = EF.normalisiereFaehigkeitenListe(z.wissen, { slModus: true });
+            z.soziales = EF.normalisiereFaehigkeitenListe(z.soziales, { slModus: true });
+          } else if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
             z.handeln = this.normalisiereBegabungswert(z.handeln);
             z.wissen = this.normalisiereBegabungswert(z.wissen);
             z.soziales = this.normalisiereBegabungswert(z.soziales);
@@ -6844,7 +6883,11 @@ function htbahStandardZufallEpocheWeltenbau() {
           z.initiative = this.normalisiereInitiativeWert(z.initiative, handelnBeg);
         } else if (typ === 'bestie') {
           const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
-          if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
+          if (EF && typeof EF.istFaehigkeitenArrayFormat === 'function' && EF.istFaehigkeitenArrayFormat(z)) {
+            z.handeln = EF.normalisiereFaehigkeitenListe(z.handeln, { slModus: true });
+            z.wissen = EF.normalisiereFaehigkeitenListe(z.wissen, { slModus: true });
+            z.soziales = EF.normalisiereFaehigkeitenListe(z.soziales, { slModus: true });
+          } else if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
             z.handeln = this.normalisiereBegabungswert(z.handeln);
             z.wissen = this.normalisiereBegabungswert(z.wissen);
             z.soziales = this.normalisiereBegabungswert(z.soziales);

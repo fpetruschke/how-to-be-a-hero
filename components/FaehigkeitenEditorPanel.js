@@ -11,6 +11,10 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
     modus: { type: String, default: 'charakter' },
     presetId: { type: String, default: '' },
     zeigeNeuFormular: { type: Boolean, default: true },
+    /** Beim Bearbeiten nur den Wert ändern (Name/Kategorie fest) */
+    bearbeitungNurWert: { type: Boolean, default: false },
+    /** npc | bestie — für Legacy-Migration */
+    entitaetTyp: { type: String, default: '' },
     idPrefix: { type: String, default: 'faeh-panel' },
   },
   emits: ['probe'],
@@ -73,6 +77,14 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
     maxWertProSkill() {
       return this.istSl ? 200 : 100;
     },
+    presetFuerEditor() {
+      const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+      const pid =
+        (typeof this.presetId === 'string' && this.presetId.trim()) ||
+        (EF && EF.DEFAULT_PRESET_ID) ||
+        '';
+      return EF && typeof EF.findePreset === 'function' ? EF.findePreset(pid) : null;
+    },
   },
   mounted() {
     this.stelleArraysSicher();
@@ -91,11 +103,42 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
       if (!e || typeof e !== 'object') {
         return;
       }
+      const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+      if (
+        this.istSl &&
+        EF &&
+        typeof EF.istFaehigkeitenArrayFormat === 'function' &&
+        typeof EF.normalisiereEntitaetFaehigkeiten === 'function' &&
+        !EF.istFaehigkeitenArrayFormat(e)
+      ) {
+        const typ = this.entitaetTyp === 'bestie' ? 'bestie' : 'npc';
+        const norm = EF.normalisiereEntitaetFaehigkeiten({ ...e }, { typ });
+        e.presetId = norm.presetId;
+        e.handeln = norm.handeln;
+        e.wissen = norm.wissen;
+        e.soziales = norm.soziales;
+        return;
+      }
       ['handeln', 'wissen', 'soziales'].forEach((kat) => {
         if (!Array.isArray(e[kat])) {
           e[kat] = [];
         }
       });
+    },
+    skillNamenFuerKategorie(kategorie) {
+      const preset = this.presetFuerEditor;
+      const arr = preset && Array.isArray(preset[kategorie]) ? preset[kategorie] : [];
+      const vorhanden = new Set(
+        (Array.isArray(this.entitaet[kategorie]) ? this.entitaet[kategorie] : []).map((f) =>
+          String(f && f.name ? f.name : '').trim(),
+        ),
+      );
+      return arr
+        .map((eintrag) => (eintrag && eintrag.name ? String(eintrag.name).trim() : ''))
+        .filter((name) => name && !vorhanden.has(name));
+    },
+    datalistIdFuerKategorie(kategorie) {
+      return `${this.idPrefix}-skills-${kategorie}`;
     },
     kategorieAnzeige(kategorie) {
       const namen = { handeln: 'Handeln', wissen: 'Wissen', soziales: 'Soziales' };
@@ -210,12 +253,23 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
       return true;
     },
     async bearbeitungSpeichern() {
-      const { name, value, type } = this.bearbeitungEntwurf;
+      const { value } = this.bearbeitungEntwurf;
       const ref = this.bearbeitungReferenz;
       const altKat = this.bearbeitungKategorie;
       if (!ref || !altKat) {
         return;
       }
+      if (this.bearbeitungNurWert) {
+        const wert = Number(value);
+        const punkteOhne = this.punkte - (Number(ref.value) || 0);
+        if (!(await this.wertGueltig(wert, punkteOhne, ref.value))) {
+          return;
+        }
+        ref.value = wert;
+        this.bearbeitungModalSchliessen();
+        return;
+      }
+      const { name, type } = this.bearbeitungEntwurf;
       const nameTrim = typeof name === 'string' ? name.trim() : '';
       if (!nameTrim) {
         await window.HTBAH.ui.alert({
@@ -272,6 +326,16 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
         await window.HTBAH.ui.alert({
           titel: 'Eingabe unvollständig',
           beschreibung: 'Gib einen Namen an.',
+        });
+        return;
+      }
+      const bereitsVorhanden = (Array.isArray(this.entitaet[kategorie]) ? this.entitaet[kategorie] : []).some(
+        (f) => String(f && f.name ? f.name : '').trim() === nameTrim,
+      );
+      if (bereitsVorhanden) {
+        await window.HTBAH.ui.alert({
+          titel: 'Bereits vorhanden',
+          beschreibung: `Die Fähigkeit „${nameTrim}“ ist in ${this.kategorieAnzeige(kategorie)} bereits eingetragen.`,
         });
         return;
       }
@@ -393,6 +457,9 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
               class="mt-2"
               :id-prefix="idPrefix + '-neu-' + kategorie"
               :fixed-type="kategorie"
+              :max-wert="maxWertProSkill"
+              :datalist-id="datalistIdFuerKategorie(kategorie)"
+              :namen-vorschlaege="skillNamenFuerKategorie(kategorie)"
               inline
               @submit="faehigkeitHinzufuegenFuerKategorie(kategorie)" />
           </div>
@@ -413,7 +480,12 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
-              <faehigkeit-formular v-model="bearbeitungEntwurf" :id-prefix="idPrefix + '-bearb'" />
+              <faehigkeit-formular
+                v-model="bearbeitungEntwurf"
+                :id-prefix="idPrefix + '-bearb'"
+                :nur-wert-bearbeiten="bearbeitungNurWert"
+                :max-wert="maxWertProSkill"
+                @submit="bearbeitungSpeichern" />
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>

@@ -17,7 +17,7 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
         zielwert: 0,
         titel: '',
         untertitel: '',
-        zeigtModifikator: false,
+        zeigtModifikator: true,
         basisLabel: 'Basiswert',
         zielLabel: 'Zielwert',
       },
@@ -33,7 +33,7 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
       return this.$refs.zielModifikator || null;
     },
     effektiverZielwert() {
-      if (this.kontext.zeigtModifikator && this.zielModifikator) {
+      if (this.zielModifikator) {
         return this.zielModifikator.zielwert;
       }
       return Math.max(0, Math.min(100, Math.round(Number(this.kontext.zielwert) || 0)));
@@ -73,9 +73,7 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
       return Math.ceil(90 + this.effektiverZielwert * 0.1);
     },
     probeModifikatorHatWert() {
-      return this.kontext.zeigtModifikator && this.zielModifikator
-        ? this.zielModifikator.modifikatorHatWert
-        : false;
+      return this.zielModifikator ? this.zielModifikator.modifikatorHatWert : false;
     },
     probeModifikatorBadgeText() {
       return this.zielModifikator ? this.zielModifikator.modifikatorBadgeText : '';
@@ -109,7 +107,7 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
         zielwert: basisGekappt,
         titel: payload.titel || 'Probe',
         untertitel: payload.untertitel || '',
-        zeigtModifikator: !!payload.zeigtModifikator,
+        zeigtModifikator: payload.zeigtModifikator !== false,
         basisLabel: payload.basisLabel || 'Basiswert',
         zielLabel: payload.zielLabel || 'Zielwert (zu unterbieten)',
       };
@@ -196,24 +194,14 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
             </p>
 
             <probe-ziel-modifikator
-              v-if="kontext.zeigtModifikator"
               ref="zielModifikator"
               :basiswert="kontext.basiswert"
               id-prefix="probe-wurf-mod"
               :basis-label="kontext.basisLabel"
               :ziel-label="kontext.zielLabel"
+              :ziel-card-klasse="wahrscheinlichkeitKlasse"
               :show-basis-card="true"
               :show-ziel-card="true" />
-
-            <div
-              v-else
-              class="card p-2 mb-3 probe-wurf-ziel-card"
-              :class="wahrscheinlichkeitKlasse">
-              <div class="d-flex justify-content-between align-items-center">
-                <span class="small">Zielwert (zu unterbieten)</span>
-                <span class="fs-6 fw-bold">{{ effektiverZielwert }}</span>
-              </div>
-            </div>
 
             <icon-text-button
               type="button"
@@ -235,13 +223,13 @@ window.HTBAH_KOMPONENTEN.ProbeWurfModal = {
                 <div class="display-6 fw-bold mb-2">{{ letzterWurf }}</div>
                 <div class="small text-body-secondary mb-2">
                   Zielwert
-                  <template v-if="kontext.zeigtModifikator && probeModifikatorHatWert">
+                  <template v-if="probeModifikatorHatWert">
                     (inkl. SL-Modifikator)
                   </template>:
                   <strong>{{ effektiverZielwert }}</strong>
                 </div>
                 <div
-                  v-if="kontext.zeigtModifikator && probeModifikatorHatWert"
+                  v-if="probeModifikatorHatWert"
                   class="d-flex justify-content-center flex-wrap gap-2 mb-2">
                   <span class="badge rounded-pill" :class="probeModifikatorBadgeKlasse">
                     {{ probeModifikatorBadgeText }}

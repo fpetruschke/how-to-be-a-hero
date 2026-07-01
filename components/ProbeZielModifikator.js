@@ -6,13 +6,19 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
     idPrefix: { type: String, default: 'probe-mod' },
     basisLabel: { type: String, default: 'Basiswert' },
     zielLabel: { type: String, default: 'Zielwert' },
+    labelSuffix: { type: String, default: 'optional' },
     showBasisCard: { type: Boolean, default: true },
     showZielCard: { type: Boolean, default: true },
     showKritMiss: { type: Boolean, default: true },
+    /** 'basis' = an Basiswert gekoppelt (Proben); 'symmetrisch' = ±max (Schaden) */
+    sliderModus: { type: String, default: 'basis' },
+    symmetrischMax: { type: Number, default: 50 },
+    zielCardKlasse: { type: String, default: '' },
   },
   data() {
     return {
       modifikatorWert: 0,
+      sliderOffen: false,
     };
   },
   computed: {
@@ -22,6 +28,9 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
     modifikatorGrenzen() {
       if (!this.modifikatorApi) {
         return { min: 0, max: 100 };
+      }
+      if (this.sliderModus === 'symmetrisch') {
+        return this.modifikatorApi.berechneSymmetrischeModifikatorGrenzen(this.symmetrischMax);
       }
       return this.modifikatorApi.berechneModifikatorGrenzen(this.basiswert);
     },
@@ -34,6 +43,12 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
     effektiverModifikator() {
       if (!this.modifikatorApi) {
         return 0;
+      }
+      if (this.sliderModus === 'symmetrisch') {
+        return this.modifikatorApi.berechneEffektiverSymmetrischerModifikator(
+          this.modifikatorWert,
+          this.symmetrischMax,
+        );
       }
       return this.modifikatorApi.berechneEffektiverModifikator(this.modifikatorWert, this.basiswert);
     },
@@ -49,19 +64,42 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
     modifikatorHatWert() {
       return this.effektiverModifikator !== 0;
     },
+    modifikatorStaerke() {
+      if (!this.modifikatorApi) {
+        return { stufe: 0, label: '' };
+      }
+      return this.modifikatorApi.berechneModifikatorStaerke(this.effektiverModifikator);
+    },
+    modifikatorRichtung() {
+      if (this.effektiverModifikator > 0) {
+        return 'bonus';
+      }
+      if (this.effektiverModifikator < 0) {
+        return 'malus';
+      }
+      return 'neutral';
+    },
     modifikatorBadgeText() {
       if (!this.modifikatorHatWert) {
         return '';
       }
-      return this.effektiverModifikator > 0
-        ? `Bonus: +${this.effektiverModifikator}`
-        : `Malus: ${this.effektiverModifikator}`;
+      const richtung = this.effektiverModifikator > 0 ? 'Bonus' : 'Malus';
+      const wert =
+        this.effektiverModifikator > 0
+          ? `+${this.effektiverModifikator}`
+          : String(this.effektiverModifikator);
+      const staerke = this.modifikatorStaerke.label;
+      return `${richtung}: ${wert}${staerke ? ` (${staerke})` : ''}`;
     },
     modifikatorBadgeKlasse() {
       if (!this.modifikatorHatWert) {
         return '';
       }
-      return this.effektiverModifikator > 0 ? 'text-bg-success' : 'text-bg-danger';
+      const stufe = this.modifikatorStaerke.stufe;
+      if (this.modifikatorRichtung === 'bonus') {
+        return `probe-mod-badge--bonus probe-mod-badge--bonus-stufe-${stufe}`;
+      }
+      return `probe-mod-badge--malus probe-mod-badge--malus-stufe-${stufe}`;
     },
     modifikatorWertAnzeige() {
       if (this.effektiverModifikator === 0) {
@@ -72,20 +110,20 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
         : String(this.effektiverModifikator);
     },
     modifikatorWertKlasse() {
-      if (this.effektiverModifikator > 0) {
-        return 'probe-mod-slider-wert--bonus';
+      if (this.modifikatorRichtung === 'bonus') {
+        return `probe-mod-slider-wert--bonus probe-mod-slider-wert--bonus-stufe-${this.modifikatorStaerke.stufe}`;
       }
-      if (this.effektiverModifikator < 0) {
-        return 'probe-mod-slider-wert--malus';
+      if (this.modifikatorRichtung === 'malus') {
+        return `probe-mod-slider-wert--malus probe-mod-slider-wert--malus-stufe-${this.modifikatorStaerke.stufe}`;
       }
       return 'probe-mod-slider-wert--neutral';
     },
     sliderFillKlasse() {
-      if (this.effektiverModifikator < 0) {
-        return 'probe-wurf-slider-fill--malus';
+      if (this.modifikatorRichtung === 'malus') {
+        return `probe-wurf-slider-fill--malus probe-wurf-slider-fill--malus-stufe-${this.modifikatorStaerke.stufe}`;
       }
-      if (this.effektiverModifikator > 0) {
-        return 'probe-wurf-slider-fill--bonus';
+      if (this.modifikatorRichtung === 'bonus') {
+        return `probe-wurf-slider-fill--bonus probe-wurf-slider-fill--bonus-stufe-${this.modifikatorStaerke.stufe}`;
       }
       return '';
     },
@@ -113,9 +151,52 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
         '--probe-mod-thumb-pct': thumbPct,
       };
     },
+    sliderLabelMalusKlasse() {
+      if (this.modifikatorRichtung !== 'malus') {
+        return 'probe-mod-slider-label--malus';
+      }
+      return `probe-mod-slider-label--malus probe-mod-slider-label--malus-stufe-${this.modifikatorStaerke.stufe}`;
+    },
+    sliderLabelBonusKlasse() {
+      if (this.modifikatorRichtung !== 'bonus') {
+        return 'probe-mod-slider-label--bonus';
+      }
+      return `probe-mod-slider-label--bonus probe-mod-slider-label--bonus-stufe-${this.modifikatorStaerke.stufe}`;
+    },
+    modifikatorEingabe: {
+      get() {
+        return this.effektiverModifikator;
+      },
+      set(roh) {
+        this.modifikatorWert = this.eingeschraenkterModifikator(roh);
+      },
+    },
+    zielwertEingabe: {
+      get() {
+        return this.zielwert;
+      },
+      set(roh) {
+        if (!this.modifikatorApi) {
+          return;
+        }
+        this.modifikatorWert = this.modifikatorApi.berechneModifikatorAusZielwert(
+          this.basiswert,
+          roh,
+        );
+      },
+    },
+    zielwertMin() {
+      return 0;
+    },
+    zielwertMax() {
+      return 100;
+    },
   },
   watch: {
     basiswert() {
+      this.modifikatorWert = this.eingeschraenkterModifikator(this.modifikatorWert);
+    },
+    symmetrischMax() {
       this.modifikatorWert = this.eingeschraenkterModifikator(this.modifikatorWert);
     },
     modifikatorWert(neu) {
@@ -130,10 +211,20 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
       if (!this.modifikatorApi) {
         return 0;
       }
+      if (this.sliderModus === 'symmetrisch') {
+        return this.modifikatorApi.berechneEffektiverSymmetrischerModifikator(
+          wert,
+          this.symmetrischMax,
+        );
+      }
       return this.modifikatorApi.berechneEffektiverModifikator(wert, this.basiswert);
     },
     zuruecksetzen() {
       this.modifikatorWert = 0;
+      this.sliderOffen = false;
+    },
+    sliderToggle() {
+      this.sliderOffen = !this.sliderOffen;
     },
   },
   template: `
@@ -146,11 +237,33 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
       </div>
 
       <div class="probe-mod-slider-wrap mb-3">
-        <label class="form-label small text-secondary mb-2" :for="idPrefix + '-slider'">
-          SL-Modifikator (Zielwert)
-        </label>
-        <div class="probe-mod-slider-row d-flex align-items-center gap-2 gap-md-3">
-          <span class="probe-mod-slider-label probe-mod-slider-label--malus small fw-semibold">Malus</span>
+        <button
+          type="button"
+          class="probe-mod-toggle-btn btn btn-link w-100 d-flex align-items-center justify-content-between gap-2 p-0 text-start text-decoration-none"
+          :aria-expanded="sliderOffen"
+          :aria-controls="idPrefix + '-slider-panel'"
+          @click="sliderToggle">
+          <span class="form-label small text-secondary mb-0">
+            SL-Modifikator ({{ labelSuffix }})
+          </span>
+          <span class="d-flex align-items-center gap-2 flex-shrink-0">
+            <span
+              v-if="modifikatorHatWert && !sliderOffen"
+              class="badge rounded-pill probe-mod-toggle-badge"
+              :class="modifikatorBadgeKlasse">
+              {{ modifikatorWertAnzeige }}
+            </span>
+            <span
+              class="material-symbols-outlined probe-mod-toggle-ico"
+              aria-hidden="true">{{ sliderOffen ? 'expand_less' : 'expand_more' }}</span>
+          </span>
+        </button>
+        <div
+          v-show="sliderOffen"
+          :id="idPrefix + '-slider-panel'"
+          class="probe-mod-slider-panel pt-2">
+          <div class="probe-mod-slider-row d-flex align-items-center gap-2 gap-md-3">
+          <span class="probe-mod-slider-label small fw-semibold" :class="sliderLabelMalusKlasse">Malus</span>
           <div class="probe-mod-slider-column flex-grow-1">
             <div class="probe-mod-slider-track-wrap">
               <div class="probe-wurf-slider" :style="sliderTrackStil">
@@ -180,21 +293,47 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
                   :aria-valuetext="modifikatorWertAnzeige" />
               </div>
             </div>
+            <div class="probe-mod-slider-wert-row d-flex justify-content-center align-items-center gap-2 mt-2">
+              <label class="visually-hidden" :for="idPrefix + '-modifikator'">Modifikator</label>
+              <input
+                :id="idPrefix + '-modifikator'"
+                type="number"
+                class="form-control form-control-sm probe-mod-wert-input text-center"
+                :class="modifikatorWertKlasse"
+                v-model.number="modifikatorEingabe"
+                :min="modifikatorMin"
+                :max="modifikatorMax"
+                step="1"
+                :aria-valuetext="modifikatorWertAnzeige" />
+            </div>
             <div
-              class="probe-mod-slider-wert text-center mt-2"
+              v-if="modifikatorHatWert && modifikatorStaerke.label"
+              class="probe-mod-staerke-label text-center small fw-semibold mt-1"
               :class="modifikatorWertKlasse"
               aria-live="polite">
-              {{ modifikatorWertAnzeige }}
+              {{ modifikatorStaerke.label }}
             </div>
           </div>
-          <span class="probe-mod-slider-label probe-mod-slider-label--bonus small fw-semibold">Bonus</span>
+          <span class="probe-mod-slider-label small fw-semibold" :class="sliderLabelBonusKlasse">Bonus</span>
+        </div>
         </div>
       </div>
 
-      <div v-if="showZielCard" class="card p-3 mb-3 probe-wurf-ziel-card">
-        <div class="d-flex justify-content-between align-items-center">
+      <div
+        v-if="showZielCard && sliderModus !== 'symmetrisch'"
+        class="card p-3 mb-3 probe-wurf-ziel-card"
+        :class="zielCardKlasse">
+        <div class="d-flex justify-content-between align-items-center gap-2">
           <span>{{ zielLabel }}</span>
-          <span class="fs-5 fw-bold">{{ zielwert }}</span>
+          <input
+            :id="idPrefix + '-zielwert'"
+            type="number"
+            class="form-control form-control-sm probe-mod-zielwert-input text-end"
+            v-model.number="zielwertEingabe"
+            :min="zielwertMin"
+            :max="zielwertMax"
+            step="1"
+            :aria-label="zielLabel" />
         </div>
         <div v-if="modifikatorHatWert" class="small text-body-secondary mt-1">
           {{ modifikatorBadgeText }} auf Basiswert {{ basiswert }}

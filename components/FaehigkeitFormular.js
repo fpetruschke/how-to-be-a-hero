@@ -25,6 +25,25 @@ window.HTBAH_KOMPONENTEN.FaehigkeitFormular = {
       type: Boolean,
       default: false,
     },
+    /** Nur Wert bearbeiten (Name/Kategorie fest) */
+    nurWertBearbeiten: {
+      type: Boolean,
+      default: false,
+    },
+    /** Maximaler Fähigkeitswert */
+    maxWert: {
+      type: Number,
+      default: 100,
+    },
+    /** Vorschläge für den Namen (datalist) */
+    namenVorschlaege: {
+      type: Array,
+      default: () => [],
+    },
+    datalistId: {
+      type: String,
+      default: '',
+    },
   },
   emits: ['update:modelValue', 'submit'],
   methods: {
@@ -46,13 +65,15 @@ window.HTBAH_KOMPONENTEN.FaehigkeitFormular = {
           return;
         }
         const n = Number(raw);
-        if (Number.isFinite(n) && n >= 0 && n <= 100) {
+        if (Number.isFinite(n) && n >= 0 && n <= this.maxWert) {
           this.aktualisiere({ value: n });
         }
         return;
       }
       const n = Number(raw);
-      this.aktualisiere({ value: Number.isFinite(n) ? n : 0 });
+      const max = Number.isFinite(this.maxWert) ? this.maxWert : 100;
+      const wert = Number.isFinite(n) ? Math.min(max, Math.max(0, n)) : 0;
+      this.aktualisiere({ value: wert });
     },
     wertAnzeige() {
       const v = this.modelValue.value;
@@ -73,24 +94,49 @@ window.HTBAH_KOMPONENTEN.FaehigkeitFormular = {
   },
   template: `
     <div class="faehigkeit-formular" :class="{ 'faehigkeit-formular--inline': inline }">
-      <template v-if="inline">
+      <template v-if="nurWertBearbeiten">
+        <p class="mb-2 mb-md-3">
+          <span class="text-secondary small d-block">Fähigkeit</span>
+          <strong>{{ modelValue.name }}</strong>
+        </p>
+        <div class="form-floating mb-0">
+          <input
+            :id="idPrefix + '-wert'"
+            type="number"
+            class="form-control"
+            :value="wertAnzeige()"
+            :min="nullableWert ? undefined : 0"
+            :max="maxWert"
+            @input="wertInput"
+            @keydown="eingabeAbschicken"
+            placeholder=" "
+            inputmode="numeric"
+            autofocus />
+          <label :for="idPrefix + '-wert'">Wert</label>
+        </div>
+      </template>
+      <template v-else-if="inline">
         <div class="input-group input-group-sm faehigkeit-hinzufuegen-gruppe">
           <input
             :id="idPrefix + '-name'"
             class="form-control faehigkeit-hinzufuegen-name"
             :value="modelValue.name"
+            :list="datalistId || undefined"
             @input="nameInput"
             @keydown="eingabeAbschicken"
             placeholder="Name"
             autocomplete="off"
             aria-label="Name der Fähigkeit" />
+          <datalist v-if="datalistId && namenVorschlaege.length" :id="datalistId">
+            <option v-for="name in namenVorschlaege" :key="idPrefix + '-dl-' + name" :value="name"></option>
+          </datalist>
           <input
             :id="idPrefix + '-wert'"
             type="number"
             class="form-control faehigkeit-hinzufuegen-wert"
             :value="wertAnzeige()"
             :min="nullableWert ? undefined : 0"
-            max="100"
+            :max="maxWert"
             @input="wertInput"
             @keydown="eingabeAbschicken"
             :placeholder="nullableWert ? 'Wert (opt.)' : 'Wert'"
@@ -135,7 +181,7 @@ window.HTBAH_KOMPONENTEN.FaehigkeitFormular = {
             class="form-control"
             :value="wertAnzeige()"
             :min="nullableWert ? undefined : 0"
-            max="100"
+            :max="maxWert"
             @input="wertInput"
             placeholder=" " />
           <label :for="idPrefix + '-wert'">{{ nullableWert ? 'Wert (optional)' : 'Wert' }}</label>

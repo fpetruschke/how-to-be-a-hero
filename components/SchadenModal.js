@@ -4,6 +4,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 window.HTBAH_KOMPONENTEN.SchadenModal = {
   components: {
     WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
+    ProbeZielModifikator: window.HTBAH_KOMPONENTEN.ProbeZielModifikator,
   },
   props: {
     charakter: { type: Object, default: null },
@@ -25,6 +26,21 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
   computed: {
     modalTitleId() {
       return this.modalDomId + 'Label';
+    },
+    slModifikator() {
+      return this.$refs.slModifikator || null;
+    },
+    slModifikatorWert() {
+      return this.slModifikator ? this.slModifikator.effektiverModifikator : 0;
+    },
+    slModifikatorHatWert() {
+      return this.slModifikator ? this.slModifikator.modifikatorHatWert : false;
+    },
+    slModifikatorBadgeText() {
+      return this.slModifikator ? this.slModifikator.modifikatorBadgeText : '';
+    },
+    slModifikatorBadgeKlasse() {
+      return this.slModifikator ? this.slModifikator.modifikatorBadgeKlasse : '';
     },
     aktiveCharakterDaten() {
       const prop = this.charakter && typeof this.charakter === 'object' ? this.charakter : null;
@@ -169,7 +185,8 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
         : 0;
     },
     wurfSumme() {
-      return this.wuerfelSumme + this.waffenBonus;
+      const basis = this.wuerfelSumme + this.waffenBonus + this.slModifikatorWert;
+      return Math.max(0, basis);
     },
     gesamtSchadenVorParade() {
       if (!this.letzterWurf.length) {
@@ -261,8 +278,11 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
       this.ausgewaehlteWaffeId = this.inventarWaffen.length ? this.inventarWaffen[0].id : 'fallback-unarmed';
       this.syncSchadensartNachWaffe();
       this.ergebnisZuruecksetzen();
-      this.modalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
-      this.modalInstanz.show();
+      this.$nextTick(() => {
+        this.$refs.slModifikator?.zuruecksetzen?.();
+        this.modalInstanz = window.bootstrap.Modal.getOrCreateInstance(el);
+        this.modalInstanz.show();
+      });
     },
     wuerfeln() {
       const gen = this.wurfGeneration;
@@ -282,6 +302,7 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
       this.letzterWurf = [];
       this.kritischerTreffer = false;
       this.$refs.wuerfelbecher?.anzeigeZuruecksetzen?.();
+      this.$refs.slModifikator?.zuruecksetzen?.();
     },
     onModalVerborgen() {
       this.ergebnisZuruecksetzen();
@@ -355,6 +376,16 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
                 <span class="fs-5 fw-bold">{{ schadenswurfAnzeige }}</span>
               </div>
             </div>
+
+            <probe-ziel-modifikator
+              ref="slModifikator"
+              :basiswert="0"
+              id-prefix="schaden-mod"
+              :show-basis-card="false"
+              :show-ziel-card="false"
+              :show-krit-miss="false"
+              slider-modus="symmetrisch"
+              :symmetrisch-max="50" />
             <div class="form-check mb-3">
               <input
                 id="schaden-kritisch"
@@ -396,9 +427,17 @@ window.HTBAH_KOMPONENTEN.SchadenModal = {
                 <div class="small text-body-secondary mt-2 text-start">
                   <div>Würfel: {{ letzterWurf.join(' + ') }} = {{ wuerfelSumme }}</div>
                   <div v-if="waffenBonus">+ Waffe: {{ waffenBonus }}</div>
+                  <div v-if="slModifikatorHatWert">+ SL-Modifikator: {{ slModifikatorWert > 0 ? '+' : '' }}{{ slModifikatorWert }}</div>
                   <div>= Summe: {{ wurfSumme }}</div>
                   <div v-if="kritischerTreffer">× 2 (kritischer Treffer): {{ gesamtSchadenVorParade }}</div>
                   <div v-if="halbeSchadenWaffenloseParade">÷ 2 (waffenlose Parade): {{ gesamtSchaden }}</div>
+                </div>
+                <div
+                  v-if="slModifikatorHatWert"
+                  class="d-flex justify-content-center flex-wrap gap-2 mt-2">
+                  <span class="badge rounded-pill" :class="slModifikatorBadgeKlasse">
+                    {{ slModifikatorBadgeText }}
+                  </span>
                 </div>
               </div>
             </div>

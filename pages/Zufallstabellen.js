@@ -1829,6 +1829,26 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if ((typ === 'npc' || typ === 'bestie') && !Array.isArray(zeileKopie.inventar)) {
         zeileKopie.inventar = [];
       }
+      const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
+      if (
+        (typ === 'npc' || typ === 'bestie') &&
+        EF &&
+        typeof EF.istFaehigkeitenArrayFormat === 'function' &&
+        typeof EF.normalisiereEntitaetFaehigkeiten === 'function' &&
+        !EF.istFaehigkeitenArrayFormat(zeileKopie)
+      ) {
+        const norm = EF.normalisiereEntitaetFaehigkeiten(zeileKopie, {
+          typ,
+          fallbackEpocheUi:
+            typ === 'bestie'
+              ? String(zeileKopie.epoche || this.zufallBestieEpoche || 'mittelalter').trim()
+              : String(this.zufallNpcEpoche || 'mittelalter').trim(),
+        });
+        zeileKopie.presetId = norm.presetId;
+        zeileKopie.handeln = norm.handeln;
+        zeileKopie.wissen = norm.wissen;
+        zeileKopie.soziales = norm.soziales;
+      }
       this.bearbeitung = {
         typ,
         zeile: zeileKopie,
@@ -2707,7 +2727,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       }
       if (typ === 'npc' && z) {
         const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
-        if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
+        if (EF && typeof EF.istFaehigkeitenArrayFormat === 'function' && EF.istFaehigkeitenArrayFormat(z)) {
+          z.handeln = EF.normalisiereFaehigkeitenListe(z.handeln, { slModus: true });
+          z.wissen = EF.normalisiereFaehigkeitenListe(z.wissen, { slModus: true });
+          z.soziales = EF.normalisiereFaehigkeitenListe(z.soziales, { slModus: true });
+        } else if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
           z.handeln = this.normalisiereBegabungswert(z.handeln);
           z.wissen = this.normalisiereBegabungswert(z.wissen);
           z.soziales = this.normalisiereBegabungswert(z.soziales);
@@ -2715,7 +2739,11 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         z.initiative = this.normalisiereInitiativeWert(z.initiative, this.begabungHandelnAusEntitaetZeile(z));
       } else if (typ === 'bestie' && z) {
         const EF = window.HTBAH_ENTITAET_FAEHIGKEITEN_MODEL;
-        if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
+        if (EF && typeof EF.istFaehigkeitenArrayFormat === 'function' && EF.istFaehigkeitenArrayFormat(z)) {
+          z.handeln = EF.normalisiereFaehigkeitenListe(z.handeln, { slModus: true });
+          z.wissen = EF.normalisiereFaehigkeitenListe(z.wissen, { slModus: true });
+          z.soziales = EF.normalisiereFaehigkeitenListe(z.soziales, { slModus: true });
+        } else if (!EF || typeof EF.istFaehigkeitenArrayFormat !== 'function' || !EF.istFaehigkeitenArrayFormat(z)) {
           z.handeln = this.normalisiereBegabungswert(z.handeln);
           z.wissen = this.normalisiereBegabungswert(z.wissen);
           z.soziales = this.normalisiereBegabungswert(z.soziales);

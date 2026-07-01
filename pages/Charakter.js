@@ -68,6 +68,7 @@ window.HTBAH_SEITEN.Charakter = {
       _autosaveTemporarAussetzen: false,
       charakterbildDropAktiv: false,
       initiativeBadgeGeschlossen: false,
+      _initiativeBadgeRouteInit: false,
     };
   },
   computed: {
@@ -329,7 +330,7 @@ window.HTBAH_SEITEN.Charakter = {
       }
     },
     'charakter.initiative'(neu, alt) {
-      if (this.spielleitungMitglied || !this.istSpielTabAktiv) {
+      if (this.spielleitungMitglied || !this.istSpielTabAktiv || this._initiativeBadgeRouteInit) {
         return;
       }
       const n = String(neu || '').trim();
@@ -340,7 +341,7 @@ window.HTBAH_SEITEN.Charakter = {
         return;
       }
       if (n !== a) {
-        this.initiativeBadgeGeschlossen = false;
+        this.initiativeBadgeGeschlossen = this.initiativeBadgeIstGeschlossenGespeichert(n);
       }
       this.initiativeBadgeSpeicherSchreiben(n, this.initiativeBadgeGeschlossen);
     },
@@ -405,19 +406,28 @@ window.HTBAH_SEITEN.Charakter = {
         });
         return;
       }
-      this.charakterId = eintrag.id;
-      this.charakterLokal = M.charakterMitDefaults(eintrag.charakter);
-      this.charakterBildLokal = eintrag.charakterBild || '';
-      this.zeigePresetAktionen = false;
-      window.HTBAH.setzeAktivenCharakterId(eintrag.id);
-      this.initialisiereGeistesblitzVerbleibend();
-      this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
-      this._prevLpSnapshot = this.normalisiereLp(this.charakterLokal.lebenspunkte);
-      if (typeof window.HTBAH.initialisiereCharakterKampfZustand === 'function') {
-        window.HTBAH.initialisiereCharakterKampfZustand(this.charakterLokal);
+      this._initiativeBadgeRouteInit = true;
+      try {
+        this.charakterId = eintrag.id;
+        this.charakterLokal = M.charakterMitDefaults(eintrag.charakter);
+        this.charakterBildLokal = eintrag.charakterBild || '';
+        this.zeigePresetAktionen = false;
+        window.HTBAH.setzeAktivenCharakterId(eintrag.id);
+        this.initialisiereGeistesblitzVerbleibend();
+        this._prevGeistesblitzMax = { ...this.geistesblitzWerte };
+        this._prevLpSnapshot = this.normalisiereLp(this.charakterLokal.lebenspunkte);
+        if (typeof window.HTBAH.initialisiereCharakterKampfZustand === 'function') {
+          window.HTBAH.initialisiereCharakterKampfZustand(this.charakterLokal);
+        }
+        window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakterLokal);
+        this.autosaveSnapshotAktualisieren();
+        this.initiativeBadgeZustandLaden();
+      } finally {
+        this.$nextTick(() => {
+          this._initiativeBadgeRouteInit = false;
+          this.initiativeBadgeZustandLaden();
+        });
       }
-      window.HTBAH.syncLebenspunkteStatusFromCharakter(this.charakterLokal);
-      this.autosaveSnapshotAktualisieren();
       this._autosaveTemporarAussetzen = false;
       this.aktualisiereAktivesSpielBegonnenAusRoute(pfad);
       // Kein erzwungener Tab-Sprung: Session Zero und Aktives Spiel müssen frei wechselbar bleiben.
@@ -1344,8 +1354,21 @@ window.HTBAH_SEITEN.Charakter = {
       }
       this.initiativeBadgeGeschlossen = !!eintrag.geschlossen;
       if (eintrag.wert && !this.initiativeBadgeWert) {
+        this._initiativeBadgeRouteInit = true;
         this.charakter.initiative = eintrag.wert;
+        this.$nextTick(() => {
+          this._initiativeBadgeRouteInit = false;
+        });
       }
+    },
+    initiativeBadgeIstGeschlossenGespeichert(wert) {
+      const S = window.HTBAH_INITIATIVE_BADGE_SPEICHER;
+      const ini = String(wert || '').trim();
+      if (!S || !this.charakterId || !ini) {
+        return false;
+      }
+      const eintrag = S.lade(this.charakterId);
+      return !!(eintrag && eintrag.wert === ini && eintrag.geschlossen);
     },
     initiativeBadgeSpeicherSchreiben(wert, geschlossen) {
       const S = window.HTBAH_INITIATIVE_BADGE_SPEICHER;
@@ -1405,7 +1428,6 @@ window.HTBAH_SEITEN.Charakter = {
         modus: 'begabung',
         basiswert: zielwert,
         zielwert,
-        zeigtModifikator: !!this.spielleitungMitglied,
         basisLabel: 'Begabung ' + this.kategorieAnzeige(kategorie),
         titel: 'Probe: Begabung ' + this.kategorieAnzeige(kategorie),
         untertitel:
@@ -1434,7 +1456,6 @@ window.HTBAH_SEITEN.Charakter = {
         modus: 'faehigkeit',
         basiswert: z,
         zielwert: z,
-        zeigtModifikator: !!this.spielleitungMitglied,
         basisLabel: 'Effektivwert ' + faehigkeit.name,
         titel: 'Probe: ' + faehigkeit.name,
         untertitel,
