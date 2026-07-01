@@ -41,13 +41,6 @@
       "value": 44
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-gg-sicherheitskraft",
-      "vorteilHtml": "Praesenz: Dein Auftreten deeskaliert viele Konflikte, bevor sie eskalieren.",
-      "nachteilHtml": "Kontrollzwang: Unklare Lagen ohne klare Befehlskette stressen dich schneller als andere."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-gg-sk-schlagstock",
@@ -77,6 +70,20 @@
       "typ": "gegenstand",
       "name": "Funkgerät",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-gg-sicherheitskraft-v",
+      "beschreibungHtml": "Praesenz: Dein Auftreten deeskaliert viele Konflikte, bevor sie eskalieren.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-gg-sicherheitskraft-n",
+      "beschreibungHtml": "Kontrollzwang: Unklare Lagen ohne klare Befehlskette stressen dich schneller als andere.",
+      "punkte": null
     }
   ]
 }

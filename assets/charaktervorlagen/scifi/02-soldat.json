@@ -41,13 +41,6 @@
       "value": 52
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-sf-soldat",
-      "vorteilHtml": "Gefechtsdisziplin: Unter Beschuss bleibst du fokussiert und handlungsfaehig.",
-      "nachteilHtml": "Befehlspraegung: Du faellst in Hierarchien schnell in alte Muster und hinterfragst zu spaet."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-sf-so-gewehr",
@@ -77,6 +70,20 @@
       "typ": "gegenstand",
       "name": "Taktikfunk",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-sf-soldat-v",
+      "beschreibungHtml": "Gefechtsdisziplin: Unter Beschuss bleibst du fokussiert und handlungsfaehig.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-sf-soldat-n",
+      "beschreibungHtml": "Befehlspraegung: Du faellst in Hierarchien schnell in alte Muster und hinterfragst zu spaet.",
+      "punkte": null
     }
   ]
 }

@@ -48,6 +48,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         pdfGrid2x2: true,
         inhaltHtml: `<p><strong>400 Fähigkeitspunkte</strong> auf Handeln, Wissen und Soziales verteilen (einzelne Fähigkeiten), z. B. Summe Handeln 127 → Begabung 13 (127 ÷ 10, kaufmännisch gerundet).</p>
 <ul>
+  <li><strong>Vor-/Nachteile</strong> (optional): getrennte Listen; Punktwerte bei Vorteilen kosten Budget, bei Nachteilen geben sie Punkte frei</li>
   <li><strong>Begabung</strong> = Summe der Fähigkeitspunkte in der Kategorie ÷ 10 (kaufmännisch gerundet)</li>
   <li><strong>Effektivwert</strong> = Fähigkeitsbasis + Begabung (max. 100)</li>
   <li>Ohne passende Fähigkeit: Probe auf den <strong>Begabungswert</strong> (kein kritischer Erfolg)</li>

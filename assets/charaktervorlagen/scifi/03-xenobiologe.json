@@ -45,13 +45,6 @@
       "value": 73
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-sf-xenobiologe",
-      "vorteilHtml": "Empathie fuer Fremdes: Du entschluesselst Verhalten unbekannter Spezies schneller als die meisten.",
-      "nachteilHtml": "Gefaehrliche Neugier: Wissenschaftliche Faszination laesst dich Risiken bei Erstkontakten unterschaetzen."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-sf-xb-proben",
@@ -76,6 +69,20 @@
       "typ": "gegenstand",
       "name": "Forschungsnotizen",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-sf-xenobiologe-v",
+      "beschreibungHtml": "Empathie fuer Fremdes: Du entschluesselst Verhalten unbekannter Spezies schneller als die meisten.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-sf-xenobiologe-n",
+      "beschreibungHtml": "Gefaehrliche Neugier: Wissenschaftliche Faszination laesst dich Risiken bei Erstkontakten unterschaetzen.",
+      "punkte": null
     }
   ]
 }

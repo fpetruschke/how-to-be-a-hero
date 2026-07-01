@@ -160,30 +160,17 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
       .filter(Boolean);
   };
 
-  M.normalisiereVorNachteilePaare = function normalisiereVorNachteilePaare(roh) {
-    if (!Array.isArray(roh)) {
-      return [];
+  M.normalisiereVorNachteileAusRoh = function normalisiereVorNachteileAusRoh(roh) {
+    const CM = window.HTBAH_CHARAKTER_MODEL;
+    if (!CM || typeof CM.vorNachteileAusQuelle !== 'function') {
+      return { vorteile: [], nachteile: [] };
     }
-    return roh
-      .map((paar, index) => {
-        if (!paar || typeof paar !== 'object') {
-          return null;
-        }
-        const vorteilHtml = typeof paar.vorteilHtml === 'string' ? paar.vorteilHtml.trim() : '';
-        const nachteilHtml = typeof paar.nachteilHtml === 'string' ? paar.nachteilHtml.trim() : '';
-        if (!vorteilHtml && !nachteilHtml) {
-          return null;
-        }
-        return {
-          id:
-            typeof paar.id === 'string' && paar.id.trim()
-              ? paar.id.trim()
-              : `vn-vorlage-${index}`,
-          vorteilHtml,
-          nachteilHtml,
-        };
-      })
-      .filter(Boolean);
+    return CM.vorNachteileAusQuelle(roh);
+  };
+
+  /** @deprecated Nutze normalisiereVorNachteileAusRoh. */
+  M.normalisiereVorNachteilePaare = function normalisiereVorNachteilePaare(roh) {
+    return M.normalisiereVorNachteileAusRoh({ vorNachteilePaare: roh }).vorteile;
   };
 
   /**
@@ -233,7 +220,7 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
       wissen: M.normalisiereFaehigkeitenListe(roh.wissen),
       soziales: M.normalisiereFaehigkeitenListe(roh.soziales),
       inventar: M.normalisiereInventarListe(roh.inventar),
-      vorNachteilePaare: M.normalisiereVorNachteilePaare(roh.vorNachteilePaare),
+      ...M.normalisiereVorNachteileAusRoh(roh),
     };
     for (const kat of KATEGORIEN) {
       for (const f of vorlage[kat]) {
@@ -249,16 +236,21 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
       M.summeFaehigkeiten(vorlage, 'handeln') +
       M.summeFaehigkeiten(vorlage, 'wissen') +
       M.summeFaehigkeiten(vorlage, 'soziales');
-    if (gesamt > 400) {
+    const CM = window.HTBAH_CHARAKTER_MODEL;
+    const budget =
+      CM && typeof CM.faehigkeitspunkteBudgetAusCharakter === 'function'
+        ? CM.faehigkeitspunkteBudgetAusCharakter(vorlage)
+        : 400;
+    if (gesamt > budget) {
       return {
         ok: false,
-        fehler: `Zu viele Fähigkeitspunkte (${gesamt} / 400).`,
+        fehler: `Zu viele Fähigkeitspunkte (${gesamt} / ${budget}).`,
       };
     }
-    if (gesamt < 400) {
+    if (gesamt < budget) {
       return {
         ok: false,
-        fehler: `Zu wenige Fähigkeitspunkte (${gesamt} / 400). Vorlagen sollen voll ausgeschöpft sein.`,
+        fehler: `Zu wenige Fähigkeitspunkte (${gesamt} / ${budget}). Vorlagen sollen voll ausgeschöpft sein.`,
       };
     }
     return { ok: true, vorlage };
@@ -299,9 +291,9 @@ window.HTBAH_CHARAKTERVORLAGEN_MODEL = window.HTBAH_CHARAKTERVORLAGEN_MODEL || {
     basis.wissen = JSON.parse(JSON.stringify(vorlage.wissen));
     basis.soziales = JSON.parse(JSON.stringify(vorlage.soziales));
     basis.inventar = JSON.parse(JSON.stringify(vorlage.inventar));
-    basis.vorNachteilePaare = JSON.parse(
-      JSON.stringify(Array.isArray(vorlage.vorNachteilePaare) ? vorlage.vorNachteilePaare : []),
-    );
+    const vn = M.normalisiereVorNachteileAusRoh(vorlage);
+    basis.vorteile = JSON.parse(JSON.stringify(vn.vorteile));
+    basis.nachteile = JSON.parse(JSON.stringify(vn.nachteile));
     basis.geistesblitzVerbleibend = null;
     return basis;
   };

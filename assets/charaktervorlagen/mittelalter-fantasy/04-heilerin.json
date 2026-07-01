@@ -45,13 +45,6 @@
       "value": 79
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-mf-heilerin",
-      "vorteilHtml": "Ruhige Hände: Unter Stress kannst du Verletzungen und Krankheiten konzentriert versorgen.",
-      "nachteilHtml": "Helfersyndrom: Du bringst dich oft selbst in Gefahr, wenn jemand in deiner Nähe leidet."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-mf-he-kraeuter",
@@ -78,6 +71,20 @@
       "typ": "gegenstand",
       "name": "Heilkräuter",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-mf-heilerin-v",
+      "beschreibungHtml": "Ruhige Hände: Unter Stress kannst du Verletzungen und Krankheiten konzentriert versorgen.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-mf-heilerin-n",
+      "beschreibungHtml": "Helfersyndrom: Du bringst dich oft selbst in Gefahr, wenn jemand in deiner Nähe leidet.",
+      "punkte": null
     }
   ]
 }

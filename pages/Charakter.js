@@ -7,7 +7,7 @@ window.HTBAH_SEITEN.Charakter = {
   components: {
     CharakterBildModal: window.HTBAH_KOMPONENTEN.CharakterBildModal,
     InventarModal: window.HTBAH_KOMPONENTEN.InventarModal,
-    VorNachteileModal: window.HTBAH_KOMPONENTEN.VorNachteileModal,
+    VorNachteileEditorPanel: window.HTBAH_KOMPONENTEN.VorNachteileEditorPanel,
     NotizenModal: window.HTBAH_KOMPONENTEN.NotizenModal,
     FaehigkeitFormular: window.HTBAH_KOMPONENTEN.FaehigkeitFormular,
     InitiativeModal: window.HTBAH_KOMPONENTEN.InitiativeModal,
@@ -130,10 +130,40 @@ window.HTBAH_SEITEN.Charakter = {
       return !this.charakterBild;
     },
     hatZuVieleFaehigkeitspunkte() {
-      return this.punkte > 400;
+      return this.punkte > this.faehigkeitspunkteBudget;
     },
     faehigkeitspunkteUeberLimit() {
-      return Math.max(0, this.punkte - 400);
+      return Math.max(0, this.punkte - this.faehigkeitspunkteBudget);
+    },
+    vorNachteilePunkte() {
+      const CM = window.HTBAH_CHARAKTER_MODEL;
+      if (!CM || typeof CM.vorNachteilePunkteAusCharakter !== 'function') {
+        return { vorteilSumme: 0, nachteilSumme: 0 };
+      }
+      const vorteile = Array.isArray(this.charakter.vorteile) ? this.charakter.vorteile : [];
+      const nachteile = Array.isArray(this.charakter.nachteile) ? this.charakter.nachteile : [];
+      for (const e of vorteile) {
+        void (e && e.punkte);
+      }
+      for (const e of nachteile) {
+        void (e && e.punkte);
+      }
+      return CM.vorNachteilePunkteAusCharakter(this.charakter);
+    },
+    faehigkeitspunkteBudget() {
+      const { vorteilSumme, nachteilSumme } = this.vorNachteilePunkte;
+      const basis =
+        window.HTBAH_CHARAKTER_MODEL && window.HTBAH_CHARAKTER_MODEL.FAEHIGKEITSPUNKTE_BASIS
+          ? window.HTBAH_CHARAKTER_MODEL.FAEHIGKEITSPUNKTE_BASIS
+          : 400;
+      return basis - vorteilSumme + nachteilSumme;
+    },
+    faehigkeitspunkteUebrig() {
+      return this.faehigkeitspunkteBudget - this.punkte;
+    },
+    hatVorNachteilePunkteAnpassung() {
+      const { vorteilSumme, nachteilSumme } = this.vorNachteilePunkte;
+      return vorteilSumme > 0 || nachteilSumme > 0;
     },
     istNeuModus() {
       return !this.spielleitungMitglied && this.charakterId === null;
@@ -900,10 +930,11 @@ window.HTBAH_SEITEN.Charakter = {
       );
     },
     async zeigeFaehigkeitspunkteLimitFehler(gesamtpunkte) {
-      const ueber = Math.max(0, Number(gesamtpunkte) - 400);
+      const budget = this.faehigkeitspunkteBudget;
+      const ueber = Math.max(0, Number(gesamtpunkte) - budget);
       await window.HTBAH.ui.alert({
         titel: 'Zu viele Fähigkeitspunkte',
-        beschreibung: `Du würdest das Maximum von 400 Punkten überschreiten (aktuell +${ueber}). Bitte reduziere die Werte.`,
+        beschreibung: `Du würdest das Maximum von ${budget} Punkten überschreiten (aktuell +${ueber}). Bitte reduziere die Werte.`,
       });
     },
     faehigkeitenPresetAufCharakterAnwenden(preset) {
@@ -961,7 +992,7 @@ window.HTBAH_SEITEN.Charakter = {
       if (!bestaetigt) return;
 
       const presetPunkte = this.summeFaehigkeitspunkteAusPreset(preset);
-      if (presetPunkte > 400) {
+      if (presetPunkte > this.faehigkeitspunkteBudget) {
         await this.zeigeFaehigkeitspunkteLimitFehler(presetPunkte);
         return;
       }
@@ -1001,7 +1032,7 @@ window.HTBAH_SEITEN.Charakter = {
             return;
           }
           const presetPunkte = this.summeFaehigkeitspunkteAusPreset(preset);
-          if (presetPunkte > 400) {
+          if (presetPunkte > this.faehigkeitspunkteBudget) {
             await this.zeigeFaehigkeitspunkteLimitFehler(presetPunkte);
             return;
           }
@@ -1107,7 +1138,7 @@ window.HTBAH_SEITEN.Charakter = {
 
       const punkteOhne = this.punkte - ref.value;
       const punkteNeu = punkteOhne + wert;
-      if (punkteNeu > 400) {
+      if (punkteNeu > this.faehigkeitspunkteBudget) {
         await this.zeigeFaehigkeitspunkteLimitFehler(punkteNeu);
         return;
       }
@@ -1177,7 +1208,7 @@ window.HTBAH_SEITEN.Charakter = {
       }
 
       const punkteNeu = this.punkte + wert;
-      if (punkteNeu > 400) {
+      if (punkteNeu > this.faehigkeitspunkteBudget) {
         await this.zeigeFaehigkeitspunkteLimitFehler(punkteNeu);
         return;
       }
@@ -1335,9 +1366,6 @@ window.HTBAH_SEITEN.Charakter = {
     },
     inventarDialogOeffnen() {
       this.$refs.inventarModal.oeffnen();
-    },
-    vorNachteileDialogOeffnen() {
-      this.$refs.vorNachteileModal.oeffnen();
     },
     initiativeModalOeffnen() {
       this.$refs.initiativeModal.oeffnen();
@@ -1976,50 +2004,14 @@ window.HTBAH_SEITEN.Charakter = {
         </div>
       </div>
 
-      <div v-if="(spielleitungMitglied || istSetupTabAktiv) && !istNeuModus" class="card p-3 mb-2">
+      <div
+        v-if="!istNeuModus && (spielleitungMitglied || istSetupTabAktiv || istSpielTabAktiv)"
+        class="card p-3 mb-2">
         <h5 class="mb-2">Vor- &amp; Nachteile</h5>
-        <p class="small text-body-secondary mb-3 mb-md-2">
-          Jedes Paar besteht aus einem Vorteil (kostet Fähigkeitspunkte) und einem Nachteil
-          (gewährt Fähigkeitspunkte); die Punkte eines Paares müssen sich ausgleichen.
-          Du kannst beliebig viele Paare anlegen — derzeit nur als Freitext mit Formatierung.
-        </p>
-        <icon-text-button
-          type="button"
-          class="btn btn-outline-primary w-100"
-          symbol="⚖️"
-          @click="vorNachteileDialogOeffnen">
-          Vor- &amp; Nachteile bearbeiten
-        </icon-text-button>
-
-        <div
-          v-if="charakter.vorNachteilePaare.length"
-          class="table-responsive rounded border border-secondary border-opacity-25 mt-3 vor-nachteile-karte-wrap">
-          <table class="table table-sm mb-0 inventar-tabelle vor-nachteile-tabelle vor-nachteile-karte-tabelle">
-            <thead>
-              <tr>
-                <th scope="col" class="vn-col-vorteil">Vorteil</th>
-                <th scope="col" class="vn-col-nachteil">Nachteil</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="paar in charakter.vorNachteilePaare" :key="paar.id">
-                <td class="vn-col-vorteil">
-                  <div
-                    class="inventar-beschreibung-vorschau small vor-nachteile-karte-vorschau"
-                    v-html="paar.vorteilHtml"></div>
-                </td>
-                <td class="vn-col-nachteil">
-                  <div
-                    class="inventar-beschreibung-vorschau small vor-nachteile-karte-vorschau"
-                    v-html="paar.nachteilHtml"></div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="small text-body-secondary mb-0 mt-3">
-          Noch keine Paare — über den Button bearbeiten.
-        </p>
+        <vor-nachteile-editor-panel
+          :charakter="charakter"
+          :bearbeitbar="!spielleitungMitglied && istSetupTabAktiv"
+          id-prefix="ce-vn" />
       </div>
 
       <div v-if="spielleitungMitglied || (!istNeuModus && (istSpielTabAktiv || istSetupTabAktiv))" class="card p-2 mb-2">
@@ -2120,21 +2112,29 @@ window.HTBAH_SEITEN.Charakter = {
         <div class="htbah-faehigkeiten-sticky-scope">
           <div class="htbah-faehigkeiten-punkte-sticky">
             <div v-if="hatZuVieleFaehigkeitspunkte" class="alert alert-danger py-2 mb-2" role="alert">
-              Zu viele Fähigkeitspunkte verteilt: {{ punkte }} / 400
+              Zu viele Fähigkeitspunkte verteilt: {{ punkte }} / {{ faehigkeitspunkteBudget }}
               ({{ faehigkeitspunkteUeberLimit }} über dem Maximum). Bitte Punkte reduzieren.
             </div>
             <p
-              v-if="punkte < 400 || !( !spielleitungMitglied && istEditModus && istSpielTabAktiv )"
+              v-if="faehigkeitspunkteUebrig > 0 || !( !spielleitungMitglied && istEditModus && istSpielTabAktiv )"
               class="mb-2">
-              Punkte: <strong>{{punkte}}</strong> / 400
-              <span class="text-warning">({{400 - punkte}} übrig)</span>
+              Punkte: <strong>{{punkte}}</strong> / {{ faehigkeitspunkteBudget }}
+              <span class="text-warning">({{ faehigkeitspunkteUebrig }} übrig)</span>
+            </p>
+            <p
+              v-if="hatVorNachteilePunkteAnpassung"
+              class="small text-body-secondary mb-2">
+              Budget: 400
+              <span v-if="vorNachteilePunkte.vorteilSumme"> − {{ vorNachteilePunkte.vorteilSumme }} (Vorteile)</span>
+              <span v-if="vorNachteilePunkte.nachteilSumme"> + {{ vorNachteilePunkte.nachteilSumme }} (Nachteile)</span>
+              = {{ faehigkeitspunkteBudget }}
             </p>
 
             <div
-              v-if="punkte < 400 || !( !spielleitungMitglied && istEditModus && istSpielTabAktiv )"
+              v-if="faehigkeitspunkteUebrig > 0 || !( !spielleitungMitglied && istEditModus && istSpielTabAktiv )"
               class="progress mb-2"
               style="height:10px;">
-              <div class="progress-bar" :style="{width: (punkte/400*100) + '%'}"></div>
+              <div class="progress-bar" :style="{width: Math.min(100, faehigkeitspunkteBudget > 0 ? punkte / faehigkeitspunkteBudget * 100 : 100) + '%'}"></div>
             </div>
           </div>
 
@@ -2664,9 +2664,17 @@ window.HTBAH_SEITEN.Charakter = {
             </div>
             <div class="modal-body">
               <p v-if="!spielleitungMitglied && istEditModus && istSpielTabAktiv">
-                <strong>Du hast in der Session Zero 400 Punkte auf die Fähigkeiten verteilt.</strong>
+                <strong>Du hast in der Session Zero {{ faehigkeitspunkteBudget }} Punkte auf die Fähigkeiten verteilt.</strong>
+                <span v-if="hatVorNachteilePunkteAnpassung" class="d-block small text-body-secondary mt-1">
+                  (Basis 400, angepasst durch Vor- und Nachteile.)
+                </span>
               </p>
-              <p v-else><strong>Du hast 400 Punkte.</strong> Diese verteilst du auf Fähigkeiten.</p>
+              <p v-else>
+                <strong>Du hast {{ faehigkeitspunkteBudget }} Punkte.</strong> Diese verteilst du auf Fähigkeiten.
+                <span v-if="hatVorNachteilePunkteAnpassung" class="d-block small text-body-secondary mt-1">
+                  (Basis 400, angepasst durch Vor- und Nachteile.)
+                </span>
+              </p>
               <p><strong>Fähigkeiten</strong> sind konkrete Dinge (z.B. Klettern, Lügen).</p>
               <p><strong>Kategorien:</strong></p>
               <ul>
@@ -2739,7 +2747,6 @@ window.HTBAH_SEITEN.Charakter = {
         class="d-none"
         accept="image/*"
         @change="charakterbildDateiAusgewaehlt" />
-      <vor-nachteile-modal ref="vorNachteileModal" :charakter="charakter" />
       <initiative-modal
         v-if="!spielleitungMitglied"
         ref="initiativeModal"

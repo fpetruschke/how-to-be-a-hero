@@ -4381,6 +4381,56 @@ input::placeholder {
   max-height: 7.5rem;
 }
 
+.vn-punkte-input {
+  max-width: 6rem;
+}
+
+.vn-punkte-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.vn-spalte-karte--vorteil {
+  border-top: 3px solid color-mix(in srgb, var(--success-color, #198754) 55%, transparent);
+}
+
+.vn-spalte-karte--nachteil {
+  border-top: 3px solid color-mix(in srgb, var(--danger-color) 42%, transparent);
+}
+
+.vn-beschreibung-vorschau {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.vn-zeile-hinzufuegen-gruppe {
+  align-items: stretch;
+}
+
+.vn-zeile-hinzufuegen-gruppe .vn-zeile-hinzufuegen-text {
+  flex: 4 1 0;
+  min-width: 0;
+  resize: vertical;
+  min-height: calc(2.5rem + 2px);
+}
+
+.vn-zeile-hinzufuegen-gruppe .vn-zeile-hinzufuegen-wert {
+  flex: 0 0 4.5rem;
+  max-width: 4.5rem;
+  min-width: 4.5rem;
+  text-align: end;
+}
+
+.vn-beschreibung-html-vorschau {
+  max-height: 7rem;
+}
+
 .inventar-beschreibung-vorschau {
   max-height: 4.25rem;
   overflow: auto;

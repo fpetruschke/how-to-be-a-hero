@@ -509,17 +509,38 @@
     const lpBlockBreitePx = optionen && optionen.stil === 'modern-futuristisch'
       ? PDF_LP_BREITE_SCIFI_PX
       : PDF_LP_BREITE_STANDARD_PX;
-    const paare = blanko ? [] : (Array.isArray(charakter.vorNachteilePaare) ? charakter.vorNachteilePaare : []);
+    const CM = window.HTBAH_CHARAKTER_MODEL;
+    let vorteile = blanko ? [] : (CM && typeof CM.normalisiereVorteileListe === 'function'
+      ? CM.normalisiereVorteileListe(charakter.vorteile)
+      : []);
+    let nachteile = blanko ? [] : (CM && typeof CM.normalisiereNachteileListe === 'function'
+      ? CM.normalisiereNachteileListe(charakter.nachteile)
+      : []);
+    if (!vorteile.length && !nachteile.length && !blanko) {
+      const migriert = CM && typeof CM.vorNachteileAusQuelle === 'function'
+        ? CM.vorNachteileAusQuelle(charakter)
+        : { vorteile: [], nachteile: [] };
+      vorteile.push(...migriert.vorteile);
+      nachteile.push(...migriert.nachteile);
+    }
+    const zeilenAnzahl = Math.max(vorteile.length, nachteile.length, blanko ? 0 : 0);
     let vnRows = '';
-    if (!paare.length) {
+    if (!zeilenAnzahl) {
       vnRows = leereTabellenZeilenHtml(2, LEERZEILEN_VOR_NACHTEILE, '', zellenRahmen);
     } else {
-      paare.forEach((paar) => {
+      const max = Math.max(vorteile.length, nachteile.length);
+      for (let i = 0; i < max; i += 1) {
+        const v = vorteile[i];
+        const n = nachteile[i];
+        const vHtml = v ? (v.beschreibungHtml || '') : '';
+        const nHtml = n ? (n.beschreibungHtml || '') : '';
+        const vPunkte = v && v.punkte ? ` <span style="font-weight:bold;color:#856404;">(+${v.punkte})</span>` : '';
+        const nPunkte = n && n.punkte ? ` <span style="font-weight:bold;color:#155724;">(−${n.punkte})</span>` : '';
         vnRows += `<tr>
-          <td style="vertical-align:top;padding:3px 4px;border:1px solid ${zellenRahmen};font-size:8.5px;" class="htbah-pdf-html">${paar.vorteilHtml || ''}</td>
-          <td style="vertical-align:top;padding:3px 4px;border:1px solid ${zellenRahmen};font-size:8.5px;" class="htbah-pdf-html">${paar.nachteilHtml || ''}</td>
+          <td style="vertical-align:top;padding:3px 4px;border:1px solid ${zellenRahmen};font-size:8.5px;" class="htbah-pdf-html">${vHtml}${vPunkte}</td>
+          <td style="vertical-align:top;padding:3px 4px;border:1px solid ${zellenRahmen};font-size:8.5px;" class="htbah-pdf-html">${nHtml}${nPunkte}</td>
         </tr>`;
-      });
+      }
       vnRows += leereTabellenZeilenHtml(2, LEERZEILEN_VOR_NACHTEILE, '', zellenRahmen);
     }
 

@@ -115,7 +115,7 @@ Das Skript prüft, ob im Paket eine Spielleitung-Kampagne erkennbar ist (Legacy 
 
 ## Charaktervorlagen (Epochen)
 
-Vorlagen liegen unter `assets/charaktervorlagen/` (je Epoche ein Unterordner, Manifest in `index.json`). Jede Vorlage nutzt ausschließlich Fähigkeitsnamen aus dem passenden Preset in `shared/faehigkeitenPresetsStandard.js` und verteilt **400 Fähigkeitspunkte** (wie ein voll ausgebauter Held).
+Vorlagen liegen unter `assets/charaktervorlagen/` (je Epoche ein Unterordner, Manifest in `index.json`). Jede Vorlage nutzt ausschließlich Fähigkeitsnamen aus dem passenden Preset in `shared/faehigkeitenPresetsStandard.js` und verteilt **400 Fähigkeitspunkte** (wie ein voll ausgebauter Held). Vor- und Nachteile sind getrennte Listen (`vorteile` / `nachteile` mit Beschreibung und optionalem Punktwert); sie können das verfügbare Fähigkeitspunkte-Budget anpassen.
 
 ```bash
 ./bin/aktualisiere-vorlagen                  # Manifest + Validierung (empfohlen)

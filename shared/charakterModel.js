@@ -27,6 +27,185 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
     });
   };
 
+  M.FAEHIGKEITSPUNKTE_BASIS = 400;
+
+  M.neueVorNachteilZeilenId = function neueVorNachteilZeilenId() {
+    return typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `vn-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  };
+
+  /** Positiver Punktwert; null = nicht gesetzt (kein Effekt auf das Budget). */
+  M.normalisiereVorNachteilPunkte = function normalisiereVorNachteilPunkte(wert) {
+    if (wert == null || wert === '') {
+      return null;
+    }
+    const n = Math.round(Number(wert));
+    if (!Number.isFinite(n) || n <= 0) {
+      return null;
+    }
+    return n;
+  };
+
+  M.vorNachteilBeschreibungAlsHtml = function vorNachteilBeschreibungAlsHtml(roh) {
+    if (typeof roh !== 'string') {
+      return '';
+    }
+    const t = roh.trim();
+    if (!t) {
+      return '';
+    }
+    if (/<[a-z][\s\S]*>/i.test(t)) {
+      return t;
+    }
+    return `<p>${t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`;
+  };
+
+  M.vorNachteilBeschreibungVorschau = function vorNachteilBeschreibungVorschau(html) {
+    const t = String(html || '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return t;
+  };
+
+  M.normalisiereVorNachteilZeile = function normalisiereVorNachteilZeile(eintrag, index, praefix) {
+    if (!eintrag || typeof eintrag !== 'object') {
+      return null;
+    }
+    const beschreibungHtml = M.vorNachteilBeschreibungAlsHtml(
+      typeof eintrag.beschreibungHtml === 'string'
+        ? eintrag.beschreibungHtml
+        : typeof eintrag.beschreibung === 'string'
+          ? eintrag.beschreibung
+          : '',
+    );
+    if (!beschreibungHtml) {
+      return null;
+    }
+    return {
+      id:
+        typeof eintrag.id === 'string' && eintrag.id.trim()
+          ? eintrag.id.trim()
+          : `${praefix}-${index}`,
+      beschreibungHtml,
+      punkte: M.normalisiereVorNachteilPunkte(eintrag.punkte),
+    };
+  };
+
+  M.normalisiereVorteileListe = function normalisiereVorteileListe(roh) {
+    if (!Array.isArray(roh)) {
+      return [];
+    }
+    return roh
+      .map((e, index) => M.normalisiereVorNachteilZeile(e, index, 'vorteil'))
+      .filter(Boolean);
+  };
+
+  M.normalisiereNachteileListe = function normalisiereNachteileListe(roh) {
+    if (!Array.isArray(roh)) {
+      return [];
+    }
+    return roh
+      .map((e, index) => M.normalisiereVorNachteilZeile(e, index, 'nachteil'))
+      .filter(Boolean);
+  };
+
+  /** Legacy: vorNachteilePaare → getrennte Listen. */
+  M.migriereVorNachteilePaare = function migriereVorNachteilePaare(paare) {
+    const vorteile = [];
+    const nachteile = [];
+    if (!Array.isArray(paare)) {
+      return { vorteile, nachteile };
+    }
+    paare.forEach((paar, index) => {
+      if (!paar || typeof paar !== 'object') {
+        return;
+      }
+      const basisId =
+        typeof paar.id === 'string' && paar.id.trim() ? paar.id.trim() : `vn-paar-${index}`;
+      const vorteilHtml = typeof paar.vorteilHtml === 'string' ? paar.vorteilHtml.trim() : '';
+      const nachteilHtml = typeof paar.nachteilHtml === 'string' ? paar.nachteilHtml.trim() : '';
+      if (vorteilHtml) {
+        vorteile.push({
+          id: `${basisId}-v`,
+          beschreibungHtml: vorteilHtml,
+          punkte: M.normalisiereVorNachteilPunkte(paar.vorteilPunkte),
+        });
+      }
+      if (nachteilHtml) {
+        nachteile.push({
+          id: `${basisId}-n`,
+          beschreibungHtml: nachteilHtml,
+          punkte: M.normalisiereVorNachteilPunkte(paar.nachteilPunkte),
+        });
+      }
+    });
+    return { vorteile, nachteile };
+  };
+
+  M.vorNachteileAusQuelle = function vorNachteileAusQuelle(quelle) {
+    const q = quelle && typeof quelle === 'object' ? quelle : {};
+    const hatPaare = Array.isArray(q.vorNachteilePaare) && q.vorNachteilePaare.length > 0;
+    const hatListen =
+      (Array.isArray(q.vorteile) && q.vorteile.length > 0) ||
+      (Array.isArray(q.nachteile) && q.nachteile.length > 0);
+    if (hatPaare && !hatListen) {
+      return M.migriereVorNachteilePaare(q.vorNachteilePaare);
+    }
+    return {
+      vorteile: M.normalisiereVorteileListe(q.vorteile),
+      nachteile: M.normalisiereNachteileListe(q.nachteile),
+    };
+  };
+
+  /**
+   * Fähigkeitspunkte-Budget aus Vor-/Nachteilen:
+   * 400 − Σ Vorteil-Punkte + Σ Nachteil-Punkte
+   * (Vorteile kosten Punkte, Nachteile geben zusätzliche Punkte zum Verteilen).
+   */
+  M.vorNachteilePunkteAusCharakter = function vorNachteilePunkteAusCharakter(charakter) {
+    const q = charakter && typeof charakter === 'object' ? charakter : {};
+    let vorteile = Array.isArray(q.vorteile) ? q.vorteile : [];
+    let nachteile = Array.isArray(q.nachteile) ? q.nachteile : [];
+    if (!vorteile.length && !nachteile.length && Array.isArray(q.vorNachteilePaare) && q.vorNachteilePaare.length) {
+      const migriert = M.migriereVorNachteilePaare(q.vorNachteilePaare);
+      vorteile = migriert.vorteile;
+      nachteile = migriert.nachteile;
+    }
+    let vorteilSumme = 0;
+    let nachteilSumme = 0;
+    for (const e of vorteile) {
+      const p = M.normalisiereVorNachteilPunkte(e && e.punkte);
+      if (p) {
+        vorteilSumme += p;
+      }
+    }
+    for (const e of nachteile) {
+      const p = M.normalisiereVorNachteilPunkte(e && e.punkte);
+      if (p) {
+        nachteilSumme += p;
+      }
+    }
+    return { vorteilSumme, nachteilSumme };
+  };
+
+  /** @deprecated Nur für Alt-Daten; nutze vorNachteilePunkteAusCharakter. */
+  M.vorNachteilePunkteAusPaaren = function vorNachteilePunkteAusPaaren(paare) {
+    return M.vorNachteilePunkteAusCharakter({ vorNachteilePaare: paare });
+  };
+
+  M.faehigkeitspunkteBudgetAusCharakter = function faehigkeitspunkteBudgetAusCharakter(charakter) {
+    const { vorteilSumme, nachteilSumme } = M.vorNachteilePunkteAusCharakter(charakter);
+    return M.FAEHIGKEITSPUNKTE_BASIS - vorteilSumme + nachteilSumme;
+  };
+
+  M.faehigkeitspunkteGesamtAusCharakter = function faehigkeitspunkteGesamtAusCharakter(charakter) {
+    const summen = M.summenAusCharakter(charakter);
+    return summen.handeln + summen.wissen + summen.soziales;
+  };
+
   M.summenAusCharakter = function summenAusCharakter(charakter) {
     const sum = (kat) =>
       (Array.isArray(charakter && charakter[kat]) ? charakter[kat] : []).reduce(
@@ -286,7 +465,8 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       beruf: '',
       familienstand: '',
       inventar: [],
-      vorNachteilePaare: [],
+      vorteile: [],
+      nachteile: [],
       journalHtml: '',
       sicherheitsmechanismen: {
         tabuHtml: '',
@@ -323,6 +503,7 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
     const zusammengefuehrt = { ...basis, ...quelle };
     delete zusammengefuehrt.inventarHtml;
     delete zusammengefuehrt.religion;
+    delete zusammengefuehrt.vorNachteilePaare;
 
     const gb = quelle.geistesblitzVerbleibend;
     const geistesblitzVerbleibend =
@@ -335,6 +516,8 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
             soziales: gb.soziales,
           }
         : null;
+
+    const vorNachteile = M.vorNachteileAusQuelle(quelle);
 
     const glaubeAusQuelle =
       typeof quelle.glaube === 'string'
@@ -364,16 +547,8 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
       wissen: Array.isArray(quelle.wissen) ? quelle.wissen : [],
       soziales: Array.isArray(quelle.soziales) ? quelle.soziales : [],
       inventar: M.inventarAusQuelle(quelle),
-      vorNachteilePaare: Array.isArray(quelle.vorNachteilePaare)
-        ? quelle.vorNachteilePaare.map((p, index) => ({
-            id:
-              typeof p.id === 'string' && p.id
-                ? p.id
-                : `vn-mig-${index}-${Date.now()}`,
-            vorteilHtml: typeof p.vorteilHtml === 'string' ? p.vorteilHtml : '',
-            nachteilHtml: typeof p.nachteilHtml === 'string' ? p.nachteilHtml : '',
-          }))
-        : [],
+      vorteile: vorNachteile.vorteile,
+      nachteile: vorNachteile.nachteile,
       sicherheitsmechanismen: {
         tabuHtml:
           typeof sicherheitsmechanismenQuelle.tabuHtml === 'string'

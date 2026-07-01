@@ -44,13 +44,6 @@
       "value": 73
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-gg-sanitaeter",
-      "vorteilHtml": "Krisenroutine: Unter Zeitdruck priorisierst du Verletzte schnell und effizient.",
-      "nachteilHtml": "Mitgefuehlige Belastung: Schwere Verluste gehen dir lange nach und koennen dich emotional blockieren."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-gg-sa-kit",
@@ -75,6 +68,20 @@
       "typ": "gegenstand",
       "name": "Einsatzfunk",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-gg-sanitaeter-v",
+      "beschreibungHtml": "Krisenroutine: Unter Zeitdruck priorisierst du Verletzte schnell und effizient.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-gg-sanitaeter-n",
+      "beschreibungHtml": "Mitgefuehlige Belastung: Schwere Verluste gehen dir lange nach und koennen dich emotional blockieren.",
+      "punkte": null
     }
   ]
 }

@@ -65,11 +65,42 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
     punkte() {
       return this.summen.handeln + this.summen.wissen + this.summen.soziales;
     },
+    faehigkeitspunkteBudget() {
+      if (this.istSl) {
+        return null;
+      }
+      const CM = window.HTBAH_CHARAKTER_MODEL;
+      if (!CM || typeof CM.vorNachteilePunkteAusCharakter !== 'function') {
+        return 400;
+      }
+      const vorteile = Array.isArray(this.entitaet?.vorteile) ? this.entitaet.vorteile : [];
+      const nachteile = Array.isArray(this.entitaet?.nachteile) ? this.entitaet.nachteile : [];
+      for (const e of vorteile) {
+        void (e && e.punkte);
+      }
+      for (const e of nachteile) {
+        void (e && e.punkte);
+      }
+      const { vorteilSumme, nachteilSumme } = CM.vorNachteilePunkteAusCharakter(this.entitaet);
+      return CM.FAEHIGKEITSPUNKTE_BASIS - vorteilSumme + nachteilSumme;
+    },
+    faehigkeitspunkteUebrig() {
+      if (this.faehigkeitspunkteBudget == null) {
+        return null;
+      }
+      return this.faehigkeitspunkteBudget - this.punkte;
+    },
     hatZuVieleFaehigkeitspunkte() {
-      return !this.istSl && this.punkte > 400;
+      if (this.istSl || this.faehigkeitspunkteBudget == null) {
+        return false;
+      }
+      return this.punkte > this.faehigkeitspunkteBudget;
     },
     faehigkeitspunkteUeberLimit() {
-      return Math.max(0, this.punkte - 400);
+      if (this.faehigkeitspunkteBudget == null) {
+        return 0;
+      }
+      return Math.max(0, this.punkte - this.faehigkeitspunkteBudget);
     },
     zeigtHeldenLimitHinweis() {
       return this.istSl && this.punkte > 400;
@@ -241,11 +272,12 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
         return false;
       }
       if (!this.istSl) {
+        const budget = this.faehigkeitspunkteBudget;
         const punkteNeu = punkteOhneAlt + wert;
-        if (punkteNeu > 400) {
+        if (punkteNeu > budget) {
           await window.HTBAH.ui.alert({
             titel: 'Zu viele Punkte',
-            beschreibung: `Maximal 400 Fähigkeitspunkte (${punkteNeu} / 400).`,
+            beschreibung: `Maximal ${budget} Fähigkeitspunkte (${punkteNeu} / ${budget}).`,
           });
           return false;
         }
@@ -353,15 +385,15 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
   template: `
     <div class="htbah-faehigkeiten-editor-panel">
       <div v-if="hatZuVieleFaehigkeitspunkte" class="alert alert-danger py-2 mb-2" role="alert">
-        Zu viele Fähigkeitspunkte verteilt: {{ punkte }} / 400
+        Zu viele Fähigkeitspunkte verteilt: {{ punkte }} / {{ faehigkeitspunkteBudget }}
         ({{ faehigkeitspunkteUeberLimit }} über dem Maximum). Bitte Punkte reduzieren.
       </div>
       <p v-else-if="zeigtHeldenLimitHinweis" class="small text-secondary mb-2">
         Hinweis: {{ punkte }} Fähigkeitspunkte — deutlich über typischen Helden (400). Für ausgewogene Kämpfe eher weniger vergeben.
       </p>
       <p v-if="!istSl" class="mb-2">
-        Punkte: <strong>{{ punkte }}</strong> / 400
-        <span class="text-warning">({{ 400 - punkte }} übrig)</span>
+        Punkte: <strong>{{ punkte }}</strong> / {{ faehigkeitspunkteBudget }}
+        <span class="text-warning">({{ faehigkeitspunkteUebrig }} übrig)</span>
       </p>
       <p v-else class="mb-2 small text-secondary">
         Fähigkeitspunkte gesamt: <strong>{{ punkte }}</strong>
@@ -370,7 +402,7 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
         </span>
       </p>
       <div v-if="!istSl" class="progress mb-3" style="height:10px;">
-        <div class="progress-bar" :style="{ width: Math.min(100, punkte / 400 * 100) + '%' }"></div>
+        <div class="progress-bar" :style="{ width: Math.min(100, faehigkeitspunkteBudget > 0 ? punkte / faehigkeitspunkteBudget * 100 : 100) + '%' }"></div>
       </div>
       <div class="htbah-faehigkeit-kat-spalten mb-2">
         <div class="htbah-faehigkeit-kat-spalten-inner">

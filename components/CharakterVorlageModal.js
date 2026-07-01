@@ -150,12 +150,25 @@ window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
         : [];
       return arr.map((f) => `${f.name} (${f.value})`).join(', ');
     },
-    vorNachteileZeilen() {
-      const paare =
-        this.vorlageVorschau && Array.isArray(this.vorlageVorschau.vorNachteilePaare)
-          ? this.vorlageVorschau.vorNachteilePaare
-          : [];
-      return paare.filter((paar) => paar && (paar.vorteilHtml || paar.nachteilHtml));
+    vorNachteileVorschau() {
+      const v = this.vorlageVorschau;
+      if (!v) {
+        return { vorteile: [], nachteile: [] };
+      }
+      const CM = window.HTBAH_CHARAKTER_MODEL;
+      if (CM && typeof CM.vorNachteileAusQuelle === 'function') {
+        return CM.vorNachteileAusQuelle(v);
+      }
+      return {
+        vorteile: Array.isArray(v.vorteile) ? v.vorteile : [],
+        nachteile: Array.isArray(v.nachteile) ? v.nachteile : [],
+      };
+    },
+    vorNachteilText(eintrag) {
+      const CM = window.HTBAH_CHARAKTER_MODEL;
+      return CM && typeof CM.vorNachteilBeschreibungVorschau === 'function'
+        ? CM.vorNachteilBeschreibungVorschau(eintrag && eintrag.beschreibungHtml)
+        : '';
     },
     async uebernehmen() {
       if (!this.kannUebernehmen || !this.vorlageVorschau) {
@@ -252,14 +265,25 @@ window.HTBAH_KOMPONENTEN.CharakterVorlageModal = {
                   <strong>Inventar:</strong>
                   {{ vorlageVorschau.inventar.map(i => i.name).filter(Boolean).join(', ') }}
                 </div>
-                <div class="small mt-2" v-if="vorNachteileZeilen().length">
+                <div class="small mt-2" v-if="vorNachteileVorschau().vorteile.length || vorNachteileVorschau().nachteile.length">
                   <strong>Vor- &amp; Nachteile:</strong>
-                  <div
-                    v-for="paar in vorNachteileZeilen()"
-                    :key="paar.id || (paar.vorteilHtml + '-' + paar.nachteilHtml)"
-                    class="border rounded p-2 mt-1 bg-body">
-                    <div v-if="paar.vorteilHtml"><strong>Vorteil:</strong> <span v-html="paar.vorteilHtml"></span></div>
-                    <div v-if="paar.nachteilHtml" class="mt-1"><strong>Nachteil:</strong> <span v-html="paar.nachteilHtml"></span></div>
+                  <div v-if="vorNachteileVorschau().vorteile.length" class="mt-1">
+                    <strong>Vorteile:</strong>
+                    <ul class="mb-1 ps-3">
+                      <li v-for="e in vorNachteileVorschau().vorteile" :key="e.id">
+                        <span v-if="e.punkte" class="text-success fw-semibold">+{{ e.punkte }}</span>
+                        {{ vorNachteilText(e) }}
+                      </li>
+                    </ul>
+                  </div>
+                  <div v-if="vorNachteileVorschau().nachteile.length">
+                    <strong>Nachteile:</strong>
+                    <ul class="mb-0 ps-3">
+                      <li v-for="e in vorNachteileVorschau().nachteile" :key="e.id">
+                        <span v-if="e.punkte" class="text-danger fw-semibold">−{{ e.punkte }}</span>
+                        {{ vorNachteilText(e) }}
+                      </li>
+                    </ul>
                   </div>
                 </div>
               </div>

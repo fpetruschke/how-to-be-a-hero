@@ -44,13 +44,6 @@
       "value": 19
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-sf-pilot",
-      "vorteilHtml": "Reflexass: In Manoevern und turbulenten Lagen behältst du instinktiv die Kontrolle.",
-      "nachteilHtml": "Risikofreude: Du setzt oft auf gewagte Flugmanoever, auch wenn sichere Optionen existieren."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-sf-pi-helm",
@@ -78,6 +71,20 @@
       "name": "Leichtanzug",
       "beschreibungHtml": "",
       "rustwert": "1"
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-sf-pilot-v",
+      "beschreibungHtml": "Reflexass: In Manoevern und turbulenten Lagen behältst du instinktiv die Kontrolle.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-sf-pilot-n",
+      "beschreibungHtml": "Risikofreude: Du setzt oft auf gewagte Flugmanoever, auch wenn sichere Optionen existieren.",
+      "punkte": null
     }
   ]
 }

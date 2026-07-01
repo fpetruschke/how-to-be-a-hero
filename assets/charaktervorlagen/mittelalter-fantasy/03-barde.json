@@ -45,13 +45,6 @@
       "value": 53
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-mf-barde",
-      "vorteilHtml": "Bühnenpräsenz: Mit Stimme und Auftreten gewinnst du rasch Aufmerksamkeit und Sympathie.",
-      "nachteilHtml": "Geltungsdrang: Schweigen fällt dir schwer, wodurch Geheimhaltung und unauffälliges Vorgehen leiden können."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-mf-bd-laute",
@@ -78,6 +71,20 @@
       "beschreibungHtml": "",
       "schadenswertNahkampf": "2W10",
       "schadenswertFernkampf": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-mf-barde-v",
+      "beschreibungHtml": "Bühnenpräsenz: Mit Stimme und Auftreten gewinnst du rasch Aufmerksamkeit und Sympathie.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-mf-barde-n",
+      "beschreibungHtml": "Geltungsdrang: Schweigen fällt dir schwer, wodurch Geheimhaltung und unauffälliges Vorgehen leiden können.",
+      "punkte": null
     }
   ]
 }

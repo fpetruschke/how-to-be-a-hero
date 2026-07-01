@@ -45,13 +45,6 @@
       "value": 47
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-sf-infiltrator",
-      "vorteilHtml": "Schattenprotokoll: Du bleibst in gesicherten Zonen laenger unentdeckt als die meisten.",
-      "nachteilHtml": "Paranoide Gewohnheit: Vertrauen faellt dir schwer, selbst im eigenen Team."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-sf-in-klinge",
@@ -78,6 +71,20 @@
       "typ": "gegenstand",
       "name": "Magnetseil",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-sf-infiltrator-v",
+      "beschreibungHtml": "Schattenprotokoll: Du bleibst in gesicherten Zonen laenger unentdeckt als die meisten.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-sf-infiltrator-n",
+      "beschreibungHtml": "Paranoide Gewohnheit: Vertrauen faellt dir schwer, selbst im eigenen Team.",
+      "punkte": null
     }
   ]
 }

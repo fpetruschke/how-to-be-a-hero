@@ -49,13 +49,6 @@
       "value": 32
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-sf-ingenieur",
-      "vorteilHtml": "Notfallreparatur: Du bringst kritische Technik auch unter widrigen Bedingungen wieder ans Laufen.",
-      "nachteilHtml": "Perfektionismus: Du verlierst Zeit, weil du Loesungen lieber sauber als nur schnell umsetzt."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-sf-in-werkzeug",
@@ -80,6 +73,20 @@
       "typ": "gegenstand",
       "name": "Ersatzmodule",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-sf-ingenieur-v",
+      "beschreibungHtml": "Notfallreparatur: Du bringst kritische Technik auch unter widrigen Bedingungen wieder ans Laufen.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-sf-ingenieur-n",
+      "beschreibungHtml": "Perfektionismus: Du verlierst Zeit, weil du Loesungen lieber sauber als nur schnell umsetzt.",
+      "punkte": null
     }
   ]
 }

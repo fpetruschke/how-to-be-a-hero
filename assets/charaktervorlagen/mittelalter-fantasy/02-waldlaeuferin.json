@@ -42,13 +42,6 @@
       "value": 80
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-mf-waldlaeuferin",
-      "vorteilHtml": "Fährtensinn: Du erkennst in Wildnis und Ruinen schneller Hinweise auf Wege, Lager und Gefahren.",
-      "nachteilHtml": "Städtescheu: In dichtem Gedränge und bei höfischer Etikette reagierst du oft ungeduldig oder verschlossen."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-mf-wl-bogen",
@@ -77,6 +70,20 @@
       "typ": "gegenstand",
       "name": "Kapuze",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-mf-waldlaeuferin-v",
+      "beschreibungHtml": "Fährtensinn: Du erkennst in Wildnis und Ruinen schneller Hinweise auf Wege, Lager und Gefahren.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-mf-waldlaeuferin-n",
+      "beschreibungHtml": "Städtescheu: In dichtem Gedränge und bei höfischer Etikette reagierst du oft ungeduldig oder verschlossen.",
+      "punkte": null
     }
   ]
 }

@@ -45,13 +45,6 @@
       "value": 47
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-mf-diebin",
-      "vorteilHtml": "Flinke Finger: Schlösser, Taschen und Mechanismen liegen dir besonders gut.",
-      "nachteilHtml": "Misstrauisch: Du rechnest schnell mit Verrat und hältst selbst Verbündete auf Distanz."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-mf-di-dietriche",
@@ -78,6 +71,20 @@
       "typ": "gegenstand",
       "name": "Kapuze",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-mf-diebin-v",
+      "beschreibungHtml": "Flinke Finger: Schlösser, Taschen und Mechanismen liegen dir besonders gut.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-mf-diebin-n",
+      "beschreibungHtml": "Misstrauisch: Du rechnest schnell mit Verrat und hältst selbst Verbündete auf Distanz.",
+      "punkte": null
     }
   ]
 }

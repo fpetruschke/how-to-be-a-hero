@@ -45,13 +45,6 @@
       "value": 52
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-mf-schildwache",
-      "vorteilHtml": "Unerschütterlicher Schutzinstinkt: Wenn Verbündete bedroht werden, bleibst du ruhig und hältst die Linie.",
-      "nachteilHtml": "Pflicht vor Freiheit: Du tust dich schwer damit, Befehle oder Schwüre zu brechen, selbst wenn es taktisch klüger wäre."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-mf-sw-schwert",
@@ -80,6 +73,20 @@
       "name": "einfacher Helm",
       "beschreibungHtml": "",
       "rustwert": "1"
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-mf-schildwache-v",
+      "beschreibungHtml": "Unerschütterlicher Schutzinstinkt: Wenn Verbündete bedroht werden, bleibst du ruhig und hältst die Linie.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-mf-schildwache-n",
+      "beschreibungHtml": "Pflicht vor Freiheit: Du tust dich schwer damit, Befehle oder Schwüre zu brechen, selbst wenn es taktisch klüger wäre.",
+      "punkte": null
     }
   ]
 }

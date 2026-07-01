@@ -23,8 +23,16 @@ function ladePresets() {
   return sandbox.window.HTBAH_STANDARD_FAEHIGKEITEN_PRESETS;
 }
 
+function ladeCharakterModel() {
+  const code = fs.readFileSync(path.join(ROOT, 'shared', 'charakterModel.js'), 'utf8');
+  const sandbox = { window: { HTBAH_CHARAKTER_MODEL: {} } };
+  vm.runInNewContext(code, sandbox);
+  return sandbox.window.HTBAH_CHARAKTER_MODEL;
+}
+
 function ladeModel() {
   const presets = ladePresets();
+  const charakterModel = ladeCharakterModel();
   const code = fs.readFileSync(
     path.join(ROOT, 'shared', 'charaktervorlagenModel.js'),
     'utf8',
@@ -33,14 +41,7 @@ function ladeModel() {
     window: {
       HTBAH_CHARAKTERVORLAGEN_MODEL: {},
       HTBAH_STANDARD_FAEHIGKEITEN_PRESETS: presets,
-      HTBAH_CHARAKTER_MODEL: {
-        inventarEintragNachTypBereinigen(e) {
-          return { ...e };
-        },
-        neueInventarId() {
-          return 'test-id';
-        },
-      },
+      HTBAH_CHARAKTER_MODEL: charakterModel,
     },
   };
   vm.runInNewContext(code, sandbox);

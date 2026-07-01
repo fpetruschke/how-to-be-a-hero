@@ -45,13 +45,6 @@
       "value": 13
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-gg-ueberlebenskuenstler",
-      "vorteilHtml": "Improvisationstalent: Du machst aus wenig Material schnell brauchbare Loesungen.",
-      "nachteilHtml": "Dauernde Alarmbereitschaft: Entspannung faellt dir schwer, was dich in ruhigen sozialen Situationen unsicher wirken laesst."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-gg-ue-rucksack",
@@ -78,6 +71,20 @@
       "typ": "gegenstand",
       "name": "Stadtplan",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-gg-ueberlebenskuenstler-v",
+      "beschreibungHtml": "Improvisationstalent: Du machst aus wenig Material schnell brauchbare Loesungen.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-gg-ueberlebenskuenstler-n",
+      "beschreibungHtml": "Dauernde Alarmbereitschaft: Entspannung faellt dir schwer, was dich in ruhigen sozialen Situationen unsicher wirken laesst.",
+      "punkte": null
     }
   ]
 }

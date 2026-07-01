@@ -45,13 +45,6 @@
       "value": 40
     }
   ],
-  "vorNachteilePaare": [
-    {
-      "id": "vn-gg-verhandler",
-      "vorteilHtml": "Wortakrobat: Du findest selbst in festgefahrenen Gespraechen oft noch einen Kompromiss.",
-      "nachteilHtml": "Konfliktscheu: Wenn ein klarer Schnitt noetig waere, zoegerst du zu lange."
-    }
-  ],
   "inventar": [
     {
       "id": "inv-gg-vh-aktentasche",
@@ -76,6 +69,20 @@
       "typ": "gegenstand",
       "name": "Thermoskanne",
       "beschreibungHtml": ""
+    }
+  ],
+  "vorteile": [
+    {
+      "id": "vn-gg-verhandler-v",
+      "beschreibungHtml": "Wortakrobat: Du findest selbst in festgefahrenen Gespraechen oft noch einen Kompromiss.",
+      "punkte": null
+    }
+  ],
+  "nachteile": [
+    {
+      "id": "vn-gg-verhandler-n",
+      "beschreibungHtml": "Konfliktscheu: Wenn ein klarer Schnitt noetig waere, zoegerst du zu lange.",
+      "punkte": null
     }
   ]
 }
