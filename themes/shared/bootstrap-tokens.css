@@ -1,0 +1,11 @@
+/* Bootstrap-Variablen an Setting-Tokens koppeln */
+:root,
+[data-theme-setting] {
+  --bs-body-font-family: var(--htbah-font-body);
+  --bs-border-radius: var(--htbah-radius);
+  --bs-border-radius-sm: var(--htbah-radius-sm);
+  --bs-border-radius-lg: var(--htbah-radius-lg);
+  --bs-border-radius-xl: var(--htbah-radius-lg);
+  --bs-border-radius-xxl: var(--htbah-radius-lg);
+  --bs-border-radius-pill: var(--htbah-radius-pill);
+}

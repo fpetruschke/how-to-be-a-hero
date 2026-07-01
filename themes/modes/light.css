@@ -1,0 +1,26 @@
+/* Helles Farbschema */
+[data-theme='light'] {
+  --bg-overlay-color: rgba(248, 250, 252, 0.25);
+  --bg-color: #f8fafc;
+  --text-color: #0f172a;
+  --heading-color: #0f172a;
+  --paragraph-color: #334155;
+  --list-color: #1e293b;
+  --card-bg: #ffffff;
+  --card-color: #0f172a;
+  --border-color: #cbd5e1;
+  --input-bg: #ffffff;
+  --input-color: #0f172a;
+  --placeholder-color: #94a3b8;
+  --form-floating-label-muted: #94a3b8;
+  --form-floating-label-floated: #64748b;
+  --navbar-bg: #ffffff;
+  --navbar-link: #334155;
+  --primary-color: #336a2b;
+  --success-color: #16a34a;
+  --danger-color: #dc2626;
+  --warning-color: #d97706;
+  --secondary-color: #64748b;
+  --modal-backdrop: rgba(15, 23, 42, 0.4);
+  --modal-bg: #ffffff;
+}

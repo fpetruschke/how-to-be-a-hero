@@ -1,0 +1,52 @@
+/* Sci-Fi — Typografie, Formen, Hintergrund, Akzentfarben, eckige UI */
+[data-theme-setting='scifi'] {
+  --bg-image-url: url('assets/img/bg-desktop-scifi.png');
+  --htbah-font-body: ui-monospace, 'Cascadia Code', 'Cascadia Mono', 'SFMono-Regular', Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --htbah-font-heading: ui-monospace, 'Cascadia Code', 'Cascadia Mono', 'SFMono-Regular', Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --htbah-letter-spacing: 0.025em;
+  --htbah-radius-sm: 0;
+  --htbah-radius: 0;
+  --htbah-radius-lg: 0;
+  --htbah-radius-pill: 0;
+}
+
+[data-theme-setting='scifi'][data-theme='dark'] {
+  --primary-color: #22d3ee;
+  --border-color: color-mix(in srgb, #22d3ee 14%, #334155);
+  --card-bg: color-mix(in srgb, #22d3ee 4%, #1e293b);
+}
+
+[data-theme-setting='scifi'][data-theme='light'] {
+  --primary-color: #0891b2;
+  --border-color: color-mix(in srgb, #0891b2 18%, #cbd5e1);
+  --card-bg: color-mix(in srgb, #0891b2 3%, #ffffff);
+}
+
+[data-theme-setting='scifi'] .btn,
+[data-theme-setting='scifi'] .card,
+[data-theme-setting='scifi'] .modal-content,
+[data-theme-setting='scifi'] .dropdown-menu,
+[data-theme-setting='scifi'] .form-control,
+[data-theme-setting='scifi'] .form-select,
+[data-theme-setting='scifi'] .input-group-text,
+[data-theme-setting='scifi'] .list-group-item,
+[data-theme-setting='scifi'] .alert,
+[data-theme-setting='scifi'] .navbar,
+[data-theme-setting='scifi'] .badge,
+[data-theme-setting='scifi'] .rounded,
+[data-theme-setting='scifi'] .rounded-pill,
+[data-theme-setting='scifi'] .htbah-lp-status-banner,
+[data-theme-setting='scifi'] .htbah-bottom-nav-inner,
+[data-theme-setting='scifi'] .ql-toolbar,
+[data-theme-setting='scifi'] .ql-container,
+[data-theme-setting='scifi'] .htbah-fab-stack .btn {
+  border-radius: 0 !important;
+}
+
+@media (max-width: 991.98px) and (orientation: portrait) {
+  [data-theme-setting='scifi'] {
+    --bg-image-url: url('assets/img/bg-mobile-device-portrait-scifi.png');
+  }
+}

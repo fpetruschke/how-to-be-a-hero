@@ -369,11 +369,14 @@ window.HTBAH_SEITEN.Einstellungen = {
       return this.istHellesTheme ? 'light_mode' : 'dark_mode';
     },
     themeSettingOptionen() {
-      return [
-        { id: 'fantasy', label: 'Fantasy', emoji: '🏰' },
-        { id: 'gegenwart', label: 'Gegenwart', emoji: '🏙️' },
-        { id: 'scifi', label: 'Sci-Fi', emoji: '🚀' },
-      ];
+      const TE = window.HTBAH_SHARED && window.HTBAH_SHARED.ThemenEinstellungen;
+      return TE && Array.isArray(TE.THEME_SETTING_OPTIONEN)
+        ? TE.THEME_SETTING_OPTIONEN
+        : [
+            { id: 'fantasy', label: 'Fantasy', emoji: '🏰' },
+            { id: 'gegenwart', label: 'Gegenwart', emoji: '🏙️' },
+            { id: 'scifi', label: 'Sci-Fi', emoji: '🚀' },
+          ];
     },
     orientierungGruppe() {
       const m = this.orientierungModus;

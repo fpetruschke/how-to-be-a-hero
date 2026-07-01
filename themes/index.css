@@ -1,0 +1,10 @@
+/**
+ * Theme-Einstiegspunkt — Reihenfolge beibehalten:
+ * 1. Modi (hell/dunkel), 2. Settings, 3. gemeinsame Kopplungen
+ */
+@import url('modes/dark.css');
+@import url('modes/light.css');
+@import url('settings/fantasy.css');
+@import url('settings/gegenwart.css');
+@import url('settings/scifi.css');
+@import url('shared/bootstrap-tokens.css');

@@ -1,0 +1,34 @@
+/* Dunkles Farbschema (Standard über :root, bis data-theme gesetzt wird) */
+:root,
+[data-theme='dark'] {
+  --bg-overlay-color: rgba(2, 6, 23, 0.62);
+  --bg-color: #0f172a;
+  --text-color: #e5e7eb;
+  --heading-color: #f9fafb;
+  --paragraph-color: #cbd5f5;
+  --list-color: #e2e8f0;
+  --card-bg: #1e293b;
+  --card-color: #f1f5f9;
+  --border-color: #334155;
+  --input-bg: #0f172a;
+  --input-color: #f1f5f9;
+  --placeholder-color: #b0bcc9;
+  --form-floating-label-muted: #b0bcc9;
+  --form-floating-label-floated: #cbd5e1;
+  --navbar-bg: #1e293b;
+  --navbar-link: #cbd5f5;
+  --primary-color: #509b4a;
+  --success-color: #22c55e;
+  --danger-color: #ef4444;
+  --warning-color: #f59e0b;
+  --secondary-color: #64748b;
+  --modal-backdrop: rgba(2, 6, 23, 0.75);
+  --modal-bg: #1e293b;
+}
+
+/* Bootstrap-Hilfstexte im Dunkelmodus ausreichend kontrastreich halten */
+[data-theme='dark'] .text-body-secondary,
+[data-theme='dark'] .text-secondary,
+[data-theme='dark'] .text-muted {
+  color: var(--paragraph-color) !important;
+}

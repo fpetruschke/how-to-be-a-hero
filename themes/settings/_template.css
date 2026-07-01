@@ -1,0 +1,35 @@
+/**
+ * Vorlage für ein neues thematisches Setting.
+ *
+ * 1. Diese Datei nach themes/settings/<deine-id>.css kopieren
+ * 2. Alle Vorkommen von <deine-id> ersetzen
+ * 3. @import in themes/index.css ergänzen
+ * 4. Eintrag in themes/themeRegistry.js hinzufügen
+ * 5. Hintergrundbilder unter assets/img/ ablegen (siehe README)
+ */
+[data-theme-setting='<deine-id>'] {
+  --bg-image-url: url('assets/img/bg-desktop-<deine-id>.png');
+  --htbah-font-body: system-ui, sans-serif;
+  --htbah-font-heading: Georgia, serif;
+  --htbah-letter-spacing: normal;
+  --htbah-radius-sm: 0.25rem;
+  --htbah-radius: 0.375rem;
+  --htbah-radius-lg: 0.75rem;
+  --htbah-radius-pill: 999px;
+}
+
+[data-theme-setting='<deine-id>'][data-theme='dark'] {
+  --primary-color: #509b4a;
+  --border-color: #334155;
+}
+
+[data-theme-setting='<deine-id>'][data-theme='light'] {
+  --primary-color: #336a2b;
+  --border-color: #cbd5e1;
+}
+
+@media (max-width: 991.98px) and (orientation: portrait) {
+  [data-theme-setting='<deine-id>'] {
+    --bg-image-url: url('assets/img/bg-mobile-device-portrait-<deine-id>.png');
+  }
+}
