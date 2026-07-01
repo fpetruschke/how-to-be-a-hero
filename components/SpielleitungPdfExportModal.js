@@ -528,7 +528,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 <label class="form-check-label" for="sl-pdf-cheat-sheet">Cheat-Sheet (Regelkurzreferenz)</label>
               </div>
               <p class="form-text mb-2 mt-0">
-                Direkt nach dem Deckblatt: Fähigkeiten, Geistesblitz, Status, Proben, Kampf, Waffen und Gegner-Balancing.
+                Direkt nach dem Deckblatt: Fähigkeiten, Geistesblitz, Status, Rast, Proben, Kampf, Waffen und Gegner-Balancing.
               </p>
               <div class="form-check form-switch mb-2">
                 <input

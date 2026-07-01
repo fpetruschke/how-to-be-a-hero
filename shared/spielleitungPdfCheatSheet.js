@@ -46,11 +46,12 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       {
         titel: 'Fähigkeiten & Begabungen',
         pdfGrid2x2: true,
-        inhaltHtml: `<p><strong>400 Fähigkeitspunkte</strong> auf Handeln, Wissen und Soziales verteilen (einzelne Fähigkeiten), z. B. Summe Handeln 127 → Begabung 13 (127 ÷ 10, kaufmännisch gerundet).</p>
+        inhaltHtml: `<p><strong>400 Fähigkeitspunkte</strong> auf Handeln, Wissen und Soziales verteilen, z. B. Summe Handeln 127 → Begabung 13 (÷ 10, kaufmännisch gerundet).</p>
 <ul>
-  <li><strong>Vor-/Nachteile</strong> (optional): getrennte Listen; Punktwerte bei Vorteilen kosten Budget, bei Nachteilen geben sie Punkte frei</li>
+  <li><strong>Vor-/Nachteile (optional):</strong> Bonus-Punkte bei Vorteilen kosten Budget, Malus-Punkte bei Nachteilen schreiben gut (verfügbar: 400 − Vorteile + Nachteile); ohne Punktwert nur beschreibend</li>
+  <li><strong>Grenzwerte:</strong> max. 70 Punkte pro Fähigkeit (nur mit SL-Erlaubnis mehr); Effektivwert max. 100 — überzählige Punkte zählen für Proben nicht</li>
   <li><strong>Begabung</strong> = Summe der Fähigkeitspunkte in der Kategorie ÷ 10 (kaufmännisch gerundet)</li>
-  <li><strong>Effektivwert</strong> = Fähigkeitsbasis + Begabung (max. 100)</li>
+  <li><strong>Effektivwert</strong> = Fähigkeitsbasis + Begabung</li>
   <li>Ohne passende Fähigkeit: Probe auf den <strong>Begabungswert</strong> (kein kritischer Erfolg)</li>
 </ul>`,
       },
@@ -73,6 +74,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   <li><strong>Vital:</strong> LP &gt; 10, handlungs- und kampffähig</li>
   <li><strong>Bewusstlos:</strong> LP ≤ 10 <em>oder</em> ein Treffer mit mehr als 60 LP Verlust auf einmal — medizinische Hilfe nötig</li>
   <li><strong>Tot:</strong> LP = 0 (sofortiger Tod)</li>
+  <li><strong>Rast:</strong> LP-Regeneration = 1W10 + SL-Modifikator (−5 bis +5, z. B. Komfort der Unterkunft); Summe min. 0, max. 100 LP</li>
 </ul>`,
       },
       {
@@ -82,6 +84,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 <ul>
   <li><strong>Bestanden:</strong> Wurf ≤ Zielwert</li>
   <li><strong>Nicht bestanden:</strong> Wurf &gt; Zielwert</li>
+  <li><strong>Bonus/Malus (SL):</strong> Spielleitung passt den Zielwert an (z. B. leichtere/erschwerte Situation); Zielwert bleibt 0–100</li>
 </ul>
 <p class="htbah-cheat-sheet-zwischenkopf">Kritische Würfe (nur Fähigkeitsproben):</p>
 <ul>
