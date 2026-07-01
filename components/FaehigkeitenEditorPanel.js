@@ -190,6 +190,13 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
       const basis = Number(faehigkeit.value) || 0;
       return Math.min(100, basis + this.begabungen[kategorie]);
     },
+    faehigkeitZeilenWarnung(kategorie, faehigkeit) {
+      const CU = window.HTBAH_SHARED && window.HTBAH_SHARED.CharakterUtils;
+      if (CU && typeof CU.faehigkeitZeilenWarnung === 'function') {
+        return CU.faehigkeitZeilenWarnung(faehigkeit, this.begabungen[kategorie]);
+      }
+      return { klassen: [], hinweis: '' };
+    },
     probeBegabung(kategorie) {
       const zielwert = this.begabungen[kategorie];
       this.$emit('probe', {
@@ -448,7 +455,7 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
               class="faehigkeiten-stat-info-panel faehigkeiten-stat-info-panel--begabung mb-2">
               <small>Begabung = Summe der Fähigkeiten / 10 (kaufmännisch runden).</small>
             </div>
-            <div class="table-responsive rounded border border-secondary border-opacity-25">
+            <div class="table-responsive rounded border border-secondary border-opacity-25 faehigkeiten-tabelle-responsive">
               <table class="table table-sm mb-0 faehigkeiten-tabelle">
                 <thead>
                   <tr>
@@ -462,8 +469,15 @@ window.HTBAH_KOMPONENTEN.FaehigkeitenEditorPanel = {
                   <tr v-if="!sortierteFaehigkeiten(kategorie).length">
                     <td colspan="4" class="text-muted small py-2">Keine Fähigkeiten</td>
                   </tr>
-                  <tr v-for="f in sortierteFaehigkeiten(kategorie)" :key="idPrefix + '-f-' + kategorie + '-' + f.name">
-                    <td class="align-middle">{{ f.name }}</td>
+                  <tr
+                    v-for="f in sortierteFaehigkeiten(kategorie)"
+                    :key="idPrefix + '-f-' + kategorie + '-' + f.name"
+                    :class="faehigkeitZeilenWarnung(kategorie, f).klassen">
+                    <td
+                      class="align-middle faehigkeiten-zeile-hinweis-zelle"
+                      :data-hinweis="faehigkeitZeilenWarnung(kategorie, f).hinweis || null">
+                      {{ f.name }}
+                    </td>
                     <td class="align-middle text-end text-muted">{{ f.value }}</td>
                     <td class="align-middle text-end">{{ effektiverWert(kategorie, f) }}</td>
                     <td class="align-middle text-end ps-1">

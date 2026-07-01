@@ -19,6 +19,57 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     },
   };
 
+  const FAEHIGKEIT_MAX_PUNKTE_STANDARD = 70;
+  const FAEHIGKEIT_EFFEKTIV_MAX = 100;
+
+  const FAEHIGKEIT_HINWEIS_HOHE_PUNKTE =
+    'Mehr als 70 Punkte auf eine Fähigkeit sind normalerweise nicht erlaubt — nur mit ausdrücklicher Erlaubnis der Spielleitung.';
+
+  const FAEHIGKEIT_HINWEIS_EFFEKTIV_UEBER_MAX =
+    'Der effektive Wert (Fähigkeit + Begabung) liegt über 100; überzählige Punkte zählen für Proben nicht (Zielwert max. 100).';
+
+  function faehigkeitBasiswert(faehigkeit) {
+    const v = Number(faehigkeit && faehigkeit.value);
+    return Number.isFinite(v) ? v : 0;
+  }
+
+  function faehigkeitHatZuVielePunkte(faehigkeit, limit = FAEHIGKEIT_MAX_PUNKTE_STANDARD) {
+    return faehigkeitBasiswert(faehigkeit) > limit;
+  }
+
+  function faehigkeitEffektivRohwert(faehigkeit, begabung) {
+    return faehigkeitBasiswert(faehigkeit) + (Number(begabung) || 0);
+  }
+
+  function faehigkeitEffektivUeberLimit(
+    faehigkeit,
+    begabung,
+    max = FAEHIGKEIT_EFFEKTIV_MAX,
+  ) {
+    return faehigkeitEffektivRohwert(faehigkeit, begabung) > max;
+  }
+
+  /** @returns {{ klassen: string[], hinweis: string }} */
+  function faehigkeitZeilenWarnung(faehigkeit, begabung) {
+    const hohePunkte = faehigkeitHatZuVielePunkte(faehigkeit);
+    const effektivHoch = faehigkeitEffektivUeberLimit(faehigkeit, begabung);
+    const teile = [];
+    if (hohePunkte) {
+      teile.push(FAEHIGKEIT_HINWEIS_HOHE_PUNKTE);
+    }
+    if (effektivHoch) {
+      teile.push(FAEHIGKEIT_HINWEIS_EFFEKTIV_UEBER_MAX);
+    }
+    const klassen = [];
+    if (hohePunkte) {
+      klassen.push('faehigkeiten-zeile--warn-hoch');
+    }
+    if (effektivHoch) {
+      klassen.push('faehigkeiten-zeile--info-effektiv');
+    }
+    return { klassen, hinweis: teile.join('\n\n') };
+  }
+
   const GEISTESBLITZ_INFO_ZEILEN = [
     'Maximalwert pro Begabung: Begabungswert geteilt durch 10, kaufmännisch runden (wie im Regelwerk).',
     'Nur für dieselbe Begabung: Ein Punkt aus „Wissen“ gilt nicht für eine Handeln-Probe (und umgekehrt).',
@@ -55,6 +106,15 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
   globalObj.CharakterUtils = {
     KATEGORIE_INFOS,
     GEISTESBLITZ_INFO_ZEILEN,
+    FAEHIGKEIT_MAX_PUNKTE_STANDARD,
+    FAEHIGKEIT_EFFEKTIV_MAX,
+    FAEHIGKEIT_HINWEIS_HOHE_PUNKTE,
+    FAEHIGKEIT_HINWEIS_EFFEKTIV_UEBER_MAX,
+    faehigkeitBasiswert,
+    faehigkeitHatZuVielePunkte,
+    faehigkeitEffektivRohwert,
+    faehigkeitEffektivUeberLimit,
+    faehigkeitZeilenWarnung,
     normalisiereFaehigkeitenPreset,
   };
 })(window.HTBAH_SHARED);

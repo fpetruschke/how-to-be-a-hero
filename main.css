@@ -4172,6 +4172,51 @@ input::placeholder {
   border-color: var(--border-color);
 }
 
+.faehigkeiten-tabelle tbody tr.faehigkeiten-zeile--warn-hoch td {
+  box-shadow: inset 3px 0 0 var(--bs-warning);
+}
+
+.faehigkeiten-tabelle tbody tr.faehigkeiten-zeile--info-effektiv td {
+  box-shadow: inset 3px 0 0 var(--bs-info);
+}
+
+.faehigkeiten-tabelle tbody tr.faehigkeiten-zeile--warn-hoch.faehigkeiten-zeile--info-effektiv td {
+  box-shadow:
+    inset 3px 0 0 var(--bs-warning),
+    inset 6px 0 0 var(--bs-info);
+}
+
+.faehigkeiten-tabelle tbody td.faehigkeiten-zeile-hinweis-zelle {
+  position: relative;
+}
+
+.faehigkeiten-tabelle tbody tr:hover td.faehigkeiten-zeile-hinweis-zelle[data-hinweis]::after {
+  content: attr(data-hinweis);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 12;
+  min-width: min(18rem, 70vw);
+  max-width: min(22rem, 85vw);
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.375rem;
+  background: var(--card-bg, var(--bs-body-bg));
+  color: var(--card-color, var(--bs-body-color));
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: pre-line;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  pointer-events: none;
+}
+
+.faehigkeiten-tabelle-responsive:has(
+    .faehigkeiten-zeile--warn-hoch:hover,
+    .faehigkeiten-zeile--info-effektiv:hover
+  ) {
+  overflow: visible;
+}
+
 .faehigkeit-hinzufuegen-gruppe .faehigkeit-hinzufuegen-name {
   flex: 4 1 0;
   min-width: 0;

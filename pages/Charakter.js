@@ -1454,6 +1454,13 @@ window.HTBAH_SEITEN.Charakter = {
       const basis = Number(faehigkeit.value) || 0;
       return Math.min(100, basis + this.begabungen[kategorie]);
     },
+    faehigkeitZeilenWarnung(kategorie, faehigkeit) {
+      const CU = window.HTBAH_SHARED && window.HTBAH_SHARED.CharakterUtils;
+      if (CU && typeof CU.faehigkeitZeilenWarnung === 'function') {
+        return CU.faehigkeitZeilenWarnung(faehigkeit, this.begabungen[kategorie]);
+      }
+      return { klassen: [], hinweis: '' };
+    },
     probeModalOeffnenBegabung(kategorie) {
       const zielwert = this.begabungen[kategorie];
       this.$refs.probeWurfModal.oeffnen({
@@ -2261,7 +2268,7 @@ window.HTBAH_SEITEN.Charakter = {
                 </div>
               </div>
 
-              <div class="table-responsive rounded border border-secondary border-opacity-25">
+              <div class="table-responsive rounded border border-secondary border-opacity-25 faehigkeiten-tabelle-responsive">
                 <table class="table table-sm mb-0 faehigkeiten-tabelle">
                   <thead>
                     <tr>
@@ -2277,8 +2284,13 @@ window.HTBAH_SEITEN.Charakter = {
                     </tr>
                     <tr
                       v-for="faehigkeit in sortierteFaehigkeiten(kategorie)"
-                      :key="faehigkeit">
-                      <td class="align-middle">{{ faehigkeit.name }}</td>
+                      :key="faehigkeit"
+                      :class="faehigkeitZeilenWarnung(kategorie, faehigkeit).klassen">
+                      <td
+                        class="align-middle faehigkeiten-zeile-hinweis-zelle"
+                        :data-hinweis="faehigkeitZeilenWarnung(kategorie, faehigkeit).hinweis || null">
+                        {{ faehigkeit.name }}
+                      </td>
                       <td class="align-middle text-end text-muted">
                         {{ faehigkeit.value == null ? '—' : faehigkeit.value }}
                       </td>
