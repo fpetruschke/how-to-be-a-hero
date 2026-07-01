@@ -33,6 +33,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
   components: {
     WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
     KonfliktModal: window.HTBAH_KOMPONENTEN.KonfliktModal,
+    RastBerechnungPanel: window.HTBAH_KOMPONENTEN.RastBerechnungPanel,
   },
   props: ['uiZustand'],
   data() {
@@ -1813,7 +1814,7 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
       if (!this.istSpielleitung) {
         return 'wuerfel';
       }
-      const erlaubteTabs = ['wuerfel', 'zeitmessung'];
+      const erlaubteTabs = ['wuerfel', 'zeitmessung', 'rast'];
       if (this.hatAktiveKampagne) {
         erlaubteTabs.push('atmosphaere', 'begegnung');
       }
@@ -3552,6 +3553,15 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                     Zeitmessung
                   </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                  <button
+                    type="button"
+                    class="nav-link"
+                    :class="{ active: wuerfelModalTab === 'rast' }"
+                    @click="wuerfelModalTab = 'rast'">
+                    Rast
+                  </button>
+                </li>
                 <li v-if="hatAktiveKampagne" class="nav-item" role="presentation">
                   <button
                     type="button"
@@ -3622,6 +3632,18 @@ window.HTBAH_KOMPONENTEN.BottomNav = {
                   :notation="wuerfelModus === 'w100' ? '1W100' : (Math.max(1, Math.min(50, Number(anzahlW10) || 1)) + 'W10')"
                   chip-praefix="#"
                 />
+              </div>
+
+              <div
+                v-if="istSpielleitung"
+                v-show="wuerfelModalTab === 'rast'"
+                class="htbah-rast-tab">
+                <rast-berechnung-panel
+                  ref="bottomNavRastPanel"
+                  modus="gruppe"
+                  :kampagne-id="aktiveKampagneId"
+                  id-prefix="bottom-nav-rast"
+                  kompakt />
               </div>
 
               <div

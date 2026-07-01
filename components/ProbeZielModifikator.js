@@ -7,6 +7,8 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
     basisLabel: { type: String, default: 'Basiswert' },
     zielLabel: { type: String, default: 'Zielwert' },
     labelSuffix: { type: String, default: 'optional' },
+    /** Überschreibt den Toggle-Text links (sonst „SL-Modifikator (…)“) */
+    modifikatorTitel: { type: String, default: '' },
     showBasisCard: { type: Boolean, default: true },
     showZielCard: { type: Boolean, default: true },
     showKritMiss: { type: Boolean, default: true },
@@ -90,6 +92,12 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
           : String(this.effektiverModifikator);
       const staerke = this.modifikatorStaerke.label;
       return `${richtung}: ${wert}${staerke ? ` (${staerke})` : ''}`;
+    },
+    modifikatorToggleLabel() {
+      if (this.modifikatorTitel) {
+        return this.modifikatorTitel;
+      }
+      return `SL-Modifikator (${this.labelSuffix})`;
     },
     modifikatorBadgeKlasse() {
       if (!this.modifikatorHatWert) {
@@ -223,6 +231,9 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
       this.modifikatorWert = 0;
       this.sliderOffen = false;
     },
+    setzeModifikator(wert) {
+      this.modifikatorWert = this.eingeschraenkterModifikator(wert);
+    },
     sliderToggle() {
       this.sliderOffen = !this.sliderOffen;
     },
@@ -244,7 +255,7 @@ window.HTBAH_KOMPONENTEN.ProbeZielModifikator = {
           :aria-controls="idPrefix + '-slider-panel'"
           @click="sliderToggle">
           <span class="form-label small text-secondary mb-0">
-            SL-Modifikator ({{ labelSuffix }})
+            {{ modifikatorToggleLabel }}
           </span>
           <span class="d-flex align-items-center gap-2 flex-shrink-0">
             <span

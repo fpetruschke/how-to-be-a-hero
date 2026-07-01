@@ -14,6 +14,7 @@ window.HTBAH_SEITEN.Charakter = {
     WuerfelbecherWurf: window.HTBAH_KOMPONENTEN.WuerfelbecherWurf,
     ParadeModal: window.HTBAH_KOMPONENTEN.ParadeModal,
     SchadenModal: window.HTBAH_KOMPONENTEN.SchadenModal,
+    RastModal: window.HTBAH_KOMPONENTEN.RastModal,
     ProbeWurfModal: window.HTBAH_KOMPONENTEN.ProbeWurfModal,
     CharakterPdfModal: window.HTBAH_KOMPONENTEN.CharakterPdfModal,
     CharakterVorlageModal: window.HTBAH_KOMPONENTEN.CharakterVorlageModal,
@@ -1399,6 +1400,9 @@ window.HTBAH_SEITEN.Charakter = {
     schadenModalOeffnen() {
       this.$refs.schadenModal.oeffnen({ charakter: this.charakter });
     },
+    rastModalOeffnen() {
+      this.$refs.rastModal.oeffnen({ charakter: this.charakter, titel: 'Rast' });
+    },
     paradeModalOeffnen() {
       const inventar = Array.isArray(this.charakter?.inventar) ? this.charakter.inventar : [];
       const ruestungen = inventar
@@ -2393,7 +2397,7 @@ window.HTBAH_SEITEN.Charakter = {
               </div>
             </div>
             <div class="row g-2 mb-2">
-              <div class="col-12 col-md-6">
+              <div class="col-12 col-md-4">
                 <icon-text-button
                   type="button"
                   class="btn btn-outline-primary btn-lg w-100"
@@ -2402,13 +2406,22 @@ window.HTBAH_SEITEN.Charakter = {
                   Parieren
                 </icon-text-button>
               </div>
-              <div class="col-12 col-md-6">
+              <div class="col-12 col-md-4">
                 <icon-text-button
                   type="button"
                   class="btn btn-outline-primary btn-lg w-100"
                   symbol="💥"
                   @click="schadenModalOeffnen">
                   Schaden erwürfeln
+                </icon-text-button>
+              </div>
+              <div class="col-12 col-md-4">
+                <icon-text-button
+                  type="button"
+                  class="btn btn-outline-primary btn-lg w-100"
+                  icon="night_shelter"
+                  @click="rastModalOeffnen">
+                  Rast
                 </icon-text-button>
               </div>
             </div>
@@ -2756,6 +2769,7 @@ window.HTBAH_SEITEN.Charakter = {
         <wuerfelbecher-wurf ref="spielleitungInitiativeWuerfelbecher" modus="w10" :auto-init="false" :ohne3d="true" />
       </div>
       <schaden-modal ref="schadenModal" :charakter="charakter" />
+      <rast-modal v-if="spielleitungMitglied" ref="rastModal" :charakter="charakter" />
       <parade-modal ref="paradeModal" />
       <probe-wurf-modal ref="probeWurfModal" />
       <inventar-modal ref="inventarModal" :charakter="charakter" />
