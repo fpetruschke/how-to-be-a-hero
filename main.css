@@ -6506,6 +6506,14 @@ body.htbah-mit-lp-banner .htbah-sicherheits-fab-stack {
   padding-inline-end: 0.65rem;
 }
 
+.htbah-zufallstabellen-sektion-kopfzeile--klickbar {
+  cursor: pointer;
+}
+
+.htbah-zufallstabellen-sektion-kopfzeile--klickbar:hover {
+  background-color: var(--bs-tertiary-bg);
+}
+
 .htbah-zufallstabellen-sektion-toggle {
   display: inline-flex;
   align-items: center;

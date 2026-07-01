@@ -97,7 +97,10 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenSektion = {
     <div
       class="card mb-3 text-start htbah-zufallstabellen-sektion"
       :class="{ 'htbah-zufallstabellen-sektion--offen': offenEffektiv }">
-      <div class="card-header htbah-zufallstabellen-sektion-kopfzeile d-flex flex-wrap align-items-center gap-2">
+      <div
+        class="card-header htbah-zufallstabellen-sektion-kopfzeile d-flex flex-wrap align-items-center gap-2"
+        :class="{ 'htbah-zufallstabellen-sektion-kopfzeile--klickbar': !sucheSteuerungAktiv }"
+        @click="toggle">
         <div class="htbah-zufallstabellen-sektion-titel min-w-0 flex-grow-1">
           <slot name="titel" />
         </div>
@@ -111,8 +114,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenSektion = {
           :aria-expanded="offenEffektiv ? 'true' : 'false'"
           :aria-controls="inhaltId"
           :aria-label="kopfAriaLabel"
-          :disabled="sucheSteuerungAktiv"
-          @click="toggle">
+          :disabled="sucheSteuerungAktiv">
           <span
             class="material-symbols-outlined htbah-zufallstabellen-sektion-ico"
             aria-hidden="true">{{ offenEffektiv ? 'expand_less' : 'expand_more' }}</span>
