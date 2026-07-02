@@ -165,6 +165,7 @@ window.HTBAH_SEITEN.Weltenbau = {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
     WeltenbauUebersichtModal: window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal,
     SpielmattenEditorModal: window.HTBAH_KOMPONENTEN.SpielmattenEditorModal,
+    TokensEffekteEditorModal: window.HTBAH_KOMPONENTEN.TokensEffekteEditorModal,
     ZufallstabellenSeite: window.HTBAH_SEITEN.Zufallstabellen,
     KampagnenUebersicht: window.HTBAH_SEITEN.KampagnenUebersicht,
     KampagneAnsicht: window.HTBAH_SEITEN.KampagneAnsicht,
@@ -407,6 +408,14 @@ window.HTBAH_SEITEN.Weltenbau = {
     oeffneSpielmattenEditor() {
       if (this.$refs.spielmattenEditorModal && typeof this.$refs.spielmattenEditorModal.oeffne === 'function') {
         this.$refs.spielmattenEditorModal.oeffne();
+      }
+    },
+    oeffneTokensEffekteEditor() {
+      if (
+        this.$refs.tokensEffekteEditorModal &&
+        typeof this.$refs.tokensEffekteEditorModal.oeffne === 'function'
+      ) {
+        this.$refs.tokensEffekteEditorModal.oeffne(this.ausgewaehlteKampagneId);
       }
     },
     onWeltenbauMapModalSchliessen() {
@@ -970,6 +979,7 @@ window.HTBAH_SEITEN.Weltenbau = {
         @abgebrochen="onWeltenbauBildImportAbgebrochen"
         @datei-import-fehler="onWeltenbauDateiImportFehler" />
       <spielmatten-editor-modal ref="spielmattenEditorModal" />
+      <tokens-effekte-editor-modal ref="tokensEffekteEditorModal" />
 
       <h4 class="text-center mb-1 htbah-page-title">
         <span class="htbah-page-title-emoji" aria-hidden="true">📖</span>
@@ -1157,6 +1167,9 @@ window.HTBAH_SEITEN.Weltenbau = {
           <div class="d-grid d-sm-flex gap-2">
             <button type="button" class="btn btn-primary" @click="oeffneSpielmattenEditor">
               🧩 Spielmatte erstellen
+            </button>
+            <button type="button" class="btn btn-primary" @click="oeffneTokensEffekteEditor">
+              🎯 Tokens &amp; Effekte
             </button>
           </div>
         </div>

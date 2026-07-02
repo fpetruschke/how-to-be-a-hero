@@ -118,6 +118,15 @@ const SPEICHER_BEREICHE = {
     buttonSymbol: '🏷️',
     buttonLabel: 'Kampagnen-Label-Katalog löschen',
   },
+  effektRahmen: {
+    keys: ['htbah_effekt_rahmen_einstellungen', 'htbah_token_export_einstellungen'],
+    titel: 'Token- und Effekt-Rahmen-Einstellungen löschen?',
+    beschreibung:
+      'Gespeicherte Effekt-/Status-Rahmen (tot, bewusstlos, schlafend, eigene) und Token-Export-Voreinstellungen werden zurückgesetzt.',
+    erfolg: 'Token- und Effekt-Rahmen-Einstellungen wurden zurückgesetzt.',
+    buttonSymbol: '🎯',
+    buttonLabel: 'Token- & Effekt-Rahmen zurücksetzen',
+  },
   spielleitung: {
     key: 'htbah_spielleitung_kampagnen',
     titel: 'Spielleitung-Kampagnen löschen?',
@@ -1088,6 +1097,13 @@ window.HTBAH_SEITEN.Einstellungen = {
             window.HTBAH.loescheOffeneModalsSpeicher();
           }
         }
+        if (this.zuLoeschenderBereich === 'effektRahmen') {
+          try {
+            window.dispatchEvent(new CustomEvent('htbah:effekt-rahmen-geaendert'));
+          } catch {
+            /* ignorieren */
+          }
+        }
       } else if (this.zuLoeschenderBereich === 'zufallstabellen') {
         await new Promise((resolve) => {
           setTimeout(resolve, 0);
@@ -1883,6 +1899,10 @@ window.HTBAH_SEITEN.Einstellungen = {
           <kampagnen-labels-verwaltung />
         </einstellungen-sektion>
 
+        <einstellungen-sektion titel="Token- &amp; Effekt-Rahmen" section-id="effekt-rahmen" emoji="🎯">
+          <effekt-rahmen-verwaltung />
+        </einstellungen-sektion>
+
         <einstellungen-sektion titel="Abenteuerbuch" section-id="abenteuerbuch" emoji="📖">
           <div class="form-check form-switch mb-0">
             <input
@@ -2379,6 +2399,13 @@ window.HTBAH_SEITEN.Einstellungen = {
                 :symbol="speicherBereiche.kampagnenLabels.buttonSymbol"
                 @click="oeffneLoeschDialog('kampagnenLabels')">
                 {{ speicherBereiche.kampagnenLabels.buttonLabel }}
+              </icon-text-button>
+              <icon-text-button
+                class="btn btn-outline-danger btn-sm w-100 text-start"
+                type="button"
+                :symbol="speicherBereiche.effektRahmen.buttonSymbol"
+                @click="oeffneLoeschDialog('effektRahmen')">
+                {{ speicherBereiche.effektRahmen.buttonLabel }}
               </icon-text-button>
               <icon-text-button
                 class="btn btn-outline-danger btn-sm w-100 text-start"

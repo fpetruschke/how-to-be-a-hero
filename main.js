@@ -27,6 +27,8 @@ const SPEICHER_KEY_INTERAKTIVE_WELT_STATS_ANZEIGEN = 'htbah_interaktive_welt_sta
 const SPEICHER_KEY_KONFLIKT_FENSTER = 'htbah_konflikt_fenster';
 const SPEICHER_KEY_OFFENE_MODALS = 'htbah_offene_modals';
 const SPEICHER_KEY_FLOATING_FAB_POS = 'htbah_floating_fab_pos';
+const SPEICHER_KEY_EFFEKT_RAHMEN = 'htbah_effekt_rahmen_einstellungen';
+const SPEICHER_KEY_TOKEN_EXPORT = 'htbah_token_export_einstellungen';
 
 function erstelleLocalStorageBackend() {
   return {
@@ -1818,6 +1820,8 @@ const ALLE_LOKALEN_APP_SPEICHER_KEYS = [
   'htbah_orientation_anchor_angle',
   'htbah_interaktive_welt_stats_anzeigen',
   'htbah_zeichen_brett',
+  'htbah_effekt_rahmen_einstellungen',
+  'htbah_token_export_einstellungen',
   'verstanden_am',
   'entwicklungshinweis_verstanden_am',
 ];
@@ -5791,6 +5795,63 @@ function setzeAbenteuerbuchEinstellungen(teil) {
   return neu;
 }
 
+function ladeEffektRahmenEinstellungen() {
+  const ERM = window.HTBAH_SHARED && window.HTBAH_SHARED.EffektRahmenModel;
+  const defaults = ERM ? ERM.normalisiereEffektRahmenKonfiguration(null) : { version: 1, rahmen: [] };
+  try {
+    const roh = htbahSpeicher.leseText(SPEICHER_KEY_EFFEKT_RAHMEN, null);
+    if (roh && String(roh).trim().startsWith('{')) {
+      const o = JSON.parse(roh);
+      return ERM ? ERM.normalisiereEffektRahmenKonfiguration(o) : defaults;
+    }
+  } catch {
+    /* defektes JSON */
+  }
+  return defaults;
+}
+
+/**
+ * @param {{ rahmen?: Array<object> }} teil
+ */
+function setzeEffektRahmenEinstellungen(teil) {
+  const ERM = window.HTBAH_SHARED && window.HTBAH_SHARED.EffektRahmenModel;
+  const aktuell = ladeEffektRahmenEinstellungen();
+  const zusammengefuegt = {
+    rahmen: teil && Array.isArray(teil.rahmen) ? teil.rahmen : aktuell.rahmen,
+  };
+  const neu = ERM ? ERM.normalisiereEffektRahmenKonfiguration(zusammengefuegt) : zusammengefuegt;
+  htbahSpeicher.schreibeText(SPEICHER_KEY_EFFEKT_RAHMEN, JSON.stringify(neu));
+  window.dispatchEvent(new CustomEvent('htbah:effekt-rahmen-geaendert', { detail: { ...neu } }));
+  return neu;
+}
+
+function ladeTokenExportEinstellungen() {
+  const ERM = window.HTBAH_SHARED && window.HTBAH_SHARED.EffektRahmenModel;
+  const defaults = ERM ? ERM.normalisiereTokenExportEinstellungen(null) : {};
+  try {
+    const roh = htbahSpeicher.leseText(SPEICHER_KEY_TOKEN_EXPORT, null);
+    if (roh && String(roh).trim().startsWith('{')) {
+      const o = JSON.parse(roh);
+      return ERM ? ERM.normalisiereTokenExportEinstellungen(o) : defaults;
+    }
+  } catch {
+    /* defektes JSON */
+  }
+  return defaults;
+}
+
+/**
+ * @param {object} teil
+ */
+function setzeTokenExportEinstellungen(teil) {
+  const ERM = window.HTBAH_SHARED && window.HTBAH_SHARED.EffektRahmenModel;
+  const aktuell = ladeTokenExportEinstellungen();
+  const zusammengefuegt = { ...aktuell, ...(teil && typeof teil === 'object' ? teil : {}) };
+  const neu = ERM ? ERM.normalisiereTokenExportEinstellungen(zusammengefuegt) : zusammengefuegt;
+  htbahSpeicher.schreibeText(SPEICHER_KEY_TOKEN_EXPORT, JSON.stringify(neu));
+  return neu;
+}
+
 function spieleZeitmessungKlick(lautstaerkeOverride) {
   const ZU = window.HTBAH_SHARED && window.HTBAH_SHARED.ZeitmessungUtils;
   if (ZU && typeof ZU.spieleKlick === 'function') {
@@ -6239,6 +6300,8 @@ const HTBAH_SPEICHER_KEYS = Object.freeze({
   konfliktFenster: SPEICHER_KEY_KONFLIKT_FENSTER,
   offeneModals: SPEICHER_KEY_OFFENE_MODALS,
   floatingFabPos: SPEICHER_KEY_FLOATING_FAB_POS,
+  effektRahmen: SPEICHER_KEY_EFFEKT_RAHMEN,
+  tokenExport: SPEICHER_KEY_TOKEN_EXPORT,
 });
 
 window.HTBAH = {
@@ -6273,6 +6336,10 @@ window.HTBAH = {
   setzeZeitmessungProfil,
   ladeAbenteuerbuchEinstellungen,
   setzeAbenteuerbuchEinstellungen,
+  ladeEffektRahmenEinstellungen,
+  setzeEffektRahmenEinstellungen,
+  ladeTokenExportEinstellungen,
+  setzeTokenExportEinstellungen,
   spieleZeitmessungKlick,
   spieleZeitmessungAbgelaufen,
   ladeZeitmessungBadgePosition,
@@ -7141,6 +7208,14 @@ app.component(
 app.component(
   'kampagnen-labels-verwaltung',
   window.HTBAH_KOMPONENTEN.KampagnenLabelsVerwaltung,
+);
+app.component(
+  'effekt-rahmen-verwaltung',
+  window.HTBAH_KOMPONENTEN.EffektRahmenVerwaltung,
+);
+app.component(
+  'tokens-effekte-editor-modal',
+  window.HTBAH_KOMPONENTEN.TokensEffekteEditorModal,
 );
 app.component(
   'kampagne-einstellungen',

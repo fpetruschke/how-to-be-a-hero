@@ -48,6 +48,18 @@ const GLOBAL_BLATT_DEFINITIONEN = [
     label: 'Kampagnen-Label-Katalog',
     nurSpielleitung: true,
   },
+  {
+    id: 'effekt_rahmen',
+    key: 'htbah_effekt_rahmen_einstellungen',
+    label: 'Token- & Effekt-Rahmen',
+    nurSpielleitung: true,
+  },
+  {
+    id: 'token_export',
+    key: 'htbah_token_export_einstellungen',
+    label: 'Token-Export-Voreinstellungen',
+    nurSpielleitung: true,
+  },
 ];
 
 /** Legacy-Sammel- und Teilexporte (Import-Label, weiterhin importierbar). */
