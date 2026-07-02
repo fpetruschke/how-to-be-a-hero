@@ -44,6 +44,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         nameFontSizePx: 0,
         kategorieShapes: {},
         entityShapes: {},
+        entityBorders: {},
+        entityShowNames: {},
+        entityCounts: {},
+        effectCounts: {},
+        entityBorderExpanded: {},
         effectFrames: [],
         pdfBlobUrl: '',
         pdfDateiname: '',
@@ -75,11 +80,43 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         return this.entitaeten.length > 0 && this.selectedEntityIds.length === this.entitaeten.length;
       },
       kannExportieren() {
-        return !this.laedt && this.selectedEntityIds.length > 0;
+        return !this.laedt && this.gesamtExportItemAnzahl > 0;
+      },
+      gesamtTokenAnzahl() {
+        const selected = new Set(this.selectedEntityIds);
+        return this.entitaeten.reduce((sum, e) => {
+          if (!selected.has(e.id)) {
+            return sum;
+          }
+          const count = this.entityCounts[e.id];
+          const n = Number.isFinite(Number(count)) ? Math.round(Number(count)) : 1;
+          return sum + Math.min(99, Math.max(0, n));
+        }, 0);
+      },
+      gesamtEffektAnzahl() {
+        if (!this.includeEffects) {
+          return 0;
+        }
+        return this.effectFrames.reduce((sum, r) => {
+          if (!r || !r.id) {
+            return sum;
+          }
+          const count = this.effectCounts[r.id];
+          const n = Number.isFinite(Number(count)) ? Math.round(Number(count)) : this.standardEffektStueckzahl;
+          return sum + Math.min(99, Math.max(0, n));
+        }, 0);
+      },
+      gesamtExportItemAnzahl() {
+        return this.gesamtTokenAnzahl + this.gesamtEffektAnzahl;
+      },
+      standardEffektStueckzahl() {
+        const relevant = new Set(['charaktere', 'npcs', 'bestien']);
+        const selected = new Set(this.selectedEntityIds);
+        return this.entitaeten.filter((e) => selected.has(e.id) && relevant.has(e.kategorieKey)).length;
       },
       exportZusammenfassung() {
-        const tokenAnzahl = this.selectedEntityIds.length;
-        const effektAnzahl = this.includeEffects ? this.effectFrames.length : 0;
+        const tokenAnzahl = this.gesamtTokenAnzahl;
+        const effektAnzahl = this.gesamtEffektAnzahl;
         return `${tokenAnzahl} Token${tokenAnzahl === 1 ? '' : 's'}${effektAnzahl ? ` + ${effektAnzahl} Effekt-Rahmen` : ''}`;
       },
     },
@@ -129,13 +166,41 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.nameFontSizePx = prefs.nameFontSizePx != null ? prefs.nameFontSizePx : 0;
         this.kategorieShapes = { ...(prefs.kategorieShapes || {}) };
         this.entityShapes = { ...(prefs.entityShapes || {}) };
+        this.entityBorders = { ...(prefs.entityBorders || {}) };
+        this.entityShowNames = { ...(prefs.entityShowNames || {}) };
+        this.entityCounts = { ...(prefs.entityCounts || {}) };
+        this.effectCounts = { ...(prefs.effectCounts || {}) };
         this.entitaeten =
           EXPORT_API && typeof EXPORT_API.sammleExportEntitaeten === 'function'
             ? EXPORT_API.sammleExportEntitaeten(this.kampagneId)
             : [];
         this.selectedEntityIds = this.entitaeten.map((e) => e.id);
+        this.initialisiereEntityCounts();
         this.initialisiereEntitaetenGruppenOffen();
         this.ladeEffektRahmen();
+        this.initialisiereEffectCounts();
+      },
+      initialisiereEntityCounts() {
+        const counts = { ...this.entityCounts };
+        this.entitaeten.forEach((e) => {
+          if (counts[e.id] === undefined) {
+            counts[e.id] = 1;
+          }
+        });
+        this.entityCounts = counts;
+      },
+      initialisiereEffectCounts() {
+        const def = this.standardEffektStueckzahl;
+        const counts = { ...this.effectCounts };
+        this.effectFrames.forEach((r) => {
+          if (!r || !r.id) {
+            return;
+          }
+          if (counts[r.id] === undefined) {
+            counts[r.id] = def;
+          }
+        });
+        this.effectCounts = counts;
       },
       initialisiereEntitaetenGruppenOffen() {
         const offen = {};
@@ -151,6 +216,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             ? window.HTBAH.ladeEffektRahmenEinstellungen()
             : { rahmen: [] };
         this.effectFrames = Array.isArray(konfig.rahmen) ? konfig.rahmen.map((r) => ({ ...r })) : [];
+        this.initialisiereEffectCounts();
       },
       speichereTokenExportPrefs() {
         if (!window.HTBAH || typeof window.HTBAH.setzeTokenExportEinstellungen !== 'function') {
@@ -171,6 +237,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           nameFontSizePx: this.nameFontSizePx,
           kategorieShapes: { ...this.kategorieShapes },
           entityShapes: { ...this.entityShapes },
+          entityBorders: { ...this.entityBorders },
+          entityShowNames: { ...this.entityShowNames },
+          entityCounts: { ...this.entityCounts },
+          effectCounts: { ...this.effectCounts },
         });
       },
       aktuelleExportEinstellungen() {
@@ -192,6 +262,10 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           nameFontSizePx: this.nameFontSizePx,
           kategorieShapes: { ...this.kategorieShapes },
           entityShapes: { ...this.entityShapes },
+          entityBorders: { ...this.entityBorders },
+          entityShowNames: { ...this.entityShowNames },
+          entityCounts: { ...this.entityCounts },
+          effectCounts: { ...this.effectCounts },
           effectFrames: this.effectFrames.map((r) => ({ ...r })),
         };
       },
@@ -267,6 +341,96 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         return this.defaultShape;
       },
+      entityBorderModus(id) {
+        const cfg = this.entityBorders[id];
+        if (cfg === false) {
+          return 'off';
+        }
+        if (cfg && typeof cfg === 'object') {
+          return 'custom';
+        }
+        return 'default';
+      },
+      setzeEntityBorderModus(id, modus) {
+        const next = { ...this.entityBorders };
+        if (modus === 'off') {
+          next[id] = false;
+        } else if (modus === 'custom') {
+          next[id] = {
+            color: next[id] && typeof next[id] === 'object' && next[id].color ? next[id].color : this.borderColor,
+            widthPx:
+              next[id] && typeof next[id] === 'object' && next[id].widthPx != null
+                ? next[id].widthPx
+                : this.borderWidthPx,
+          };
+          this.entityBorderExpanded = { ...this.entityBorderExpanded, [id]: true };
+        } else {
+          delete next[id];
+        }
+        this.entityBorders = next;
+        this.verwerfePdfVorschau();
+      },
+      setzeEntityBorderCustom(id, field, value) {
+        const current =
+          this.entityBorders[id] && typeof this.entityBorders[id] === 'object'
+            ? { ...this.entityBorders[id] }
+            : { color: this.borderColor, widthPx: this.borderWidthPx };
+        if (field === 'color') {
+          current.color = value;
+        } else if (field === 'widthPx') {
+          current.widthPx = value;
+        }
+        this.entityBorders = { ...this.entityBorders, [id]: current };
+        this.verwerfePdfVorschau();
+      },
+      entityNameModus(id) {
+        if (this.entityShowNames[id] === true) {
+          return 'on';
+        }
+        if (this.entityShowNames[id] === false) {
+          return 'off';
+        }
+        return 'default';
+      },
+      setzeEntityNameModus(id, modus) {
+        const next = { ...this.entityShowNames };
+        if (modus === 'on') {
+          next[id] = true;
+        } else if (modus === 'off') {
+          next[id] = false;
+        } else {
+          delete next[id];
+        }
+        this.entityShowNames = next;
+        this.verwerfePdfVorschau();
+      },
+      setzeEntityCount(id, value) {
+        const n = Number(value);
+        this.entityCounts = {
+          ...this.entityCounts,
+          [id]: Number.isFinite(n) ? Math.min(99, Math.max(0, Math.round(n))) : 1,
+        };
+        this.verwerfePdfVorschau();
+      },
+      setzeEffectCount(id, value) {
+        const n = Number(value);
+        this.effectCounts = {
+          ...this.effectCounts,
+          [id]: Number.isFinite(n) ? Math.min(99, Math.max(0, Math.round(n))) : this.standardEffektStueckzahl,
+        };
+        this.verwerfePdfVorschau();
+      },
+      setzeAlleEffektCountsAufStandard() {
+        const def = this.standardEffektStueckzahl;
+        const counts = { ...this.effectCounts };
+        this.effectFrames.forEach((r) => {
+          if (r && r.id) {
+            counts[r.id] = def;
+          }
+        });
+        this.effectCounts = counts;
+        this.verwerfePdfVorschau();
+      },
       revokePdfBlobUrl() {
         if (this.pdfBlobUrl) {
           URL.revokeObjectURL(this.pdfBlobUrl);
@@ -282,6 +446,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       onEffektRahmenGeaendert(rahmen) {
         this.effectFrames = Array.isArray(rahmen) ? rahmen.map((r) => ({ ...r })) : [];
+        this.initialisiereEffectCounts();
         this.verwerfePdfVorschau();
       },
       async pngExportieren() {
@@ -450,12 +615,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                           class="form-control"
                           type="number"
                           min="0"
-                          max="28"
+                          max="64"
                           step="1"
                           @input="verwerfePdfVorschau" />
                         <span class="input-group-text">px</span>
                       </div>
-                      <div class="form-text">0 = automatisch (abhängig von der Token-Größe)</div>
+                      <div class="form-text">0 = automatisch (~12 % der Token-Breite). Sonst Schriftgröße in Export-Pixeln.</div>
                     </div>
                     <div class="col-12">
                       <div class="form-check form-switch mb-0">
@@ -512,29 +677,83 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                         </select>
                       </div>
                       <div v-show="gruppeIstOffen(gruppe.key)" class="htbah-tokens-entitaeten-liste">
-                        <label
+                        <div
                           v-for="entitaet in gruppe.entitaeten"
                           :key="entitaet.id"
-                          class="htbah-tokens-entitaet-zeile d-flex align-items-center gap-2 small py-1 px-2 rounded">
-                          <input
-                            type="checkbox"
-                            class="form-check-input m-0 flex-shrink-0"
-                            :checked="selectedEntityIds.includes(entitaet.id)"
-                            @change="entitaetToggle(entitaet.id)" />
-                          <span class="text-truncate flex-grow-1" :title="entitaet.name || entitaet.id">
-                            {{ entitaet.art === 'bild' ? '🖼️' : (entitaet.emoji || '📌') }}
-                            {{ entitaet.name || 'Ohne Name' }}
-                          </span>
-                          <select
-                            class="form-select form-select-sm flex-shrink-0"
-                            style="width: 6.5rem"
-                            :value="entityShapes[entitaet.id] || ''"
-                            @change="setzeEntityShape(entitaet.id, $event.target.value || null)">
-                            <option value="">Std.</option>
-                            <option value="kreis">○</option>
-                            <option value="quadrat">□</option>
-                          </select>
-                        </label>
+                          class="htbah-tokens-entitaet-zeile small py-1 px-2 rounded">
+                          <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <input
+                              type="checkbox"
+                              class="form-check-input m-0 flex-shrink-0"
+                              :checked="selectedEntityIds.includes(entitaet.id)"
+                              @change="entitaetToggle(entitaet.id)" />
+                            <span class="text-truncate flex-grow-1 min-w-0" :title="entitaet.name || entitaet.id">
+                              {{ entitaet.art === 'bild' ? '🖼️' : (entitaet.emoji || '📌') }}
+                              {{ entitaet.name || 'Ohne Name' }}
+                            </span>
+                            <div class="input-group input-group-sm flex-shrink-0 htbah-tokens-count-input">
+                              <span class="input-group-text">×</span>
+                              <input
+                                type="number"
+                                class="form-control"
+                                min="0"
+                                max="99"
+                                :value="entityCounts[entitaet.id] != null ? entityCounts[entitaet.id] : 1"
+                                :disabled="!selectedEntityIds.includes(entitaet.id)"
+                                title="Anzahl"
+                                @input="setzeEntityCount(entitaet.id, $event.target.value)" />
+                            </div>
+                            <select
+                              class="form-select form-select-sm flex-shrink-0"
+                              style="width: 6.5rem"
+                              :value="entityShapes[entitaet.id] || ''"
+                              @change="setzeEntityShape(entitaet.id, $event.target.value || null)">
+                              <option value="">Std.</option>
+                              <option value="kreis">○</option>
+                              <option value="quadrat">□</option>
+                            </select>
+                            <select
+                              class="form-select form-select-sm flex-shrink-0"
+                              style="width: 6.5rem"
+                              :value="entityBorderModus(entitaet.id)"
+                              title="Rahmen"
+                              @change="setzeEntityBorderModus(entitaet.id, $event.target.value)">
+                              <option value="default">Rahmen: Std.</option>
+                              <option value="off">Rahmen: Aus</option>
+                              <option value="custom">Rahmen: Eigene</option>
+                            </select>
+                            <select
+                              class="form-select form-select-sm flex-shrink-0"
+                              style="width: 6rem"
+                              :value="entityNameModus(entitaet.id)"
+                              title="Name"
+                              @change="setzeEntityNameModus(entitaet.id, $event.target.value)">
+                              <option value="default">Name: Std.</option>
+                              <option value="on">Name: An</option>
+                              <option value="off">Name: Aus</option>
+                            </select>
+                          </div>
+                          <div
+                            v-if="entityBorderModus(entitaet.id) === 'custom'"
+                            class="d-flex flex-wrap align-items-center gap-2 mt-1 ps-4">
+                            <input
+                              type="color"
+                              class="form-control form-control-color form-control-sm"
+                              :value="(entityBorders[entitaet.id] && entityBorders[entitaet.id].color) || borderColor"
+                              title="Rahmenfarbe"
+                              @input="setzeEntityBorderCustom(entitaet.id, 'color', $event.target.value)" />
+                            <div class="input-group input-group-sm" style="width: 7rem">
+                              <input
+                                type="number"
+                                class="form-control"
+                                min="0"
+                                max="24"
+                                :value="(entityBorders[entitaet.id] && entityBorders[entitaet.id].widthPx != null) ? entityBorders[entitaet.id].widthPx : borderWidthPx"
+                                @input="setzeEntityBorderCustom(entitaet.id, 'widthPx', $event.target.value)" />
+                              <span class="input-group-text">px</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -554,6 +773,30 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                     <div class="form-check form-switch mb-2">
                       <input id="tokens-show-effect-names" v-model="showEffectNames" class="form-check-input" type="checkbox" @change="verwerfePdfVorschau" />
                       <label class="form-check-label small" for="tokens-show-effect-names">Namen auf Effekt-Rahmen anzeigen</label>
+                    </div>
+                    <div v-if="effectFrames.length" class="mb-2">
+                      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                        <span class="small text-body-secondary">Stückzahl pro Effekt-Rahmen</span>
+                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" @click="setzeAlleEffektCountsAufStandard">
+                          Standard ({{ standardEffektStueckzahl }})
+                        </button>
+                      </div>
+                      <div
+                        v-for="rahmen in effectFrames"
+                        :key="'effekt-count-' + rahmen.id"
+                        class="d-flex align-items-center gap-2 small py-1">
+                        <span class="text-truncate flex-grow-1" :title="rahmen.label || rahmen.id">{{ rahmen.label || rahmen.id }}</span>
+                        <div class="input-group input-group-sm flex-shrink-0 htbah-tokens-count-input">
+                          <span class="input-group-text">×</span>
+                          <input
+                            type="number"
+                            class="form-control"
+                            min="0"
+                            max="99"
+                            :value="effectCounts[rahmen.id] != null ? effectCounts[rahmen.id] : standardEffektStueckzahl"
+                            @input="setzeEffectCount(rahmen.id, $event.target.value)" />
+                        </div>
+                      </div>
                     </div>
                     <div class="pt-2 border-top border-secondary border-opacity-25">
                       <button

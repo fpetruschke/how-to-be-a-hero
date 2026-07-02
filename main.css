@@ -673,6 +673,16 @@ input::placeholder {
   width: auto;
 }
 
+.htbah-spielmatten-terrain-select {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+  max-width: 100%;
+}
+
+.htbah-spielmatten-grid-switch {
+  flex-shrink: 0;
+}
+
 .htbah-spielmatten-rand-manuell {
   max-width: 36rem;
 }
@@ -1855,7 +1865,7 @@ input::placeholder {
 }
 
 .htbah-tokens-entitaeten-liste {
-  max-height: 14rem;
+  max-height: 20rem;
   overflow-y: auto;
   border: none;
   border-radius: 0;
@@ -1864,6 +1874,14 @@ input::placeholder {
 
 .htbah-tokens-entitaet-zeile:hover {
   background: color-mix(in srgb, var(--bs-secondary) 8%, transparent);
+}
+
+.htbah-tokens-count-input {
+  width: 5.5rem;
+}
+
+.htbah-tokens-count-input .form-control {
+  min-width: 2.5rem;
 }
 
 .htbah-effekt-rahmen-zeile {

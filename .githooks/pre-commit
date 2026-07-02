@@ -130,4 +130,57 @@ EOF
   git add "$VORLAGEN_INDEX"
 fi
 
+# --- Terrain-Manifest ------------------------------------------------------------
+TERRAIN_DIR="assets/terrain"
+TERRAIN_INDEX="$TERRAIN_DIR/index.json"
+TERRAIN_GENERATOR="bin/aktualisiere-terrain-index"
+TERRAIN_BILD_PATTERN='\.(jpe?g|png|webp)$'
+
+if [[ -d "$TERRAIN_DIR" && -x "$TERRAIN_GENERATOR" ]]; then
+  untracked_terrain="$(
+    git ls-files --others --exclude-standard -- "$TERRAIN_DIR" \
+      | { grep -Ei "$TERRAIN_BILD_PATTERN" || true; }
+  )"
+  if [[ -n "$untracked_terrain" ]]; then
+    cat >&2 <<EOF
+
+✗ Pre-commit abgebrochen: neue Bilddatei(en) in ${TERRAIN_DIR}/ sind nicht gestaged.
+
+$(printf '%s\n' "$untracked_terrain" | sed 's/^/    /')
+
+Bitte stagen:
+
+    git add ${TERRAIN_DIR}/
+
+(Bypass einmalig: git commit --no-verify)
+
+EOF
+    exit 1
+  fi
+
+  deleted_terrain="$(
+    git ls-files --deleted -- "$TERRAIN_DIR" \
+      | { grep -Ei "$TERRAIN_BILD_PATTERN" || true; }
+  )"
+  if [[ -n "$deleted_terrain" ]]; then
+    cat >&2 <<EOF
+
+✗ Pre-commit abgebrochen: gelöschte Bilddatei(en) in ${TERRAIN_DIR}/ sind nicht gestaged.
+
+$(printf '%s\n' "$deleted_terrain" | sed 's/^/    /')
+
+Bitte stagen:
+
+    git add -A ${TERRAIN_DIR}/
+
+(Bypass einmalig: git commit --no-verify)
+
+EOF
+    exit 1
+  fi
+
+  "$TERRAIN_GENERATOR" >/dev/null
+  git add "$TERRAIN_INDEX"
+fi
+
 exit 0

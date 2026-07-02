@@ -11,6 +11,7 @@ const EXPORT_ZTF_KATEGORIEN = [
   { schluessel: 'raetsel', label: 'Rätsel' },
   { schluessel: 'bestien', label: 'Bestien' },
   { schluessel: 'pantheon', label: 'Pantheon' },
+  { schluessel: 'kartenobjekte', label: 'Kartenobjekte' },
 ];
 
 const WUERFELBECHER_BUNDLE_KEY = 'htbah_wuerfelbecher_bundle';

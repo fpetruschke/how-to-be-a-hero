@@ -19,6 +19,7 @@ const TABLE_TYPE_CONFIG = {
   raetsel: { label: 'Rätsel', emoji: '🧩', detail: '🧩 Rätsel · Übersicht' },
   bestie: { label: 'Bestie', emoji: '🦁', detail: '🦁 Bestie · Übersicht' },
   gegenstand: { label: 'Gegenstand', emoji: '📦', detail: '📦 Gegenstand · Übersicht' },
+  kartenobjekt: { label: 'Kartenobjekt', emoji: '🌳', detail: '🌳 Kartenobjekt · Übersicht' },
 };
 
 function htbahTextVorschau(html, maxLen) {
@@ -46,6 +47,7 @@ const ZUFALLSTABELLEN_SEKTION_SUCHE = {
   pantheon: { sucheKey: 'suchePantheon', anzeigeKey: 'anzeigePantheon' },
   raetsel: { sucheKey: 'sucheRaetsel', anzeigeKey: 'anzeigeRaetsel' },
   bestien: { sucheKey: 'sucheBestien', anzeigeKey: 'anzeigeBestien' },
+  kartenobjekte: { sucheKey: 'sucheKartenobjekte', anzeigeKey: 'anzeigeKartenobjekte' },
 };
 
 function zufallstabellenFormatBytes(n) {
@@ -148,6 +150,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       suchePantheon: '',
       sucheRaetsel: '',
       sucheBestien: '',
+      sucheKartenobjekte: '',
       zeigeBewusstloseNpcs: true,
       zeigeToteNpcs: true,
       zeigeBewusstloseBestien: true,
@@ -332,6 +335,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         ),
       );
     },
+    gefilterteKartenobjekte() {
+      const q = this.normSucheText(this.sucheKartenobjekte);
+      if (!q) {
+        return this.zustand.kartenobjekte || [];
+      }
+      return (this.zustand.kartenobjekte || []).filter((row) =>
+        this.trifftSucheZu(row, ['name', 'beschreibungHtml'], q),
+      );
+    },
     gefiltertesPantheon() {
       const q = this.normSucheText(this.suchePantheon);
       if (!q) {
@@ -421,6 +433,13 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           label: 'Gegenstand',
           emoji: '🎒',
         },
+        {
+          id: 'kartenobjekte',
+          zustandKey: 'kartenobjekte',
+          bearbeiten: 'kartenobjektBearbeiten',
+          label: 'Kartenobjekt',
+          emoji: '🌳',
+        },
       ];
     },
     zufallKategorienMitEintraegen() {
@@ -502,6 +521,14 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           gq,
         ),
       );
+    },
+    anzeigeKartenobjekte() {
+      const gq = this.normSucheText(this.sucheGlobal);
+      const base = this.gefilterteKartenobjekte;
+      if (!gq) {
+        return base;
+      }
+      return base.filter((row) => this.trifftSucheZu(row, ['name', 'beschreibungHtml'], gq));
     },
     anzeigePantheon() {
       const gq = this.normSucheText(this.sucheGlobal);
@@ -652,6 +679,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         raetsel: ['raetsel', 'raetselBearbeiten'],
         bestie: ['bestien', 'bestieBearbeiten'],
         gegenstand: ['gegenstaende', 'gegenstandBearbeiten'],
+        kartenobjekt: ['kartenobjekte', 'kartenobjektBearbeiten'],
       };
       const entry = map[typ];
       if (!entry) {
@@ -840,6 +868,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         pantheon: 'pantheon',
         raetsel: 'raetsel',
         bestien: 'bestie',
+        kartenobjekte: 'kartenobjekt',
       };
       return map[tabellenTyp] || '';
     },
@@ -928,6 +957,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       pushListe('fraktion', this.anzeigeFraktionen);
       pushListe('npc', this.anzeigeNpcs);
       pushListe('gegenstand', this.anzeigeGegenstaende);
+      pushListe('kartenobjekt', this.anzeigeKartenobjekte);
       pushListe('pantheon', this.anzeigePantheon);
       pushListe('raetsel', this.anzeigeRaetsel);
       pushListe('bestie', this.anzeigeBestien);
@@ -1235,7 +1265,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     ? 'bestien'
                     : typ === 'gegenstand'
                       ? 'gegenstaende'
-                      : '';
+                      : typ === 'kartenobjekt'
+                        ? 'kartenobjekte'
+                        : '';
       if (!key || !this.zustand) {
         return [];
       }
@@ -1549,6 +1581,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         liste = this.zustand.raetsel;
       } else if (typ === 'bestie') {
         liste = this.zustand.bestien;
+      } else if (typ === 'kartenobjekt') {
+        liste = this.zustand.kartenobjekte;
       } else {
         liste = this.zustand.gegenstaende;
       }
@@ -1723,6 +1757,16 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         kartenIcon: { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' },
       };
     },
+    kartenobjektLeer() {
+      return {
+        id: window.HTBAH.neueEntropieId(),
+        name: '',
+        beschreibungHtml: '',
+        medien: [],
+        primaryMediumId: '',
+        kartenIcon: { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' },
+      };
+    },
     fraktionLeer() {
       return {
         id: window.HTBAH.neueEntropieId(),
@@ -1874,6 +1918,12 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     gegenstandBearbeiten(row, index) {
       this.zeileModalOeffnen('gegenstand', row, index);
     },
+    kartenobjektHinzufuegen() {
+      this.zeileModalOeffnen('kartenobjekt', this.kartenobjektLeer(), -1);
+    },
+    kartenobjektBearbeiten(row, index) {
+      this.zeileModalOeffnen('kartenobjekt', row, index);
+    },
     fraktionHinzufuegen() {
       this.zeileModalOeffnen('fraktion', this.fraktionLeer(), -1);
     },
@@ -1905,6 +1955,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       if (this.bearbeitung.typ === 'gegenstand') {
         return this.bearbeitung.zeile.beschreibungHtml || '';
       }
+      if (this.bearbeitung.typ === 'kartenobjekt') {
+        return this.bearbeitung.zeile.beschreibungHtml || '';
+      }
       if (this.bearbeitung.typ === 'fraktion') {
         return this.bearbeitung.zeile.beschreibungHtml || '';
       }
@@ -1918,6 +1971,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return '';
       }
       if (this.bearbeitungOverlay.typ === 'gegenstand') {
+        return this.bearbeitungOverlay.zeile.beschreibungHtml || '';
+      }
+      if (this.bearbeitungOverlay.typ === 'kartenobjekt') {
         return this.bearbeitungOverlay.zeile.beschreibungHtml || '';
       }
       if (this.bearbeitungOverlay.typ === 'fraktion') {
@@ -2107,6 +2163,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const html = this.zeileQuillInstanz.root.innerHTML;
       if (
         this.bearbeitung.typ === 'gegenstand' ||
+        this.bearbeitung.typ === 'kartenobjekt' ||
         this.bearbeitung.typ === 'fraktion' ||
         this.bearbeitung.typ === 'bestie'
       ) {
@@ -2765,6 +2822,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         liste = this.zustand.raetsel;
       } else if (typ === 'bestie') {
         liste = this.zustand.bestien;
+      } else if (typ === 'kartenobjekt') {
+        liste = this.zustand.kartenobjekte;
       } else {
         liste = this.zustand.gegenstaende;
       }
@@ -2807,6 +2866,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         liste = this.zustand.raetsel;
       } else if (typ === 'bestie') {
         liste = this.zustand.bestien;
+      } else if (typ === 'kartenobjekt') {
+        liste = this.zustand.kartenobjekte;
       } else {
         liste = this.zustand.gegenstaende;
       }
@@ -2895,6 +2956,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         pantheon: '✨ Pantheon',
         raetsel: '🧩 Rätsel',
         bestien: '🦁 Bestarium',
+        kartenobjekte: '🌳 Kartenobjekte',
       };
       this.$refs.zufallstabellenBestaetigen.oeffnen({
         titel: `${labels[typ] || 'Tabelle'} leeren?`,
@@ -2924,6 +2986,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           } else if (typ === 'bestien') {
             zuBereinigendeIds = (this.zustand.bestien || []).map((row) => row && row.id).filter(Boolean);
             this.zustand.bestien = [];
+          } else if (typ === 'kartenobjekte') {
+            zuBereinigendeIds = (this.zustand.kartenobjekte || []).map((row) => row && row.id).filter(Boolean);
+            this.zustand.kartenobjekte = [];
           }
           if (singularTyp && zuBereinigendeIds.length) {
             this.bereinigeWeltenbauLayoutdaten(
@@ -4359,6 +4424,161 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
                     <li><button type="button" class="dropdown-item" @click="bestieBearbeiten(row, indexNachId(zustand.bestien, row.id))">Bearbeiten</button></li>
                     <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('bestie', row.id)">Löschen</button></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+      </zufallstabellen-sektion>
+
+      <zufallstabellen-sektion
+        section-id="kartenobjekte"
+        aria-titel="Kartenobjekte"
+        :suche-steuerung-aktiv="sektionSucheAktiv('kartenobjekte')"
+        :suche-hat-treffer="sektionSucheHatTreffer('kartenobjekte')">
+        <template #titel>
+          <span class="fw-semibold htbah-zufall-karten-titel">
+            <span class="material-symbols-outlined" aria-hidden="true">park</span>
+            Kartenobjekte
+          </span>
+        </template>
+        <template #aktionen>
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="tabelleLeerenDialog('kartenobjekte')">
+              Leeren
+            </button>
+            <icon-text-button
+              type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0"
+              icon="add"
+              @click="kartenobjektHinzufuegen"
+              aria-label="Eintrag hinzufügen">
+              Hinzufügen
+            </icon-text-button>
+        </template>
+          <div class="p-2 border-bottom">
+            <input
+              v-model.trim="sucheKartenobjekte"
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Kartenobjekte durchsuchen…" />
+          </div>
+          <div class="table-responsive d-none d-md-block">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th v-if="entitaetenAuswahlModus" class="text-center zufallstabellen-auswahl-spalte" scope="col">
+                    <span class="visually-hidden">Auswahl</span>
+                  </th>
+                  <th>Name</th>
+                  <th>Beschreibung</th>
+                  <th class="text-end text-nowrap">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!anzeigeKartenobjekte.length">
+                  <td :colspan="entitaetenAuswahlModus ? 4 : 3" class="text-secondary text-center py-3">
+                    {{ zufallstabellenLeerNachricht((zustand.kartenobjekte || []).length, sucheKartenobjekte) }}
+                  </td>
+                </tr>
+                <tr
+                  v-for="row in anzeigeKartenobjekte"
+                  :key="row.id"
+                  class="zufallstabellen-tabellenzeile-klickbar"
+                  @click="zeileBearbeitenAusListe('kartenobjekt', row)">
+                  <td v-if="entitaetenAuswahlModus" class="text-center align-middle" @click.stop>
+                    <input
+                      class="form-check-input m-0"
+                      type="checkbox"
+                      :checked="istEntitaetAusgewaehlt('kartenobjekt', row.id)"
+                      :aria-label="'Kartenobjekt auswählen: ' + karteWert(row.name)"
+                      @change="toggleEntitaetAuswahl('kartenobjekt', row.id)" />
+                  </td>
+                  <td>{{ karteWert(row.name) }}</td>
+                  <td class="small">
+                    <div
+                      v-if="zeilenWertAlsText(row.beschreibungHtml)"
+                      class="htbah-zufall-rich-preview"
+                      @click.stop="onRichTextLinkClick($event)"
+                      v-html="richTextHtml(row.beschreibungHtml)"></div>
+                    <span v-else>—</span>
+                  </td>
+                  <td class="text-end text-nowrap" @click.stop>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                        ⚙️
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li class="px-2 py-2">
+                          <zufallstabellen-reihenfolge-split
+                            :kann-nach-oben="kannZeileNachOben('kartenobjekt', row.id)"
+                            :kann-nach-unten="kannZeileNachUnten('kartenobjekt', row.id)"
+                            @nach-oben="zeileReihenfolgeAendern('kartenobjekt', row.id, 'oben')"
+                            @nach-unten="zeileReihenfolgeAendern('kartenobjekt', row.id, 'unten')" />
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                        <li><button type="button" class="dropdown-item" @click="kartenobjektBearbeiten(row, indexNachId(zustand.kartenobjekte, row.id))">Bearbeiten</button></li>
+                        <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('kartenobjekt', row.id)">Löschen</button></li>
+                      </ul>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="d-md-none p-2">
+            <div v-if="!anzeigeKartenobjekte.length" class="text-secondary text-center py-3 small">
+              {{ zufallstabellenLeerNachricht((zustand.kartenobjekte || []).length, sucheKartenobjekte) }}
+            </div>
+            <div
+              v-for="row in anzeigeKartenobjekte"
+              :key="'kartenobjekt-card-' + row.id"
+              class="card zufallstabellen-mobile-card zufallstabellen-mobile-card--klickbar mb-2">
+              <div class="card-body p-2" @click="zeileBearbeitenAusListe('kartenobjekt', row)">
+                <div v-if="entitaetenAuswahlModus" class="form-check mb-2" @click.stop>
+                  <input
+                    :id="'zst-kartenobjekt-sel-' + row.id"
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="istEntitaetAusgewaehlt('kartenobjekt', row.id)"
+                    @change="toggleEntitaetAuswahl('kartenobjekt', row.id)" />
+                  <label class="form-check-label small" :for="'zst-kartenobjekt-sel-' + row.id">Auswählen</label>
+                </div>
+                <div class="fw-semibold mb-1">{{ karteWert(row.name) }}</div>
+                <div
+                  v-if="featuredBildAusZeile(row)"
+                  class="zufallstabellen-mobile-slides my-2"
+                  @click.stop>
+                  <button
+                    type="button"
+                    class="zufallstabellen-mobile-slide"
+                    aria-label="Titelbild anzeigen"
+                    @click="mediumImBildbetrachterOeffnen(featuredBildAusZeile(row))">
+                    <img :src="featuredBildAusZeile(row).dataUrl" :alt="mediumDateiname(featuredBildAusZeile(row))" loading="lazy" />
+                  </button>
+                </div>
+                <div
+                  v-if="zeilenWertAlsText(row.beschreibungHtml)"
+                  class="small mb-2 zufallstabellen-richtext-vorschau"
+                  @click.stop="onRichTextLinkClick($event)"
+                  v-html="richTextHtml(row.beschreibungHtml)"></div>
+                <div v-else class="small mb-2">—</div>
+                <div class="dropdown mt-2" @click.stop>
+                  <button type="button" class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aktionen">
+                    ⚙️
+                  </button>
+                  <ul class="dropdown-menu w-100">
+                    <li class="px-2 py-2">
+                      <zufallstabellen-reihenfolge-split
+                        :kann-nach-oben="kannZeileNachOben('kartenobjekt', row.id)"
+                        :kann-nach-unten="kannZeileNachUnten('kartenobjekt', row.id)"
+                        @nach-oben="zeileReihenfolgeAendern('kartenobjekt', row.id, 'oben')"
+                        @nach-unten="zeileReihenfolgeAendern('kartenobjekt', row.id, 'unten')" />
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
+                    <li><button type="button" class="dropdown-item" @click="galerieFuerZeileOeffnen(row)">Medien ({{ medienAnzahl(row) }})</button></li>
+                    <li><button type="button" class="dropdown-item" @click="kartenobjektBearbeiten(row, indexNachId(zustand.kartenobjekte, row.id))">Bearbeiten</button></li>
+                    <li><button type="button" class="dropdown-item text-danger" @click="zeileLoeschenDialog('kartenobjekt', row.id)">Löschen</button></li>
                   </ul>
                 </div>
               </div>

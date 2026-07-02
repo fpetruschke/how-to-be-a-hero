@@ -1133,6 +1133,21 @@ function normalisiereZufallstabellenOrtZeile(z) {
   };
 }
 
+function normalisiereZufallstabellenKartenobjektZeile(z) {
+  if (!z || typeof z !== 'object') {
+    return null;
+  }
+  const medien = normalisiereZufallstabellenMedienListe(z.medien);
+  return {
+    id: typeof z.id === 'string' && z.id ? z.id : neueEntropieId(),
+    name: typeof z.name === 'string' ? z.name : '',
+    beschreibungHtml: typeof z.beschreibungHtml === 'string' ? z.beschreibungHtml : '',
+    medien,
+    primaryMediumId: normalisiereZufallstabellenPrimaryMediumId(z.primaryMediumId, medien),
+    kartenIcon: normalisiereZufallstabellenKartenIcon(z.kartenIcon, 'kartenobjekt'),
+  };
+}
+
 function normalisiereZufallstabellenGegenstandZeile(z) {
   if (!z || typeof z !== 'object') {
     return null;
@@ -1555,6 +1570,7 @@ function leerenZufallstabellenZustand() {
     pantheon: [],
     raetsel: [],
     bestien: [],
+    kartenobjekte: [],
   };
 }
 
@@ -1575,6 +1591,7 @@ const ZUFALLSTABELLEN_LISTEN_SCHLUESSEL_SET = new Set([
   'pantheon',
   'raetsel',
   'bestien',
+  'kartenobjekte',
 ]);
 
 /**
@@ -1912,6 +1929,9 @@ function ladeZufallstabellenZustand(kampagneId) {
     bestien: Array.isArray(roh.bestien)
       ? roh.bestien.map(normalisiereZufallstabellenBestieZeile).filter(Boolean)
       : [],
+    kartenobjekte: Array.isArray(roh.kartenobjekte)
+      ? roh.kartenobjekte.map(normalisiereZufallstabellenKartenobjektZeile).filter(Boolean)
+      : [],
   });
 }
 
@@ -1939,6 +1959,9 @@ function zufallstabellenZustandFuerSpeicher(zustand) {
       : [],
     bestien: Array.isArray(z.bestien)
       ? z.bestien.map(normalisiereZufallstabellenBestieZeile).filter(Boolean)
+      : [],
+    kartenobjekte: Array.isArray(z.kartenobjekte)
+      ? z.kartenobjekte.map(normalisiereZufallstabellenKartenobjektZeile).filter(Boolean)
       : [],
   });
 }
@@ -2734,6 +2757,7 @@ function normalisiereZufallstabellenZeilenListeExportImport(schluessel, arr) {
     pantheon: normalisiereZufallstabellenPantheonZeile,
     raetsel: normalisiereZufallstabellenRaetselZeile,
     bestien: normalisiereZufallstabellenBestieZeile,
+    kartenobjekte: normalisiereZufallstabellenKartenobjektZeile,
   };
   const fn = mapper[schluessel];
   return fn ? arr.map(fn).filter(Boolean) : [];
@@ -4008,6 +4032,7 @@ const ZST_DUPLIZIER_TYP_ZU_LISTE = Object.freeze({
   raetsel: 'raetsel',
   bestie: 'bestien',
   gegenstand: 'gegenstaende',
+  kartenobjekt: 'kartenobjekte',
 });
 
 const ZST_DUPLIZIER_TYP_REIHENFOLGE = Object.freeze([
@@ -4016,6 +4041,7 @@ const ZST_DUPLIZIER_TYP_REIHENFOLGE = Object.freeze([
   'npc',
   'bestie',
   'gegenstand',
+  'kartenobjekt',
   'raetsel',
   'pantheon',
 ]);
@@ -4053,6 +4079,7 @@ function zstDuplizierLeeresIdMaps() {
     npc: {},
     bestie: {},
     gegenstand: {},
+    kartenobjekt: {},
     raetsel: {},
     pantheon: {},
   };
@@ -4099,6 +4126,10 @@ function zstDuplizierMapLayoutKey(layoutKey, idMaps) {
     return neuKey;
   }
   neuKey = einfach('gegenstand');
+  if (neuKey) {
+    return neuKey;
+  }
+  neuKey = einfach('kartenobjekt');
   if (neuKey) {
     return neuKey;
   }

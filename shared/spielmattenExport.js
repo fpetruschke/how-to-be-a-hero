@@ -145,7 +145,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       : 5;
     const linieMm = Number.isFinite(Number(einstellungen.gridLinienbreiteMm))
       ? Math.max(0.1, Number(einstellungen.gridLinienbreiteMm))
-      : 0.5;
+      : 0.3;
     const raster = berechneRasterInhaltMm(
       orient.widthMm,
       orient.heightMm,
@@ -226,38 +226,138 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return result.sort((a, b) => a - b);
   }
 
-  function canvasMitHintergrundFuellen(ctx, canvas, einstellungen) {
-    const bgColor = typeof einstellungen.hintergrundFarbe === 'string' ? einstellungen.hintergrundFarbe.trim() : '';
-    if (bgColor && bgColor !== 'transparent') {
-      ctx.save();
-      ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.restore();
+  function hexZuRgb(hexRaw) {
+    const hex = typeof hexRaw === 'string' ? hexRaw.trim().replace(/^#/, '') : '';
+    if (!hex) {
+      return null;
     }
-    const bgBild = typeof einstellungen.hintergrundBildDataUrl === 'string' ? einstellungen.hintergrundBildDataUrl : '';
-    if (!bgBild) {
+    if (hex.length === 3) {
+      const r = parseInt(hex.charAt(0) + hex.charAt(0), 16);
+      const g = parseInt(hex.charAt(1) + hex.charAt(1), 16);
+      const b = parseInt(hex.charAt(2) + hex.charAt(2), 16);
+      if ([r, g, b].some((v) => Number.isNaN(v))) {
+        return null;
+      }
+      return { r, g, b };
+    }
+    if (hex.length >= 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      if ([r, g, b].some((v) => Number.isNaN(v))) {
+        return null;
+      }
+      return { r, g, b };
+    }
+    return null;
+  }
+
+  function normalisiereOverlayTransparenzProzent(wertRaw) {
+    const wert = Number(wertRaw);
+    if (!Number.isFinite(wert)) {
+      return 10;
+    }
+    return Math.min(100, Math.max(0, Math.round(wert)));
+  }
+
+  function hintergrundHatRasterOverlay(einstellungenRaw) {
+    const einstellungen = einstellungenRaw && typeof einstellungenRaw === 'object' ? einstellungenRaw : {};
+    const modus = typeof einstellungen.hintergrundModus === 'string' ? einstellungen.hintergrundModus.trim() : '';
+    if (modus === 'transparent') {
+      return false;
+    }
+    if (modus === 'bild') {
+      return Boolean(typeof einstellungen.hintergrundBildDataUrl === 'string' && einstellungen.hintergrundBildDataUrl.trim());
+    }
+    if (modus === 'farbe') {
+      const farbe = typeof einstellungen.hintergrundFarbe === 'string' ? einstellungen.hintergrundFarbe.trim() : '';
+      return Boolean(farbe && farbe !== 'transparent');
+    }
+    const bgColor = typeof einstellungen.hintergrundFarbe === 'string' ? einstellungen.hintergrundFarbe.trim() : '';
+    const bgBild = typeof einstellungen.hintergrundBildDataUrl === 'string' ? einstellungen.hintergrundBildDataUrl.trim() : '';
+    return Boolean((bgColor && bgColor !== 'transparent') || bgBild);
+  }
+
+  function hintergrundBildMitRasterAbschliessen(einstellungenRaw) {
+    const einstellungen = einstellungenRaw && typeof einstellungenRaw === 'object' ? einstellungenRaw : {};
+    return einstellungen.hintergrundBildMitRasterAbschliessen !== false;
+  }
+
+  function overlayBereichAusEinstellungen(einstellungen, rasterBereichPx) {
+    const modus = typeof einstellungen.hintergrundModus === 'string' ? einstellungen.hintergrundModus.trim() : '';
+    const bgBild = typeof einstellungen.hintergrundBildDataUrl === 'string' ? einstellungen.hintergrundBildDataUrl.trim() : '';
+    if (modus === 'bild' && bgBild && hintergrundBildMitRasterAbschliessen(einstellungen) && rasterBereichPx) {
+      return rasterBereichPx;
+    }
+    return null;
+  }
+
+  function zeichneRasterOverlay(ctx, canvas, einstellungen, rasterBereichPx) {
+    if (!ctx || !canvas || !hintergrundHatRasterOverlay(einstellungen)) {
+      return;
+    }
+    const farbe = typeof einstellungen.gridOverlayFarbe === 'string' ? einstellungen.gridOverlayFarbe.trim() || '#ffffff' : '#ffffff';
+    const rgb = hexZuRgb(farbe);
+    if (!rgb) {
+      return;
+    }
+    const alpha = normalisiereOverlayTransparenzProzent(einstellungen.gridOverlayTransparenzProzent) / 100;
+    const bereich = overlayBereichAusEinstellungen(einstellungen, rasterBereichPx);
+    const x = bereich ? bereich.x : 0;
+    const y = bereich ? bereich.y : 0;
+    const breite = bereich ? bereich.width : canvas.width;
+    const hoehe = bereich ? bereich.height : canvas.height;
+    ctx.save();
+    ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+    ctx.fillRect(x, y, breite, hoehe);
+    ctx.restore();
+  }
+
+  function canvasMitHintergrundFarbeFuellen(ctx, canvas, einstellungen) {
+    const bgColor = typeof einstellungen.hintergrundFarbe === 'string' ? einstellungen.hintergrundFarbe.trim() : '';
+    if (!bgColor || bgColor === 'transparent') {
+      return;
+    }
+    ctx.save();
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  function zeichneHintergrundBild(ctx, bgBild, zielBereich) {
+    const dataUrl = typeof bgBild === 'string' ? bgBild.trim() : '';
+    if (!ctx || !dataUrl || !zielBereich) {
+      return Promise.resolve();
+    }
+    const bereich = zielBereich;
+    if (!Number.isFinite(bereich.width) || !Number.isFinite(bereich.height) || bereich.width <= 0 || bereich.height <= 0) {
       return Promise.resolve();
     }
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+        const scale = Math.max(bereich.width / img.width, bereich.height / img.height);
         const drawW = img.width * scale;
         const drawH = img.height * scale;
-        const x = (canvas.width - drawW) / 2;
-        const y = (canvas.height - drawH) / 2;
+        const x = bereich.x + (bereich.width - drawW) / 2;
+        const y = bereich.y + (bereich.height - drawH) / 2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(bereich.x, bereich.y, bereich.width, bereich.height);
+        ctx.clip();
         ctx.drawImage(img, x, y, drawW, drawH);
+        ctx.restore();
         resolve();
       };
       img.onerror = () => resolve();
-      img.src = bgBild;
+      img.src = dataUrl;
     });
   }
 
   function berechneLinienbreitePx(einstellungen, dpi) {
     const linienbreiteMm = Number.isFinite(Number(einstellungen.gridLinienbreiteMm))
       ? Math.max(0.1, Number(einstellungen.gridLinienbreiteMm))
-      : 0.5;
+      : 0.3;
     return Math.max(1, mmZuPx(linienbreiteMm, dpi || DEFAULT_DPI));
   }
 
@@ -317,7 +417,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     if (!ctx) {
       throw new Error('Canvas-Kontext konnte nicht erstellt werden.');
     }
-    await canvasMitHintergrundFuellen(ctx, canvas, einstellungen);
+    canvasMitHintergrundFarbeFuellen(ctx, canvas, einstellungen);
     const randLinksPx = mmZuPx(raender.links, dpi);
     const randRechtsPx = mmZuPx(raender.rechts, dpi);
     const randObenPx = mmZuPx(raender.oben, dpi);
@@ -325,6 +425,21 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const rasterCanvas = document.createElement('canvas');
     rasterCanvas.width = Math.max(1, canvas.width - randLinksPx - randRechtsPx);
     rasterCanvas.height = Math.max(1, canvas.height - randObenPx - randUntenPx);
+    const rasterBereichPx = {
+      x: randLinksPx,
+      y: randObenPx,
+      width: rasterCanvas.width,
+      height: rasterCanvas.height,
+    };
+    const bgBild = typeof einstellungen.hintergrundBildDataUrl === 'string' ? einstellungen.hintergrundBildDataUrl.trim() : '';
+    const modus = typeof einstellungen.hintergrundModus === 'string' ? einstellungen.hintergrundModus.trim() : '';
+    if (modus === 'bild' && bgBild) {
+      const bildBereich = hintergrundBildMitRasterAbschliessen(einstellungen)
+        ? rasterBereichPx
+        : { x: 0, y: 0, width: canvas.width, height: canvas.height };
+      await zeichneHintergrundBild(ctx, bgBild, bildBereich);
+    }
+    zeichneRasterOverlay(ctx, canvas, einstellungen, rasterBereichPx);
     const rasterCtx = rasterCanvas.getContext('2d');
     if (!rasterCtx) {
       throw new Error('Canvas-Kontext konnte nicht erstellt werden.');
@@ -338,16 +453,18 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const rowsRender = keineAbgeschnittenen
       ? Math.max(0, Math.floor((rasterCanvas.height - linienbreitePx) / rasterPx))
       : Math.max(1, Math.ceil(rasterCanvas.height / rasterPx));
-    zeichneRaster(
-      rasterCtx,
-      rasterCanvas,
-      einstellungen,
-      colsRender,
-      rowsRender,
-      rasterPx,
-      dpi,
-      keineAbgeschnittenen,
-    );
+    if (einstellungen.gridAktiv !== false) {
+      zeichneRaster(
+        rasterCtx,
+        rasterCanvas,
+        einstellungen,
+        colsRender,
+        rowsRender,
+        rasterPx,
+        dpi,
+        keineAbgeschnittenen,
+      );
+    }
     ctx.drawImage(rasterCanvas, randLinksPx, randObenPx);
     return {
       canvas,

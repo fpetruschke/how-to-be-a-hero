@@ -259,7 +259,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const t = node && node.data ? node.data.entityType : '';
     const istKreisNode = t === 'charakter' || t === 'npc' || t === 'bestie';
     const istKartenIconRechteck =
-      t === 'ort' || t === 'fraktion' || t === 'raetsel' || t === 'gegenstand';
+      t === 'ort' || t === 'fraktion' || t === 'raetsel' || t === 'gegenstand' || t === 'kartenobjekt';
     const klassen = ['htbah-map-node'];
     if (t === 'ort') {
       klassen.push('htbah-map-node-ort');
@@ -344,7 +344,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     const icon = data.kartenIconAnzeige || G().graphKnotenIconAnzeige(data.payload, entityType);
     const iconForm = icon && icon.form === 'rund' ? 'rund' : 'eckig';
     const iconSlot =
-      entityType === 'ort' || entityType === 'fraktion' || entityType === 'raetsel' || entityType === 'gegenstand'
+      entityType === 'ort' || entityType === 'fraktion' || entityType === 'raetsel' || entityType === 'gegenstand' || entityType === 'kartenobjekt'
         ? `<div class="htbah-map-node-icon-slot htbah-map-node-icon-slot--${iconForm}">${kartenIconHtml(node)}</div>`
         : '';
     const statusRect = data.statusEmoji

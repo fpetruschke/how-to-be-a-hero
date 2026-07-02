@@ -442,6 +442,33 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     pushEnt('gegenstand', gegenstaende, 'aufenthaltsort', 460, false);
     pushEnt('raetsel', zustand.raetsel, 'aufenthaltsort', 660, false);
 
+    (zustand.kartenobjekte || []).forEach((row, idx) => {
+      if (!row || !row.id) {
+        return;
+      }
+      const key = `kartenobjekt:${row.id}`;
+      nodes.push({
+        id: key,
+        position:
+          layout[key] || {
+            x: 1400 + (idx % 4) * 220,
+            y: 900 + Math.floor(idx / 4) * 120,
+          },
+        data: {
+          label: graphKnotenLabel(row, 'kartenobjekt'),
+          kartenIconAnzeige: graphKnotenIconAnzeige(row, 'kartenobjekt'),
+          entityType: 'kartenobjekt',
+          entityId: row.id,
+          payload: row,
+          avatarDataUrl: '',
+          charakterBild: '',
+          initiative: '',
+          statusEmoji: '',
+        },
+        style: { width: 200 },
+      });
+    });
+
     nodes.forEach((node) => {
       if (!(node && node.data && node.data.entityType === 'raetsel')) {
         return;

@@ -1,0 +1,117 @@
+#!/usr/bin/env node
+/**
+ * Scannt `assets/terrain/` nach Bilddateien (nur Top-Level, keine Unterordner)
+ * und schreibt ein Manifest für die Spielmatten-Auswahl.
+ *
+ * Aufruf: ./bin/aktualisiere-terrain-index
+ */
+
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const ROOT_DIR = path.resolve(__dirname, '..');
+const VERZEICHNIS = path.join(ROOT_DIR, 'assets', 'terrain');
+const INDEX_PFAD = path.join(VERZEICHNIS, 'index.json');
+const BILD_ENDUNGEN = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+
+function fehler(text) {
+  console.error(`Fehler: ${text}`);
+  process.exitCode = 1;
+}
+
+function nameAusId(id) {
+  return String(id || '')
+    .split('-')
+    .filter(Boolean)
+    .map((teil) => teil.charAt(0).toUpperCase() + teil.slice(1))
+    .join(' ');
+}
+
+function eintragAusDateiname(dateiname) {
+  const basis = path.basename(dateiname, path.extname(dateiname));
+  const hoch = basis.endsWith('-hochformat');
+  const quer = basis.endsWith('-querformat');
+  if (!hoch && !quer) {
+    return { ok: false, fehler: 'erwartet Suffix -hochformat oder -querformat' };
+  }
+  const id = hoch ? basis.slice(0, -'-hochformat'.length) : basis.slice(0, -'-querformat'.length);
+  if (!id) {
+    return { ok: false, fehler: 'leere Terrain-ID' };
+  }
+  return {
+    ok: true,
+    eintrag: {
+      datei: dateiname,
+      id,
+      name: nameAusId(id),
+      ausrichtung: hoch ? 'portrait' : 'landscape',
+    },
+  };
+}
+
+function alleBildDateien(dir) {
+  const out = [];
+  if (!fs.existsSync(dir)) {
+    return out;
+  }
+  for (const name of fs.readdirSync(dir)) {
+    const voll = path.join(dir, name);
+    if (!fs.statSync(voll).isFile()) {
+      continue;
+    }
+    const ext = path.extname(name).toLowerCase();
+    if (!BILD_ENDUNGEN.has(ext)) {
+      continue;
+    }
+    out.push(name);
+  }
+  return out.sort((a, b) => a.localeCompare(b, 'de'));
+}
+
+function main() {
+  if (!fs.existsSync(VERZEICHNIS) || !fs.statSync(VERZEICHNIS).isDirectory()) {
+    fehler(`Verzeichnis fehlt: ${VERZEICHNIS}`);
+    return;
+  }
+
+  const dateien = alleBildDateien(VERZEICHNIS);
+  const eintraege = [];
+  const warnungen = [];
+  const schluessel = new Set();
+
+  dateien.forEach((dateiname) => {
+    const ergebnis = eintragAusDateiname(dateiname);
+    if (!ergebnis.ok) {
+      warnungen.push(`${dateiname}: ${ergebnis.fehler}. Übersprungen.`);
+      return;
+    }
+    const key = `${ergebnis.eintrag.id}:${ergebnis.eintrag.ausrichtung}`;
+    if (schluessel.has(key)) {
+      warnungen.push(`${dateiname}: doppelter Eintrag „${key}“. Übersprungen.`);
+      return;
+    }
+    schluessel.add(key);
+    eintraege.push(ergebnis.eintrag);
+  });
+
+  eintraege.sort((a, b) => {
+    const nameCmp = a.name.localeCompare(b.name, 'de');
+    if (nameCmp !== 0) {
+      return nameCmp;
+    }
+    return a.ausrichtung.localeCompare(b.ausrichtung, 'de');
+  });
+
+  fs.writeFileSync(INDEX_PFAD, JSON.stringify(eintraege, null, 2) + '\n', 'utf8');
+
+  console.log(`Schrieb ${path.relative(ROOT_DIR, INDEX_PFAD)} mit ${eintraege.length} Einträgen:`);
+  eintraege.forEach((e) => console.log(`  - ${e.datei}: ${e.name} (${e.ausrichtung})`));
+  if (warnungen.length) {
+    console.warn('\nHinweise:');
+    warnungen.forEach((w) => console.warn(`  • ${w}`));
+  }
+}
+
+main();

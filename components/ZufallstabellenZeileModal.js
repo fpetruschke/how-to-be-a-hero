@@ -118,14 +118,14 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
       if (!this.istBearbeitung || !typ) {
         return false;
       }
-      return ['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand'].includes(typ);
+      return ['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand', 'kartenobjekt'].includes(typ);
     },
     kannDuplizieren() {
       const typ = this.anlage && this.anlage.typ;
       return (
         this.istBearbeitung &&
         !!typ &&
-        ['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand'].includes(typ)
+        ['npc', 'ort', 'fraktion', 'pantheon', 'raetsel', 'bestie', 'gegenstand', 'kartenobjekt'].includes(typ)
       );
     },
     entitaetBegabungen() {
@@ -154,7 +154,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
         return false;
       }
       const typ = this.anlage && this.anlage.typ;
-      if (!['npc', 'bestie', 'ort', 'raetsel', 'gegenstand'].includes(typ)) {
+      if (!['npc', 'bestie', 'ort', 'raetsel', 'gegenstand', 'kartenobjekt'].includes(typ)) {
         return false;
       }
       const id = this.anlage && this.anlage.zeile && this.anlage.zeile.id;
@@ -213,7 +213,7 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
     },
     zeigtKartenIconFeld() {
       const typ = this.anlage && this.anlage.typ;
-      return ['ort', 'fraktion', 'raetsel', 'gegenstand'].includes(typ);
+      return ['ort', 'fraktion', 'raetsel', 'gegenstand', 'kartenobjekt'].includes(typ);
     },
     kartenIconModalSuffix() {
       return this.interaktiveWeltBearbeitung ? 'iw' : 'zst';
@@ -1683,6 +1683,30 @@ window.HTBAH_KOMPONENTEN.ZufallstabellenZeileModal = {
             <datalist v-if="orteNamenListe.length" id="wb-zg-ort-datalist">
               <option v-for="ort in orteNamenListe" :key="'wb-zg-ort-' + ort" :value="ort"></option>
             </datalist>
+          </section>
+        </template>
+        <template v-else-if="anlage.typ === 'kartenobjekt'">
+          <section class="htbah-entitaet-bereich">
+            <h6 class="htbah-entitaet-bereich-titel">🧾 Stammdaten</h6>
+            <div class="row g-2">
+              <div class="col-12">
+                <div class="input-group">
+                  <div class="form-floating">
+                    <input class="form-control" v-model="anlage.zeile.name" placeholder=" " />
+                    <label>Name</label>
+                  </div>
+                  <button
+                    v-if="kannInWeltOeffnen"
+                    type="button"
+                    class="btn btn-outline-secondary htbah-input-icon-btn"
+                    title="In interaktiver Welt öffnen"
+                    aria-label="In interaktiver Welt öffnen"
+                    @click="inWeltOeffnen">
+                    🌍
+                  </button>
+                </div>
+              </div>
+            </div>
           </section>
         </template>
         </div>

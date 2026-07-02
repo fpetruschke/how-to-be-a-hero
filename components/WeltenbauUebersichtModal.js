@@ -675,7 +675,8 @@ function htbahStandardZufallEpocheWeltenbau() {
           fraktion: ['fraktion', 'fraktionen', 'faction'],
           bestie: ['bestie', 'bestien', 'monster', 'kreatur', 'kreaturen'],
           raetsel: ['rätsel', 'raetsel', 'puzzle'],
-          gegenstand: ['gegenstand', 'gegenstände', 'gegenstaende', 'item', 'items', 'objekt', 'objekte'],
+          gegenstand: ['gegenstand', 'gegenstände', 'gegenstaende', 'item', 'items'],
+          kartenobjekt: ['kartenobjekt', 'kartenobjekte', 'objekt', 'objekte'],
           charakter: ['charakter', 'charaktere', 'character', 'characters', 'held', 'helden'],
         };
         const passtZuTypSuche = (entityType) => {
@@ -700,6 +701,7 @@ function htbahStandardZufallEpocheWeltenbau() {
             bestie: 'Bestie',
             raetsel: 'Rätsel',
             gegenstand: 'Gegenstand',
+            kartenobjekt: 'Kartenobjekt',
             charakter: 'Charakter',
           };
           treffer.push({
@@ -844,6 +846,9 @@ function htbahStandardZufallEpocheWeltenbau() {
         }
         if (typ === 'gegenstand') {
           return this.zustand.gegenstaende || [];
+        }
+        if (typ === 'kartenobjekt') {
+          return this.zustand.kartenobjekte || [];
         }
         if (typ === 'pantheon') {
           return this.zustand.pantheon || [];
@@ -2420,7 +2425,7 @@ function htbahStandardZufallEpocheWeltenbau() {
               data: {
                 label: graphKnotenLabel(row, prefix),
                 kartenIconAnzeige:
-                  prefix === 'raetsel' || prefix === 'gegenstand'
+                  prefix === 'raetsel' || prefix === 'gegenstand' || prefix === 'kartenobjekt'
                     ? graphKnotenIconAnzeige(row, prefix)
                     : null,
                 entityType: prefix,
@@ -2466,6 +2471,32 @@ function htbahStandardZufallEpocheWeltenbau() {
         pushEnt('bestie', '🦁', this.zustand.bestien, 'aufenthaltsort', 260, true);
         pushEnt('gegenstand', '📦', gegenstaende, 'aufenthaltsort', 460, false);
         pushEnt('raetsel', '🧩', this.zustand.raetsel, 'aufenthaltsort', 660, false);
+        (this.zustand.kartenobjekte || []).forEach((row, idx) => {
+          if (!row || !row.id) {
+            return;
+          }
+          const key = `kartenobjekt:${row.id}`;
+          nodes.push({
+            id: key,
+            type: 'default',
+            position:
+              layout[key] || {
+                x: 1400 + (idx % 4) * 220,
+                y: 900 + Math.floor(idx / 4) * 120,
+              },
+            data: {
+              label: graphKnotenLabel(row, 'kartenobjekt'),
+              kartenIconAnzeige: graphKnotenIconAnzeige(row, 'kartenobjekt'),
+              entityType: 'kartenobjekt',
+              entityId: row.id,
+              payload: row,
+              avatarDataUrl: '',
+              initiative: '',
+              statusEmoji: '',
+            },
+            style: { width: 200 },
+          });
+        });
         nodes.forEach((node) => {
           if (!(node && node.data && node.data.entityType === 'raetsel')) {
             return;
@@ -2597,6 +2628,7 @@ function htbahStandardZufallEpocheWeltenbau() {
           'npc',
           'bestie',
           'gegenstand',
+          'kartenobjekt',
           'raetsel',
         ];
         let zielNode = null;
@@ -2847,7 +2879,7 @@ function htbahStandardZufallEpocheWeltenbau() {
           !!(this.nodeDrag && this.nodeDrag.aktiv && this.map && this.map.dragHoverNodeId && node && node.id === this.map.dragHoverNodeId);
         const istKreisNode = t === 'charakter' || t === 'npc' || t === 'bestie';
         const istKartenIconRechteck =
-          t === 'ort' || t === 'fraktion' || t === 'raetsel' || t === 'gegenstand';
+          t === 'ort' || t === 'fraktion' || t === 'raetsel' || t === 'gegenstand' || t === 'kartenobjekt';
         return {
           'htbah-map-node': true,
           'htbah-map-node-ort': t === 'ort',
@@ -2876,7 +2908,7 @@ function htbahStandardZufallEpocheWeltenbau() {
       },
       istKartenIconRechteckNode(node) {
         const t = node && node.data && node.data.entityType;
-        return t === 'ort' || t === 'fraktion' || t === 'raetsel' || t === 'gegenstand';
+        return t === 'ort' || t === 'fraktion' || t === 'raetsel' || t === 'gegenstand' || t === 'kartenobjekt';
       },
       kartenIconAnzeigeFuerNode(node) {
         if (node && node.data && node.data.kartenIconAnzeige) {
@@ -5393,7 +5425,9 @@ function htbahStandardZufallEpocheWeltenbau() {
                       ? 'bestien'
                       : typ === 'gegenstand'
                         ? 'gegenstaende'
-                        : '';
+                        : typ === 'kartenobjekt'
+                          ? 'kartenobjekte'
+                          : '';
         if (!listeName || !Array.isArray(this.zustand[listeName]) || index >= this.zustand[listeName].length) {
           return false;
         }
@@ -5473,7 +5507,11 @@ function htbahStandardZufallEpocheWeltenbau() {
                 ? this.zustand.pantheon || []
               : typ === 'raetsel'
                   ? this.zustand.raetsel || []
-                  : this.zustand.gegenstaende || [];
+                  : typ === 'gegenstand'
+                    ? this.zustand.gegenstaende || []
+                    : typ === 'kartenobjekt'
+                      ? this.zustand.kartenobjekte || []
+                      : [];
         const index = liste.findIndex((z) => z && z.id === this.detail.entityId);
         if (index < 0) {
           return;
@@ -5650,6 +5688,18 @@ function htbahStandardZufallEpocheWeltenbau() {
           stelleZeileKartenIconSicher(zeile, 'raetsel');
           return zeile;
         }
+        if (typ === 'kartenobjekt') {
+          const zeile = {
+            id: window.HTBAH.neueEntropieId(),
+            name: '',
+            beschreibungHtml: '',
+            medien: [],
+            primaryMediumId: '',
+            kartenIcon: (() => { const api = kartenIconApi(); return api ? api.leeresKartenIcon() : { quelle: '', emoji: '', mediumId: '', eigenDataUrl: '', form: 'eckig' }; })(),
+          };
+          stelleZeileKartenIconSicher(zeile, 'kartenobjekt');
+          return zeile;
+        }
         const zeile = {
           id: window.HTBAH.neueEntropieId(),
           name: '',
@@ -5713,6 +5763,8 @@ function htbahStandardZufallEpocheWeltenbau() {
           this.zustand.raetsel = patchListe(this.zustand.raetsel);
         } else if (typ === 'gegenstand') {
           this.zustand.gegenstaende = patchListe(this.zustand.gegenstaende);
+        } else if (typ === 'kartenobjekt') {
+          this.zustand.kartenobjekte = patchListe(this.zustand.kartenobjekte);
         }
       },
       onKartenIconGeaendert() {
@@ -6936,6 +6988,12 @@ function htbahStandardZufallEpocheWeltenbau() {
           } else {
             this.zustand.gegenstaende = [...(this.zustand.gegenstaende || []), z];
           }
+        } else if (typ === 'kartenobjekt') {
+          if (index >= 0) {
+            this.zustand.kartenobjekte = (this.zustand.kartenobjekte || []).map((row, i) => (i === index ? z : row));
+          } else {
+            this.zustand.kartenobjekte = [...(this.zustand.kartenobjekte || []), z];
+          }
         } else if (typ === 'pantheon') {
           if (index >= 0) {
             this.zustand.pantheon = (this.zustand.pantheon || []).map((row, i) => (i === index ? z : row));
@@ -6979,7 +7037,9 @@ function htbahStandardZufallEpocheWeltenbau() {
                       ? 'raetsel'
                       : typ === 'gegenstand'
                         ? 'gegenstand'
-                        : '';
+                        : typ === 'kartenobjekt'
+                          ? 'kartenobjekt'
+                          : '';
           if (nodeIdPrefix) {
             const nodeId = `${nodeIdPrefix}:${z.id}`;
             const standardGroesse =
@@ -7306,6 +7366,7 @@ function htbahStandardZufallEpocheWeltenbau() {
                   <li><button class="dropdown-item" type="button" @click="starteAnlageFlow('bestie')">Bestie</button></li>
                   <li><button class="dropdown-item" type="button" @click="starteAnlageFlow('raetsel')">Rätsel</button></li>
                   <li><button class="dropdown-item" type="button" @click="starteAnlageFlow('gegenstand')">Gegenstand</button></li>
+                  <li><button class="dropdown-item" type="button" @click="starteAnlageFlow('kartenobjekt')">Kartenobjekt</button></li>
                   <li><button class="dropdown-item" type="button" @click="starteAnlageFlow('bild')">Bild</button></li>
                   <li><hr class="dropdown-divider" /></li>
                   <li><h6 class="dropdown-header">Sonstiges</h6></li>

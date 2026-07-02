@@ -1,0 +1,218 @@
+[
+  {
+    "datei": "ackerland-querformat.jpg",
+    "id": "ackerland",
+    "name": "Ackerland",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "ackerland-hochformat.jpg",
+    "id": "ackerland",
+    "name": "Ackerland",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "asphalt-querformat.jpg",
+    "id": "asphalt",
+    "name": "Asphalt",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "asphalt-hochformat.jpg",
+    "id": "asphalt",
+    "name": "Asphalt",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "dorf-querformat.jpg",
+    "id": "dorf",
+    "name": "Dorf",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "dorf-hochformat.jpg",
+    "id": "dorf",
+    "name": "Dorf",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "eislandschaft-querformat.jpg",
+    "id": "eislandschaft",
+    "name": "Eislandschaft",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "eislandschaft-hochformat.jpg",
+    "id": "eislandschaft",
+    "name": "Eislandschaft",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "flussbett-querformat.jpg",
+    "id": "flussbett",
+    "name": "Flussbett",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "flussbett-hochformat.jpg",
+    "id": "flussbett",
+    "name": "Flussbett",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "fremder-planet-querformat.jpg",
+    "id": "fremder-planet",
+    "name": "Fremder Planet",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "fremder-planet-hochformat.jpg",
+    "id": "fremder-planet",
+    "name": "Fremder Planet",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "gebirge-querformat.jpg",
+    "id": "gebirge",
+    "name": "Gebirge",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "gebirge-hochformat.jpg",
+    "id": "gebirge",
+    "name": "Gebirge",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "hafen-querformat.jpg",
+    "id": "hafen",
+    "name": "Hafen",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "hafen-hochformat.jpg",
+    "id": "hafen",
+    "name": "Hafen",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "hangar-querformat.jpg",
+    "id": "hangar",
+    "name": "Hangar",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "hangar-hochformat.jpg",
+    "id": "hangar",
+    "name": "Hangar",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "holzboden-querformat.jpg",
+    "id": "holzboden",
+    "name": "Holzboden",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "holzboden-hochformat.jpg",
+    "id": "holzboden",
+    "name": "Holzboden",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "kopfsteinpflaster-dunkel-querformat.jpg",
+    "id": "kopfsteinpflaster-dunkel",
+    "name": "Kopfsteinpflaster Dunkel",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "kopfsteinpflaster-dunkel-hochformat.jpg",
+    "id": "kopfsteinpflaster-dunkel",
+    "name": "Kopfsteinpflaster Dunkel",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "kopfsteinpflaster-hell-querformat.jpg",
+    "id": "kopfsteinpflaster-hell",
+    "name": "Kopfsteinpflaster Hell",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "kopfsteinpflaster-hell-hochformat.jpg",
+    "id": "kopfsteinpflaster-hell",
+    "name": "Kopfsteinpflaster Hell",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "schneelandschaft-querformat.jpg",
+    "id": "schneelandschaft",
+    "name": "Schneelandschaft",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "schneelandschaft-hochformat.jpg",
+    "id": "schneelandschaft",
+    "name": "Schneelandschaft",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "waldboden-querformat.jpg",
+    "id": "waldboden",
+    "name": "Waldboden",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "waldboden-hochformat.jpg",
+    "id": "waldboden",
+    "name": "Waldboden",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "wasser-querformat.jpg",
+    "id": "wasser",
+    "name": "Wasser",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "wasser-hochformat.jpg",
+    "id": "wasser",
+    "name": "Wasser",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "weltraum-querformat.jpg",
+    "id": "weltraum",
+    "name": "Weltraum",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "weltraum-hochformat.jpg",
+    "id": "weltraum",
+    "name": "Weltraum",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "wiese-querformat.jpg",
+    "id": "wiese",
+    "name": "Wiese",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "wiese-hochformat.jpg",
+    "id": "wiese",
+    "name": "Wiese",
+    "ausrichtung": "portrait"
+  },
+  {
+    "datei": "wueste-querformat.jpg",
+    "id": "wueste",
+    "name": "Wueste",
+    "ausrichtung": "landscape"
+  },
+  {
+    "datei": "wueste-hochformat.jpg",
+    "id": "wueste",
+    "name": "Wueste",
+    "ausrichtung": "portrait"
+  }
+]

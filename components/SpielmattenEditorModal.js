@@ -23,6 +23,63 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
     });
   }
 
+  const TERRAIN_BASIS_PFAD = 'assets/terrain';
+  let _terrainIndexCache = null;
+  let _terrainIndexLadePromise = null;
+
+  function terrainAssetUrl(relativ) {
+    const teil = String(relativ || '').replace(/^\/+/, '');
+    if (window.HTBAH && typeof window.HTBAH.ermittleAssetUrl === 'function') {
+      return window.HTBAH.ermittleAssetUrl(`${TERRAIN_BASIS_PFAD}/${teil}`);
+    }
+    return `${TERRAIN_BASIS_PFAD}/${teil}`;
+  }
+
+  async function ladeTerrainIndex() {
+    if (_terrainIndexCache) {
+      return _terrainIndexCache;
+    }
+    if (_terrainIndexLadePromise) {
+      return _terrainIndexLadePromise;
+    }
+    _terrainIndexLadePromise = (async () => {
+      try {
+        const res = await fetch(terrainAssetUrl('index.json'), { cache: 'no-cache' });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const json = await res.json();
+        _terrainIndexCache = Array.isArray(json) ? json : [];
+        return _terrainIndexCache;
+      } catch (err) {
+        console.warn('Terrain-Index konnte nicht geladen werden:', err);
+        _terrainIndexCache = [];
+        return _terrainIndexCache;
+      } finally {
+        _terrainIndexLadePromise = null;
+      }
+    })();
+    return _terrainIndexLadePromise;
+  }
+
+  async function ladeTerrainBildAlsDataUrl(datei) {
+    const rel = typeof datei === 'string' ? datei.trim() : '';
+    if (!rel) {
+      return '';
+    }
+    const res = await fetch(terrainAssetUrl(rel), { cache: 'no-cache' });
+    if (!res.ok) {
+      throw new Error(`Terrain-Bild konnte nicht geladen werden (HTTP ${res.status}).`);
+    }
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = () => reject(new Error('Terrain-Bild konnte nicht gelesen werden.'));
+      reader.readAsDataURL(blob);
+    });
+  }
+
   window.HTBAH_KOMPONENTEN.SpielmattenEditorModal = {
     name: 'SpielmattenEditorModal',
     components: {
@@ -37,11 +94,20 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         statusText: '',
         format,
         ausrichtung: 'portrait',
-        gridLinienbreiteMm: 0.8,
+        gridLinienbreiteMm: 0.3,
         gridFarbe: '#d9d9d9',
+        gridAktiv: true,
         hintergrundModus: 'farbe',
         hintergrundFarbe: '#ffffff',
         hintergrundBildDataUrl: '',
+        hintergrundBildQuelle: '',
+        hintergrundTerrainDatei: '',
+        hintergrundBildDateiname: '',
+        hintergrundBildMitRasterAbschliessen: true,
+        terrainKatalog: [],
+        terrainLaedt: false,
+        gridOverlayFarbe: '#ffffff',
+        gridOverlayTransparenzProzent: 10,
         randModus: 'auto',
         randObenMm: 0,
         randUntenMm: 0,
@@ -160,6 +226,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           Number(this.effektiveRasterkanteMm) > 0
         );
       },
+      terrainOptionen() {
+        const zielAusrichtung = this.ausrichtung === 'landscape' ? 'landscape' : 'portrait';
+        return (Array.isArray(this.terrainKatalog) ? this.terrainKatalog : [])
+          .filter((eintrag) => eintrag && eintrag.ausrichtung === zielAusrichtung)
+          .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'de'));
+      },
+      zeigtRasterOverlayEinstellungen() {
+        return this.hintergrundModus === 'farbe' || this.hintergrundModus === 'bild';
+      },
     },
     watch: {
       format() {
@@ -168,6 +243,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       ausrichtung() {
         this.aktualisiereZulaessigeRasterkanten();
+        this.passeTerrainAnAusrichtungAn();
         this.verwerfePdfVorschau();
       },
       randModus() {
@@ -205,10 +281,34 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       gridFarbe() {
         this.verwerfePdfVorschau();
       },
+      gridAktiv() {
+        this.verwerfePdfVorschau();
+      },
       hintergrundFarbe() {
         this.verwerfePdfVorschau();
       },
       hintergrundBildDataUrl() {
+        this.verwerfePdfVorschau();
+      },
+      gridOverlayFarbe() {
+        this.verwerfePdfVorschau();
+      },
+      gridOverlayTransparenzProzent() {
+        this.verwerfePdfVorschau();
+      },
+      hintergrundBildMitRasterAbschliessen() {
+        this.verwerfePdfVorschau();
+      },
+      hintergrundModus(neu, alt) {
+        if (neu === alt) {
+          return;
+        }
+        if (neu !== 'bild') {
+          this.hintergrundBildDataUrl = '';
+          this.hintergrundBildQuelle = '';
+          this.hintergrundTerrainDatei = '';
+          this.hintergrundBildDateiname = '';
+        }
         this.verwerfePdfVorschau();
       },
     },
@@ -222,19 +322,27 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.hintergrundModus = 'farbe';
         this.hintergrundFarbe = '#ffffff';
         this.hintergrundBildDataUrl = '';
+        this.hintergrundBildQuelle = '';
+        this.hintergrundTerrainDatei = '';
+        this.hintergrundBildDateiname = '';
+        this.hintergrundBildMitRasterAbschliessen = true;
+        this.gridOverlayFarbe = '#ffffff';
+        this.gridOverlayTransparenzProzent = 10;
         this.randModus = 'auto';
         this.randObenMm = 0;
         this.randUntenMm = 0;
         this.randLinksMm = 0;
         this.randRechtsMm = 0;
-        this.gridLinienbreiteMm = 0.8;
+        this.gridLinienbreiteMm = 0.3;
         this.gridFarbe = '#d9d9d9';
+        this.gridAktiv = true;
         this.keineAbgeschnittenenQuadrate = true;
         this.rasterAuswahl = 'frei';
         this.freieRasterkanteMm = 10;
         this.offen = true;
         this.statusText = '';
         this.aktualisiereZulaessigeRasterkanten();
+        this.ladeTerrainKatalog();
       },
       schliessen() {
         this.pdfVorschauOffen = false;
@@ -255,10 +363,15 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         return {
           format: this.format,
           ausrichtung: this.ausrichtung,
+          hintergrundModus: modus,
           gridLinienbreiteMm: this.gridLinienbreiteMm,
           gridFarbe: this.gridFarbe,
+          gridAktiv: this.gridAktiv !== false,
+          gridOverlayFarbe: this.gridOverlayFarbe,
+          gridOverlayTransparenzProzent: Number(this.gridOverlayTransparenzProzent),
           hintergrundFarbe,
           hintergrundBildDataUrl,
+          hintergrundBildMitRasterAbschliessen: this.hintergrundBildMitRasterAbschliessen !== false,
           randModus: this.randModus,
           randObenMm: Number(this.randObenMm),
           randUntenMm: Number(this.randUntenMm),
@@ -327,6 +440,53 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.revokePdfBlobUrl();
         this.pdfDateiname = '';
       },
+      async ladeTerrainKatalog() {
+        this.terrainLaedt = true;
+        try {
+          this.terrainKatalog = await ladeTerrainIndex();
+        } catch {
+          this.terrainKatalog = [];
+        } finally {
+          this.terrainLaedt = false;
+        }
+      },
+      passeTerrainAnAusrichtungAn() {
+        if (this.hintergrundBildQuelle !== 'terrain' || !this.hintergrundTerrainDatei) {
+          return;
+        }
+        const passt = this.terrainOptionen.some((eintrag) => eintrag.datei === this.hintergrundTerrainDatei);
+        if (!passt) {
+          this.hintergrundBildDataUrl = '';
+          this.hintergrundBildQuelle = '';
+          this.hintergrundTerrainDatei = '';
+          this.hintergrundBildDateiname = '';
+        }
+      },
+      async onTerrainGewaehlt() {
+        const datei = typeof this.hintergrundTerrainDatei === 'string' ? this.hintergrundTerrainDatei.trim() : '';
+        if (!datei) {
+          this.hintergrundBildDataUrl = '';
+          this.hintergrundBildQuelle = '';
+          this.hintergrundBildDateiname = '';
+          return;
+        }
+        this.laedt = true;
+        this.statusText = '';
+        try {
+          this.hintergrundBildDataUrl = await ladeTerrainBildAlsDataUrl(datei);
+          this.hintergrundBildQuelle = 'terrain';
+          const eintrag = this.terrainOptionen.find((e) => e.datei === datei);
+          this.hintergrundBildDateiname = eintrag && eintrag.name ? eintrag.name : datei;
+        } catch (error) {
+          this.hintergrundBildDataUrl = '';
+          this.hintergrundBildQuelle = '';
+          this.hintergrundTerrainDatei = '';
+          this.hintergrundBildDateiname = '';
+          this.statusText = error && error.message ? error.message : 'Terrain-Bild konnte nicht geladen werden.';
+        } finally {
+          this.laedt = false;
+        }
+      },
       async onHintergrundBildGewaehlt(evt) {
         const datei = evt && evt.target && evt.target.files && evt.target.files[0] ? evt.target.files[0] : null;
         if (!datei) {
@@ -334,6 +494,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         }
         try {
           this.hintergrundBildDataUrl = await leseDateiAlsDataUrl(datei);
+          this.hintergrundBildQuelle = 'upload';
+          this.hintergrundTerrainDatei = '';
+          this.hintergrundBildDateiname = datei.name || 'Eigenes Bild';
         } catch (error) {
           this.statusText = error && error.message ? error.message : 'Hintergrundbild konnte nicht geladen werden.';
         } finally {
@@ -342,6 +505,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       hintergrundBildEntfernen() {
         this.hintergrundBildDataUrl = '';
+        this.hintergrundBildQuelle = '';
+        this.hintergrundTerrainDatei = '';
+        this.hintergrundBildDateiname = '';
       },
       async pngExportieren() {
         if (!EXPORT_API || typeof EXPORT_API.erzeugeSpielmattenPng !== 'function' || !this.kannExportieren) {
@@ -459,17 +625,90 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                       <div v-if="hintergrundModus === 'farbe'" class="d-flex gap-2">
                         <input v-model="hintergrundFarbe" class="form-control form-control-color form-control-sm" type="color" />
                       </div>
+                      <div v-else-if="hintergrundModus === 'bild'" class="d-flex flex-column gap-2">
+                        <div class="small text-body-secondary">
+                          Wähle ein Gelände aus der Bibliothek oder lade ein eigenes Bild hoch.
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                          <select
+                            v-model="hintergrundTerrainDatei"
+                            class="form-select form-select-sm htbah-spielmatten-terrain-select"
+                            :disabled="terrainLaedt || laedt"
+                            aria-label="Gelände aus Bibliothek"
+                            @change="onTerrainGewaehlt">
+                            <option value="">— Gelände auswählen —</option>
+                            <option v-for="terrain in terrainOptionen" :key="terrain.datei" :value="terrain.datei">
+                              {{ terrain.name }}
+                            </option>
+                          </select>
+                          <button type="button" class="btn btn-outline-secondary btn-sm" :disabled="laedt" @click="$refs.bgInput.click()">
+                            Eigenes Bild hochladen
+                          </button>
+                          <button
+                            v-if="hintergrundBildDataUrl"
+                            type="button"
+                            class="btn btn-outline-danger btn-sm"
+                            :disabled="laedt"
+                            @click="hintergrundBildEntfernen">
+                            Bild entfernen
+                          </button>
+                        </div>
+                        <div v-if="terrainLaedt" class="small text-body-secondary">Gelände-Bibliothek wird geladen …</div>
+                        <div v-else-if="!terrainOptionen.length" class="small text-body-secondary">
+                          Keine Gelände-Bilder für diese Ausrichtung verfügbar.
+                        </div>
+                        <div v-if="hintergrundBildDataUrl" class="small text-body-secondary">
+                          Aktiv:
+                          <span v-if="hintergrundBildQuelle === 'terrain'">Bibliothek — {{ hintergrundBildDateiname }}</span>
+                          <span v-else-if="hintergrundBildQuelle === 'upload'">Eigenes Bild — {{ hintergrundBildDateiname }}</span>
+                          <span v-else>Bild geladen</span>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                          <input
+                            id="spielmatten-bild-mit-raster"
+                            v-model="hintergrundBildMitRasterAbschliessen"
+                            class="form-check-input"
+                            type="checkbox"
+                            role="switch" />
+                          <label class="form-check-label small" for="spielmatten-bild-mit-raster">
+                            Hintergrundbild mit Raster abschließen lassen
+                          </label>
+                        </div>
+                        <div class="small text-body-secondary">
+                          Das Bild wird auf die Rasterfläche beschnitten — außerhalb bleibt der Rand leer bzw. transparent.
+                        </div>
+                      </div>
                       <div v-else class="d-flex flex-wrap gap-2">
-                        <template v-if="hintergrundModus === 'bild'">
-                          <button type="button" class="btn btn-outline-secondary btn-sm" @click="$refs.bgInput.click()">Bild wählen</button>
-                          <button v-if="hintergrundBildDataUrl" type="button" class="btn btn-outline-danger btn-sm" @click="hintergrundBildEntfernen">Bild entfernen</button>
-                          <span v-if="hintergrundBildDataUrl" class="small text-body-secondary align-self-center">Bild geladen</span>
-                        </template>
-                        <template v-else>
-                          <span class="small text-body-secondary align-self-center">Transparenter Hintergrund aktiv</span>
-                        </template>
+                        <span class="small text-body-secondary align-self-center">Transparenter Hintergrund aktiv</span>
                       </div>
                       <input ref="bgInput" type="file" class="d-none" accept="image/*" @change="onHintergrundBildGewaehlt" />
+                    </div>
+                    <div v-if="zeigtRasterOverlayEinstellungen" class="col-12">
+                      <div class="pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Raster-Abdeckung</div>
+                        <div class="small text-body-secondary mb-2">
+                          Halbtransparente Ebene zwischen Hintergrund und Raster — damit das Grid besser sichtbar bleibt.
+                        </div>
+                        <div class="row g-2 align-items-end">
+                          <div class="col-6 col-md-auto">
+                            <label class="form-label small mb-1">Farbe</label>
+                            <input v-model="gridOverlayFarbe" class="form-control form-control-color form-control-sm htbah-spielmatten-grid-farbe" type="color" />
+                          </div>
+                          <div class="col-12 col-md">
+                            <label class="form-label small mb-1" for="spielmatten-overlay-transparenz">
+                              Deckkraft {{ gridOverlayTransparenzProzent }} %
+                            </label>
+                            <input
+                              id="spielmatten-overlay-transparenz"
+                              v-model.number="gridOverlayTransparenzProzent"
+                              class="form-range"
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="1" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     <div class="col-12">
                       <label class="form-label small mb-1 d-block">Rand</label>
@@ -525,8 +764,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 </div>
               </div>
               <div class="card p-0 htbah-spielmatten-sektion shadow-sm">
-                <div class="card-header py-2">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2">
                   <h6 class="mb-0 small fw-semibold">Grid</h6>
+                  <div class="form-check form-switch mb-0 htbah-spielmatten-grid-switch">
+                    <input
+                      id="spielmatten-grid-aktiv"
+                      v-model="gridAktiv"
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      aria-label="Grid ein oder aus" />
+                    <label class="form-check-label small" for="spielmatten-grid-aktiv">Ein/Aus</label>
+                  </div>
                 </div>
                 <div class="card-body py-2">
                   <div class="row g-2 align-items-end htbah-spielmatten-grid-zeile">

@@ -12,6 +12,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     raetsel: { label: 'Rätsel', emoji: '🧩' },
     bestie: { label: 'Bestie', emoji: '🦁' },
     gegenstand: { label: 'Gegenstand', emoji: '📦' },
+    kartenobjekt: { label: 'Kartenobjekt', emoji: '🌳' },
     charakter: { label: 'Charakter', emoji: '🧙' },
   };
 
@@ -421,6 +422,11 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         plain('Name', z.name),
         plain('Art', gegenstandKategorieLabel(z.kategorie, z.istWaffe)),
         plain('Aufenthaltsort', z.aufenthaltsort),
+        rich('Beschreibung', z.beschreibungHtml),
+      ];
+    } else if (typ === 'kartenobjekt') {
+      felder = [
+        plain('Name', z.name),
         rich('Beschreibung', z.beschreibungHtml),
       ];
     } else if (typ === 'pantheon') {

@@ -183,6 +183,7 @@ const ZTF_KAMPAGNE_KATEGORIEN = [
   { schluessel: 'gegenstaende', label: 'Gegenstände' },
   { schluessel: 'raetsel', label: 'Rätsel' },
   { schluessel: 'pantheon', label: 'Pantheon' },
+  { schluessel: 'kartenobjekte', label: 'Kartenobjekte' },
 ];
 
 const WUERFELBECHER_KEYS = [

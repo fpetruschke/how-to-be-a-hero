@@ -159,9 +159,21 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       nameFontSizePx: 0,
       kategorieShapes: {},
       entityShapes: {},
+      entityBorders: {},
+      entityShowNames: {},
+      entityCounts: {},
+      effectCounts: {},
     };
     if (!roh || typeof roh !== 'object') {
-      return { ...basis, kategorieShapes: {}, entityShapes: {} };
+      return {
+        ...basis,
+        kategorieShapes: {},
+        entityShapes: {},
+        entityBorders: {},
+        entityShowNames: {},
+        entityCounts: {},
+        effectCounts: {},
+      };
     }
     const shapeRaw = String(roh.defaultShape || '').trim();
     const defaultShape = shapeRaw === 'quadrat' ? 'quadrat' : 'kreis';
@@ -180,6 +192,52 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         const s = String(roh.entityShapes[key] || '').trim();
         if (s === 'kreis' || s === 'quadrat') {
           entityShapes[key] = s;
+        }
+      });
+    }
+    const entityBorders = {};
+    if (roh.entityBorders && typeof roh.entityBorders === 'object') {
+      Object.keys(roh.entityBorders).forEach((key) => {
+        const v = roh.entityBorders[key];
+        if (v === true || v === false) {
+          entityBorders[key] = v;
+          return;
+        }
+        if (v && typeof v === 'object') {
+          const entry = {};
+          if (typeof v.color === 'string' && v.color.trim()) {
+            entry.color = normalisiereHexFarbe(v.color, basis.borderColor);
+          }
+          if (Number.isFinite(Number(v.widthPx))) {
+            entry.widthPx = Math.min(24, Math.max(0, Math.round(Number(v.widthPx))));
+          }
+          if (Object.keys(entry).length) {
+            entityBorders[key] = entry;
+          }
+        }
+      });
+    }
+    const entityShowNames = {};
+    if (roh.entityShowNames && typeof roh.entityShowNames === 'object') {
+      Object.keys(roh.entityShowNames).forEach((key) => {
+        entityShowNames[key] = Boolean(roh.entityShowNames[key]);
+      });
+    }
+    const entityCounts = {};
+    if (roh.entityCounts && typeof roh.entityCounts === 'object') {
+      Object.keys(roh.entityCounts).forEach((key) => {
+        const n = Number(roh.entityCounts[key]);
+        if (Number.isFinite(n)) {
+          entityCounts[key] = Math.min(99, Math.max(0, Math.round(n)));
+        }
+      });
+    }
+    const effectCounts = {};
+    if (roh.effectCounts && typeof roh.effectCounts === 'object') {
+      Object.keys(roh.effectCounts).forEach((key) => {
+        const n = Number(roh.effectCounts[key]);
+        if (Number.isFinite(n)) {
+          effectCounts[key] = Math.min(99, Math.max(0, Math.round(n)));
         }
       });
     }
@@ -205,10 +263,14 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       includeEffects: roh.includeEffects !== undefined ? Boolean(roh.includeEffects) : basis.includeEffects,
       showEffectNames: roh.showEffectNames !== undefined ? Boolean(roh.showEffectNames) : basis.showEffectNames,
       nameFontSizePx: Number.isFinite(Number(roh.nameFontSizePx))
-        ? Math.min(28, Math.max(0, Math.round(Number(roh.nameFontSizePx))))
+        ? Math.min(64, Math.max(0, Math.round(Number(roh.nameFontSizePx))))
         : basis.nameFontSizePx,
       kategorieShapes,
       entityShapes,
+      entityBorders,
+      entityShowNames,
+      entityCounts,
+      effectCounts,
     };
   }
 

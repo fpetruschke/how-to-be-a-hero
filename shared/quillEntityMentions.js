@@ -9,6 +9,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     ort: 2,
     fraktion: 3,
     gegenstand: 4,
+    kartenobjekt: 4,
     bestie: 5,
     raetsel: 6,
     pantheon: 7,
@@ -18,7 +19,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     npc: ['npc', 'npcs'],
     ort: ['ort', 'orte', 'location', 'locations'],
     fraktion: ['fraktion', 'fraktionen', 'faction', 'factions'],
-    gegenstand: ['gegenstand', 'gegenstaende', 'gegenstände', 'item', 'items', 'objekt', 'objekte'],
+    gegenstand: ['gegenstand', 'gegenstaende', 'gegenstände', 'item', 'items'],
+    kartenobjekt: ['kartenobjekt', 'kartenobjekte', 'objekt', 'objekte'],
     bestie: ['bestie', 'bestien', 'monster', 'kreatur', 'kreaturen'],
     raetsel: ['rätsel', 'raetsel', 'puzzle', 'puzzles'],
     pantheon: ['pantheon', 'gottheit', 'gottheiten', 'gott', 'goetter', 'götter'],
@@ -214,6 +216,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     (z.raetsel || []).forEach((row) => pushEntity(result, query, 'raetsel', row, 'titel'));
     (z.bestien || []).forEach((row) => pushEntity(result, query, 'bestie', row, 'name'));
     (z.gegenstaende || []).forEach((row) => pushEntity(result, query, 'gegenstand', row, 'name'));
+    (z.kartenobjekte || []).forEach((row) => pushEntity(result, query, 'kartenobjekt', row, 'name'));
 
     const sl = window.HTBAH && typeof window.HTBAH.ladeSpielleitungZustand === 'function'
       ? window.HTBAH.ladeSpielleitungZustand()

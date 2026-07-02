@@ -6,7 +6,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 (function (SHARED) {
   'use strict';
 
-  const KARTEN_ICON_ENTITY_TYPEN = ['ort', 'fraktion', 'raetsel', 'gegenstand'];
+  const KARTEN_ICON_ENTITY_TYPEN = ['ort', 'fraktion', 'raetsel', 'gegenstand', 'kartenobjekt'];
 
   const DEFAULT_EMOJI = Object.freeze({
     npc: '👤',
@@ -15,6 +15,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     raetsel: '🧩',
     bestie: '🦁',
     gegenstand: '📦',
+    kartenobjekt: '🌳',
     pantheon: '✨',
     charakter: '🧙',
   });

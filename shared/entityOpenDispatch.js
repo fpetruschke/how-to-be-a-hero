@@ -9,6 +9,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     'raetsel',
     'bestie',
     'gegenstand',
+    'kartenobjekt',
   ]);
 
   function kampagnenTabAusRoute(route) {
