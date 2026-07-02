@@ -66,27 +66,144 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return Math.max(0, Math.round(rand / MM_SCHRITT) * MM_SCHRITT);
   }
 
-  function rasterTeilerDaten(formatRaw, randRaw, ausrichtungRaw) {
+  function normalisiereRandModus(modusRaw) {
+    const modus = typeof modusRaw === 'string' ? modusRaw.trim().toLowerCase() : '';
+    if (modus === 'kein' || modus === 'manuell') {
+      return modus;
+    }
+    return 'auto';
+  }
+
+  function raenderAusEinstellungen(einstellungenRaw) {
+    const einstellungen = einstellungenRaw && typeof einstellungenRaw === 'object' ? einstellungenRaw : {};
+    if (
+      einstellungen.randObenMm != null ||
+      einstellungen.randUntenMm != null ||
+      einstellungen.randLinksMm != null ||
+      einstellungen.randRechtsMm != null
+    ) {
+      return {
+        oben: normalisiereRandMm(einstellungen.randObenMm),
+        unten: normalisiereRandMm(einstellungen.randUntenMm),
+        links: normalisiereRandMm(einstellungen.randLinksMm),
+        rechts: normalisiereRandMm(einstellungen.randRechtsMm),
+      };
+    }
+    const einheitlich = normalisiereRandMm(einstellungen.seitenRandMm);
+    return { oben: einheitlich, unten: einheitlich, links: einheitlich, rechts: einheitlich };
+  }
+
+  function verteileRestGleichmaessigMm(gesamtMm, inhaltMm) {
+    const rest = Math.max(0, gesamtMm - inhaltMm);
+    const start = normalisiereRandMm(rest / 2);
+    const ende = normalisiereRandMm(rest - start);
+    return { start, ende };
+  }
+
+  function berechneRasterInhaltMm(breiteMm, hoeheMm, rasterkanteMm, linieMm, keineAbgeschnittenen) {
+    const rasterMm = Math.max(MM_SCHRITT, Number(rasterkanteMm) || MM_SCHRITT);
+    const linie = Math.max(0.1, Number(linieMm) || 0.1);
+    const nutzBreite = Math.max(0, Number(breiteMm) || 0);
+    const nutzHoehe = Math.max(0, Number(hoeheMm) || 0);
+    if (!Number.isFinite(nutzBreite) || !Number.isFinite(nutzHoehe) || nutzBreite <= 0 || nutzHoehe <= 0) {
+      return { spalten: 0, zeilen: 0, breiteMm: 0, hoeheMm: 0 };
+    }
+    let spalten = 0;
+    let zeilen = 0;
+    if (keineAbgeschnittenen !== false) {
+      spalten = Math.max(0, Math.floor((nutzBreite - linie) / rasterMm));
+      zeilen = Math.max(0, Math.floor((nutzHoehe - linie) / rasterMm));
+    } else {
+      spalten = Math.max(1, Math.ceil(nutzBreite / rasterMm));
+      zeilen = Math.max(1, Math.ceil(nutzHoehe / rasterMm));
+    }
+    const breite = keineAbgeschnittenen !== false
+      ? Math.max(0, spalten * rasterMm + linie)
+      : Math.min(nutzBreite, spalten * rasterMm);
+    const hoehe = keineAbgeschnittenen !== false
+      ? Math.max(0, zeilen * rasterMm + linie)
+      : Math.min(nutzHoehe, zeilen * rasterMm);
+    return { spalten, zeilen, breiteMm: breite, hoeheMm: hoehe };
+  }
+
+  function berechneRaenderMm(einstellungenRaw) {
+    const einstellungen = einstellungenRaw && typeof einstellungenRaw === 'object' ? einstellungenRaw : {};
+    const orient = formatAbmessungenMm(einstellungen.format, einstellungen.ausrichtung);
+    const modus = normalisiereRandModus(einstellungen.randModus);
+    const keineAbgeschnittenen = einstellungen.keineAbgeschnittenenQuadrate !== false;
+    if (modus === 'kein') {
+      return { oben: 0, unten: 0, links: 0, rechts: 0, modus };
+    }
+    if (modus === 'manuell') {
+      return { ...raenderAusEinstellungen(einstellungen), modus };
+    }
+    if (!keineAbgeschnittenen) {
+      return { oben: 0, unten: 0, links: 0, rechts: 0, modus };
+    }
+    const rasterkanteMm = Number.isFinite(Number(einstellungen.rasterkanteMm))
+      ? Math.max(MM_SCHRITT, Number(einstellungen.rasterkanteMm))
+      : 5;
+    const linieMm = Number.isFinite(Number(einstellungen.gridLinienbreiteMm))
+      ? Math.max(0.1, Number(einstellungen.gridLinienbreiteMm))
+      : 0.5;
+    const raster = berechneRasterInhaltMm(
+      orient.widthMm,
+      orient.heightMm,
+      rasterkanteMm,
+      linieMm,
+      true,
+    );
+    const horizontal = verteileRestGleichmaessigMm(orient.widthMm, raster.breiteMm);
+    const vertikal = verteileRestGleichmaessigMm(orient.heightMm, raster.hoeheMm);
+    return {
+      oben: normalisiereRandMm(vertikal.start),
+      unten: normalisiereRandMm(vertikal.ende),
+      links: normalisiereRandMm(horizontal.start),
+      rechts: normalisiereRandMm(horizontal.ende),
+      modus,
+    };
+  }
+
+  function rasterTeilerDaten(formatRaw, randOptionen, ausrichtungRaw) {
     const abmessungen = formatAbmessungenMm(formatRaw, ausrichtungRaw);
-    const randMm = normalisiereRandMm(randRaw);
+    let raender;
+    if (randOptionen && typeof randOptionen === 'object' && !Number.isFinite(Number(randOptionen))) {
+      raender = raenderAusEinstellungen(randOptionen);
+    } else {
+      const randMm = normalisiereRandMm(randOptionen);
+      raender = { oben: randMm, unten: randMm, links: randMm, rechts: randMm };
+    }
     const widthZehntel = Math.round(abmessungen.widthMm / MM_SCHRITT);
     const heightZehntel = Math.round(abmessungen.heightMm / MM_SCHRITT);
-    const randZehntel = Math.round(randMm / MM_SCHRITT);
-    const innenW = widthZehntel - randZehntel * 2;
-    const innenH = heightZehntel - randZehntel * 2;
+    const randLinksZehntel = Math.round(raender.links / MM_SCHRITT);
+    const randRechtsZehntel = Math.round(raender.rechts / MM_SCHRITT);
+    const randObenZehntel = Math.round(raender.oben / MM_SCHRITT);
+    const randUntenZehntel = Math.round(raender.unten / MM_SCHRITT);
+    const innenW = widthZehntel - randLinksZehntel - randRechtsZehntel;
+    const innenH = heightZehntel - randObenZehntel - randUntenZehntel;
     return {
       format: abmessungen.format,
       widthMm: abmessungen.widthMm,
       heightMm: abmessungen.heightMm,
-      randMm,
+      raender,
       innenW,
       innenH,
     };
   }
 
   function listValidSquareSizesMm(formatRaw, optionen) {
-    const basis = rasterTeilerDaten(formatRaw, optionen && optionen.randMm, optionen && optionen.ausrichtung);
     const opts = optionen && typeof optionen === 'object' ? optionen : {};
+    const modus = normalisiereRandModus(opts.randModus);
+    const randOptionen = modus === 'manuell'
+      ? {
+        randObenMm: opts.randObenMm,
+        randUntenMm: opts.randUntenMm,
+        randLinksMm: opts.randLinksMm,
+        randRechtsMm: opts.randRechtsMm,
+        seitenRandMm: opts.randMm,
+      }
+      : 0;
+    const basis = rasterTeilerDaten(formatRaw, randOptionen, opts.ausrichtung);
     const minMm = Number.isFinite(Number(opts.minMm)) ? Math.max(MM_SCHRITT, Number(opts.minMm)) : 2;
     const maxMm = Number.isFinite(Number(opts.maxMm))
       ? Math.max(minMm, Number(opts.maxMm))
@@ -183,12 +300,10 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       : 5;
     const widthMm = orient.widthMm;
     const heightMm = orient.heightMm;
-    const randMm = normalisiereRandMm(einstellungen.seitenRandMm);
-    const widthZehntel = Math.round(widthMm / MM_SCHRITT);
-    const heightZehntel = Math.round(heightMm / MM_SCHRITT);
-    const randZehntel = Math.round(randMm / MM_SCHRITT);
-    const innenW = widthZehntel - randZehntel * 2;
-    const innenH = heightZehntel - randZehntel * 2;
+    const raender = berechneRaenderMm(einstellungen);
+    const teiler = rasterTeilerDaten(format, raender, orient.ausrichtung);
+    const innenW = teiler.innenW;
+    const innenH = teiler.innenH;
     const rasterZehntel = Math.round(rasterkanteMm / MM_SCHRITT);
     if (rasterZehntel <= 0 || innenW <= 0 || innenH <= 0) {
       throw new Error('Ungültige Rasterkante für dieses Format.');
@@ -203,10 +318,13 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       throw new Error('Canvas-Kontext konnte nicht erstellt werden.');
     }
     await canvasMitHintergrundFuellen(ctx, canvas, einstellungen);
-    const randPx = mmZuPx(randMm, dpi);
+    const randLinksPx = mmZuPx(raender.links, dpi);
+    const randRechtsPx = mmZuPx(raender.rechts, dpi);
+    const randObenPx = mmZuPx(raender.oben, dpi);
+    const randUntenPx = mmZuPx(raender.unten, dpi);
     const rasterCanvas = document.createElement('canvas');
-    rasterCanvas.width = Math.max(1, canvas.width - randPx * 2);
-    rasterCanvas.height = Math.max(1, canvas.height - randPx * 2);
+    rasterCanvas.width = Math.max(1, canvas.width - randLinksPx - randRechtsPx);
+    rasterCanvas.height = Math.max(1, canvas.height - randObenPx - randUntenPx);
     const rasterCtx = rasterCanvas.getContext('2d');
     if (!rasterCtx) {
       throw new Error('Canvas-Kontext konnte nicht erstellt werden.');
@@ -230,8 +348,18 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       dpi,
       keineAbgeschnittenen,
     );
-    ctx.drawImage(rasterCanvas, randPx, randPx);
-    return { canvas, format, widthMm, heightMm, cols, rows, rasterkanteMm, randMm, ausrichtung: orient.ausrichtung };
+    ctx.drawImage(rasterCanvas, randLinksPx, randObenPx);
+    return {
+      canvas,
+      format,
+      widthMm,
+      heightMm,
+      cols,
+      rows,
+      rasterkanteMm,
+      raender,
+      ausrichtung: orient.ausrichtung,
+    };
   }
 
   function canvasZuPngBlob(canvas) {
@@ -285,6 +413,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     DEFAULT_DPI,
     normalisiereDinFormat,
     formatiereMm,
+    berechneRaenderMm,
+    berechneRasterInhaltMm,
     listValidSquareSizesMm,
     renderSpielmatteCanvas,
     erzeugeSpielmattenPng,

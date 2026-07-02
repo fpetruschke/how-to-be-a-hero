@@ -49,6 +49,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         pdfDateiname: '',
         pdfVorschauOffen: false,
         effektRahmenSichtbar: false,
+        entitaetenGruppenOffen: {},
       };
     },
     computed: {
@@ -133,7 +134,16 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             ? EXPORT_API.sammleExportEntitaeten(this.kampagneId)
             : [];
         this.selectedEntityIds = this.entitaeten.map((e) => e.id);
+        this.initialisiereEntitaetenGruppenOffen();
         this.ladeEffektRahmen();
+      },
+      initialisiereEntitaetenGruppenOffen() {
+        const offen = {};
+        this.entitaeten.forEach((e) => {
+          const key = e.kategorieKey || e.entityTyp;
+          offen[key] = false;
+        });
+        this.entitaetenGruppenOffen = offen;
       },
       ladeEffektRahmen() {
         const konfig =
@@ -207,6 +217,18 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       },
       gruppeIstVollAusgewaehlt(gruppe) {
         return gruppe.entitaeten.length > 0 && gruppe.entitaeten.every((e) => this.selectedEntityIds.includes(e.id));
+      },
+      gruppeAuswahlAnzahl(gruppe) {
+        return gruppe.entitaeten.filter((e) => this.selectedEntityIds.includes(e.id)).length;
+      },
+      gruppeIstOffen(key) {
+        return this.entitaetenGruppenOffen[key] === true;
+      },
+      gruppeToggle(key) {
+        this.entitaetenGruppenOffen = {
+          ...this.entitaetenGruppenOffen,
+          [key]: !this.gruppeIstOffen(key),
+        };
       },
       entitaetToggle(id) {
         if (this.selectedEntityIds.includes(id)) {
@@ -346,162 +368,206 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>
           <div class="card-body pt-2 pb-1 overflow-auto">
-            <div class="row g-2">
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Format</label>
-                <select v-model="format" class="form-select form-select-sm" @change="verwerfePdfVorschau">
-                  <option v-for="opt in dinOptionen" :key="opt" :value="opt">DIN {{ opt }}</option>
-                </select>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1 d-block">Ausrichtung</label>
-                <div class="btn-group btn-group-sm w-100" role="group" aria-label="Ausrichtung">
-                  <input id="tokens-ausrichtung-hoch" v-model="ausrichtung" class="btn-check" type="radio" value="portrait" @change="verwerfePdfVorschau" />
-                  <label class="btn btn-outline-secondary" for="tokens-ausrichtung-hoch">Hoch</label>
-                  <input id="tokens-ausrichtung-quer" v-model="ausrichtung" class="btn-check" type="radio" value="landscape" @change="verwerfePdfVorschau" />
-                  <label class="btn btn-outline-secondary" for="tokens-ausrichtung-quer">Quer</label>
+            <div class="d-flex flex-column gap-3">
+              <div class="card p-0 htbah-tokens-effekte-sektion shadow-sm">
+                <div class="card-header py-2">
+                  <h6 class="mb-0 small fw-semibold">Seite</h6>
+                </div>
+                <div class="card-body py-2">
+                  <div class="row g-2">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1">Format</label>
+                      <select v-model="format" class="form-select form-select-sm" @change="verwerfePdfVorschau">
+                        <option v-for="opt in dinOptionen" :key="opt" :value="opt">DIN {{ opt }}</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1 d-block">Ausrichtung</label>
+                      <div class="btn-group btn-group-sm w-100" role="group" aria-label="Ausrichtung">
+                        <input id="tokens-ausrichtung-hoch" v-model="ausrichtung" class="btn-check" type="radio" value="portrait" @change="verwerfePdfVorschau" />
+                        <label class="btn btn-outline-secondary" for="tokens-ausrichtung-hoch">Hoch</label>
+                        <input id="tokens-ausrichtung-quer" v-model="ausrichtung" class="btn-check" type="radio" value="landscape" @change="verwerfePdfVorschau" />
+                        <label class="btn btn-outline-secondary" for="tokens-ausrichtung-quer">Quer</label>
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1">Seitenrand</label>
+                      <div class="input-group input-group-sm">
+                        <input v-model.number="seitenRandMm" class="form-control" type="number" min="0" max="40" step="1" @input="verwerfePdfVorschau" />
+                        <span class="input-group-text">mm</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Token-Größe</label>
-                <div class="input-group input-group-sm">
-                  <input v-model.number="tokenGroesseMm" class="form-control" type="number" min="10" max="80" step="1" @input="verwerfePdfVorschau" />
-                  <span class="input-group-text">mm</span>
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Seitenrand</label>
-                <div class="input-group input-group-sm">
-                  <input v-model.number="seitenRandMm" class="form-control" type="number" min="0" max="40" step="1" @input="verwerfePdfVorschau" />
-                  <span class="input-group-text">mm</span>
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Abstand</label>
-                <div class="input-group input-group-sm">
-                  <input v-model.number="abstandMm" class="form-control" type="number" min="0" max="20" step="1" @input="verwerfePdfVorschau" />
-                  <span class="input-group-text">mm</span>
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1 d-block">Standard-Form</label>
-                <div class="btn-group btn-group-sm w-100" role="group">
-                  <input id="tokens-shape-kreis" v-model="defaultShape" class="btn-check" type="radio" value="kreis" @change="verwerfePdfVorschau" />
-                  <label class="btn btn-outline-secondary" for="tokens-shape-kreis">Kreis</label>
-                  <input id="tokens-shape-quadrat" v-model="defaultShape" class="btn-check" type="radio" value="quadrat" @change="verwerfePdfVorschau" />
-                  <label class="btn btn-outline-secondary" for="tokens-shape-quadrat">Quadrat</label>
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Token-Rahmenfarbe</label>
-                <input v-model="borderColor" class="form-control form-control-color form-control-sm" type="color" @input="verwerfePdfVorschau" />
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Token-Rahmenbreite</label>
-                <div class="input-group input-group-sm">
-                  <input v-model.number="borderWidthPx" class="form-control" type="number" min="0" max="24" step="1" @input="verwerfePdfVorschau" />
-                  <span class="input-group-text">px</span>
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1" for="tokens-name-font-size">Schriftgröße Benennungen</label>
-                <div class="input-group input-group-sm">
-                  <input
-                    id="tokens-name-font-size"
-                    v-model.number="nameFontSizePx"
-                    class="form-control"
-                    type="number"
-                    min="0"
-                    max="28"
-                    step="1"
-                    @input="verwerfePdfVorschau" />
-                  <span class="input-group-text">px</span>
-                </div>
-                <div class="form-text">0 = automatisch (wie bisher, abhängig von der Token-Größe)</div>
-              </div>
-              <div class="col-12 col-md-4 d-flex align-items-end">
-                <div class="form-check form-switch mb-1">
-                  <input id="tokens-show-name" v-model="showName" class="form-check-input" type="checkbox" @change="verwerfePdfVorschau" />
-                  <label class="form-check-label small" for="tokens-show-name">Name auf Token anzeigen</label>
-                </div>
-              </div>
-              <div class="col-12 col-md-4 d-flex align-items-end">
-                <div class="form-check form-switch mb-1">
-                  <input id="tokens-include-effects" v-model="includeEffects" class="form-check-input" type="checkbox" @change="verwerfePdfVorschau" />
-                  <label class="form-check-label small" for="tokens-include-effects">Effekt-Rahmen generieren</label>
-                </div>
-              </div>
-              <div v-if="includeEffects" class="col-12 col-md-4 d-flex align-items-end">
-                <div class="form-check form-switch mb-1">
-                  <input id="tokens-show-effect-names" v-model="showEffectNames" class="form-check-input" type="checkbox" @change="verwerfePdfVorschau" />
-                  <label class="form-check-label small" for="tokens-show-effect-names">Namen auf Effekt-Rahmen anzeigen</label>
-                </div>
-              </div>
-            </div>
 
-            <div class="mt-3 pt-2 border-top border-secondary border-opacity-25">
-              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                <h6 class="small text-uppercase text-body-secondary mb-0">Entitäten</h6>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @click="alleAuswaehlenToggle">
-                  {{ alleAusgewaehlt ? 'Keine auswählen' : 'Alle auswählen' }}
-                </button>
-              </div>
-              <p v-if="!entitaeten.length" class="small text-body-secondary mb-0">
-                Keine Entitäten in Zufallstabellen oder Charakter-Gruppe gefunden.
-              </p>
-              <div v-for="gruppe in gruppierteEntitaeten" :key="gruppe.key" class="mb-3">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                  <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" @click="gruppeAuswaehlenToggle(gruppe)">
-                    {{ gruppeIstVollAusgewaehlt(gruppe) ? '☑' : '☐' }}
-                  </button>
-                  <span class="fw-semibold small">{{ gruppe.label }}</span>
-                  <select
-                    class="form-select form-select-sm ms-auto"
-                    style="width: auto; min-width: 7rem"
-                    :value="kategorieShapes[gruppe.key] || ''"
-                    @change="setzeKategorieShape(gruppe.key, $event.target.value || null)">
-                    <option value="">Form: Standard</option>
-                    <option value="kreis">Kreis</option>
-                    <option value="quadrat">Quadrat</option>
-                  </select>
+              <div class="card p-0 htbah-tokens-effekte-sektion shadow-sm">
+                <div class="card-header py-2">
+                  <h6 class="mb-0 small fw-semibold">Token</h6>
                 </div>
-                <div class="htbah-tokens-entitaeten-liste">
-                  <label
-                    v-for="entitaet in gruppe.entitaeten"
-                    :key="entitaet.id"
-                    class="htbah-tokens-entitaet-zeile d-flex align-items-center gap-2 small py-1 px-2 rounded">
-                    <input
-                      type="checkbox"
-                      class="form-check-input m-0 flex-shrink-0"
-                      :checked="selectedEntityIds.includes(entitaet.id)"
-                      @change="entitaetToggle(entitaet.id)" />
-                    <span class="text-truncate flex-grow-1" :title="entitaet.name || entitaet.id">
-                      {{ entitaet.art === 'bild' ? '🖼️' : (entitaet.emoji || '📌') }}
-                      {{ entitaet.name || 'Ohne Name' }}
-                    </span>
-                    <select
-                      class="form-select form-select-sm flex-shrink-0"
-                      style="width: 6.5rem"
-                      :value="entityShapes[entitaet.id] || ''"
-                      @change="setzeEntityShape(entitaet.id, $event.target.value || null)">
-                      <option value="">Std.</option>
-                      <option value="kreis">○</option>
-                      <option value="quadrat">□</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-            </div>
+                <div class="card-body py-2">
+                  <div class="row g-2">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1">Größe</label>
+                      <div class="input-group input-group-sm">
+                        <input v-model.number="tokenGroesseMm" class="form-control" type="number" min="10" max="80" step="1" @input="verwerfePdfVorschau" />
+                        <span class="input-group-text">mm</span>
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1">Abstand</label>
+                      <div class="input-group input-group-sm">
+                        <input v-model.number="abstandMm" class="form-control" type="number" min="0" max="20" step="1" @input="verwerfePdfVorschau" />
+                        <span class="input-group-text">mm</span>
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1 d-block">Form</label>
+                      <div class="btn-group btn-group-sm w-100" role="group">
+                        <input id="tokens-shape-kreis" v-model="defaultShape" class="btn-check" type="radio" value="kreis" @change="verwerfePdfVorschau" />
+                        <label class="btn btn-outline-secondary" for="tokens-shape-kreis">Kreis</label>
+                        <input id="tokens-shape-quadrat" v-model="defaultShape" class="btn-check" type="radio" value="quadrat" @change="verwerfePdfVorschau" />
+                        <label class="btn btn-outline-secondary" for="tokens-shape-quadrat">Quadrat</label>
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1">Rahmenfarbe</label>
+                      <input v-model="borderColor" class="form-control form-control-color form-control-sm" type="color" @input="verwerfePdfVorschau" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1">Rahmenbreite</label>
+                      <div class="input-group input-group-sm">
+                        <input v-model.number="borderWidthPx" class="form-control" type="number" min="0" max="24" step="1" @input="verwerfePdfVorschau" />
+                        <span class="input-group-text">px</span>
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1" for="tokens-name-font-size">Schriftgröße</label>
+                      <div class="input-group input-group-sm">
+                        <input
+                          id="tokens-name-font-size"
+                          v-model.number="nameFontSizePx"
+                          class="form-control"
+                          type="number"
+                          min="0"
+                          max="28"
+                          step="1"
+                          @input="verwerfePdfVorschau" />
+                        <span class="input-group-text">px</span>
+                      </div>
+                      <div class="form-text">0 = automatisch (abhängig von der Token-Größe)</div>
+                    </div>
+                    <div class="col-12">
+                      <div class="form-check form-switch mb-0">
+                        <input id="tokens-show-name" v-model="showName" class="form-check-input" type="checkbox" @change="verwerfePdfVorschau" />
+                        <label class="form-check-label small" for="tokens-show-name">Namen auf Token anzeigen</label>
+                      </div>
+                    </div>
+                  </div>
 
-            <div class="mt-2 pt-2 border-top border-secondary border-opacity-25">
-              <button
-                type="button"
-                class="btn btn-link btn-sm p-0 text-decoration-none"
-                @click="effektRahmenSichtbar = !effektRahmenSichtbar">
-                {{ effektRahmenSichtbar ? '▼' : '▶' }} Effekt-/Status-Rahmen bearbeiten
-              </button>
-              <div v-show="effektRahmenSichtbar" class="mt-2">
-                <effekt-rahmen-verwaltung kompakt @geaendert="onEffektRahmenGeaendert" />
+                  <div class="mt-3 pt-2 border-top border-secondary border-opacity-25">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                      <h6 class="small text-body-secondary mb-0">Entitäten-Auswahl</h6>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" @click="alleAuswaehlenToggle">
+                        {{ alleAusgewaehlt ? 'Keine auswählen' : 'Alle auswählen' }}
+                      </button>
+                    </div>
+                    <p v-if="!entitaeten.length" class="small text-body-secondary mb-0">
+                      Keine Entitäten in Zufallstabellen oder Charakter-Gruppe gefunden.
+                    </p>
+                    <div v-for="gruppe in gruppierteEntitaeten" :key="gruppe.key" class="htbah-tokens-entitaeten-gruppe mb-2">
+                      <div class="htbah-tokens-entitaeten-gruppe-kopf d-flex flex-wrap align-items-center gap-2">
+                        <button
+                          type="button"
+                          class="btn btn-link btn-sm p-0 text-decoration-none flex-shrink-0"
+                          :aria-label="gruppeIstVollAusgewaehlt(gruppe) ? 'Gruppe abwählen' : 'Gruppe auswählen'"
+                          @click.stop="gruppeAuswaehlenToggle(gruppe)">
+                          {{ gruppeIstVollAusgewaehlt(gruppe) ? '☑' : '☐' }}
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-link btn-sm p-0 text-decoration-none d-flex align-items-center gap-1 flex-grow-1 min-w-0 text-start text-body"
+                          :aria-expanded="gruppeIstOffen(gruppe.key) ? 'true' : 'false'"
+                          @click="gruppeToggle(gruppe.key)">
+                          <span class="material-symbols-outlined htbah-tokens-gruppe-collapse-ico flex-shrink-0" aria-hidden="true">
+                            {{ gruppeIstOffen(gruppe.key) ? 'expand_less' : 'expand_more' }}
+                          </span>
+                          <span class="fw-semibold small text-truncate">{{ gruppe.label }}</span>
+                          <span class="badge rounded-pill text-bg-secondary flex-shrink-0">{{ gruppe.entitaeten.length }}</span>
+                          <span
+                            v-if="!gruppeIstVollAusgewaehlt(gruppe)"
+                            class="small text-body-secondary flex-shrink-0">
+                            ({{ gruppeAuswahlAnzahl(gruppe) }}/{{ gruppe.entitaeten.length }})
+                          </span>
+                        </button>
+                        <select
+                          class="form-select form-select-sm flex-shrink-0"
+                          style="width: auto; min-width: 7rem"
+                          :value="kategorieShapes[gruppe.key] || ''"
+                          @click.stop
+                          @change="setzeKategorieShape(gruppe.key, $event.target.value || null)">
+                          <option value="">Form: Standard</option>
+                          <option value="kreis">Kreis</option>
+                          <option value="quadrat">Quadrat</option>
+                        </select>
+                      </div>
+                      <div v-show="gruppeIstOffen(gruppe.key)" class="htbah-tokens-entitaeten-liste">
+                        <label
+                          v-for="entitaet in gruppe.entitaeten"
+                          :key="entitaet.id"
+                          class="htbah-tokens-entitaet-zeile d-flex align-items-center gap-2 small py-1 px-2 rounded">
+                          <input
+                            type="checkbox"
+                            class="form-check-input m-0 flex-shrink-0"
+                            :checked="selectedEntityIds.includes(entitaet.id)"
+                            @change="entitaetToggle(entitaet.id)" />
+                          <span class="text-truncate flex-grow-1" :title="entitaet.name || entitaet.id">
+                            {{ entitaet.art === 'bild' ? '🖼️' : (entitaet.emoji || '📌') }}
+                            {{ entitaet.name || 'Ohne Name' }}
+                          </span>
+                          <select
+                            class="form-select form-select-sm flex-shrink-0"
+                            style="width: 6.5rem"
+                            :value="entityShapes[entitaet.id] || ''"
+                            @change="setzeEntityShape(entitaet.id, $event.target.value || null)">
+                            <option value="">Std.</option>
+                            <option value="kreis">○</option>
+                            <option value="quadrat">□</option>
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card p-0 htbah-tokens-effekte-sektion shadow-sm">
+                <div class="card-header py-2">
+                  <h6 class="mb-0 small fw-semibold">Effekte</h6>
+                </div>
+                <div class="card-body py-2">
+                  <div class="form-check form-switch mb-2">
+                    <input id="tokens-include-effects" v-model="includeEffects" class="form-check-input" type="checkbox" @change="verwerfePdfVorschau" />
+                    <label class="form-check-label small" for="tokens-include-effects">Effekt-Rahmen generieren</label>
+                  </div>
+                  <template v-if="includeEffects">
+                    <div class="form-check form-switch mb-2">
+                      <input id="tokens-show-effect-names" v-model="showEffectNames" class="form-check-input" type="checkbox" @change="verwerfePdfVorschau" />
+                      <label class="form-check-label small" for="tokens-show-effect-names">Namen auf Effekt-Rahmen anzeigen</label>
+                    </div>
+                    <div class="pt-2 border-top border-secondary border-opacity-25">
+                      <button
+                        type="button"
+                        class="btn btn-link btn-sm p-0 text-decoration-none"
+                        @click="effektRahmenSichtbar = !effektRahmenSichtbar">
+                        {{ effektRahmenSichtbar ? '▼' : '▶' }} Effekt-/Status-Rahmen bearbeiten
+                      </button>
+                      <div v-show="effektRahmenSichtbar" class="mt-2">
+                        <effekt-rahmen-verwaltung kompakt @geaendert="onEffektRahmenGeaendert" />
+                      </div>
+                    </div>
+                  </template>
+                </div>
               </div>
             </div>
 

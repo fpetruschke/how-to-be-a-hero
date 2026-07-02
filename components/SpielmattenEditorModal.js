@@ -42,7 +42,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         hintergrundModus: 'farbe',
         hintergrundFarbe: '#ffffff',
         hintergrundBildDataUrl: '',
-        seitenRandMm: 0,
+        randModus: 'auto',
+        randObenMm: 0,
+        randUntenMm: 0,
+        randLinksMm: 0,
+        randRechtsMm: 0,
         keineAbgeschnittenenQuadrate: true,
         rasterAuswahl: 'frei',
         freieRasterkanteMm: 10,
@@ -88,7 +92,25 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         return this.zulaessigeRasterkantenMm.some((wert) => Math.abs(Number(wert) - frei) < 0.0001);
       },
       freieRasterkanteErzeugtRestflaeche() {
+        if (this.randModus === 'auto') {
+          return false;
+        }
+        if (this.randModus === 'kein' && !this.effektiveKeineAbgeschnittenenQuadrate) {
+          return false;
+        }
         return this.rasterAuswahl === 'frei' && !this.freieRasterkanteIstGueltig;
+      },
+      effektiveRaenderMm() {
+        if (!EXPORT_API || typeof EXPORT_API.berechneRaenderMm !== 'function') {
+          return { oben: 0, unten: 0, links: 0, rechts: 0 };
+        }
+        return EXPORT_API.berechneRaenderMm(this.aktuelleExportEinstellungen());
+      },
+      effektiveKeineAbgeschnittenenQuadrate() {
+        if (this.randModus === 'auto') {
+          return true;
+        }
+        return this.keineAbgeschnittenenQuadrate !== false;
       },
       rasterAnalyse() {
         if (!EXPORT_API || !EXPORT_API.DIN_FORMATE_MM) {
@@ -101,36 +123,34 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const istQuer = this.ausrichtung === 'landscape';
         const breiteMm = istQuer ? Number(fmt.heightMm) : Number(fmt.widthMm);
         const hoeheMm = istQuer ? Number(fmt.widthMm) : Number(fmt.heightMm);
-        const randMm = Math.max(0, Number(this.seitenRandMm) || 0);
+        const raender = this.effektiveRaenderMm;
         const rasterMm = Number(this.effektiveRasterkanteMm);
         const linieMm = Math.max(0.1, Number(this.gridLinienbreiteMm) || 0.1);
         if (!Number.isFinite(breiteMm) || !Number.isFinite(hoeheMm) || !Number.isFinite(rasterMm) || rasterMm <= 0) {
           return null;
         }
-        const nutzBreite = Math.max(0, breiteMm - randMm * 2);
-        const nutzHoehe = Math.max(0, hoeheMm - randMm * 2);
-        let spalten = 0;
-        let zeilen = 0;
-        if (this.keineAbgeschnittenenQuadrate) {
-          spalten = Math.max(0, Math.floor((nutzBreite - linieMm) / rasterMm));
-          zeilen = Math.max(0, Math.floor((nutzHoehe - linieMm) / rasterMm));
-        } else {
-          spalten = Math.max(1, Math.ceil(nutzBreite / rasterMm));
-          zeilen = Math.max(1, Math.ceil(nutzHoehe / rasterMm));
+        const nutzBreite = Math.max(0, breiteMm - raender.links - raender.rechts);
+        const nutzHoehe = Math.max(0, hoeheMm - raender.oben - raender.unten);
+        const raster = EXPORT_API.berechneRasterInhaltMm
+          ? EXPORT_API.berechneRasterInhaltMm(
+            nutzBreite,
+            nutzHoehe,
+            rasterMm,
+            linieMm,
+            this.effektiveKeineAbgeschnittenenQuadrate,
+          )
+          : null;
+        if (!raster) {
+          return null;
         }
-        const belegteBreite = this.keineAbgeschnittenenQuadrate
-          ? Math.max(0, spalten * rasterMm + linieMm)
-          : Math.min(nutzBreite, spalten * rasterMm);
-        const belegteHoehe = this.keineAbgeschnittenenQuadrate
-          ? Math.max(0, zeilen * rasterMm + linieMm)
-          : Math.min(nutzHoehe, zeilen * rasterMm);
-        const restRechts = Math.max(0, nutzBreite - belegteBreite);
-        const restUnten = Math.max(0, nutzHoehe - belegteHoehe);
+        const restRechts = Math.max(0, nutzBreite - raster.breiteMm);
+        const restUnten = Math.max(0, nutzHoehe - raster.hoeheMm);
         return {
-          spalten,
-          zeilen,
+          spalten: raster.spalten,
+          zeilen: raster.zeilen,
           restRechts,
           restUnten,
+          raender,
         };
       },
       kannExportieren() {
@@ -150,7 +170,23 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.aktualisiereZulaessigeRasterkanten();
         this.verwerfePdfVorschau();
       },
-      seitenRandMm() {
+      randModus() {
+        this.aktualisiereZulaessigeRasterkanten();
+        this.verwerfePdfVorschau();
+      },
+      randObenMm() {
+        this.aktualisiereZulaessigeRasterkanten();
+        this.verwerfePdfVorschau();
+      },
+      randUntenMm() {
+        this.aktualisiereZulaessigeRasterkanten();
+        this.verwerfePdfVorschau();
+      },
+      randLinksMm() {
+        this.aktualisiereZulaessigeRasterkanten();
+        this.verwerfePdfVorschau();
+      },
+      randRechtsMm() {
         this.aktualisiereZulaessigeRasterkanten();
         this.verwerfePdfVorschau();
       },
@@ -186,7 +222,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.hintergrundModus = 'farbe';
         this.hintergrundFarbe = '#ffffff';
         this.hintergrundBildDataUrl = '';
-        this.seitenRandMm = 0;
+        this.randModus = 'auto';
+        this.randObenMm = 0;
+        this.randUntenMm = 0;
+        this.randLinksMm = 0;
+        this.randRechtsMm = 0;
         this.gridLinienbreiteMm = 0.8;
         this.gridFarbe = '#d9d9d9';
         this.keineAbgeschnittenenQuadrate = true;
@@ -219,8 +259,12 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           gridFarbe: this.gridFarbe,
           hintergrundFarbe,
           hintergrundBildDataUrl,
-          seitenRandMm: Number(this.seitenRandMm),
-          keineAbgeschnittenenQuadrate: this.keineAbgeschnittenenQuadrate !== false,
+          randModus: this.randModus,
+          randObenMm: Number(this.randObenMm),
+          randUntenMm: Number(this.randUntenMm),
+          randLinksMm: Number(this.randLinksMm),
+          randRechtsMm: Number(this.randRechtsMm),
+          keineAbgeschnittenenQuadrate: this.effektiveKeineAbgeschnittenenQuadrate,
           rasterkanteMm: Number(this.effektiveRasterkanteMm),
         };
       },
@@ -233,7 +277,11 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         const liste = EXPORT_API.listValidSquareSizesMm(this.format, {
           minMm: 2,
           maxMm: 30,
-          randMm: Number(this.seitenRandMm) || 0,
+          randModus: this.randModus,
+          randObenMm: Number(this.randObenMm) || 0,
+          randUntenMm: Number(this.randUntenMm) || 0,
+          randLinksMm: Number(this.randLinksMm) || 0,
+          randRechtsMm: Number(this.randRechtsMm) || 0,
           ausrichtung: this.ausrichtung,
         });
         this.zulaessigeRasterkantenMm = liste;
@@ -376,105 +424,172 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
             <button type="button" class="btn-close" aria-label="Schließen" @click="schliessen"></button>
           </div>
           <div class="card-body pt-2 pb-1 overflow-auto">
-            <div class="row g-2">
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Format</label>
-                <select v-model="format" class="form-select form-select-sm">
-                  <option v-for="opt in dinOptionen" :key="opt" :value="opt">DIN {{ opt }}</option>
-                </select>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1 d-block">Ausrichtung</label>
-                <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="Ausrichtung">
-                  <input id="spielmatten-ausrichtung-hoch" v-model="ausrichtung" class="btn-check" type="radio" value="portrait" />
-                  <label class="btn btn-outline-secondary" for="spielmatten-ausrichtung-hoch">Hochformat</label>
-                  <input id="spielmatten-ausrichtung-quer" v-model="ausrichtung" class="btn-check" type="radio" value="landscape" />
-                  <label class="btn btn-outline-secondary" for="spielmatten-ausrichtung-quer">Querformat</label>
+            <div class="d-flex flex-column gap-3">
+              <div class="card p-0 htbah-spielmatten-sektion shadow-sm">
+                <div class="card-header py-2">
+                  <h6 class="mb-0 small fw-semibold">Blatt</h6>
                 </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1 d-block">Hintergrund</label>
-                <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="Hintergrund-Modus">
-                  <input id="spielmatten-bg-farbe" v-model="hintergrundModus" class="btn-check" type="radio" value="farbe" />
-                  <label class="btn btn-outline-secondary" for="spielmatten-bg-farbe">Farbe</label>
-                  <input id="spielmatten-bg-transparent" v-model="hintergrundModus" class="btn-check" type="radio" value="transparent" />
-                  <label class="btn btn-outline-secondary" for="spielmatten-bg-transparent">Transparenz</label>
-                  <input id="spielmatten-bg-bild" v-model="hintergrundModus" class="btn-check" type="radio" value="bild" />
-                  <label class="btn btn-outline-secondary" for="spielmatten-bg-bild">Bild</label>
-                </div>
-                <div v-if="hintergrundModus === 'farbe'" class="d-flex gap-2">
-                  <input v-model="hintergrundFarbe" class="form-control form-control-color form-control-sm" type="color" />
-                </div>
-                <div v-else class="d-flex flex-wrap gap-2">
-                  <template v-if="hintergrundModus === 'bild'">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="$refs.bgInput.click()">Bild wählen</button>
-                    <button v-if="hintergrundBildDataUrl" type="button" class="btn btn-outline-danger btn-sm" @click="hintergrundBildEntfernen">Bild entfernen</button>
-                    <span v-if="hintergrundBildDataUrl" class="small text-body-secondary align-self-center">Bild geladen</span>
-                  </template>
-                  <template v-else>
-                    <span class="small text-body-secondary align-self-center">Transparenter Hintergrund aktiv</span>
-                  </template>
-                </div>
-                <input ref="bgInput" type="file" class="d-none" accept="image/*" @change="onHintergrundBildGewaehlt" />
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Randbreite</label>
-                <div class="input-group input-group-sm">
-                  <input v-model.number="seitenRandMm" class="form-control" type="number" min="0" max="40" step="0.1" />
-                  <span class="input-group-text">mm</span>
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Grid-Linienbreite</label>
-                <div class="input-group input-group-sm">
-                  <input v-model.number="gridLinienbreiteMm" class="form-control" type="number" min="0.1" max="3" step="0.1" />
-                  <span class="input-group-text">mm</span>
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label small mb-1">Grid-Farbe</label>
-                <input v-model="gridFarbe" class="form-control form-control-color form-control-sm" type="color" />
-              </div>
-              <div class="col-12">
-                <label class="form-label small mb-1">Grid-Quadrat-Größe</label>
-                <div class="input-group input-group-sm htbah-spielmatten-raster-input-group">
-                  <select v-model="rasterAuswahl" class="form-select htbah-spielmatten-raster-select" :disabled="!zulaessigeRasterkantenMm.length">
-                    <option v-for="mm in zulaessigeRasterkantenMm" :key="mm" :value="String(mm)">{{ formatRasterkanteWert(mm) }}</option>
-                    <option value="frei">Frei angeben</option>
-                  </select>
-                  <input
-                    v-if="rasterAuswahl === 'frei'"
-                    v-model.number="freieRasterkanteMm"
-                    class="form-control htbah-spielmatten-raster-frei-input"
-                    type="number"
-                    min="0.001"
-                    max="999.999"
-                    step="0.001"
-                    placeholder="Wert" />
-                  <span class="input-group-text htbah-spielmatten-raster-unit">mm</span>
-                </div>
-                <div v-if="rasterAuswahl === 'frei'" class="mt-2">
-                  <div v-if="freieRasterkanteErzeugtRestflaeche" class="small text-warning mt-1">
-                    Diese freie Größe erzeugt bei diesem DIN-Format und der Randbreite Restfläche bzw. Anschnitt.
+                <div class="card-body py-2">
+                  <div class="row g-2">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1">Format</label>
+                      <select v-model="format" class="form-select form-select-sm">
+                        <option v-for="opt in dinOptionen" :key="opt" :value="opt">DIN {{ opt }}</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1 d-block">Ausrichtung</label>
+                      <div class="btn-group btn-group-sm w-100" role="group" aria-label="Ausrichtung">
+                        <input id="spielmatten-ausrichtung-hoch" v-model="ausrichtung" class="btn-check" type="radio" value="portrait" />
+                        <label class="btn btn-outline-secondary" for="spielmatten-ausrichtung-hoch">Hochformat</label>
+                        <input id="spielmatten-ausrichtung-quer" v-model="ausrichtung" class="btn-check" type="radio" value="landscape" />
+                        <label class="btn btn-outline-secondary" for="spielmatten-ausrichtung-quer">Querformat</label>
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small mb-1 d-block">Hintergrund</label>
+                      <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="Hintergrund-Modus">
+                        <input id="spielmatten-bg-farbe" v-model="hintergrundModus" class="btn-check" type="radio" value="farbe" />
+                        <label class="btn btn-outline-secondary" for="spielmatten-bg-farbe">Farbe</label>
+                        <input id="spielmatten-bg-transparent" v-model="hintergrundModus" class="btn-check" type="radio" value="transparent" />
+                        <label class="btn btn-outline-secondary" for="spielmatten-bg-transparent">Transparenz</label>
+                        <input id="spielmatten-bg-bild" v-model="hintergrundModus" class="btn-check" type="radio" value="bild" />
+                        <label class="btn btn-outline-secondary" for="spielmatten-bg-bild">Bild</label>
+                      </div>
+                      <div v-if="hintergrundModus === 'farbe'" class="d-flex gap-2">
+                        <input v-model="hintergrundFarbe" class="form-control form-control-color form-control-sm" type="color" />
+                      </div>
+                      <div v-else class="d-flex flex-wrap gap-2">
+                        <template v-if="hintergrundModus === 'bild'">
+                          <button type="button" class="btn btn-outline-secondary btn-sm" @click="$refs.bgInput.click()">Bild wählen</button>
+                          <button v-if="hintergrundBildDataUrl" type="button" class="btn btn-outline-danger btn-sm" @click="hintergrundBildEntfernen">Bild entfernen</button>
+                          <span v-if="hintergrundBildDataUrl" class="small text-body-secondary align-self-center">Bild geladen</span>
+                        </template>
+                        <template v-else>
+                          <span class="small text-body-secondary align-self-center">Transparenter Hintergrund aktiv</span>
+                        </template>
+                      </div>
+                      <input ref="bgInput" type="file" class="d-none" accept="image/*" @change="onHintergrundBildGewaehlt" />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label small mb-1 d-block">Rand</label>
+                      <div class="btn-group btn-group-sm mb-2" role="group" aria-label="Rand-Modus">
+                        <input id="spielmatten-rand-auto" v-model="randModus" class="btn-check" type="radio" value="auto" />
+                        <label class="btn btn-outline-secondary" for="spielmatten-rand-auto">Automatisch</label>
+                        <input id="spielmatten-rand-kein" v-model="randModus" class="btn-check" type="radio" value="kein" />
+                        <label class="btn btn-outline-secondary" for="spielmatten-rand-kein">Kein Rand</label>
+                        <input id="spielmatten-rand-manuell" v-model="randModus" class="btn-check" type="radio" value="manuell" />
+                        <label class="btn btn-outline-secondary" for="spielmatten-rand-manuell">Manuell</label>
+                      </div>
+                      <div v-if="randModus === 'manuell'" class="row g-2 htbah-spielmatten-rand-manuell">
+                        <div class="col-6 col-md-3">
+                          <label class="form-label small mb-1" for="spielmatten-rand-oben">Oben</label>
+                          <div class="input-group input-group-sm">
+                            <input id="spielmatten-rand-oben" v-model.number="randObenMm" class="form-control" type="number" min="0" max="40" step="0.1" />
+                            <span class="input-group-text">mm</span>
+                          </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                          <label class="form-label small mb-1" for="spielmatten-rand-unten">Unten</label>
+                          <div class="input-group input-group-sm">
+                            <input id="spielmatten-rand-unten" v-model.number="randUntenMm" class="form-control" type="number" min="0" max="40" step="0.1" />
+                            <span class="input-group-text">mm</span>
+                          </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                          <label class="form-label small mb-1" for="spielmatten-rand-links">Links</label>
+                          <div class="input-group input-group-sm">
+                            <input id="spielmatten-rand-links" v-model.number="randLinksMm" class="form-control" type="number" min="0" max="40" step="0.1" />
+                            <span class="input-group-text">mm</span>
+                          </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                          <label class="form-label small mb-1" for="spielmatten-rand-rechts">Rechts</label>
+                          <div class="input-group input-group-sm">
+                            <input id="spielmatten-rand-rechts" v-model.number="randRechtsMm" class="form-control" type="number" min="0" max="40" step="0.1" />
+                            <span class="input-group-text">mm</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-else-if="randModus === 'auto' && rasterAnalyse" class="small text-body-secondary">
+                        Berechneter Rand: oben {{ formatRasterkanteLabel(rasterAnalyse.raender.oben) }},
+                        unten {{ formatRasterkanteLabel(rasterAnalyse.raender.unten) }},
+                        links {{ formatRasterkanteLabel(rasterAnalyse.raender.links) }},
+                        rechts {{ formatRasterkanteLabel(rasterAnalyse.raender.rechts) }}
+                      </div>
+                      <div v-else-if="randModus === 'kein'" class="small text-body-secondary">
+                        Das Raster beginnt am Blattrand.
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="small text-body-secondary mt-1" v-if="rasterkantePxHinweis">{{ rasterkantePxHinweis }}</div>
-                <div v-if="!zulaessigeRasterkantenMm.length" class="small text-warning mt-1">
-                  Für diese Kombination aus Format und Randbreite gibt es keine gültigen Rasterkanten.
+              </div>
+              <div class="card p-0 htbah-spielmatten-sektion shadow-sm">
+                <div class="card-header py-2">
+                  <h6 class="mb-0 small fw-semibold">Grid</h6>
                 </div>
-                <div v-if="rasterAnalyse" class="small text-body-secondary mt-1">
-                  Vollständige Kästchen: {{ rasterAnalyse.spalten }} × {{ rasterAnalyse.zeilen }} ·
-                  Restfläche: {{ formatRasterkanteLabel(rasterAnalyse.restRechts) }} rechts, {{ formatRasterkanteLabel(rasterAnalyse.restUnten) }} unten
-                </div>
-                <div class="form-check mt-2">
-                  <input
-                    id="spielmatten-kein-anschnitt"
-                    v-model="keineAbgeschnittenenQuadrate"
-                    class="form-check-input"
-                    type="checkbox" />
-                  <label class="form-check-label small" for="spielmatten-kein-anschnitt">
-                    Keine abgeschnittenen Quadrate
-                  </label>
+                <div class="card-body py-2">
+                  <div class="row g-2 align-items-end htbah-spielmatten-grid-zeile">
+                    <div class="col-6 col-md-3">
+                      <label class="form-label small mb-1">Linienbreite</label>
+                      <div class="input-group input-group-sm">
+                        <input v-model.number="gridLinienbreiteMm" class="form-control" type="number" min="0.1" max="3" step="0.1" />
+                        <span class="input-group-text">mm</span>
+                      </div>
+                    </div>
+                    <div class="col-6 col-md-auto">
+                      <label class="form-label small mb-1">Farbe</label>
+                      <input v-model="gridFarbe" class="form-control form-control-color form-control-sm htbah-spielmatten-grid-farbe" type="color" />
+                    </div>
+                    <div class="col-12 col-md">
+                      <label class="form-label small mb-1">Quadrat-Größe</label>
+                      <div class="input-group input-group-sm htbah-spielmatten-raster-input-group">
+                        <select v-model="rasterAuswahl" class="form-select htbah-spielmatten-raster-select" :disabled="!zulaessigeRasterkantenMm.length">
+                          <option v-for="mm in zulaessigeRasterkantenMm" :key="mm" :value="String(mm)">{{ formatRasterkanteWert(mm) }}</option>
+                          <option value="frei">Frei angeben</option>
+                        </select>
+                        <input
+                          v-if="rasterAuswahl === 'frei'"
+                          v-model.number="freieRasterkanteMm"
+                          class="form-control htbah-spielmatten-raster-frei-input"
+                          type="number"
+                          min="0.001"
+                          max="999.999"
+                          step="0.001"
+                          placeholder="Wert" />
+                        <span class="input-group-text htbah-spielmatten-raster-unit">mm</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="rasterAuswahl === 'frei'" class="mt-2">
+                    <div v-if="freieRasterkanteErzeugtRestflaeche" class="small text-warning mt-1">
+                      Diese freie Größe erzeugt bei diesem DIN-Format und dem gewählten Rand Restfläche bzw. Anschnitt.
+                    </div>
+                  </div>
+                  <div class="small text-body-secondary mt-1" v-if="rasterkantePxHinweis">{{ rasterkantePxHinweis }}</div>
+                  <div v-if="!zulaessigeRasterkantenMm.length" class="small text-warning mt-1">
+                    Für diese Kombination aus Format und Rand gibt es keine gültigen Rasterkanten.
+                  </div>
+                  <div v-if="rasterAnalyse" class="small text-body-secondary mt-1">
+                    Vollständige Kästchen: {{ rasterAnalyse.spalten }} × {{ rasterAnalyse.zeilen }}
+                    <template v-if="randModus !== 'auto' && (rasterAnalyse.restRechts > 0 || rasterAnalyse.restUnten > 0)">
+                      · Restfläche im Raster: {{ formatRasterkanteLabel(rasterAnalyse.restRechts) }} rechts,
+                      {{ formatRasterkanteLabel(rasterAnalyse.restUnten) }} unten
+                    </template>
+                  </div>
+                  <div v-if="randModus === 'kein' || randModus === 'manuell'" class="form-check mt-2">
+                    <input
+                      id="spielmatten-kein-anschnitt"
+                      v-model="keineAbgeschnittenenQuadrate"
+                      class="form-check-input"
+                      type="checkbox" />
+                    <label class="form-check-label small" for="spielmatten-kein-anschnitt">
+                      Keine abgeschnittenen Quadrate
+                    </label>
+                  </div>
+                  <div v-else class="small text-body-secondary mt-2">
+                    Vollständige Quadrate werden zentriert; die Restfläche wird gleichmäßig als Rand verteilt.
+                  </div>
                 </div>
               </div>
             </div>

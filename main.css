@@ -620,6 +620,23 @@ input::placeholder {
   max-height: min(92vh, 92dvh) !important;
 }
 
+.htbah-spielmatten-sektion,
+.htbah-tokens-effekte-sektion {
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.htbah-spielmatten-sektion .card-header,
+.htbah-tokens-effekte-sektion .card-header {
+  background: color-mix(in srgb, var(--bs-secondary-bg) 65%, var(--bs-body-bg));
+  min-height: 2.1rem;
+}
+
+.htbah-spielmatten-sektion .card-body,
+.htbah-tokens-effekte-sektion .card-body {
+  background: var(--bs-body-bg);
+}
+
 .htbah-spielmatten-pdf-vorschau {
   width: 100%;
   height: min(54vh, 520px);
@@ -629,14 +646,20 @@ input::placeholder {
 }
 
 .htbah-spielmatten-raster-input-group {
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
 }
 
+.htbah-spielmatten-grid-zeile .htbah-spielmatten-grid-farbe {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0.125rem;
+}
+
 .htbah-spielmatten-raster-select {
-  flex: 0 0 150px;
-  width: 150px;
-  min-width: 150px;
+  flex: 1 1 8rem;
+  width: auto;
+  min-width: 7rem;
 }
 
 .htbah-spielmatten-raster-frei-input {
@@ -648,6 +671,10 @@ input::placeholder {
 .htbah-spielmatten-raster-unit {
   flex: 0 0 auto;
   width: auto;
+}
+
+.htbah-spielmatten-rand-manuell {
+  max-width: 36rem;
 }
 
 .htbah-weltenbau-map-layer {
@@ -1810,11 +1837,29 @@ input::placeholder {
   max-width: min(920px, calc(100vw - 1rem));
 }
 
+.htbah-tokens-entitaeten-gruppe {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.htbah-tokens-entitaeten-gruppe-kopf {
+  padding: 0.35rem 0.5rem;
+  background: color-mix(in srgb, var(--bs-secondary-bg) 40%, var(--bs-body-bg));
+}
+
+.htbah-tokens-gruppe-collapse-ico {
+  font-size: 1.15rem;
+  line-height: 1;
+  opacity: 0.75;
+}
+
 .htbah-tokens-entitaeten-liste {
   max-height: 14rem;
   overflow-y: auto;
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.375rem;
+  border: none;
+  border-radius: 0;
+  border-top: 1px solid var(--bs-border-color);
 }
 
 .htbah-tokens-entitaet-zeile:hover {
