@@ -802,9 +802,13 @@ function kampagnenSlugAusName(name) {
   return basis || 'kampagne';
 }
 
-const KAMPAGNEN_TAB_IDS = new Set(['gruppe', 'einstellungen', 'welt', 'zufallstabellen', 'generatoren']);
+const KAMPAGNEN_TAB_IDS = new Set(['gruppe', 'einstellungen', 'welt', 'zufallstabellen', 'assets']);
+const KAMPAGNEN_TAB_LEGACY_IDS = new Set(['generatoren']);
 
 function normalisiereKampagnenTabId(tab, fallback = 'einstellungen') {
+  if (tab === 'generatoren') {
+    return 'assets';
+  }
   return KAMPAGNEN_TAB_IDS.has(tab) ? tab : fallback;
 }
 
@@ -822,7 +826,8 @@ function leseGespeichertenKampagnenTab(kampagneId) {
     return null;
   }
   const tab = leseTabProKampagneMap()[kid];
-  return KAMPAGNEN_TAB_IDS.has(tab) ? tab : null;
+  const normal = normalisiereKampagnenTabId(tab, '');
+  return KAMPAGNEN_TAB_IDS.has(normal) ? normal : null;
 }
 
 function kampagnenEinstiegsTab(kampagneId) {
@@ -831,8 +836,9 @@ function kampagnenEinstiegsTab(kampagneId) {
 
 function speichereKampagnenTab(kampagneId, tab) {
   const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
-  const normal = KAMPAGNEN_TAB_IDS.has(tab) ? tab : null;
-  if (!kid || !normal) {
+  const normal = normalisiereKampagnenTabId(tab, '');
+  const tabFinal = KAMPAGNEN_TAB_IDS.has(normal) ? normal : null;
+  if (!kid || !tabFinal) {
     return false;
   }
   const roh = leseSpielleitungZustandRoh();
@@ -842,10 +848,10 @@ function speichereKampagnenTab(kampagneId, tab) {
   if (!roh.tabProKampagne || typeof roh.tabProKampagne !== 'object') {
     roh.tabProKampagne = {};
   }
-  if (roh.tabProKampagne[kid] === normal) {
+  if (roh.tabProKampagne[kid] === tabFinal) {
     return true;
   }
-  roh.tabProKampagne[kid] = normal;
+  roh.tabProKampagne[kid] = tabFinal;
   return speichereSpielleitungRoh(roh);
 }
 
@@ -862,7 +868,11 @@ function findeSpielleitungKampagneNachId(kampagneId) {
 function kampagneIdAusPfad(pfad) {
   const p = typeof pfad === 'string' ? pfad : '';
   const parts = p.split('/').filter(Boolean);
-  if (parts.length >= 3 && parts[0] === 'kampagnen' && KAMPAGNEN_TAB_IDS.has(parts[2])) {
+  if (
+    parts.length >= 3 &&
+    parts[0] === 'kampagnen' &&
+    (KAMPAGNEN_TAB_IDS.has(parts[2]) || KAMPAGNEN_TAB_LEGACY_IDS.has(parts[2]))
+  ) {
     return kampagneIdAusSlug(parts[1]);
   }
   return null;
@@ -1590,7 +1600,7 @@ function loescheZufallstabellenListeFuerKampagne(kampagneId, listenSchluessel) {
 
 /**
  * @param {string} kampagneId
- * @param {'alles' | 'galerie' | 'interaktive_welt' | 'interaktive_welt_einstellungen' | 'generatoren'} bereich
+ * @param {'alles' | 'galerie' | 'interaktive_welt' | 'interaktive_welt_einstellungen' | 'generatoren' | 'assets'} bereich
  */
 function loescheWeltenbauBereichFuerKampagne(kampagneId, bereich) {
   const kid = typeof kampagneId === 'string' && kampagneId.trim() ? kampagneId.trim() : '';
@@ -1605,7 +1615,7 @@ function loescheWeltenbauBereichFuerKampagne(kampagneId, bereich) {
   const wb = ladeWeltenbauZustand(kid);
   if (bereich === 'galerie') {
     wb.eintraege = [];
-  } else if (bereich === 'generatoren') {
+  } else if (bereich === 'generatoren' || bereich === 'assets') {
     wb.generatorUrls = {};
     wb.generatorAufrufe = {};
   } else if (bereich === 'interaktive_welt') {
@@ -3176,7 +3186,8 @@ function erstelleWeltenbauBereichExportPaket(kampagneId, bereich) {
     bereich !== 'galerie' &&
     bereich !== 'interaktive_welt' &&
     bereich !== 'interaktive_welt_einstellungen' &&
-    bereich !== 'generatoren'
+    bereich !== 'generatoren' &&
+    bereich !== 'assets'
   ) {
     return null;
   }
@@ -3184,7 +3195,7 @@ function erstelleWeltenbauBereichExportPaket(kampagneId, bereich) {
   let daten = {};
   if (bereich === 'galerie') {
     daten = { eintraege: JSON.parse(JSON.stringify(wb.eintraege || [])) };
-  } else if (bereich === 'generatoren') {
+  } else if (bereich === 'generatoren' || bereich === 'assets') {
     daten = {
       generatorUrls: JSON.parse(JSON.stringify(wb.generatorUrls || {})),
       generatorAufrufe: JSON.parse(JSON.stringify(wb.generatorAufrufe || {})),
@@ -3228,7 +3239,8 @@ function importiereWeltenbauBereichPaket(zielKampagneId, roh) {
     bereich !== 'galerie' &&
     bereich !== 'interaktive_welt' &&
     bereich !== 'interaktive_welt_einstellungen' &&
-    bereich !== 'generatoren'
+    bereich !== 'generatoren' &&
+    bereich !== 'assets'
   ) {
     return { ok: false, fehler: 'Unbekannter Weltenbau-Bereich.' };
   }
@@ -3238,7 +3250,7 @@ function importiereWeltenbauBereichPaket(zielKampagneId, roh) {
     wb.eintraege = Array.isArray(d.eintraege)
       ? d.eintraege.map(normalisiereWeltenbauEintrag).filter(Boolean)
       : [];
-  } else if (bereich === 'generatoren') {
+  } else if (bereich === 'generatoren' || bereich === 'assets') {
     wb.generatorUrls = normalisiereWeltenbauGeneratorUrls(d.generatorUrls);
     wb.generatorAufrufe = d.generatorAufrufe && typeof d.generatorAufrufe === 'object' ? d.generatorAufrufe : {};
   } else if (bereich === 'interaktive_welt_einstellungen') {
@@ -3321,7 +3333,9 @@ function validiereKampagneDatenImportDatei(ctxArt, roh, extras) {
       return { ok: false, fehler: 'Keine Weltenbau-Bereichs-Datei (falscher Dateityp).' };
     }
     const br = typeof ex.wbBereich === 'string' ? ex.wbBereich : '';
-    if (br !== roh.bereich) {
+    const erwarteterBereich = br === 'generatoren' ? 'assets' : br;
+    const dateiBereich = roh.bereich === 'generatoren' ? 'assets' : roh.bereich;
+    if (erwarteterBereich !== dateiBereich) {
       return { ok: false, fehler: 'Die Datei gehört zu einem anderen Weltenbau-Bereich.' };
     }
     return { ok: true };
@@ -6698,14 +6712,22 @@ function istWeltenbauRoutePfad(pfad) {
   return (
     p === '/weltenbau' ||
     p.startsWith('/weltenbau/') ||
-    /^\/kampagnen\/[^/]+\/(?:welt|zufallstabellen|generatoren|einstellungen|gruppe)$/.test(p) ||
-    /^\/kampagne\/[^/]+\/(?:welt|zufallstabellen|generatoren|einstellungen|gruppe)$/.test(p)
+    /^\/kampagnen\/[^/]+\/(?:welt|zufallstabellen|assets|generatoren|einstellungen|gruppe)$/.test(p) ||
+    /^\/kampagne\/[^/]+\/(?:welt|zufallstabellen|assets|generatoren|einstellungen|gruppe)$/.test(p)
   );
 }
 
 router.beforeEach(async (to, from) => {
   const rolle = window.HTBAH.ladeAppRolle();
   const ziel = to.path || '/';
+  const legacyTabMatch = ziel.match(/^\/kampagnen\/([^/]+)\/generatoren$/);
+  if (legacyTabMatch && legacyTabMatch[1]) {
+    return { path: `/kampagnen/${legacyTabMatch[1]}/assets`, replace: true };
+  }
+  const legacyTabMatchSingular = ziel.match(/^\/kampagne\/([^/]+)\/generatoren$/);
+  if (legacyTabMatchSingular && legacyTabMatchSingular[1]) {
+    return { path: `/kampagne/${legacyTabMatchSingular[1]}/assets`, replace: true };
+  }
 
   const weltenbauModal = window.HTBAH._weltenbauUebersichtModalInstanz;
   if (
@@ -7059,10 +7081,14 @@ router.afterEach((to) => {
   }
   if (to.path.startsWith('/kampagnen/')) {
     const parts = to.path.split('/').filter(Boolean);
-    if (parts.length >= 3 && parts[0] === 'kampagnen' && KAMPAGNEN_TAB_IDS.has(parts[2])) {
+    if (
+      parts.length >= 3 &&
+      parts[0] === 'kampagnen' &&
+      (KAMPAGNEN_TAB_IDS.has(parts[2]) || KAMPAGNEN_TAB_LEGACY_IDS.has(parts[2]))
+    ) {
       const kid = kampagneIdAusSlug(parts[1]);
       if (kid) {
-        speichereKampagnenTab(kid, parts[2]);
+        speichereKampagnenTab(kid, normalisiereKampagnenTabId(parts[2]));
       }
     }
     return;

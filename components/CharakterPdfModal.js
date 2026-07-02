@@ -9,6 +9,7 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
     offen: { type: Boolean, default: false },
     pdfUrl: { type: String, default: '' },
     dateiname: { type: String, default: 'charakter.pdf' },
+    titel: { type: String, default: 'Charakterbogen' },
   },
   emits: ['schliessen'],
   data() {
@@ -124,7 +125,7 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
         this.entsorgeDruckIframe();
         const frame = document.createElement('iframe');
         frame.setAttribute('aria-hidden', 'true');
-        frame.title = 'Charakterbogen Druck';
+        frame.title = `${this.titel || 'PDF'} Druck`;
         frame.style.cssText =
           'position:fixed;left:0;top:0;width:0;height:0;border:0;opacity:0;pointer-events:none;';
         this.druckIframe = frame;
@@ -180,14 +181,14 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
         class="regelwerk-modal-window regelwerk-modal-window-fullscreen card shadow-lg"
         role="dialog"
         aria-modal="true"
-        aria-label="Charakterbogen PDF"
+        :aria-label="(titel || 'PDF') + ' PDF'"
         tabindex="-1"
         @keydown.esc.stop.prevent="onFensterEscape">
         <div
           class="regelwerk-modal-header d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
           <h4 class="mb-0 d-flex align-items-center gap-2">
             <span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
-            Charakterbogen
+            {{ titel || 'PDF' }}
           </h4>
           <div class="d-flex gap-1 align-items-center">
             <button
@@ -219,7 +220,7 @@ window.HTBAH_KOMPONENTEN.CharakterPdfModal = {
           ref="pdfIframe"
           :src="viewerUrl"
           class="regelwerk-modal-content"
-          title="Charakterbogen PDF"></iframe>
+          :title="(titel || 'PDF') + ' PDF'"></iframe>
       </div>
     </div>
   `,

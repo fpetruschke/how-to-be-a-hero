@@ -164,6 +164,7 @@ window.HTBAH_SEITEN.Weltenbau = {
   components: {
     WeltenbauBildImportModal: window.HTBAH_KOMPONENTEN.WeltenbauBildImportModal,
     WeltenbauUebersichtModal: window.HTBAH_KOMPONENTEN.WeltenbauUebersichtModal,
+    SpielmattenEditorModal: window.HTBAH_KOMPONENTEN.SpielmattenEditorModal,
     ZufallstabellenSeite: window.HTBAH_SEITEN.Zufallstabellen,
     KampagnenUebersicht: window.HTBAH_SEITEN.KampagnenUebersicht,
     KampagneAnsicht: window.HTBAH_SEITEN.KampagneAnsicht,
@@ -257,8 +258,12 @@ window.HTBAH_SEITEN.Weltenbau = {
         tab === 'einstellungen' ||
         tab === 'welt' ||
         tab === 'zufallstabellen' ||
+        tab === 'assets' ||
         tab === 'generatoren'
       ) {
+        if (tab === 'generatoren') {
+          return 'assets';
+        }
         return tab;
       }
       return 'einstellungen';
@@ -397,6 +402,11 @@ window.HTBAH_SEITEN.Weltenbau = {
       const ziel = window.HTBAH.kampagnenPfad(tabId, this.ausgewaehlteKampagneId);
       if (ziel !== this.$route.path) {
         this.$router.push(ziel);
+      }
+    },
+    oeffneSpielmattenEditor() {
+      if (this.$refs.spielmattenEditorModal && typeof this.$refs.spielmattenEditorModal.oeffne === 'function') {
+        this.$refs.spielmattenEditorModal.oeffne();
       }
     },
     onWeltenbauMapModalSchliessen() {
@@ -959,13 +969,14 @@ window.HTBAH_SEITEN.Weltenbau = {
         @fertig="onWeltenbauBildImportFertig"
         @abgebrochen="onWeltenbauBildImportAbgebrochen"
         @datei-import-fehler="onWeltenbauDateiImportFehler" />
+      <spielmatten-editor-modal ref="spielmattenEditorModal" />
 
       <h4 class="text-center mb-1 htbah-page-title">
         <span class="htbah-page-title-emoji" aria-hidden="true">📖</span>
         <span>{{ seitenTitel }}</span>
       </h4>
       <p class="small text-body-secondary text-center mb-3">
-        Weltenbau mit Fokus auf Interaktive Welt, Tabellen, Generatoren und Gruppenverwaltung.
+        Weltenbau mit Fokus auf Interaktive Welt, Tabellen, Assets und Gruppenverwaltung.
       </p>
 
       <ul class="nav htbah-weltenbau-pill-tabs mb-3" role="tablist" aria-label="Weltenbau Unterseiten">
@@ -994,9 +1005,9 @@ window.HTBAH_SEITEN.Weltenbau = {
           </button>
         </li>
         <li class="nav-item" role="presentation">
-          <button type="button" class="nav-link htbah-weltenbau-pill-tab" :class="{ active: aktiveWeltenbauTab === 'generatoren' }" @click="wechsleWeltenbauTab('generatoren')">
+          <button type="button" class="nav-link htbah-weltenbau-pill-tab" :class="{ active: aktiveWeltenbauTab === 'assets' }" @click="wechsleWeltenbauTab('assets')">
             <span aria-hidden="true">🛠️</span>
-            <span>Generatoren</span>
+            <span>Assets</span>
           </button>
         </li>
       </ul>
@@ -1137,11 +1148,20 @@ window.HTBAH_SEITEN.Weltenbau = {
           @geaendert="syncKampagneAusRoute" />
       </template>
 
-      <template v-else-if="aktiveWeltenbauTab === 'generatoren'">
+      <template v-else-if="aktiveWeltenbauTab === 'assets'">
         <div class="alert alert-info py-2 px-3 small mb-2" role="note">
-          Nutze externe Werkzeuge, um dort z. B. Bilddateien herunterzuladen und in den anderen Bereichen hochzuladen.
+          Assets bündelt druckbare und wiederverwendbare Hilfsmittel für deine Kampagne.
         </div>
         <div class="card p-3 mb-3">
+          <h6 class="mb-2">Assets</h6>
+          <div class="d-grid d-sm-flex gap-2">
+            <button type="button" class="btn btn-primary" @click="oeffneSpielmattenEditor">
+              🧩 Spielmatte erstellen
+            </button>
+          </div>
+        </div>
+        <div class="card p-3 mb-3">
+          <h6 class="mb-2">Generatoren</h6>
           <div class="alert alert-warning py-2 small mb-3" role="alert">
             Diese Generatoren stammen von Watabou und werden hier nur eingebettet. JSON-Exporte kannst du
             in den Generatoren selbst sichern und später wieder laden. Die zuletzt bekannte Generator-URL

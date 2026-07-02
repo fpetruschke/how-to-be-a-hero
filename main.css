@@ -615,6 +615,41 @@ input::placeholder {
   background: #fff;
 }
 
+.htbah-spielmatten-modal-window {
+  width: min(980px, 96vw) !important;
+  max-height: min(92vh, 92dvh) !important;
+}
+
+.htbah-spielmatten-pdf-vorschau {
+  width: 100%;
+  height: min(54vh, 520px);
+  border: 1px solid var(--border-color);
+  border-radius: 0.35rem;
+  background: #fff;
+}
+
+.htbah-spielmatten-raster-input-group {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.htbah-spielmatten-raster-select {
+  flex: 0 0 150px;
+  width: 150px;
+  min-width: 150px;
+}
+
+.htbah-spielmatten-raster-frei-input {
+  flex: 0 0 7.25rem;
+  width: 7.25rem;
+  max-width: 7.25rem;
+}
+
+.htbah-spielmatten-raster-unit {
+  flex: 0 0 auto;
+  width: auto;
+}
+
 .htbah-weltenbau-map-layer {
   z-index: var(--htbah-z-modal-map);
 }
@@ -1752,6 +1787,22 @@ input::placeholder {
 
   .htbah-weltenbau-charakter-modal-body {
     max-height: calc(100dvh - 3.2rem);
+  }
+
+  .htbah-spielmatten-footer {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 0.5rem;
+  }
+
+  .htbah-spielmatten-footer-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .htbah-spielmatten-footer-btn {
+    width: 100%;
   }
 }
 

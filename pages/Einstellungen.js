@@ -56,7 +56,7 @@ const SPEICHER_BEREICHE = {
     key: 'htbah_weltenbau',
     titel: 'Weltenbau-Bilder löschen?',
     beschreibung:
-      'Alle unter „Weltenbau“ und in der interaktiven Welt je Kampagne gespeicherten Daten (Bilder, Karten, Generatoren) werden aus dem lokalen Speicher entfernt.',
+      'Alle unter „Weltenbau“ und in der interaktiven Welt je Kampagne gespeicherten Daten (Bilder, Karten, Assets) werden aus dem lokalen Speicher entfernt.',
     erfolg: 'Weltenbau-Bilder wurden gelöscht.',
     buttonSymbol: '🗺️',
     buttonLabel: 'Weltenbau-Bilder löschen',
@@ -697,19 +697,19 @@ window.HTBAH_SEITEN.Einstellungen = {
         case 'wb_alles':
           return {
             titel: 'Weltenbau dieser Kampagne löschen?',
-            beschreibung: `Zu „${name}“ werden alle Weltenbau- und interaktiven-Welt-Daten entfernt (Galerie, Karten, Generatoren).`,
+            beschreibung: `Zu „${name}“ werden alle Weltenbau- und interaktiven-Welt-Daten entfernt (Galerie, Karten, Assets).`,
             erfolg: `Weltenbau zu „${name}“ wurde vollständig gelöscht.`,
           };
         case 'wb_galerie':
           return {
             titel: 'Weltenbau-Galerie löschen?',
-            beschreibung: `Zu „${name}“ werden nur die unter „Weltenbau“ gespeicherten Galerie-Bilder (data-URLs) entfernt. Karten und Generator-Einstellungen bleiben erhalten.`,
+            beschreibung: `Zu „${name}“ werden nur die unter „Weltenbau“ gespeicherten Galerie-Bilder (data-URLs) entfernt. Karten und Asset-Einstellungen bleiben erhalten.`,
             erfolg: `Weltenbau-Galerie zu „${name}“ wurde gelöscht.`,
           };
         case 'wb_interaktive_welt':
           return {
             titel: 'Interaktive Welt / Karten löschen?',
-            beschreibung: `Zu „${name}“ werden Kartenlayouts, Hintergründe, freie Bilder, Notizen, Pfeile und Karten-Einstellungen entfernt. Die Galerie unter „Weltenbau“ und Generator-Links bleiben erhalten.`,
+            beschreibung: `Zu „${name}“ werden Kartenlayouts, Hintergründe, freie Bilder, Notizen, Pfeile und Karten-Einstellungen entfernt. Die Galerie unter „Weltenbau“ und Asset-Links bleiben erhalten.`,
             erfolg: `Interaktive Welt zu „${name}“ wurde geleert.`,
           };
         case 'wb_interaktive_welt_einstellungen':
@@ -719,10 +719,11 @@ window.HTBAH_SEITEN.Einstellungen = {
             erfolg: `Interaktive-Welt-Einstellungen zu „${name}“ wurden zurückgesetzt.`,
           };
         case 'wb_generatoren':
+        case 'wb_assets':
           return {
-            titel: 'Weltenbau-Generatoren zurücksetzen?',
-            beschreibung: `Zu „${name}“ werden gespeicherte Generator-URLs und Aufrufzähler entfernt.`,
-            erfolg: `Generator-Daten zu „${name}“ wurden gelöscht.`,
+            titel: 'Weltenbau-Assets zurücksetzen?',
+            beschreibung: `Zu „${name}“ werden gespeicherte Asset-Generator-URLs und Aufrufzähler entfernt.`,
+            erfolg: `Asset-Daten zu „${name}“ wurden gelöscht.`,
           };
         default:
           return {
@@ -821,9 +822,10 @@ window.HTBAH_SEITEN.Einstellungen = {
           }
           break;
         case 'wb_generatoren':
-          if (!window.HTBAH.loescheWeltenbauBereichFuerKampagne(p.kampagneId, 'generatoren')) {
+        case 'wb_assets':
+          if (!window.HTBAH.loescheWeltenbauBereichFuerKampagne(p.kampagneId, 'assets')) {
             ok = false;
-            this.statusAnzeigen('Generator-Daten konnten nicht gelöscht werden.', 'danger');
+            this.statusAnzeigen('Asset-Daten konnten nicht gelöscht werden.', 'danger');
           }
           break;
         default:
@@ -2346,8 +2348,8 @@ window.HTBAH_SEITEN.Einstellungen = {
                       <button
                         type="button"
                         class="btn btn-outline-danger btn-sm text-start w-100"
-                        @click="oeffneKampagneLoeschDialog('wb_generatoren', k)">
-                        Nur Generator-Links löschen
+                        @click="oeffneKampagneLoeschDialog('wb_assets', k)">
+                        Nur Asset-Links löschen
                       </button>
                     </div>
                     </div>

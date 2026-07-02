@@ -322,12 +322,12 @@ function baueKampagneKnoten(kampagne, opts) {
       kampagneId: kid,
       weltenbauBereich: 'interaktive_welt_einstellungen',
     }),
-    blattKnoten(`ex:wb:${kid}:gen`, 'Generatoren', {
-      key: `htbah_export_ls:wb_bereich:${kid}:generatoren`,
-      label: 'Generatoren',
+    blattKnoten(`ex:wb:${kid}:assets`, 'Assets', {
+      key: `htbah_export_ls:wb_bereich:${kid}:assets`,
+      label: 'Assets',
       lsTyp: 'wb_bereich',
       kampagneId: kid,
-      weltenbauBereich: 'generatoren',
+      weltenbauBereich: 'assets',
     }),
   ];
   kinder.push(gruppenKnoten(`grp:wb:${kid}`, 'Weltenbau', wbKinder));
