@@ -328,6 +328,29 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     flow.hatInhaltAufSeite = false;
   }
 
+  function erzwingePdfFlowNeueSeite(pdf, flow) {
+    if (!pdf || typeof pdf.addPage !== 'function') {
+      return;
+    }
+    pdf.addPage();
+    pdfFlowNachSeitenReset(flow);
+  }
+
+  function setzeEinmaligeFlowBlockVorbereitung(flow, fn) {
+    if (!flow || typeof fn !== 'function') {
+      return;
+    }
+    flow._vorNaechstemBlock = fn;
+  }
+
+  function ausfuehrenFlowBlockVorbereitung(pdf, flow) {
+    if (!flow || typeof flow._vorNaechstemBlock !== 'function') {
+      return;
+    }
+    flow._vorNaechstemBlock(pdf, flow);
+    flow._vorNaechstemBlock = null;
+  }
+
   function platzierungFuerCanvasSlice(cw, ch, maxW, maxH, volleBreite) {
     let finalW = maxW;
     let finalH = (ch * maxW) / cw;
@@ -585,6 +608,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     pdfSeitenAbmessungen,
     erstellePdfFlowState,
     pdfFlowNachSeitenReset,
+    erzwingePdfFlowNeueSeite,
+    setzeEinmaligeFlowBlockVorbereitung,
+    ausfuehrenFlowBlockVorbereitung,
     flowVerfuegbareHoeheCanvasPx,
     sicherePdfNeueSeiteWennZuKlein,
     fuegeCanvasInPdfFlow,

@@ -84,6 +84,60 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return { w, h };
   }
 
+  const PDF_TILE_ZIEL_PX = 3200;
+  const PDF_WELT_MAX_CANVAS_KANTE_PX = 8192;
+
+  function volleStageBounds(kontext) {
+    const stageWidth = Number.isFinite(Number(kontext && kontext.stageWidth))
+      ? Number(kontext.stageWidth)
+      : 5200;
+    const stageHeight = Number.isFinite(Number(kontext && kontext.stageHeight))
+      ? Number(kontext.stageHeight)
+      : 3600;
+    return { x: 0, y: 0, w: stageWidth, h: stageHeight };
+  }
+
+  function exportBounds(kontext, optionen) {
+    const opts = optionen && typeof optionen === 'object' ? optionen : {};
+    if (opts.volleStage) {
+      return volleStageBounds(kontext);
+    }
+    return berechneBounds(kontext.graph, kontext.bildElemente, kontext.itemScale, {
+      fuerPdf: !!opts.fuerPdf,
+    });
+  }
+
+  function berechneWeltExportAufloesung(logicalW, logicalH, optionen) {
+    const opts = optionen && typeof optionen === 'object' ? optionen : {};
+    let logicalScale = 1;
+    if (Math.max(logicalW, logicalH) > MAX_EXPORT_KANTE_PX) {
+      logicalScale = MAX_EXPORT_KANTE_PX / Math.max(logicalW, logicalH);
+    }
+    const renderW = Math.max(1, Math.ceil(logicalW * logicalScale));
+    const renderH = Math.max(1, Math.ceil(logicalH * logicalScale));
+    if (!opts.fuerPdf) {
+      const h2cScale = Math.max(renderW, renderH) > 2800 ? 1 : 2;
+      return { logicalScale, h2cScale, renderW, renderH };
+    }
+    const seiten = normalisiereWeltPdfSeitenAnzahl(opts.seitenAnzahl == null ? 1 : opts.seitenAnzahl);
+    const { cols, rows } = weltPdfRasterLayout(seiten);
+    const zielMasterW = cols * PDF_TILE_ZIEL_PX;
+    const zielMasterH = rows * PDF_TILE_ZIEL_PX;
+    let h2cScale = Math.max(
+      1,
+      Math.ceil(Math.min(zielMasterW / renderW, zielMasterH / renderH)),
+    );
+    h2cScale = Math.min(2, h2cScale);
+    while (
+      (renderW * h2cScale > PDF_WELT_MAX_CANVAS_KANTE_PX ||
+        renderH * h2cScale > PDF_WELT_MAX_CANVAS_KANTE_PX) &&
+      h2cScale > 1
+    ) {
+      h2cScale -= 1;
+    }
+    return { logicalScale, h2cScale, renderW, renderH };
+  }
+
   function berechneBounds(graph, bildElemente, itemScale, optionen) {
     const opts = optionen && typeof optionen === 'object' ? optionen : {};
     let minX = Infinity;
@@ -196,10 +250,6 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 
   function nodeHoeheExport(node, itemScale) {
     const sk = itemScaleFaktor({ itemScale });
-    const entityType = node && node.data ? node.data.entityType : '';
-    if (entityType === 'charakter' || entityType === 'npc' || entityType === 'bestie') {
-      return Math.max(30, Math.round(86 * sk));
-    }
     const basisHoehe =
       node && node.style && Number.isFinite(Number(node.style.minHeight))
         ? Number(node.style.minHeight)
@@ -414,9 +464,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 .htbah-map-charakter-avatar-wrap { position:relative; width:var(--htbah-node-avatar-size,36px); height:var(--htbah-node-avatar-size,36px); flex:0 0 auto; }
 .htbah-map-charakterbild { width:var(--htbah-node-avatar-size,36px); height:var(--htbah-node-avatar-size,36px); object-fit:cover; border-radius:999px; border:1px solid rgba(0,0,0,.12); }
 .htbah-map-charakter-emoji { display:flex; align-items:center; justify-content:center; background:#f8f9fa; width:100%; height:100%; border-radius:999px; font-size:1.4rem; }
-.htbah-map-charakter-status { position:absolute; top:-8px; left:-6px; font-size:14px; line-height:1; }
-.htbah-map-node-kreis-meta { position:absolute; top:calc(100% + 6px); left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; z-index:4; pointer-events:none; }
-.htbah-map-node-kreis-label { white-space:nowrap; font-size:calc(11px*var(--htbah-node-scale,1)); font-weight:600; color:#212529; background:#ffffff; border:1px solid #dee2e6; border-radius:999px; padding:2px 8px; box-shadow:0 2px 6px rgba(0,0,0,.18); }
+.htbah-map-charakter-status { position:absolute; top:calc(-10px*var(--htbah-node-scale,1)); left:calc(-8px*var(--htbah-node-scale,1)); width:calc(20px*var(--htbah-node-scale,1)); height:calc(20px*var(--htbah-node-scale,1)); display:flex; align-items:center; justify-content:center; font-size:calc(14px*var(--htbah-node-scale,1)); line-height:1; }
+.htbah-map-node-kreis-meta { position:absolute; top:calc(100% + 6px); left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:4px; z-index:4; pointer-events:none; }
+.htbah-map-node-kreis-label { position:static; transform:none; white-space:nowrap; font-size:calc(11px*var(--htbah-node-scale,1)); line-height:1.2; font-weight:600; color:#212529; background:#ffffff; border:1px solid #dee2e6; border-radius:999px; padding:2px 8px; box-shadow:0 2px 6px rgba(0,0,0,.18); }
 .htbah-map-node-kreis-label .badge { font-size:9px; font-weight:600; padding:2px 6px; margin-left:4px; background:#0dcaf0; color:#055160; border-radius:999px; }
 `;
   }
@@ -428,12 +478,16 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((link) => link.remove());
     clonedDoc.querySelectorAll('style').forEach((styleEl) => {
       const text = styleEl.textContent || '';
-      if (/color-mix\s*\(/i.test(text)) {
+      if (/color-mix\s*\(/i.test(text) || /color\s*\(\s*from/i.test(text)) {
         styleEl.remove();
       }
     });
     const style = clonedDoc.createElement('style');
     style.textContent = mapExportEssentialCssText();
+    const quillCss = U() ? U().quillHtmlBasisStyles() : '';
+    if (quillCss) {
+      style.textContent += quillCss;
+    }
     const ziel = clonedDoc.head || clonedDoc.body || clonedDoc.documentElement;
     if (ziel) {
       ziel.appendChild(style);
@@ -487,16 +541,40 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     ]);
   }
 
-  function baueExportStageHtml(kontext) {
-    const bounds = berechneBounds(kontext.graph, kontext.bildElemente, kontext.itemScale, {
-      fuerPdf: !!kontext.fuerPdf,
-    });
+  function baueExportStageHtml(kontext, optionen) {
+    const opts = optionen && typeof optionen === 'object' ? optionen : {};
+    const volleStage = opts.volleStage === true;
+    const fuerPdf = !!opts.fuerPdf;
+    const bounds = exportBounds(kontext, { ...opts, volleStage, fuerPdf });
     let exportScale = 1;
     if (Math.max(bounds.w, bounds.h) > MAX_EXPORT_KANTE_PX) {
       exportScale = MAX_EXPORT_KANTE_PX / Math.max(bounds.w, bounds.h);
     }
-    const stageW = Math.ceil(bounds.w * exportScale);
-    const stageH = Math.ceil(bounds.h * exportScale);
+    let h2cScale = 2;
+    if (fuerPdf) {
+      const seiten = normalisiereWeltPdfSeitenAnzahl(
+        opts.seitenAnzahl == null ? 1 : opts.seitenAnzahl,
+      );
+      const { cols, rows } = weltPdfRasterLayout(seiten);
+      const zielMasterW = cols * PDF_TILE_ZIEL_PX;
+      const zielMasterH = rows * PDF_TILE_ZIEL_PX;
+      const renderW = Math.max(1, Math.ceil(bounds.w * exportScale));
+      const renderH = Math.max(1, Math.ceil(bounds.h * exportScale));
+      h2cScale = Math.max(
+        1,
+        Math.ceil(Math.min(zielMasterW / renderW, zielMasterH / renderH)),
+      );
+      h2cScale = Math.min(2, h2cScale);
+      while (
+        (renderW * h2cScale > PDF_WELT_MAX_CANVAS_KANTE_PX ||
+          renderH * h2cScale > PDF_WELT_MAX_CANVAS_KANTE_PX) &&
+        h2cScale > 1
+      ) {
+        h2cScale -= 1;
+      }
+    }
+    const stageW = Math.max(1, Math.ceil(bounds.w * exportScale));
+    const stageH = Math.max(1, Math.ceil(bounds.h * exportScale));
     const offsetX = bounds.x;
     const offsetY = bounds.y;
     const itemScale = kontext.itemScale;
@@ -532,6 +610,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       scale: exportScale,
       stageW,
       stageH,
+      h2cScale,
       html: `<div class="htbah-pdf-wurzel htbah-iw-export-host" style="width:${stageW}px;height:${stageH}px;position:relative;overflow:hidden;">
         <style>${mapExportEssentialCssText()}${quillCss}</style>
         <div class="htbah-weltenbau-map-stage htbah-iw-export-stage" style="position:relative;width:${stageW}px;height:${stageH}px;overflow:visible;">
@@ -549,16 +628,22 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       throw new Error('Karten-Stage für Export nicht gefunden.');
     }
     const opts = optionen && typeof optionen === 'object' ? optionen : {};
+    const volleStage = opts.volleStage === true;
     const kontext = ladeKampagnenKontext(kampagneId);
-    const bounds = berechneBounds(kontext.graph, kontext.bildElemente, kontext.itemScale, {
-      fuerPdf: !!opts.fuerPdf,
-    });
+    const bounds = exportBounds(kontext, { ...opts, volleStage, fuerPdf: !!opts.fuerPdf });
     let exportScale = 1;
-    if (Math.max(bounds.w, bounds.h) > MAX_EXPORT_KANTE_PX) {
+    if (!volleStage && Math.max(bounds.w, bounds.h) > MAX_EXPORT_KANTE_PX) {
       exportScale = MAX_EXPORT_KANTE_PX / Math.max(bounds.w, bounds.h);
     }
-    const stageW = Math.ceil(bounds.w * exportScale);
-    const stageH = Math.ceil(bounds.h * exportScale);
+    const stageWidth = Number.isFinite(Number(kontext.stageWidth)) ? Number(kontext.stageWidth) : 5200;
+    const stageHeight = Number.isFinite(Number(kontext.stageHeight)) ? Number(kontext.stageHeight) : 3600;
+    const stageW = volleStage
+      ? Math.max(1, Math.ceil(stageWidth * exportScale))
+      : Math.max(1, Math.ceil(bounds.w * exportScale));
+    const stageH = volleStage
+      ? Math.max(1, Math.ceil(stageHeight * exportScale))
+      : Math.max(1, Math.ceil(bounds.h * exportScale));
+    const h2cScale = 2;
 
     const host = document.createElement('div');
     host.className = 'htbah-iw-export-host';
@@ -572,14 +657,18 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     clone.classList.add('htbah-iw-export-capture');
     entferneExportChrome(clone);
     clone.style.position = 'absolute';
-    clone.style.left = `${-bounds.x * exportScale}px`;
-    clone.style.top = `${-bounds.y * exportScale}px`;
     clone.style.margin = '0';
-    if (exportScale < 1) {
-      clone.style.transform = `scale(${exportScale})`;
-      clone.style.transformOrigin = '0 0';
+    clone.style.transformOrigin = '0 0';
+    if (volleStage) {
+      clone.style.left = '0';
+      clone.style.top = '0';
+      clone.style.width = `${stageWidth}px`;
+      clone.style.height = `${stageHeight}px`;
+      clone.style.transform = exportScale < 1 ? `scale(${exportScale})` : 'none';
     } else {
-      clone.style.transform = 'none';
+      clone.style.left = `${-bounds.x * exportScale}px`;
+      clone.style.top = `${-bounds.y * exportScale}px`;
+      clone.style.transform = exportScale < 1 ? `scale(${exportScale})` : 'none';
     }
 
     viewport.appendChild(clone);
@@ -591,7 +680,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       const canvas = await window.html2canvas(
         viewport,
         html2canvasOptionenIwExport({
-          scale: 2,
+          scale: h2cScale,
           useCORS: true,
           allowTaint: true,
           backgroundColor: '#f4f6f8',
@@ -601,25 +690,103 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
           windowHeight: stageH,
         }),
       );
-      return { canvas, kontext, stage: { bounds, scale: exportScale, stageW, stageH } };
+      return {
+        canvas,
+        kontext,
+        stage: { bounds, scale: exportScale, stageW, stageH, h2cScale },
+      };
     } finally {
       document.body.removeChild(host);
     }
+  }
+
+  function istSichtbareMapStage(el) {
+    if (!(el instanceof HTMLElement)) {
+      return false;
+    }
+    const weltenbauLayer = el.closest('.htbah-weltenbau-map-layer');
+    if (weltenbauLayer) {
+      const style = window.getComputedStyle(weltenbauLayer);
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    }
+    const modal = el.closest('.modal');
+    return !!(modal && modal.classList.contains('show'));
   }
 
   function findeSichtbareMapStage() {
     const kandidaten = document.querySelectorAll('.htbah-weltenbau-map-stage');
     for (let i = 0; i < kandidaten.length; i += 1) {
       const el = kandidaten[i];
-      if (!(el instanceof HTMLElement)) {
-        continue;
-      }
-      const modal = el.closest('.modal');
-      if (modal && modal.classList.contains('show')) {
+      if (istSichtbareMapStage(el)) {
         return el;
       }
     }
     return null;
+  }
+
+  function begrenzeCanvasMaxKante(canvas, maxKante) {
+    if (!(canvas instanceof HTMLCanvasElement) || !maxKante) {
+      return canvas;
+    }
+    const w = canvas.width;
+    const h = canvas.height;
+    const max = Math.max(w, h);
+    if (!w || !h || max <= maxKante) {
+      return canvas;
+    }
+    const f = maxKante / max;
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(w * f));
+    out.height = Math.max(1, Math.round(h * f));
+    const ctx = out.getContext('2d');
+    if (!ctx) {
+      return canvas;
+    }
+    ctx.fillStyle = '#f4f6f8';
+    ctx.fillRect(0, 0, out.width, out.height);
+    ctx.drawImage(canvas, 0, 0, out.width, out.height);
+    return out;
+  }
+
+  function canvasZuPdfBildDaten(canvas) {
+    const png = canvas.toDataURL('image/png');
+    if (png && png.length > 200) {
+      return { data: png, format: 'PNG' };
+    }
+    try {
+      const jpeg = canvas.toDataURL('image/jpeg', 0.92);
+      if (jpeg && jpeg.length > 200) {
+        return { data: jpeg, format: 'JPEG' };
+      }
+    } catch {
+      /* PNG-Fallback oben */
+    }
+    throw new Error('Kartenbild konnte nicht in ein PDF-Bild umgewandelt werden.');
+  }
+
+  function fuegeCanvasBildAufA4Seite(pdf, canvas, querformat) {
+    if (querformat) {
+      pdf.addPage('a4', 'landscape');
+    } else {
+      pdf.addPage('a4', 'portrait');
+    }
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const rand = U() && typeof U().PDF_SEITEN_RAND_MM === 'number' ? U().PDF_SEITEN_RAND_MM : 5;
+    const maxW = pageW - 2 * rand;
+    const maxH = pageH - 2 * rand;
+    const { data, format } = canvasZuPdfBildDaten(canvas);
+    const cw = canvas.width;
+    const ch = canvas.height;
+    let finalW = maxW;
+    let finalH = (ch * maxW) / cw;
+    if (finalH > maxH) {
+      finalH = maxH;
+      finalW = (cw * maxH) / ch;
+    }
+    const x = rand + (maxW - finalW) / 2;
+    const y = rand + (maxH - finalH) / 2;
+    pdf.addImage(data, format, x, y, finalW, finalH);
   }
 
   async function erzeugeInteraktiveWeltCanvas(kampagneId, optionen) {
@@ -627,20 +794,28 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       throw new Error('html2canvas fehlt.');
     }
     const opts = optionen && typeof optionen === 'object' ? optionen : {};
+    const exportOpts = {
+      ...opts,
+      fuerPdf: !!opts.fuerPdf,
+      volleStage: opts.volleStage === true,
+    };
     const stageEl =
-      opts.mapStageElement instanceof HTMLElement
-        ? opts.mapStageElement
-        : findeSichtbareMapStage();
+      exportOpts.mapStageElement instanceof HTMLElement
+        ? exportOpts.mapStageElement
+        : exportOpts.fuerPdf
+          ? null
+          : findeSichtbareMapStage();
     if (stageEl) {
-      return erzeugeCanvasVonMapStage(stageEl, kampagneId, opts);
+      return erzeugeCanvasVonMapStage(stageEl, kampagneId, exportOpts);
     }
     const kontext = ladeKampagnenKontext(kampagneId);
-    kontext.fuerPdf = !!opts.fuerPdf;
-    const stage = baueExportStageHtml(kontext);
-    await new Promise((resolve) => window.setTimeout(resolve, 80));
+    const stage = baueExportStageHtml(kontext, exportOpts);
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
+    const h2cScale = Math.max(2, stage.h2cScale || 1);
     const canvas = await U().renderHtmlZuCanvas(stage.html, {
       breitePx: stage.stageW,
       hoehePx: stage.stageH,
+      scale: h2cScale,
       backgroundColor: '#f4f6f8',
       interaktiveWeltExport: true,
     });
@@ -726,19 +901,45 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
 
   async function erzeugeInteraktiveWeltPdfTiles(kampagneId, seitenAnzahl, optionen) {
     const opts = optionen && typeof optionen === 'object' ? optionen : {};
-    const { canvas } = await erzeugeInteraktiveWeltCanvas(kampagneId, { ...opts, fuerPdf: true });
-    return teileCanvasInRaster(canvas, normalisiereWeltPdfSeitenAnzahl(seitenAnzahl));
+    const n = normalisiereWeltPdfSeitenAnzahl(seitenAnzahl);
+    const { canvas } = await erzeugeInteraktiveWeltCanvas(kampagneId, {
+      ...opts,
+      fuerPdf: true,
+      seitenAnzahl: n,
+    });
+    return teileCanvasInRaster(canvas, n);
+  }
+
+  async function fuegeInteraktiveWeltAlsBildInPdf(pdf, kampagneId, seitenAnzahl, querformat, optionen) {
+    const opts = optionen && typeof optionen === 'object' ? optionen : {};
+    const tiles = await erzeugeInteraktiveWeltPdfTiles(kampagneId, seitenAnzahl, opts);
+    if (!tiles.length) {
+      throw new Error('Interaktive Welt: Es konnten keine Karten-Seiten erzeugt werden.');
+    }
+    tiles.forEach((tile) => {
+      if (!tile || !tile.canvas || tile.canvas.width < 1 || tile.canvas.height < 1) {
+        throw new Error('Interaktive Welt: Leeres Kartenbild.');
+      }
+      fuegeCanvasBildAufA4Seite(pdf, tile.canvas, !!querformat);
+    });
   }
 
   window.HTBAH_SHARED.InteraktiveWeltExport = {
     ladeKampagnenKontext,
     findeSichtbareMapStage,
+    istSichtbareMapStage,
+    volleStageBounds,
+    exportBounds,
     berechneBounds,
+    berechneWeltExportAufloesung,
     baueExportStageHtml,
     erzeugeInteraktiveWeltCanvas,
     erzeugeCanvasVonMapStage,
+    begrenzeCanvasMaxKante,
+    fuegeCanvasBildAufA4Seite,
     erzeugeInteraktiveWeltPng,
     erzeugeInteraktiveWeltPdfTiles,
+    fuegeInteraktiveWeltAlsBildInPdf,
     normalisiereWeltPdfSeitenAnzahl,
     weltPdfRasterLayout,
     teileCanvasInRaster,

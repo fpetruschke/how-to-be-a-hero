@@ -582,6 +582,7 @@
   }
 
   async function renderHtmlInFlow(pdf, innerHtml, stil, flow, htmlOpts) {
+    U().ausfuehrenFlowBlockVorbereitung(pdf, flow);
     const html = `${pdfWurzelStart(stil)}${innerHtml}${pdfWurzelEnde()}`;
     const canvas = await U().renderHtmlZuCanvas(html, htmlOpts);
     U().sicherePdfNeueSeiteWennZuKlein(pdf, flow, canvas.height);
@@ -777,6 +778,7 @@
   }
 
   async function htmlZuPdfSeiten(pdf, html, flow, htmlOpts) {
+    U().ausfuehrenFlowBlockVorbereitung(pdf, flow);
     const canvas = await U().renderHtmlZuCanvas(html, htmlOpts);
     U().fuegeCanvasInPdfFlow(pdf, canvas, flow, { seite1BreitePrioritaet: true });
     await U().yieldToMain();
@@ -831,7 +833,12 @@
       n += 1;
     }
     if (opts.sicherheitsmechanismen) {
-      n += 1;
+      const mitglieder = Array.isArray(kampagne.mitglieder) ? kampagne.mitglieder : [];
+      const charakterBoegenMitSicherheit =
+        auswahl.gruppe && mitglieder.length && charakterModus === 'voller_bogen';
+      if (!charakterBoegenMitSicherheit) {
+        n += 1;
+      }
     }
     const mitglieder = Array.isArray(kampagne.mitglieder) ? kampagne.mitglieder : [];
     if (auswahl.gruppe && mitglieder.length && charakterModus === 'voller_bogen') {
@@ -846,6 +853,30 @@
     return n;
   }
 
+  async function fuegeKampagnenSicherheitsseiteEin(pdf, kampagne, optionen, tick) {
+    const fn =
+      typeof window.HTBAH.erzeugeSicherheitsseiteCanvas === 'function'
+        ? window.HTBAH.erzeugeSicherheitsseiteCanvas
+        : null;
+    if (!fn) {
+      return;
+    }
+    const CSmod = CS();
+    const sicher =
+      CSmod && typeof CSmod.ladeKampagnenSicherheitsmechanismen === 'function'
+        ? CSmod.ladeKampagnenSicherheitsmechanismen(kampagne)
+        : { tabuHtml: '', schleierHtml: '' };
+    if (typeof tick === 'function') {
+      await tick('Sicherheitsmechanismen …');
+    }
+    const canvas = await fn(
+      { sicherheitsmechanismen: sicher },
+      { stil: optionen.pdfStil || 'fantasy-mittelalter' },
+    );
+    pdf.addPage();
+    U().fuegeCanvasAlsA4SeiteHinzu(pdf, canvas, false);
+  }
+
   async function fuegeCharakterBoegenEin(pdf, kampagne, optionen, tick) {
     const fn =
       typeof window.HTBAH.erzeugeCharakterPdfSeitenCanvases === 'function'
@@ -854,6 +885,8 @@
     if (!fn) {
       return;
     }
+    const mitSicherheitsseite = optionen && optionen.sicherheitsmechanismen === true;
+    const mitNotizseite = !optionen || optionen.charakterNotizseite !== false;
     const mitglieder = Array.isArray(kampagne.mitglieder) ? kampagne.mitglieder : [];
     for (let i = 0; i < mitglieder.length; i += 1) {
       const m = mitglieder[i];
@@ -862,13 +895,19 @@
       }
       const canvases = await fn(m.charakter, m.charakterBild, {
         stil: optionen.pdfStil || 'fantasy-mittelalter',
+        mitSicherheitsseite,
+        mitNotizseite: mitNotizseite,
       });
       pdf.addPage();
       U().fuegeCanvasAlsA4SeiteHinzu(pdf, canvases.seite1, true);
-      pdf.addPage();
-      U().fuegeCanvasAlsA4SeiteHinzu(pdf, canvases.notizen, true);
-      pdf.addPage();
-      U().fuegeCanvasAlsA4SeiteHinzu(pdf, canvases.sicherheit, false);
+      if (mitNotizseite && canvases.notizen) {
+        pdf.addPage();
+        U().fuegeCanvasAlsA4SeiteHinzu(pdf, canvases.notizen, true);
+      }
+      if (mitSicherheitsseite && canvases.sicherheit) {
+        pdf.addPage();
+        U().fuegeCanvasAlsA4SeiteHinzu(pdf, canvases.sicherheit, false);
+      }
     }
   }
 
@@ -892,7 +931,7 @@
   async function erzeugeSpielleitungPdfBlob(kampagneId, optionen) {
     const opts = optionen && typeof optionen === 'object' ? optionen : {};
     const charakterModus =
-      opts.charakterDarstellung === 'voller_bogen' ? 'voller_bogen' : 'kompakt';
+      opts.charakterDarstellung === 'kompakt' ? 'kompakt' : 'voller_bogen';
     const weltSeitenNorm =
       IW() && typeof IW().normalisiereWeltPdfSeitenAnzahl === 'function'
         ? IW().normalisiereWeltPdfSeitenAnzahl(opts.weltSeiten == null ? 1 : opts.weltSeiten)
@@ -919,8 +958,7 @@
     const verfuegbar = ermittleSpielleitungPdfVerfuegbarkeit(kid);
     const auswahl = normalisiereAuswahl(opts.auswahl, verfuegbar);
     const cheatSheet = opts.cheatSheet === true;
-    const sicherheitsmechanismen =
-      opts.sicherheitsmechanismen === true || opts.redFlags === true;
+    const sicherheitsmechanismen = opts.sicherheitsmechanismen === true;
     const kapitelSeitenumbruch = opts.kapitelSeitenumbruch === true;
     if (!hatExportSektionAuswahl(auswahl) && !cheatSheet && !sicherheitsmechanismen) {
       throw new Error('Keine exportierbaren Inhalte ausgewählt.');
@@ -982,22 +1020,34 @@
       await renderHtmlInFlow(pdf, CS().baueCheatSheetHtml(stil), stil, pdfFlow, htmlOpts);
     }
 
-    if (sicherheitsmechanismen && CS() && typeof CS().baueSicherheitsmechanismenPdfHtml === 'function') {
-      await tick('Sicherheitsmechanismen …');
-      await renderHtmlInFlow(
-        pdf,
-        CS().baueSicherheitsmechanismenPdfHtml(kampagne, stil),
-        stil,
-        pdfFlow,
-        htmlOpts,
-      );
+    const mitglieder = Array.isArray(kampagne.mitglieder) ? kampagne.mitglieder : [];
+    const charakterBoegenMitSicherheit =
+      auswahl.gruppe && mitglieder.length && charakterModus === 'voller_bogen';
+
+    if (sicherheitsmechanismen && !charakterBoegenMitSicherheit) {
+      U().pdfFlowNachSeitenReset(pdfFlow);
+      await fuegeKampagnenSicherheitsseiteEin(pdf, kampagne, opts, tick);
+      U().setzeEinmaligeFlowBlockVorbereitung(pdfFlow, (pdfInstanz, flow) => {
+        U().erzwingePdfFlowNeueSeite(pdfInstanz, flow);
+      });
     }
 
-    const mitglieder = Array.isArray(kampagne.mitglieder) ? kampagne.mitglieder : [];
-
     if (auswahl.gruppe && mitglieder.length && charakterModus === 'voller_bogen') {
-      await fuegeCharakterBoegenEin(pdf, kampagne, opts, tick);
       U().pdfFlowNachSeitenReset(pdfFlow);
+      await fuegeCharakterBoegenEin(
+        pdf,
+        kampagne,
+        {
+          ...opts,
+          sicherheitsmechanismen,
+          charakterNotizseite: opts.charakterNotizseite !== false,
+        },
+        tick,
+      );
+      U().pdfFlowNachSeitenReset(pdfFlow);
+      U().setzeEinmaligeFlowBlockVorbereitung(pdfFlow, (pdfInstanz, flow) => {
+        U().erzwingePdfFlowNeueSeite(pdfInstanz, flow);
+      });
     }
 
     let ersteInhaltsSektion = true;
@@ -1090,23 +1140,25 @@
 
     if (auswahl.interaktiveWelt && IW() && hatInteraktiveWeltInhalt(kid)) {
       await tick('Interaktive Welt …');
+      U().ausfuehrenFlowBlockVorbereitung(pdf, pdfFlow);
       U().pdfFlowNachSeitenReset(pdfFlow);
       const mapStage =
-        opts.mapStageElement instanceof HTMLElement
-          ? opts.mapStageElement
-          : IW().findeSichtbareMapStage && typeof IW().findeSichtbareMapStage === 'function'
-            ? IW().findeSichtbareMapStage()
-            : null;
-      const tiles = await IW().erzeugeInteraktiveWeltPdfTiles(kid, weltSeiten, {
-        mapStageElement: mapStage || undefined,
-      });
-      const weltOrientation = weltQuerformat ? 'landscape' : 'portrait';
-      tiles.forEach((tile, idx) => {
-        U().fuegeRohCanvasAlsA4SeiteHinzu(pdf, tile.canvas, {
-          neueSeite: true,
-          orientation: weltOrientation,
+        opts.mapStageElement instanceof HTMLElement ? opts.mapStageElement : null;
+      if (typeof IW().fuegeInteraktiveWeltAlsBildInPdf === 'function') {
+        await IW().fuegeInteraktiveWeltAlsBildInPdf(pdf, kid, weltSeiten, weltQuerformat, {
+          mapStageElement: mapStage || undefined,
         });
-      });
+      } else {
+        const tiles = await IW().erzeugeInteraktiveWeltPdfTiles(kid, weltSeiten, {
+          mapStageElement: mapStage || undefined,
+        });
+        tiles.forEach((tile) => {
+          U().fuegeRohCanvasAlsA4SeiteHinzu(pdf, tile.canvas, {
+            neueSeite: true,
+            orientation: weltQuerformat ? 'landscape' : 'portrait',
+          });
+        });
+      }
       await U().yieldToMain();
     }
 

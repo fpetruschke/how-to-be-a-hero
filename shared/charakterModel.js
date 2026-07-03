@@ -352,6 +352,72 @@ window.HTBAH_CHARAKTER_MODEL = window.HTBAH_CHARAKTER_MODEL || {};
     return inv;
   };
 
+  M.inventarTypLabelKurz = function inventarTypLabelKurz(typ) {
+    if (typ === 'rustung') {
+      return 'Rüstung';
+    }
+    if (typ === 'waffe') {
+      return 'Waffe';
+    }
+    return 'Gegenstand';
+  };
+
+  M.inventarEintragWerteText = function inventarEintragWerteText(eintrag) {
+    if (!eintrag || typeof eintrag !== 'object') {
+      return '';
+    }
+    const t = eintrag.typ || 'gegenstand';
+    if (t === 'gegenstand') {
+      return '';
+    }
+    if (t === 'rustung') {
+      const rw = String(eintrag.rustwert != null ? eintrag.rustwert : '').trim();
+      return rw ? `Rüstwert ${rw}` : '';
+    }
+    if (t === 'waffe') {
+      const sdNah = String(
+        eintrag.schadenswertNahkampf != null ? eintrag.schadenswertNahkampf : '',
+      ).trim();
+      const sdFern = String(
+        eintrag.schadenswertFernkampf != null ? eintrag.schadenswertFernkampf : '',
+      ).trim();
+      const teile = [];
+      if (sdNah) {
+        teile.push(`NK ${sdNah}`);
+      }
+      if (sdFern) {
+        teile.push(`FK ${sdFern}`);
+      }
+      return teile.join(' · ');
+    }
+    return '';
+  };
+
+  M.entitaetInventarAnzeigeText = function entitaetInventarAnzeigeText(zeile, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    let quelle = zeile;
+    if (o.typ === 'npc') {
+      quelle = M.migriereLegacyKampfwerteNachInventar(zeile, { npc: true });
+    } else if (o.typ === 'bestie') {
+      quelle = M.migriereLegacyKampfwerteNachInventar(zeile, { bestie: true });
+    } else if (o.typ === 'charakter') {
+      const inventar = M.inventarAusQuelle(zeile);
+      quelle = { ...zeile, inventar };
+    }
+    const inventar = M.inventarOhneWaffenlosEntraege(quelle && quelle.inventar);
+    if (!inventar.length) {
+      return '—';
+    }
+    return inventar
+      .map((item) => {
+        const name = String(item.name || '').trim() || '—';
+        const typ = M.inventarTypLabelKurz(item.typ);
+        const werte = M.inventarEintragWerteText(item);
+        return werte ? `${name} (${typ}: ${werte})` : `${name} (${typ})`;
+      })
+      .join(' · ');
+  };
+
   M.entitaetInventarWaffenAnzeigeText = function entitaetInventarWaffenAnzeigeText(zeile, opts) {
     const o = opts && typeof opts === 'object' ? opts : {};
     const waffen = M.inventarWaffenAusEntitaet(zeile, o);

@@ -192,6 +192,22 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     return '—';
   }
 
+  function entitaetInventarAnzeigeText(zeile, typ) {
+    const M = window.HTBAH_CHARAKTER_MODEL;
+    if (M && typeof M.entitaetInventarAnzeigeText === 'function') {
+      return M.entitaetInventarAnzeigeText(zeile, { typ });
+    }
+    return '—';
+  }
+
+  function inventarBereichFuerPdf(zeile, typ) {
+    const text = entitaetInventarAnzeigeText(zeile, typ);
+    if (!text || text === '—') {
+      return null;
+    }
+    return bereich('🎒 Inventar', [plain('Gegenstände', text)]);
+  }
+
   function gegenstandWaffenWerteText() {
     return '—';
   }
@@ -264,22 +280,6 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       plain('Aufenthaltsort', z.aufenthaltsort),
       plain('Fraktion(en)', fraktionen),
     ];
-    const inventar = Array.isArray(z.inventar) ? z.inventar : [];
-    if (inventar.length) {
-      const liste = inventar
-        .map((e) => {
-          const n = String(e && e.name ? e.name : '').trim() || '—';
-          const t = String(e && e.typ ? e.typ : 'gegenstand');
-          return `${n} (${t})`;
-        })
-        .join('; ');
-      felder.push(plain('Inventar (Überblick)', liste));
-    }
-    const journal =
-      typeof z.journalHtml === 'string' && z.journalHtml.trim() ? z.journalHtml : '';
-    if (journal) {
-      felder.push(rich('Notizen / Journal', journal));
-    }
     const bereiche = [
       bereich('🧾 Stammdaten', [
         plain('Name', z.name),
@@ -297,21 +297,7 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         plain('Aufenthaltsort', z.aufenthaltsort),
         plain('Fraktion(en)', fraktionen),
       ]),
-      inventar.length
-        ? bereich('🎒 Inventar', [
-            plain(
-              'Gegenstände',
-              inventar
-                .map((e) => {
-                  const n = String(e && e.name ? e.name : '').trim() || '—';
-                  const t = String(e && e.typ ? e.typ : 'gegenstand');
-                  return `${n} (${t})`;
-                })
-                .join('; '),
-            ),
-          ])
-        : null,
-      journal ? bereich('📝 Notizen', [rich('Journal', journal)], 1) : null,
+      inventarBereichFuerPdf(z, 'charakter'),
     ].filter(Boolean);
     return {
       typ: 'charakter',
@@ -338,9 +324,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       bereich('🧍 Körper & Merkmale', [plain('Statur', z.statur), plain('Stimme', z.stimme)]),
       bereich('⚔️ Kampfwerte', [
         plain('Lebenspunkte', z.lebenspunkte),
-        plain('Waffen (Inventar)', entitaetInventarWaffenAnzeigeText(z)),
         plain('Initiative', z.initiative),
       ]),
+      inventarBereichFuerPdf(z, 'npc'),
       bereich('🧭 Zugehörigkeit & Kontext', [
         plain('Gesinnung', z.gesinnung),
         plain('Glaube', z.glaube),
@@ -360,9 +346,9 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       ]),
       bereich('⚔️ Kampfwerte', [
         plain('Lebenspunkte', z.lebenspunkte),
-        plain('Waffen (Inventar)', entitaetInventarWaffenAnzeigeText(z)),
         plain('Initiative', z.initiative),
       ]),
+      inventarBereichFuerPdf(z, 'bestie'),
       bereich('🐾 Verhalten & Natur', [
         plain('Aggressivität (1–10)', bestieAggressivitaetText(z)),
         plain('Stärken', z.staerke),
@@ -413,7 +399,6 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
         plain('Aufenthaltsort', z.aufenthaltsort),
         plain('Ziel', z.ziel),
         plain('Stimme', z.stimme),
-        plain('Waffen (Inventar)', entitaetInventarWaffenAnzeigeText(z)),
         plain('Initiative', z.initiative),
         rich('Notizen', bereinigeNpcNotizenHtml(z.notizenHtml)),
       ];
@@ -457,7 +442,6 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
       felder = [
         plain('Kategorie', bestieKategorieLabel(z.kategorie)),
         plain('Name', z.name),
-        plain('Waffen (Inventar)', entitaetInventarWaffenAnzeigeText(z)),
         plain('Lebenspunkte', z.lebenspunkte),
         plain('Aufenthaltsort', z.aufenthaltsort),
         plain('Initiative', z.initiative),
@@ -503,6 +487,8 @@ window.HTBAH_SHARED = window.HTBAH_SHARED || {};
     bestieKategorieLabel,
     bestieAggressivitaetText,
     entitaetInventarWaffenAnzeigeText,
+    entitaetInventarAnzeigeText,
+    inventarBereichFuerPdf,
     gegenstandWaffenWerteText,
     featuredBildAusZeile,
     mediumIstBild,

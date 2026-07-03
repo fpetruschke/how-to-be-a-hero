@@ -1,5 +1,5 @@
 /**
- * Charakterbogen als PDF (drei DIN-A4-Seiten: Bogen, Notizen, Sicherheit).
+ * Charakterbogen als PDF (Bogen, optional Notizen- und Sicherheitsseite).
  * Nutzung: await window.HTBAH.erzeugeCharakterPdfBlob(charakter, charakterBild)
  * Benötigt globale libs: window.jspdf, window.html2canvas
  */
@@ -400,7 +400,6 @@
     const wurzel = host.querySelector('.htbah-pdf-wurzel');
     const ergebnis = {
       inventarLeerzeilen: blanko ? 15 : LEERZEILEN_INVENTAR,
-      notizenLinien: blanko ? 18 : 0,
     };
     try {
       if (!wurzel) {
@@ -420,15 +419,6 @@
           Math.floor(nutzbar / PDF_INV_ZEILE_HOEHE_PX),
         );
         ergebnis.inventarLeerzeilen = Math.max(0, zielZeilen - datenZeilen);
-      }
-      const notizenFuell = wurzel.querySelector('.htbah-pdf-notizen-fuell');
-      if (notizenFuell && notizenFuell.getAttribute('data-linien-modus') === '1') {
-        const hoehe = notizenFuell.clientHeight;
-        const padding = 8;
-        ergebnis.notizenLinien = Math.max(
-          1,
-          Math.floor((hoehe - padding) / PDF_NOTIZ_LINIE_HOEHE_PX),
-        );
       }
     } finally {
       document.body.removeChild(host);
@@ -544,7 +534,13 @@
       vnRows += leereTabellenZeilenHtml(2, LEERZEILEN_VOR_NACHTEILE, '', zellenRahmen);
     }
 
-    const inventar = blanko ? [] : (Array.isArray(charakter.inventar) ? charakter.inventar : []);
+    const inventar = blanko
+      ? []
+      : (CM && typeof CM.inventarAusQuelle === 'function'
+        ? CM.inventarAusQuelle(charakter)
+        : Array.isArray(charakter.inventar)
+          ? charakter.inventar
+          : []);
     const inventarDatenZeilen = inventar.length;
     const inventarLeerzeilen = layoutOpts.inventarLeerzeilen != null
       ? layoutOpts.inventarLeerzeilen
@@ -569,18 +565,6 @@
       });
       invRows += leereTabellenZeilenHtml(4, inventarLeerzeilen, '', zellenRahmen);
     }
-
-    const journalRoh =
-      typeof charakter.journalHtml === 'string' && charakter.journalHtml.trim()
-        ? charakter.journalHtml
-        : '';
-    const notizenLinienModus = blanko || !journalRoh;
-    const notizenLinienAnzahl = layoutOpts.notizenLinien != null
-      ? layoutOpts.notizenLinien
-      : (notizenLinienModus ? (blanko ? 18 : 12) : 0);
-    const journalHtml = notizenLinienModus
-      ? linienBlockHtml(notizenLinienAnzahl)
-      : journalRoh;
 
     const jetzt = new Date();
     const heute = jetzt.toLocaleDateString('de-DE', {
@@ -693,8 +677,8 @@
       </div>
       </div>
 
-      <div style="flex:1 1 auto;display:flex;gap:10px;min-height:0;align-items:stretch;width:100%;margin:0;padding:0;">
-        <div style="flex:58 1 0;min-width:0;display:flex;">
+      <div style="flex:1 1 auto;display:flex;min-height:0;align-items:stretch;width:100%;margin:0;padding:0;">
+        <div style="flex:1 1 auto;min-width:0;display:flex;">
           <div class="htbah-pdf-kachel" style="height:100%;width:100%;display:flex;flex-direction:column;">
                 ${abschnittsUeberschriftHtml('Inventar', stil, blanko, 'flex-shrink:0;')}
                 <div class="htbah-pdf-inventar-fuell" style="flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;">
@@ -710,12 +694,6 @@
                   <tbody data-daten-zeilen="${inventarDatenZeilen}">${invRows}</tbody>
                 </table>
                 </div>
-          </div>
-        </div>
-        <div style="flex:42 1 0;min-width:0;display:flex;">
-          <div class="htbah-pdf-kachel" style="display:flex;flex-direction:column;flex:1 1 auto;height:100%;width:100%;">
-            ${abschnittsUeberschriftHtml('Notizen', stil, blanko, 'flex-shrink:0;')}
-            <div class="htbah-pdf-notizen htbah-pdf-html htbah-pdf-notizen-fuell" data-linien-modus="${notizenLinienModus ? '1' : '0'}" style="flex:1 1 auto;min-height:0;width:100%;box-sizing:border-box;border:1px solid ${stil.panelInset};background:${stil.panelBg};padding:4px;font-size:8.5px;line-height:1.25;color:#222;display:flex;flex-direction:column;">${journalHtml}</div>
           </div>
         </div>
       </div>
@@ -826,19 +804,38 @@
     }
     const htmlSeite1Probe = baueHtml(charakter, charakterBild, optionen, {
       inventarLeerzeilen: 0,
-      notizenLinien: 1,
     });
     const layoutSeite1 = await messeSeite1Layout(htmlSeite1Probe, optionen);
     const htmlSeite1 = baueHtml(charakter, charakterBild, optionen, layoutSeite1);
-    const htmlNotizenProbe = baueNotizenSeiteHtml(charakter, optionen, { notizenLinien: 1 });
-    const layoutNotizen = await messeNotizenSeiteLayout(htmlNotizenProbe);
-    const htmlNotizen = baueNotizenSeiteHtml(charakter, optionen, layoutNotizen);
-    const htmlSeiteSicherheit = baueSicherheitsseiteHtml(charakter, optionen);
-    return {
+    const mitNotizseite = !optionen || optionen.mitNotizseite !== false;
+    const mitSicherheitsseite = !optionen || optionen.mitSicherheitsseite !== false;
+    const result = {
       seite1: await renderHtmlZuCanvas(htmlSeite1),
-      notizen: await renderHtmlZuCanvas(htmlNotizen),
-      sicherheit: await renderHtmlZuCanvas(htmlSeiteSicherheit),
+      notizen: null,
+      sicherheit: null,
     };
+    if (mitNotizseite) {
+      const htmlNotizenProbe = baueNotizenSeiteHtml(charakter, optionen, { notizenLinien: 1 });
+      const layoutNotizen = await messeNotizenSeiteLayout(htmlNotizenProbe);
+      const htmlNotizen = baueNotizenSeiteHtml(charakter, optionen, layoutNotizen);
+      result.notizen = await renderHtmlZuCanvas(htmlNotizen);
+    }
+    if (mitSicherheitsseite) {
+      const htmlSeiteSicherheit = baueSicherheitsseiteHtml(charakter, optionen);
+      result.sicherheit = await renderHtmlZuCanvas(htmlSeiteSicherheit);
+    }
+    return result;
+  }
+
+  async function erzeugeSicherheitsseiteCanvas(charakter, optionen) {
+    if (!charakter || typeof charakter !== 'object') {
+      throw new Error('Kein Charakter übergeben.');
+    }
+    if (typeof window.html2canvas !== 'function') {
+      throw new Error('html2canvas fehlt.');
+    }
+    const html = baueSicherheitsseiteHtml(charakter, optionen);
+    return renderHtmlZuCanvas(html);
   }
 
   async function erzeugeCharakterPdfBlob(charakter, charakterBild, optionen) {
@@ -865,10 +862,14 @@
     });
 
     fuegeCanvasAlsA4SeiteHinzu(pdf, canvasSeite1, true);
-    pdf.addPage();
-    fuegeCanvasAlsA4SeiteHinzu(pdf, canvasNotizen, true);
-    pdf.addPage();
-    fuegeCanvasAlsA4SeiteHinzu(pdf, canvasSeiteSicherheit, false);
+    if (canvasNotizen) {
+      pdf.addPage();
+      fuegeCanvasAlsA4SeiteHinzu(pdf, canvasNotizen, true);
+    }
+    if (canvasSeiteSicherheit) {
+      pdf.addPage();
+      fuegeCanvasAlsA4SeiteHinzu(pdf, canvasSeiteSicherheit, false);
+    }
     const ab = pdf.output('arraybuffer');
     const blob = new Blob([ab], { type: 'application/pdf' });
     const dateiname = dateinameAusCharaktername(charakter.name, optionen);
@@ -878,6 +879,7 @@
   window.HTBAH = window.HTBAH || {};
   window.HTBAH.erzeugeCharakterPdfBlob = erzeugeCharakterPdfBlob;
   window.HTBAH.erzeugeCharakterPdfSeitenCanvases = erzeugeCharakterPdfSeitenCanvases;
+  window.HTBAH.erzeugeSicherheitsseiteCanvas = erzeugeSicherheitsseiteCanvas;
   window.HTBAH.leseCharakterPdfStilKonfiguration = lesePdfStilKonfiguration;
   window.HTBAH.CHARAKTER_PDF_STIL_OPTIONEN = [
     { value: 'fantasy-mittelalter', label: 'Fantasy / Mittelalter' },

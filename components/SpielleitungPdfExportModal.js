@@ -102,7 +102,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         laedt: false,
         statusText: '',
         auswahl: { ...STANDARD },
-        charakterDarstellung: 'kompakt',
+        charakterDarstellung: 'voller_bogen',
+        charakterNotizseite: true,
         weltSeiten: 1,
         weltQuerformat: true,
         pdfStil: standardPdfStilAusApp(),
@@ -174,6 +175,9 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
         this.onExportEinstellungGeaendert();
       },
       charakterDarstellung() {
+        this.onExportEinstellungGeaendert();
+      },
+      charakterNotizseite() {
         this.onExportEinstellungGeaendert();
       },
       weltSeiten() {
@@ -337,7 +341,8 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
       oeffnen() {
         this.verfuegbar = ermittleVerfuegbarkeit(this.kampagneId);
         this.auswahl = standardAuswahlFuerVerfuegbar(this.verfuegbar);
-        this.charakterDarstellung = 'kompakt';
+        this.charakterDarstellung = 'voller_bogen';
+        this.charakterNotizseite = true;
         this.weltSeiten = 1;
         this.weltQuerformat = true;
         this.pdfStil = standardPdfStilAusApp();
@@ -434,6 +439,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
           const { blob, dateiname } = await fn(this.kampagneId, {
             auswahl: { ...this.auswahl },
             charakterDarstellung: this.charakterDarstellung,
+            charakterNotizseite: this.charakterNotizseite,
             weltSeiten: this.weltSeiten,
             weltQuerformat: this.weltQuerformat,
             pdfStil: this.pdfStil,
@@ -541,8 +547,7 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
                 <label class="form-check-label" for="sl-pdf-sicherheitsmechanismen">Sicherheitsmechanismen (Session Zero)</label>
               </div>
               <p class="form-text mb-2 mt-0">
-                Nach Deckblatt bzw. Cheat-Sheet: Tabu, Schleier und X-Karte — wie im Sicherheitsmechanismen-Modal.
-                Ohne Einträge werden Linienfelder zum handschriftlichen Ausfüllen exportiert.
+                Nach Deckblatt bzw. Cheat-Sheet: Session-Zero-Seite mit Tabu, Schleier und X-Karte (pro Charakterbogen oder einmal kampagnenweit).
               </p>
               <div class="form-check form-switch mb-0">
                 <input
@@ -647,10 +652,23 @@ window.HTBAH_KOMPONENTEN = window.HTBAH_KOMPONENTEN || {};
 
             <div v-if="verfuegbar.gruppe && auswahl.gruppe" class="mb-3">
               <label class="form-label small text-secondary mb-1">Charakterdarstellung</label>
-              <select v-model="charakterDarstellung" class="form-select form-select-sm" :disabled="laedt">
+              <select v-model="charakterDarstellung" class="form-select form-select-sm mb-2" :disabled="laedt">
+                <option value="voller_bogen">Voller Charakterbogen (1 DIN-A4 pro Mitglied)</option>
                 <option value="kompakt">Kompakte Übersicht pro Charakter</option>
-                <option value="voller_bogen">Voller Charakterbogen (3 DIN-A4 pro Mitglied)</option>
               </select>
+              <div v-if="charakterDarstellung === 'voller_bogen'" class="form-check form-switch mb-0">
+                <input
+                  id="sl-pdf-char-notizseite"
+                  v-model="charakterNotizseite"
+                  class="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  :disabled="laedt" />
+                <label class="form-check-label" for="sl-pdf-char-notizseite">Notizseite pro Charakter mitdrucken</label>
+              </div>
+              <p v-if="charakterDarstellung === 'voller_bogen'" class="form-text mb-0 mt-1">
+                Die Notizseite ist eine eigene DIN-A4-Seite je Charakter (mit Seitenumbruch davor). Ohne Häkchen entfällt sie.
+              </p>
             </div>
 
             <div v-if="verfuegbar.interaktiveWelt && auswahl.interaktiveWelt" class="mb-3">
