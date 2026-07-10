@@ -4085,18 +4085,78 @@ function zstDuplizierLeeresIdMaps() {
   };
 }
 
-function zstDuplizierWendeKopieSuffix(zeile, typ) {
+function zstNormalisiereEntitaetsAnzeigenameVergleich(name) {
+  return String(name || '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('de');
+}
+
+function zstEntitaetBasisAnzeigename(name) {
+  return String(name || '')
+    .trim()
+    .replace(/\s+#\d+$/, '')
+    .trim();
+}
+
+function zstEntitaetAnzeigenameFeld(typ) {
+  return typ === 'raetsel' ? 'titel' : 'name';
+}
+
+/** Eindeutiger Anzeigename (name/titel) innerhalb einer Zufallstabellen-Kategorie; Suffix #2, #3, … bei Kollision. */
+function zstEindeutigerEntitaetsAnzeigename(zustand, typ, nameRoh, opts) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const feld = zstEntitaetAnzeigenameFeld(typ);
+  const listeKey = ZST_DUPLIZIER_TYP_ZU_LISTE[typ];
+  const liste = listeKey && zustand && Array.isArray(zustand[listeKey]) ? zustand[listeKey] : [];
+  const eingabe = String(nameRoh != null ? nameRoh : '').trim();
+  const basis = zstEntitaetBasisAnzeigename(eingabe) || eingabe;
+  const basisNorm = zstNormalisiereEntitaetsAnzeigenameVergleich(basis);
+  if (!basisNorm) {
+    return eingabe;
+  }
+  const ausserId = typeof o.ausserId === 'string' && o.ausserId ? o.ausserId : '';
+  let hatExaktenTreffer = false;
+  let maxNum = 0;
+  liste.forEach((z) => {
+    if (!z || (ausserId && z.id === ausserId)) {
+      return;
+    }
+    const n = String(z[feld] != null ? z[feld] : '').trim();
+    if (!n) {
+      return;
+    }
+    const nNorm = zstNormalisiereEntitaetsAnzeigenameVergleich(n);
+    if (nNorm === basisNorm) {
+      hatExaktenTreffer = true;
+      maxNum = Math.max(maxNum, 1);
+      return;
+    }
+    const praefix = `${basisNorm} #`;
+    if (!nNorm.startsWith(praefix)) {
+      return;
+    }
+    const nr = parseInt(nNorm.slice(praefix.length).trim(), 10);
+    if (Number.isFinite(nr) && nr > 0) {
+      maxNum = Math.max(maxNum, nr);
+    }
+  });
+  if (!hatExaktenTreffer) {
+    return eingabe || basis;
+  }
+  return `${basis} #${maxNum + 1}`;
+}
+
+function zstWendeEindeutigenEntitaetsAnzeigenamenAufZeile(zustand, typ, zeile, opts) {
   if (!zeile || typeof zeile !== 'object') {
     return;
   }
-  const suffix = ' (Kopie)';
-  if (typ === 'raetsel') {
-    const t = String(zeile.titel != null ? zeile.titel : '').trim();
-    zeile.titel = t ? `${t}${suffix}` : `Rätsel${suffix}`;
-    return;
-  }
-  const n = String(zeile.name != null ? zeile.name : '').trim();
-  zeile.name = n ? `${n}${suffix}` : suffix.trim();
+  const feld = zstEntitaetAnzeigenameFeld(typ);
+  const alt = String(zeile[feld] != null ? zeile[feld] : '').trim();
+  const basisFallback = typ === 'raetsel' ? 'Rätsel' : '';
+  const eingabe = alt || basisFallback;
+  zeile[feld] = zstEindeutigerEntitaetsAnzeigename(zustand, typ, eingabe, opts);
 }
 
 function zstDuplizierMapLayoutKey(layoutKey, idMaps) {
@@ -4969,7 +5029,6 @@ function dupliziereZufallstabellenEntitaeten(opts) {
     return { ok: false, fehler: 'Keine gültige Kampagne.', angelegt: 0, ergebnisse: [] };
   }
   const eintraegeRoh = Array.isArray(o.eintraege) ? o.eintraege : [];
-  const schon = new Set();
   const eintraege = [];
   eintraegeRoh.forEach((e) => {
     const typ = String(e && e.typ ? e.typ : '').trim();
@@ -4977,12 +5036,14 @@ function dupliziereZufallstabellenEntitaeten(opts) {
     if (!typ || !id || !ZST_DUPLIZIER_TYP_ZU_LISTE[typ]) {
       return;
     }
-    const sk = `${typ}:${id}`;
-    if (schon.has(sk)) {
-      return;
+    let anzahl = parseInt(e && e.anzahl, 10);
+    if (!Number.isFinite(anzahl) || anzahl < 1) {
+      anzahl = 1;
     }
-    schon.add(sk);
-    eintraege.push({ typ, id });
+    anzahl = Math.min(99, anzahl);
+    for (let i = 0; i < anzahl; i += 1) {
+      eintraege.push({ typ, id });
+    }
   });
   if (!eintraege.length) {
     return { ok: false, fehler: 'Keine Einträge ausgewählt.', angelegt: 0, ergebnisse: [] };
@@ -4995,7 +5056,6 @@ function dupliziereZufallstabellenEntitaeten(opts) {
 
   const quelleZ = JSON.parse(JSON.stringify(ladeZufallstabellenZustand(quelle)));
   const zielZ = JSON.parse(JSON.stringify(ladeZufallstabellenZustand(ziel)));
-  const gleicheKampagne = quelle === ziel;
   const idMaps = zstDuplizierLeeresIdMaps();
   const ergebnisse = [];
   eintraege.forEach(({ typ, id }) => {
@@ -5009,10 +5069,10 @@ function dupliziereZufallstabellenEntitaeten(opts) {
     const altId = id;
     const neuId = neueEntropieId();
     zeile.id = neuId;
-    if (gleicheKampagne) {
-      zstDuplizierWendeKopieSuffix(zeile, typ);
+    zstWendeEindeutigenEntitaetsAnzeigenamenAufZeile(zielZ, typ, zeile, {});
+    if (!idMaps[typ][altId]) {
+      idMaps[typ][altId] = neuId;
     }
-    idMaps[typ][altId] = neuId;
     if (!Array.isArray(zielZ[listeKey])) {
       zielZ[listeKey] = [];
     }
@@ -6435,6 +6495,7 @@ window.HTBAH = {
   speichereWeltenbauMapBildLayoutsGruppe,
   erstelleSpielleitungKampagne,
   dupliziereZufallstabellenEntitaeten,
+  zstWendeEindeutigenEntitaetsAnzeigenamenAufZeile,
   entferneZufallstabellenParentReferenzenAufGegenstand,
   entferneZufallstabellenBesitzerReferenzen,
   entferneGegenstandAusAllenInventaren,

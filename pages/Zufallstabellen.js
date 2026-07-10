@@ -164,6 +164,8 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       entitaetenAuswahlModus: false,
       /** Schlüssel `${typ}:${id}` → true */
       entitaetenAuswahl: {},
+      /** Schlüssel `${typ}:${id}` → Anzahl Duplikate (Default 1) */
+      entitaetenDuplikatAnzahlen: {},
       duplizierenZielKampagneId: '',
       duplizierenNeueKampagneName: '',
       duplikatZielNeueKampagne: DUPLIKAT_ZIEL_NEUE_KAMPAGNE,
@@ -239,6 +241,27 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     },
     entitaetenAuswahlAnzahl() {
       return this.entitaetenAuswahlSchluesselListe.length;
+    },
+    entitaetenAuswahlDuplikatZeilen() {
+      return this.entitaetenAuswahlSchluesselListe.map((k) => {
+        const p = k.indexOf(':');
+        const typ = p >= 1 ? k.slice(0, p) : '';
+        const id = p >= 1 ? k.slice(p + 1) : '';
+        const cfg = TABLE_TYPE_CONFIG[typ] || TABLE_TYPE_CONFIG.gegenstand;
+        return {
+          typ,
+          id,
+          schluessel: k,
+          typLabel: typ === 'bestie' ? 'Bestarium' : cfg.label,
+          name: this.entitaetAnzeigenameFuerDuplikat(typ, id),
+        };
+      });
+    },
+    entitaetenDuplikatGesamtAnzahl() {
+      return this.entitaetenAuswahlDuplikatZeilen.reduce(
+        (sum, zeile) => sum + this.entitaetDuplikatAnzahl(zeile.typ, zeile.id),
+        0,
+      );
     },
     /** Fraktionen mit auswählbarem Namen (NPC-Dropdown) */
     fraktionenMitNamen() {
@@ -590,6 +613,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       this.zustand = window.HTBAH.ladeZufallstabellenZustand(neu);
       this.duplizierenZielKampagneId = neu || '';
       this.entitaetenAuswahl = {};
+      this.entitaetenDuplikatAnzahlen = {};
       this.entitaetenAuswahlModus = false;
       this.zufallKategorie = 'beliebig';
     },
@@ -934,12 +958,18 @@ window.HTBAH_SEITEN.Zufallstabellen = {
     setzeEntitaetAuswahl(typ, id, wert) {
       const k = this.entitaetenAuswahlSchluessel(typ, id);
       const neu = { ...this.entitaetenAuswahl };
+      const anzahlen = { ...this.entitaetenDuplikatAnzahlen };
       if (wert) {
         neu[k] = true;
+        if (anzahlen[k] == null) {
+          anzahlen[k] = 1;
+        }
       } else {
         delete neu[k];
+        delete anzahlen[k];
       }
       this.entitaetenAuswahl = neu;
+      this.entitaetenDuplikatAnzahlen = anzahlen;
     },
     toggleEntitaetAuswahl(typ, id) {
       this.setzeEntitaetAuswahl(typ, id, !this.istEntitaetAusgewaehlt(typ, id));
@@ -968,21 +998,30 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       const alleMarkiert =
         sichtbar.length > 0 && sichtbar.every((e) => this.istEntitaetAusgewaehlt(e.typ, e.id));
       const neu = { ...this.entitaetenAuswahl };
+      const anzahlen = { ...this.entitaetenDuplikatAnzahlen };
       if (alleMarkiert) {
         sichtbar.forEach((e) => {
-          delete neu[this.entitaetenAuswahlSchluessel(e.typ, e.id)];
+          const sk = this.entitaetenAuswahlSchluessel(e.typ, e.id);
+          delete neu[sk];
+          delete anzahlen[sk];
         });
       } else {
         sichtbar.forEach((e) => {
-          neu[this.entitaetenAuswahlSchluessel(e.typ, e.id)] = true;
+          const sk = this.entitaetenAuswahlSchluessel(e.typ, e.id);
+          neu[sk] = true;
+          if (anzahlen[sk] == null) {
+            anzahlen[sk] = 1;
+          }
         });
       }
       this.entitaetenAuswahl = neu;
+      this.entitaetenDuplikatAnzahlen = anzahlen;
     },
     entitaetenAuswahlModusUmschalten() {
       this.entitaetenAuswahlModus = !this.entitaetenAuswahlModus;
       if (!this.entitaetenAuswahlModus) {
         this.entitaetenAuswahl = {};
+        this.entitaetenDuplikatAnzahlen = {};
       }
     },
     duplizierenNeueKampagneAnlegen() {
@@ -1053,6 +1092,7 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         this.zustand = window.HTBAH.ladeZufallstabellenZustand(this.kampagneIdEffektiv);
       }
       this.entitaetenAuswahl = {};
+      this.entitaetenDuplikatAnzahlen = {};
       const n = res.angelegt != null ? res.angelegt : (res.ergebnisse || []).length;
       window.HTBAH.ui.notify({
         text: n === 1 ? 'Eine Entität wurde dupliziert.' : `${n} Entitäten wurden dupliziert.`,
@@ -1083,7 +1123,9 @@ window.HTBAH_SEITEN.Zufallstabellen = {
           if (p < 1) {
             return null;
           }
-          return { typ: k.slice(0, p), id: k.slice(p + 1) };
+          const typ = k.slice(0, p);
+          const id = k.slice(p + 1);
+          return { typ, id, anzahl: this.entitaetDuplikatAnzahl(typ, id) };
         })
         .filter(Boolean);
       if (!eintraege.length) {
@@ -1091,6 +1133,52 @@ window.HTBAH_SEITEN.Zufallstabellen = {
         return;
       }
       this.dupliziereEntitaetenMitZiel(eintraege, {});
+    },
+    entitaetAusZustand(typ, id) {
+      const keyMap = {
+        ort: 'orte',
+        fraktion: 'fraktionen',
+        npc: 'npcs',
+        gegenstand: 'gegenstaende',
+        kartenobjekt: 'kartenobjekte',
+        pantheon: 'pantheon',
+        raetsel: 'raetsel',
+        bestie: 'bestien',
+      };
+      const listeKey = keyMap[typ];
+      const liste = listeKey && this.zustand ? this.zustand[listeKey] : [];
+      return (Array.isArray(liste) ? liste : []).find((z) => z && z.id === id) || null;
+    },
+    entitaetAnzeigenameFuerDuplikat(typ, id) {
+      const z = this.entitaetAusZustand(typ, id);
+      if (!z) {
+        return '—';
+      }
+      if (typ === 'raetsel') {
+        return String(z.titel || '').trim() || '—';
+      }
+      return String(z.name || '').trim() || '—';
+    },
+    entitaetDuplikatAnzahl(typ, id) {
+      const k = this.entitaetenAuswahlSchluessel(typ, id);
+      const v = this.entitaetenDuplikatAnzahlen[k];
+      const n = parseInt(v, 10);
+      if (!Number.isFinite(n) || n < 1) {
+        return 1;
+      }
+      return Math.min(99, n);
+    },
+    setzeEntitaetDuplikatAnzahl(typ, id, wert) {
+      const k = this.entitaetenAuswahlSchluessel(typ, id);
+      if (!this.entitaetenAuswahl[k]) {
+        return;
+      }
+      let n = parseInt(wert, 10);
+      if (!Number.isFinite(n) || n < 1) {
+        n = 1;
+      }
+      n = Math.min(99, n);
+      this.entitaetenDuplikatAnzahlen = { ...this.entitaetenDuplikatAnzahlen, [k]: n };
     },
     textVorschau(html) {
       return htbahTextVorschau(html);
@@ -2827,6 +2915,15 @@ window.HTBAH_SEITEN.Zufallstabellen = {
       } else {
         liste = this.zustand.gegenstaende;
       }
+      const eindeutig =
+        window.HTBAH && typeof window.HTBAH.zstWendeEindeutigenEntitaetsAnzeigenamenAufZeile === 'function'
+          ? window.HTBAH.zstWendeEindeutigenEntitaetsAnzeigenamenAufZeile
+          : null;
+      if (eindeutig) {
+        eindeutig(this.zustand, typ, z, {
+          ausserId: this.bearbeitungIndex >= 0 ? z.id : undefined,
+        });
+      }
       if (this.bearbeitungIndex < 0) {
         liste.push(z);
       } else {
@@ -3144,14 +3241,45 @@ window.HTBAH_SEITEN.Zufallstabellen = {
                     Alle sichtbaren
                   </button>
                   <span class="small text-secondary">{{ entitaetenAuswahlAnzahl }} markiert</span>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-primary"
-                    :disabled="!entitaetenAuswahlAnzahl"
-                    @click="onAusgewaehlteEntitaetenDuplizieren">
-                    Duplizieren
-                  </button>
                 </template>
+              </div>
+            </div>
+            <div
+              v-if="entitaetenAuswahlModus && entitaetenAuswahlAnzahl"
+              class="table-responsive mt-3">
+              <table class="table table-sm table-striped align-middle mb-2">
+                <thead>
+                  <tr>
+                    <th scope="col" class="small">Typ</th>
+                    <th scope="col" class="small">Name</th>
+                    <th scope="col" class="text-center small" style="width: 6.5rem;">Anzahl</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="zeile in entitaetenAuswahlDuplikatZeilen" :key="'zst-dup-' + zeile.schluessel">
+                    <td class="small text-secondary">{{ zeile.typLabel }}</td>
+                    <td>{{ zeile.name }}</td>
+                    <td class="text-center">
+                      <input
+                        type="number"
+                        class="form-control form-control-sm text-center mx-auto"
+                        style="max-width: 4.5rem;"
+                        min="1"
+                        max="99"
+                        :value="entitaetDuplikatAnzahl(zeile.typ, zeile.id)"
+                        :aria-label="'Anzahl für ' + zeile.name"
+                        @input="setzeEntitaetDuplikatAnzahl(zeile.typ, zeile.id, $event.target.value)" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="d-flex justify-content-end">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-primary"
+                  @click="onAusgewaehlteEntitaetenDuplizieren">
+                  {{ entitaetenDuplikatGesamtAnzahl === 1 ? '1 Duplikat anlegen' : entitaetenDuplikatGesamtAnzahl + ' Duplikate anlegen' }}
+                </button>
               </div>
             </div>
             <p class="small text-secondary mb-0 mt-2">
